@@ -25,7 +25,7 @@ type AxisConfig = {
 
 const WIDTH = 760;
 const HEIGHT = 280;
-const PADDING_X = 42;
+const PADDING_X = 74;
 const PADDING_TOP = 26;
 const PADDING_BOTTOM = 36;
 
@@ -39,31 +39,27 @@ function chooseRoundingBase(maxAbs: number): number {
   return 1000;
 }
 
-function buildAxis(maxAbsRaw: number): AxisConfig {
+function buildSymmetricNetAxis(maxAbsRaw: number): AxisConfig {
   const base = chooseRoundingBase(maxAbsRaw);
-  const roundedMaxAbs = Math.max(base, Math.ceil(maxAbsRaw / base) * base);
-
-  const targetTickCounts = [7, 6, 5];
-  for (const target of targetTickCounts) {
-    const approxStep = (roundedMaxAbs * 2) / Math.max(target - 1, 1);
-    const step = Math.max(base, Math.ceil(approxStep / base) * base);
-    const tickCount = Math.floor((roundedMaxAbs * 2) / step) + 1;
-    if (tickCount >= 5 && tickCount <= 7) {
-      const ticks: number[] = [];
-      for (let value = -roundedMaxAbs; value <= roundedMaxAbs; value += step) {
-        ticks.push(value);
-      }
-      if (ticks[ticks.length - 1] !== roundedMaxAbs) {
-        ticks.push(roundedMaxAbs);
-      }
-      return { min: -roundedMaxAbs, max: roundedMaxAbs, ticks };
-    }
-  }
+  const roundedMaxAbs = Math.max(base * 2, Math.ceil(maxAbsRaw / (base * 2)) * (base * 2));
+  const half = roundedMaxAbs / 2;
 
   return {
     min: -roundedMaxAbs,
     max: roundedMaxAbs,
-    ticks: [-roundedMaxAbs, -roundedMaxAbs / 2, 0, roundedMaxAbs / 2, roundedMaxAbs],
+    ticks: [-roundedMaxAbs, -half, 0, half, roundedMaxAbs],
+  };
+}
+
+function buildPositiveAxis(maxRaw: number): AxisConfig {
+  const base = maxRaw >= 50000 ? 5000 : 1000;
+  const roundedMax = Math.max(base * 4, Math.ceil(maxRaw / (base * 4)) * (base * 4));
+  const quarter = roundedMax / 4;
+
+  return {
+    min: 0,
+    max: roundedMax,
+    ticks: [0, quarter, quarter * 2, quarter * 3, roundedMax],
   };
 }
 
@@ -72,9 +68,7 @@ function formatCurrencyTick(value: number): string {
   const sign = value < 0 ? '-' : '';
   const abs = Math.abs(value);
   if (abs >= 1000) {
-    const compact = abs / 1000;
-    const compactText = Number.isInteger(compact) ? String(compact) : compact.toFixed(1);
-    return `${sign}$${compactText}k`;
+    return `${sign}$${Math.round(abs / 1000)}k`;
   }
   return `${sign}$${Math.round(abs).toLocaleString()}`;
 }
@@ -91,7 +85,10 @@ export default function TrendLineChart({ data, metric, title }: TrendLineChartPr
     const values = data.map((item) => item[metric]);
     const minRaw = Math.min(...values, 0);
     const maxRaw = Math.max(...values, 0);
-    const axis = buildAxis(Math.max(Math.abs(minRaw), Math.abs(maxRaw)));
+    const axis =
+      metric === 'net'
+        ? buildSymmetricNetAxis(Math.max(Math.abs(minRaw), Math.abs(maxRaw)))
+        : buildPositiveAxis(maxRaw);
     const range = Math.max(axis.max - axis.min, 1);
 
     const computedPoints = data.map((item, index) => {
@@ -157,7 +154,11 @@ export default function TrendLineChart({ data, metric, title }: TrendLineChartPr
 
         <line x1={PADDING_X} x2={WIDTH - PADDING_X} y1={PADDING_TOP + innerHeight} y2={PADDING_TOP + innerHeight} className="axis-line" />
         <line x1={PADDING_X} x2={PADDING_X} y1={PADDING_TOP} y2={PADDING_TOP + innerHeight} className="axis-line" />
-        <line x1={PADDING_X} x2={WIDTH - PADDING_X} y1={zeroY} y2={zeroY} className="axis-zero" />
+        {yTicks.map((tick) => {
+          const y = PADDING_TOP + ((axisMax - tick) / Math.max(axisMax - axisMin, 1)) * innerHeight;
+          const lineClass = Math.abs(tick) < 0.5 ? 'axis-zero' : 'axis-grid';
+          return <line key={`grid-${tick}`} x1={PADDING_X} x2={WIDTH - PADDING_X} y1={y} y2={y} className={lineClass} />;
+        })}
 
         <path d={areaPath} fill="url(#trendFill)" />
         <path d={linePath} className="trend-path" />
@@ -175,7 +176,7 @@ export default function TrendLineChart({ data, metric, title }: TrendLineChartPr
         {yTicks.map((tick) => {
           const y = PADDING_TOP + ((axisMax - tick) / Math.max(axisMax - axisMin, 1)) * innerHeight;
           return (
-            <text key={tick} x={PADDING_X - 10} y={y + 4} textAnchor="end" className="axis-label">
+            <text key={tick} x={PADDING_X - 12} y={y + 4} textAnchor="end" className="axis-label">
               {formatCurrencyTick(tick)}
             </text>
           );

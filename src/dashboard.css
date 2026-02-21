@@ -320,9 +320,14 @@ body {
   stroke-width: 1;
 }
 
+.axis-grid {
+  stroke: #e6edf9;
+  stroke-width: 1;
+}
+
 .axis-zero {
-  stroke: #bccbe7;
-  stroke-width: 1.6;
+  stroke: #a8bbdf;
+  stroke-width: 1.9;
 }
 
 .trend-path {
