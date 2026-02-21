@@ -3,3 +3,7 @@ dist
 .vite
 .DS_Store
 .env
+
+# build/cache artifacts
+*.tsbuildinfo
+vite.config.d.ts
