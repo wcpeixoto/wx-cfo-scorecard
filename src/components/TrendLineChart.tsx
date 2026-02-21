@@ -17,6 +17,12 @@ type PlotPoint = {
   label: string;
 };
 
+type AxisConfig = {
+  min: number;
+  max: number;
+  ticks: number[];
+};
+
 const WIDTH = 760;
 const HEIGHT = 280;
 const PADDING_X = 42;
@@ -28,24 +34,70 @@ function buildPath(points: PlotPoint[]): string {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
 }
 
+function chooseRoundingBase(maxAbs: number): number {
+  if (maxAbs >= 50000) return 5000;
+  return 1000;
+}
+
+function buildAxis(maxAbsRaw: number): AxisConfig {
+  const base = chooseRoundingBase(maxAbsRaw);
+  const roundedMaxAbs = Math.max(base, Math.ceil(maxAbsRaw / base) * base);
+
+  const targetTickCounts = [7, 6, 5];
+  for (const target of targetTickCounts) {
+    const approxStep = (roundedMaxAbs * 2) / Math.max(target - 1, 1);
+    const step = Math.max(base, Math.ceil(approxStep / base) * base);
+    const tickCount = Math.floor((roundedMaxAbs * 2) / step) + 1;
+    if (tickCount >= 5 && tickCount <= 7) {
+      const ticks: number[] = [];
+      for (let value = -roundedMaxAbs; value <= roundedMaxAbs; value += step) {
+        ticks.push(value);
+      }
+      if (ticks[ticks.length - 1] !== roundedMaxAbs) {
+        ticks.push(roundedMaxAbs);
+      }
+      return { min: -roundedMaxAbs, max: roundedMaxAbs, ticks };
+    }
+  }
+
+  return {
+    min: -roundedMaxAbs,
+    max: roundedMaxAbs,
+    ticks: [-roundedMaxAbs, -roundedMaxAbs / 2, 0, roundedMaxAbs / 2, roundedMaxAbs],
+  };
+}
+
+function formatCurrencyTick(value: number): string {
+  if (Math.abs(value) < 0.5) return '$0';
+  const sign = value < 0 ? '-' : '';
+  const abs = Math.abs(value);
+  if (abs >= 1000) {
+    const compact = abs / 1000;
+    const compactText = Number.isInteger(compact) ? String(compact) : compact.toFixed(1);
+    return `${sign}$${compactText}k`;
+  }
+  return `${sign}$${Math.round(abs).toLocaleString()}`;
+}
+
 export default function TrendLineChart({ data, metric, title }: TrendLineChartProps) {
   const innerWidth = WIDTH - PADDING_X * 2;
   const innerHeight = HEIGHT - PADDING_TOP - PADDING_BOTTOM;
 
-  const { points, linePath, areaPath, minValue, maxValue } = useMemo(() => {
+  const { points, linePath, areaPath, axisMin, axisMax, yTicks, zeroY } = useMemo(() => {
     if (data.length === 0) {
-      return { points: [], linePath: '', areaPath: '', minValue: 0, maxValue: 0 };
+      return { points: [], linePath: '', areaPath: '', axisMin: 0, axisMax: 0, yTicks: [0], zeroY: 0 };
     }
 
     const values = data.map((item) => item[metric]);
-    const minRaw = Math.min(...values, metric === 'net' ? 0 : values[0]);
-    const maxRaw = Math.max(...values, metric === 'net' ? 0 : values[0]);
-    const range = Math.max(maxRaw - minRaw, 1);
+    const minRaw = Math.min(...values, 0);
+    const maxRaw = Math.max(...values, 0);
+    const axis = buildAxis(Math.max(Math.abs(minRaw), Math.abs(maxRaw)));
+    const range = Math.max(axis.max - axis.min, 1);
 
     const computedPoints = data.map((item, index) => {
       const step = data.length > 1 ? innerWidth / (data.length - 1) : 0;
       const x = PADDING_X + index * step;
-      const y = PADDING_TOP + ((maxRaw - item[metric]) / range) * innerHeight;
+      const y = PADDING_TOP + ((axis.max - item[metric]) / range) * innerHeight;
 
       return {
         x,
@@ -56,7 +108,7 @@ export default function TrendLineChart({ data, metric, title }: TrendLineChartPr
     });
 
     const line = buildPath(computedPoints);
-    const baselineY = PADDING_TOP + ((maxRaw - Math.max(minRaw, 0)) / range) * innerHeight;
+    const baselineY = PADDING_TOP + ((axis.max - 0) / range) * innerHeight;
     const area =
       computedPoints.length > 0
         ? `${line} L ${computedPoints[computedPoints.length - 1].x} ${baselineY} L ${computedPoints[0].x} ${baselineY} Z`
@@ -66,8 +118,10 @@ export default function TrendLineChart({ data, metric, title }: TrendLineChartPr
       points: computedPoints,
       linePath: line,
       areaPath: area,
-      minValue: minRaw,
-      maxValue: maxRaw,
+      axisMin: axis.min,
+      axisMax: axis.max,
+      yTicks: axis.ticks,
+      zeroY: baselineY,
     };
   }, [data, innerHeight, innerWidth, metric]);
 
@@ -103,6 +157,7 @@ export default function TrendLineChart({ data, metric, title }: TrendLineChartPr
 
         <line x1={PADDING_X} x2={WIDTH - PADDING_X} y1={PADDING_TOP + innerHeight} y2={PADDING_TOP + innerHeight} className="axis-line" />
         <line x1={PADDING_X} x2={PADDING_X} y1={PADDING_TOP} y2={PADDING_TOP + innerHeight} className="axis-line" />
+        <line x1={PADDING_X} x2={WIDTH - PADDING_X} y1={zeroY} y2={zeroY} className="axis-zero" />
 
         <path d={areaPath} fill="url(#trendFill)" />
         <path d={linePath} className="trend-path" />
@@ -117,12 +172,14 @@ export default function TrendLineChart({ data, metric, title }: TrendLineChartPr
           </text>
         ))}
 
-        <text x={PADDING_X - 10} y={PADDING_TOP + 12} textAnchor="end" className="axis-label">
-          {maxValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-        </text>
-        <text x={PADDING_X - 10} y={PADDING_TOP + innerHeight} textAnchor="end" className="axis-label">
-          {minValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-        </text>
+        {yTicks.map((tick) => {
+          const y = PADDING_TOP + ((axisMax - tick) / Math.max(axisMax - axisMin, 1)) * innerHeight;
+          return (
+            <text key={tick} x={PADDING_X - 10} y={y + 4} textAnchor="end" className="axis-label">
+              {formatCurrencyTick(tick)}
+            </text>
+          );
+        })}
       </svg>
     </article>
   );

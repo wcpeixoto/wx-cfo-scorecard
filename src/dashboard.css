@@ -320,6 +320,11 @@ body {
   stroke-width: 1;
 }
 
+.axis-zero {
+  stroke: #bccbe7;
+  stroke-width: 1.6;
+}
+
 .trend-path {
   fill: none;
   stroke: #4f78ff;
