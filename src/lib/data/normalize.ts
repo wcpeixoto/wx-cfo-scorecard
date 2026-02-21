@@ -127,7 +127,7 @@ export function toISODateOnly(input: string | Date): string | null {
   const value = input.trim();
   if (!value || value.includes(' - ')) return null;
 
-  const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
   if (isoMatch) {
     const year = Number.parseInt(isoMatch[1], 10);
     const month = Number.parseInt(isoMatch[2], 10);
@@ -135,7 +135,7 @@ export function toISODateOnly(input: string | Date): string | null {
     return fromDateParts(year, month, day);
   }
 
-  const slashMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  const slashMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+.*)?$/);
   if (slashMatch) {
     const month = Number.parseInt(slashMatch[1], 10);
     const day = Number.parseInt(slashMatch[2], 10);
