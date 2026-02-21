@@ -56,8 +56,8 @@ function classifyType(rawAmount: number): TxnType {
 function toTransaction(record: CsvRecord): Txn | null {
   const lookup = lookupRecord(record);
 
-  const dateValue = pickValue(lookup, ['Date', 'Transaction Date']);
-  const amountValue = pickValue(lookup, ['Amount']);
+  const dateValue = pickValue(lookup, ['Date', 'Transaction Date', 'Txn Date']);
+  const amountValue = pickValue(lookup, ['Amount', 'Transaction Amount', 'Value']);
 
   const isoDate = parseDate(dateValue);
   const rawAmount = parseAmount(amountValue);
@@ -66,12 +66,11 @@ function toTransaction(record: CsvRecord): Txn | null {
     return null;
   }
 
-  const account = pickValue(lookup, ['Account']);
-  const payee = pickValue(lookup, ['Payee']);
-  const category = pickValue(lookup, ['Category']) || 'Uncategorized';
-  const memo = pickValue(lookup, ['Memo/Notes', 'Memo', 'Notes']);
-  const transfer = pickValue(lookup, ['Transfer']);
-  const tags = parseTags(pickValue(lookup, ['Tags']));
+  const account = pickValue(lookup, ['Account', 'Account Name']);
+  const payee = pickValue(lookup, ['Payee', 'Description', 'Merchant']);
+  const category = pickValue(lookup, ['Category', 'Categories']) || 'Uncategorized';
+  const memo = pickValue(lookup, ['Memo/Notes', 'Memo / Notes', 'Memo', 'Notes']);
+  const tags = parseTags(pickValue(lookup, ['Tags', 'Tag']));
 
   const type = classifyType(rawAmount);
   const amount = Math.abs(rawAmount);
@@ -88,7 +87,6 @@ function toTransaction(record: CsvRecord): Txn | null {
     memo: memo || undefined,
     account: account || undefined,
     tags: tags.length > 0 ? tags : undefined,
-    transfer: transfer || undefined,
     rawAmount,
   };
 }

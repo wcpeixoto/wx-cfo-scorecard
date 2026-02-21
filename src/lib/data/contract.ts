@@ -11,7 +11,6 @@ export type Txn = {
   memo?: string;
   account?: string;
   tags?: string[];
-  transfer?: string;
   rawAmount: number;
 };
 
