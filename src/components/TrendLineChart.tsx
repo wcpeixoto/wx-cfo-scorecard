@@ -53,29 +53,97 @@ const TIMEFRAME_OPTIONS: TimeframeItem[] = [
   { value: 'all', label: 'All time' },
 ];
 
+function buildMonotoneCurvePath(points: Array<{ x: number; y: number }>): string {
+  const count = points.length;
+  if (count === 0) return '';
+  if (count === 1) return `M ${points[0].x} ${points[0].y}`;
+
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const slopes: number[] = [];
+
+  for (let index = 0; index < count - 1; index += 1) {
+    const dx = xs[index + 1] - xs[index];
+    if (Math.abs(dx) <= EPSILON) {
+      slopes.push(0);
+    } else {
+      slopes.push((ys[index + 1] - ys[index]) / dx);
+    }
+  }
+
+  const tangents: number[] = new Array(count);
+  tangents[0] = slopes[0];
+  tangents[count - 1] = slopes[count - 2];
+
+  for (let index = 1; index < count - 1; index += 1) {
+    tangents[index] = (slopes[index - 1] + slopes[index]) / 2;
+  }
+
+  for (let index = 0; index < slopes.length; index += 1) {
+    const slope = slopes[index];
+    if (Math.abs(slope) <= EPSILON) {
+      tangents[index] = 0;
+      tangents[index + 1] = 0;
+      continue;
+    }
+
+    const a = tangents[index] / slope;
+    const b = tangents[index + 1] / slope;
+    const magnitude = Math.hypot(a, b);
+    if (magnitude > 3) {
+      const factor = 3 / magnitude;
+      tangents[index] = factor * a * slope;
+      tangents[index + 1] = factor * b * slope;
+    }
+  }
+
+  let path = `M ${xs[0]} ${ys[0]}`;
+  for (let index = 0; index < count - 1; index += 1) {
+    const x0 = xs[index];
+    const x1 = xs[index + 1];
+    const y0 = ys[index];
+    const y1 = ys[index + 1];
+    const dx = x1 - x0;
+
+    const c1x = x0 + dx / 3;
+    const c1y = y0 + (tangents[index] * dx) / 3;
+    const c2x = x1 - dx / 3;
+    const c2y = y1 - (tangents[index + 1] * dx) / 3;
+
+    path += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x1} ${y1}`;
+  }
+
+  return path;
+}
+
 function buildPath(points: PlotPoint[]): string {
-  if (points.length === 0) return '';
-  return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+  return buildMonotoneCurvePath(points.map((point) => ({ x: point.x, y: point.y })));
 }
 
 function buildNullablePath(points: PlotPoint[], values: Array<number | null>, axisMax: number, range: number, innerHeight: number): string {
-  let path = '';
-  let hasStarted = false;
+  const segments: Array<Array<{ x: number; y: number }>> = [];
+  let currentSegment: Array<{ x: number; y: number }> = [];
 
   for (let index = 0; index < points.length; index += 1) {
     const value = values[index];
     if (value === null) {
-      hasStarted = false;
+      if (currentSegment.length > 0) {
+        segments.push(currentSegment);
+        currentSegment = [];
+      }
       continue;
     }
 
     const x = points[index].x;
     const y = PADDING_TOP + ((axisMax - value) / range) * innerHeight;
-    path += `${hasStarted ? ' L' : ' M'} ${x} ${y}`;
-    hasStarted = true;
+    currentSegment.push({ x, y });
   }
 
-  return path.trim();
+  if (currentSegment.length > 0) {
+    segments.push(currentSegment);
+  }
+
+  return segments.map((segment) => buildMonotoneCurvePath(segment)).join(' ');
 }
 
 function timeframeLabel(value: TimeframeOption): string {
