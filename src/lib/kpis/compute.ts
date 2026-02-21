@@ -40,8 +40,12 @@ function monthLabel(month: string): string {
   const [yearText, monthText] = month.split('-');
   const year = Number.parseInt(yearText, 10);
   const monthIndex = Number.parseInt(monthText, 10) - 1;
+  if (Number.isNaN(year) || Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+    return month;
+  }
+
   const date = new Date(Date.UTC(year, monthIndex, 1));
-  return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
 function addMonths(month: string, offset: number): string {
