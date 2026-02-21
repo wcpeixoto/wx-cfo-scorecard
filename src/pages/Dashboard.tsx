@@ -5,7 +5,7 @@ import KpiCards from '../components/KpiCards';
 import MoversList from '../components/MoversList';
 import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
-import { buildDataSet } from '../lib/data/normalize';
+import { buildDataSet, splitActualsAndProjections } from '../lib/data/normalize';
 import { fetchSheetCsv } from '../lib/data/fetchCsv';
 import { computeDashboardModel, projectScenario, toMonthLabel } from '../lib/kpis/compute';
 import type { DataSet, ScenarioInput, TrendPoint } from '../lib/data/contract';
@@ -23,6 +23,8 @@ type NavItem = {
   label: string;
   shortLabel: string;
 };
+
+type DataViewMode = 'actuals' | 'all';
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'big-picture', label: 'Big Picture', shortLabel: 'Big Picture' },
@@ -71,6 +73,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(DEFAULT_SCENARIO);
+  const [dataViewMode, setDataViewMode] = useState<DataViewMode>('actuals');
 
   const runSync = useCallback(async () => {
     setLoading(true);
@@ -92,19 +95,28 @@ export default function Dashboard() {
     void runSync();
   }, [runSync]);
 
-  const filteredTxns = useMemo(() => {
-    if (!dataSet) return [];
-    const needle = query.trim().toLowerCase();
-    if (!needle) return dataSet.txns;
+  const dataSplit = useMemo(
+    () => splitActualsAndProjections(dataSet?.txns ?? []),
+    [dataSet?.txns]
+  );
 
-    return dataSet.txns.filter((txn) => {
+  const baseTxns = useMemo(
+    () => (dataViewMode === 'all' ? [...dataSplit.actuals, ...dataSplit.projections] : dataSplit.actuals),
+    [dataSplit.actuals, dataSplit.projections, dataViewMode]
+  );
+
+  const filteredTxns = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return baseTxns;
+
+    return baseTxns.filter((txn) => {
       const joined = [txn.payee, txn.category, txn.memo, txn.account]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
       return joined.includes(needle);
     });
-  }, [dataSet, query]);
+  }, [baseTxns, query]);
 
   const model = useMemo(() => computeDashboardModel(filteredTxns), [filteredTxns]);
 
@@ -226,6 +238,26 @@ export default function Dashboard() {
               placeholder="Search payee, category, memo..."
               aria-label="Search transactions"
             />
+            <div className="view-toggle" role="group" aria-label="Data view mode">
+              <button
+                type="button"
+                className={dataViewMode === 'actuals' ? 'is-active' : ''}
+                onClick={() => setDataViewMode('actuals')}
+              >
+                Actuals
+              </button>
+              <button
+                type="button"
+                className={dataViewMode === 'all' ? 'is-active' : ''}
+                onClick={() => setDataViewMode('all')}
+              >
+                Actuals + Projections
+              </button>
+            </div>
+            <p className="data-count-note">
+              Actuals: {dataSplit.actuals.length.toLocaleString()} rows • Projections:{' '}
+              {dataSplit.projections.length.toLocaleString()} rows
+            </p>
           </div>
         </header>
 

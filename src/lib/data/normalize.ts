@@ -38,39 +38,7 @@ function parseAmount(raw: string): number | null {
 }
 
 function parseDate(raw: string): string | null {
-  const value = raw.trim();
-  if (!value || value.includes(' - ')) return null;
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const date = new Date(`${value}T00:00:00`);
-    if (Number.isNaN(date.getTime())) return null;
-    return value;
-  }
-
-  const slashMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (!slashMatch) return null;
-
-  const month = Number.parseInt(slashMatch[1], 10);
-  const day = Number.parseInt(slashMatch[2], 10);
-  let year = Number.parseInt(slashMatch[3], 10);
-
-  if (year < 100) {
-    year += year >= 70 ? 1900 : 2000;
-  }
-
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (
-    Number.isNaN(date.getTime()) ||
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
-    return null;
-  }
-
-  const monthPart = String(month).padStart(2, '0');
-  const dayPart = String(day).padStart(2, '0');
-  return `${year}-${monthPart}-${dayPart}`;
+  return toISODateOnly(raw);
 }
 
 function parseTags(raw: string): string[] {
@@ -130,6 +98,98 @@ export function normalizeRecords(records: CsvRecord[]): Txn[] {
 
   txns.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
   return txns;
+}
+
+function formatLocalIsoDate(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function fromDateParts(year: number, month: number, day: number): string | null {
+  const candidate = new Date(year, month - 1, day);
+  if (
+    Number.isNaN(candidate.getTime()) ||
+    candidate.getFullYear() !== year ||
+    candidate.getMonth() !== month - 1 ||
+    candidate.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return formatLocalIsoDate(year, month, day);
+}
+
+export function toISODateOnly(input: string | Date): string | null {
+  if (input instanceof Date) {
+    if (Number.isNaN(input.getTime())) return null;
+    return formatLocalIsoDate(input.getFullYear(), input.getMonth() + 1, input.getDate());
+  }
+
+  const value = input.trim();
+  if (!value || value.includes(' - ')) return null;
+
+  const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const year = Number.parseInt(isoMatch[1], 10);
+    const month = Number.parseInt(isoMatch[2], 10);
+    const day = Number.parseInt(isoMatch[3], 10);
+    return fromDateParts(year, month, day);
+  }
+
+  const slashMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (slashMatch) {
+    const month = Number.parseInt(slashMatch[1], 10);
+    const day = Number.parseInt(slashMatch[2], 10);
+    let year = Number.parseInt(slashMatch[3], 10);
+    if (year < 100) {
+      year += year >= 70 ? 1900 : 2000;
+    }
+    return fromDateParts(year, month, day);
+  }
+
+  const fallback = new Date(value);
+  if (Number.isNaN(fallback.getTime())) return null;
+  return formatLocalIsoDate(fallback.getFullYear(), fallback.getMonth() + 1, fallback.getDate());
+}
+
+export function isFutureDate(dateISO: string, todayISO: string): boolean {
+  return dateISO > todayISO;
+}
+
+export function splitActualsAndProjections(rows: Txn[]) {
+  const todayISO = toISODateOnly(new Date());
+  const safeTodayISO = todayISO ?? '9999-12-31';
+  const actuals: Txn[] = [];
+  const projections: Txn[] = [];
+  let invalidDateRows = 0;
+
+  rows.forEach((row) => {
+    const normalizedDate = toISODateOnly(row.date);
+    if (!normalizedDate) {
+      invalidDateRows += 1;
+      return;
+    }
+
+    const normalizedRow =
+      row.date === normalizedDate && row.month === normalizedDate.slice(0, 7)
+        ? row
+        : {
+            ...row,
+            date: normalizedDate,
+            month: normalizedDate.slice(0, 7),
+          };
+
+    if (isFutureDate(normalizedDate, safeTodayISO)) {
+      projections.push(normalizedRow);
+    } else {
+      actuals.push(normalizedRow);
+    }
+  });
+
+  if (invalidDateRows > 0) {
+    console.warn(`[data] Ignored ${invalidDateRows} row(s) with invalid date values.`);
+  }
+
+  return { actuals, projections, todayISO: safeTodayISO, invalidDateRows };
 }
 
 export function buildDataSet(records: CsvRecord[], sourceUrl: string): DataSet {
