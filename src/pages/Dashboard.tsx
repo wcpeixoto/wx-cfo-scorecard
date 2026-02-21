@@ -267,7 +267,7 @@ export default function Dashboard() {
           <>
             <KpiCards cards={model.kpiCards} />
 
-            <TrendLineChart data={model.trend} metric="net" title="Monthly Net Cash Flow" />
+            <TrendLineChart data={model.trend} metric="net" title="Monthly Net Cash Flow" enableTimeframeControl />
 
             <div className="two-col-grid">
               <article className="card preview-card">

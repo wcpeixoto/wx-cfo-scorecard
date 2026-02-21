@@ -309,6 +309,71 @@ body {
   overflow: hidden;
 }
 
+.chart-head {
+  align-items: center;
+}
+
+.chart-head-right {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.timeframe-menu {
+  position: relative;
+}
+
+.timeframe-trigger {
+  border: 1px solid #cfdcf2;
+  background: #f6f9ff;
+  color: #2a4677;
+  border-radius: 999px;
+  height: 32px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.timeframe-list {
+  position: absolute;
+  right: 0;
+  top: 38px;
+  min-width: 172px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid #d4e0f5;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(21, 42, 79, 0.15);
+  z-index: 20;
+}
+
+.timeframe-list button {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: #34506f;
+  border-radius: 8px;
+  min-height: 30px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.timeframe-list button:hover {
+  background: #eff4ff;
+}
+
+.timeframe-list button.is-active {
+  background: #e7efff;
+  color: #1d3f84;
+  font-weight: 700;
+}
+
 .trend-svg {
   width: 100%;
   height: auto;
@@ -781,5 +846,14 @@ body {
 
   .top-controls {
     width: 100%;
+  }
+
+  .chart-head-right {
+    justify-items: start;
+  }
+
+  .timeframe-list {
+    right: auto;
+    left: 0;
   }
 }
