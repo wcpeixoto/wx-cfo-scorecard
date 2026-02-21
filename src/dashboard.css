@@ -319,6 +319,14 @@ body {
   gap: 6px;
 }
 
+.chart-control-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .timeframe-menu {
   position: relative;
 }
@@ -374,6 +382,37 @@ body {
   font-weight: 700;
 }
 
+.mom-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.79rem;
+  border: 1px solid #d8e3f7;
+}
+
+.mom-badge.is-up {
+  color: #1f8e5f;
+  background: #e9f6ef;
+  border-color: #cdebdc;
+}
+
+.mom-badge.is-down {
+  color: #c85067;
+  background: #fdeef2;
+  border-color: #f4d3dc;
+}
+
+.mom-badge.is-neutral {
+  color: #5c718c;
+  background: #edf3ff;
+}
+
+.trend-note {
+  font-size: 0.78rem;
+}
+
 .trend-svg {
   width: 100%;
   height: auto;
@@ -403,10 +442,47 @@ body {
   stroke-linejoin: round;
 }
 
+.ma-path {
+  fill: none;
+  stroke: #6f87b8;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 6 5;
+}
+
 .trend-dot {
   fill: #4f78ff;
   stroke: #f6f9ff;
   stroke-width: 1.8;
+}
+
+.trend-dot-latest-ring {
+  fill: rgba(79, 120, 255, 0.2);
+  stroke: none;
+}
+
+.trend-dot-latest {
+  fill: #4f78ff;
+  stroke: #ffffff;
+  stroke-width: 2.4;
+}
+
+.tooltip-box {
+  fill: rgba(255, 255, 255, 0.97);
+  stroke: #d6e2f6;
+  stroke-width: 1;
+}
+
+.tooltip-title {
+  fill: #2f4665;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tooltip-line {
+  fill: #556e8c;
+  font-size: 11px;
 }
 
 .axis-label {
@@ -850,6 +926,10 @@ body {
 
   .chart-head-right {
     justify-items: start;
+  }
+
+  .chart-control-row {
+    justify-content: flex-start;
   }
 
   .timeframe-list {

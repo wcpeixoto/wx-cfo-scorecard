@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { computeRollingMovingAverage } from '../lib/charts/movingAverage';
 import { toMonthLabel } from '../lib/kpis/compute';
 import type { TrendPoint } from '../lib/data/contract';
 
@@ -16,6 +17,7 @@ type PlotPoint = {
   y: number;
   value: number;
   label: string;
+  month: string;
 };
 
 type AxisConfig = {
@@ -31,11 +33,17 @@ type TimeframeItem = {
   label: string;
 };
 
+type MoMBadge = {
+  text: string;
+  tone: 'up' | 'down' | 'neutral';
+};
+
 const WIDTH = 760;
 const HEIGHT = 280;
 const PADDING_X = 74;
 const PADDING_TOP = 26;
 const PADDING_BOTTOM = 36;
+const EPSILON = 0.00001;
 
 const TIMEFRAME_OPTIONS: TimeframeItem[] = [
   { value: 6, label: 'Last 6 months' },
@@ -50,8 +58,34 @@ function buildPath(points: PlotPoint[]): string {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
 }
 
+function buildNullablePath(points: PlotPoint[], values: Array<number | null>, axisMax: number, range: number, innerHeight: number): string {
+  let path = '';
+  let hasStarted = false;
+
+  for (let index = 0; index < points.length; index += 1) {
+    const value = values[index];
+    if (value === null) {
+      hasStarted = false;
+      continue;
+    }
+
+    const x = points[index].x;
+    const y = PADDING_TOP + ((axisMax - value) / range) * innerHeight;
+    path += `${hasStarted ? ' L' : ' M'} ${x} ${y}`;
+    hasStarted = true;
+  }
+
+  return path.trim();
+}
+
 function timeframeLabel(value: TimeframeOption): string {
   return TIMEFRAME_OPTIONS.find((option) => option.value === value)?.label ?? 'Last 24 months';
+}
+
+function getAutoMovingAverageWindow(timeframe: TimeframeOption): number {
+  if (timeframe === 6 || timeframe === 12) return 3;
+  if (timeframe === 24) return 6;
+  return 12;
 }
 
 function chooseRoundingBase(maxAbs: number): number {
@@ -93,6 +127,25 @@ function formatCurrencyTick(value: number): string {
   return `${sign}$${Math.round(abs).toLocaleString()}`;
 }
 
+function formatCurrencyValue(value: number): string {
+  return value.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  });
+}
+
+function formatSignedCurrency(value: number): string {
+  const sign = value > EPSILON ? '+' : value < -EPSILON ? '-' : '';
+  return `${sign}${formatCurrencyValue(Math.abs(value))}`;
+}
+
+function formatSignedPercent(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return '—';
+  const sign = value > EPSILON ? '+' : '';
+  return `${sign}${value.toFixed(1)}%`;
+}
+
 function buildXAxisTickIndices(pointCount: number, width: number): number[] {
   if (pointCount === 0) return [];
   if (pointCount === 1) return [0];
@@ -117,10 +170,30 @@ function buildXAxisTickIndices(pointCount: number, width: number): number[] {
   return [...indices].sort((a, b) => a - b);
 }
 
+function tooltipBoxX(anchorX: number): number {
+  const width = 196;
+  const preferred = anchorX + 12;
+  return Math.max(PADDING_X + 6, Math.min(preferred, WIDTH - width - 8));
+}
+
+function tooltipBoxY(anchorY: number, lineCount: number): number {
+  const height = 16 + lineCount * 14;
+  const preferred = anchorY - height - 10;
+  return Math.max(PADDING_TOP + 6, Math.min(preferred, HEIGHT - PADDING_BOTTOM - height - 4));
+}
+
+function gradientIdFor(title: string, metric: TrendMetric): string {
+  return `trend-fill-${metric}-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+}
+
 export default function TrendLineChart({ data, metric, title, enableTimeframeControl = false }: TrendLineChartProps) {
   const [timeframe, setTimeframe] = useState<TimeframeOption>(24);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const showNetEnhancements = enableTimeframeControl && metric === 'net';
+  const movingAverageWindow = getAutoMovingAverageWindow(timeframe);
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -154,54 +227,76 @@ export default function TrendLineChart({ data, metric, title, enableTimeframeCon
   const innerWidth = WIDTH - PADDING_X * 2;
   const innerHeight = HEIGHT - PADDING_TOP - PADDING_BOTTOM;
 
-  const { points, linePath, areaPath, axisMin, axisMax, yTicks, xTickIndices } = useMemo(() => {
+  const { points, linePath, areaPath, maPath, maValues, axisMin, axisMax, yTicks, xTickIndices } = useMemo(() => {
     if (scopedData.length === 0) {
-      return { points: [], linePath: '', areaPath: '', axisMin: 0, axisMax: 0, yTicks: [0], xTickIndices: [] };
+      return {
+        points: [],
+        linePath: '',
+        areaPath: '',
+        maPath: '',
+        maValues: [] as Array<number | null>,
+        axisMin: 0,
+        axisMax: 0,
+        yTicks: [0],
+        xTickIndices: [] as number[],
+      };
     }
 
     const values = scopedData.map((item) => {
       const numeric = Number(item[metric]);
       return Number.isFinite(numeric) ? numeric : 0;
     });
+
     const minRaw = Math.min(...values, 0);
     const maxRaw = Math.max(...values, 0);
-    const axis =
-      metric === 'net'
-        ? buildSymmetricNetAxis(Math.max(Math.abs(minRaw), Math.abs(maxRaw)))
-        : buildPositiveAxis(maxRaw);
+    const axis = metric === 'net' ? buildSymmetricNetAxis(Math.max(Math.abs(minRaw), Math.abs(maxRaw))) : buildPositiveAxis(maxRaw);
     const range = Math.max(axis.max - axis.min, 1);
 
+    const step = scopedData.length > 1 ? innerWidth / (scopedData.length - 1) : 0;
     const computedPoints = scopedData.map((item, index) => {
-      const step = scopedData.length > 1 ? innerWidth / (scopedData.length - 1) : 0;
-      const x = PADDING_X + index * step;
       const value = values[index];
+      const x = PADDING_X + index * step;
       const y = PADDING_TOP + ((axis.max - value) / range) * innerHeight;
-
       return {
         x,
         y,
         value,
         label: toMonthLabel(item.month),
+        month: item.month,
       };
     });
 
     const line = buildPath(computedPoints);
-    const baselineY = PADDING_TOP + ((axis.max - 0) / range) * innerHeight;
+    const zeroY = PADDING_TOP + ((axis.max - 0) / range) * innerHeight;
     const area =
       computedPoints.length > 0
-        ? `${line} L ${computedPoints[computedPoints.length - 1].x} ${baselineY} L ${computedPoints[0].x} ${baselineY} Z`
+        ? `${line} L ${computedPoints[computedPoints.length - 1].x} ${zeroY} L ${computedPoints[0].x} ${zeroY} Z`
         : '';
+
+    const rolling = showNetEnhancements && values.length >= movingAverageWindow
+      ? computeRollingMovingAverage(values, movingAverageWindow)
+      : values.map(() => null);
 
     return {
       points: computedPoints,
       linePath: line,
       areaPath: area,
+      maPath: buildNullablePath(computedPoints, rolling, axis.max, range, innerHeight),
+      maValues: rolling,
       axisMin: axis.min,
       axisMax: axis.max,
       yTicks: axis.ticks,
       xTickIndices: buildXAxisTickIndices(computedPoints.length, innerWidth),
     };
-  }, [scopedData, innerHeight, innerWidth, metric]);
+  }, [scopedData, metric, innerHeight, innerWidth, showNetEnhancements, movingAverageWindow]);
+
+  useEffect(() => {
+    if (points.length === 0) {
+      setActiveIndex(null);
+      return;
+    }
+    setActiveIndex(points.length - 1);
+  }, [points.length, timeframe]);
 
   if (scopedData.length === 0) {
     return (
@@ -215,6 +310,28 @@ export default function TrendLineChart({ data, metric, title, enableTimeframeCon
   }
 
   const rangeLabel = `${toMonthLabel(scopedData[0].month)} – ${toMonthLabel(scopedData[scopedData.length - 1].month)}`;
+  const activePointIndex = activeIndex !== null && activeIndex >= 0 && activeIndex < points.length ? activeIndex : points.length - 1;
+  const activePoint = points[activePointIndex] ?? null;
+  const activeMA = activePointIndex >= 0 ? maValues[activePointIndex] ?? null : null;
+  const hasMA = maValues.some((value) => value !== null);
+
+  const momBadge: MoMBadge = (() => {
+    if (!showNetEnhancements || points.length < 2) {
+      return { text: 'MoM: —', tone: 'neutral' };
+    }
+
+    const latest = points[points.length - 1].value;
+    const previous = points[points.length - 2].value;
+    const delta = latest - previous;
+    const pct = Math.abs(previous) > EPSILON ? (delta / Math.abs(previous)) * 100 : null;
+
+    return {
+      text: `MoM: ${formatSignedCurrency(delta)} (${formatSignedPercent(pct)})`,
+      tone: delta > EPSILON ? 'up' : delta < -EPSILON ? 'down' : 'neutral',
+    };
+  })();
+
+  const gradientId = gradientIdFor(title, metric);
 
   return (
     <article className="card chart-card">
@@ -222,64 +339,99 @@ export default function TrendLineChart({ data, metric, title, enableTimeframeCon
         <h3>{title}</h3>
         <div className="chart-head-right">
           {enableTimeframeControl && (
-            <div className="timeframe-menu" ref={menuRef}>
-              <button
-                type="button"
-                className="timeframe-trigger"
-                onClick={() => setMenuOpen((current) => !current)}
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-              >
-                {timeframeLabel(timeframe)} ▾
-              </button>
-              {menuOpen && (
-                <ul className="timeframe-list" role="menu" aria-label="Select timeframe">
-                  {TIMEFRAME_OPTIONS.map((option) => (
-                    <li key={option.label}>
-                      <button
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={timeframe === option.value}
-                        className={timeframe === option.value ? 'is-active' : ''}
-                        onClick={() => {
-                          setTimeframe(option.value);
-                          setMenuOpen(false);
-                        }}
-                      >
-                        {option.label}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <div className="chart-control-row">
+              <div className="timeframe-menu" ref={menuRef}>
+                <button
+                  type="button"
+                  className="timeframe-trigger"
+                  onClick={() => setMenuOpen((current) => !current)}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                >
+                  {timeframeLabel(timeframe)} ▾
+                </button>
+                {menuOpen && (
+                  <ul className="timeframe-list" role="menu" aria-label="Select timeframe">
+                    {TIMEFRAME_OPTIONS.map((option) => (
+                      <li key={option.label}>
+                        <button
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={timeframe === option.value}
+                          className={timeframe === option.value ? 'is-active' : ''}
+                          onClick={() => {
+                            setTimeframe(option.value);
+                            setMenuOpen(false);
+                          }}
+                        >
+                          {option.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {showNetEnhancements && <span className={`mom-badge is-${momBadge.tone}`}>{momBadge.text}</span>}
             </div>
           )}
           <p className="subtle">{rangeLabel}</p>
+          {showNetEnhancements && <p className="subtle trend-note">Trend: {movingAverageWindow}-mo avg</p>}
         </div>
       </div>
 
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="trend-svg" role="img" aria-label={title}>
         <defs>
-          <linearGradient id="trendFill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="rgba(93, 132, 247, 0.28)" />
-            <stop offset="100%" stopColor="rgba(93, 132, 247, 0.04)" />
+          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="rgba(93, 132, 247, 0.18)" />
+            <stop offset="100%" stopColor="rgba(93, 132, 247, 0.02)" />
           </linearGradient>
         </defs>
 
         <line x1={PADDING_X} x2={WIDTH - PADDING_X} y1={PADDING_TOP + innerHeight} y2={PADDING_TOP + innerHeight} className="axis-line" />
         <line x1={PADDING_X} x2={PADDING_X} y1={PADDING_TOP} y2={PADDING_TOP + innerHeight} className="axis-line" />
+
         {yTicks.map((tick) => {
           const y = PADDING_TOP + ((axisMax - tick) / Math.max(axisMax - axisMin, 1)) * innerHeight;
           const lineClass = Math.abs(tick) < 0.5 ? 'axis-zero' : 'axis-grid';
           return <line key={`grid-${tick}`} x1={PADDING_X} x2={WIDTH - PADDING_X} y1={y} y2={y} className={lineClass} />;
         })}
 
-        <path d={areaPath} fill="url(#trendFill)" />
+        <path d={areaPath} fill={`url(#${gradientId})`} />
+
+        {showNetEnhancements && hasMA && <path d={maPath} className="ma-path" />}
         <path d={linePath} className="trend-path" />
 
-        {points.map((point, index) => (
-          <circle key={`${point.label}-${index}`} cx={point.x} cy={point.y} r={3.8} className="trend-dot" />
-        ))}
+        {points.map((point, index) => {
+          const isLatest = index === points.length - 1;
+          return (
+            <g key={`${point.month}-${index}`}>
+              {isLatest && <circle cx={point.x} cy={point.y} r={7.2} className="trend-dot-latest-ring" />}
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r={isLatest ? 5.1 : 3.8}
+                className={isLatest ? 'trend-dot-latest' : 'trend-dot'}
+                onMouseEnter={() => setActiveIndex(index)}
+              />
+            </g>
+          );
+        })}
+
+        {points.map((point, index) => {
+          const leftEdge = index === 0 ? PADDING_X : (points[index - 1].x + point.x) / 2;
+          const rightEdge = index === points.length - 1 ? WIDTH - PADDING_X : (point.x + points[index + 1].x) / 2;
+          return (
+            <rect
+              key={`hover-zone-${point.month}-${index}`}
+              x={leftEdge}
+              y={PADDING_TOP}
+              width={Math.max(rightEdge - leftEdge, 1)}
+              height={innerHeight}
+              fill="transparent"
+              onMouseEnter={() => setActiveIndex(index)}
+            />
+          );
+        })}
 
         {xTickIndices.map((index) => {
           const point = points[index];
@@ -299,6 +451,31 @@ export default function TrendLineChart({ data, metric, title, enableTimeframeCon
             </text>
           );
         })}
+
+        {activePoint && (
+          <g className="chart-tooltip" pointerEvents="none">
+            <rect
+              x={tooltipBoxX(activePoint.x)}
+              y={tooltipBoxY(activePoint.y, showNetEnhancements ? 3 : 2)}
+              width={192}
+              height={showNetEnhancements ? 58 : 44}
+              rx={10}
+              ry={10}
+              className="tooltip-box"
+            />
+            <text x={tooltipBoxX(activePoint.x) + 10} y={tooltipBoxY(activePoint.y, showNetEnhancements ? 3 : 2) + 14} className="tooltip-title">
+              {toMonthLabel(activePoint.month)}
+            </text>
+            <text x={tooltipBoxX(activePoint.x) + 10} y={tooltipBoxY(activePoint.y, showNetEnhancements ? 3 : 2) + 28} className="tooltip-line">
+              {`Net cash flow: ${formatCurrencyValue(activePoint.value)}`}
+            </text>
+            {showNetEnhancements && (
+              <text x={tooltipBoxX(activePoint.x) + 10} y={tooltipBoxY(activePoint.y, 3) + 42} className="tooltip-line">
+                {`Trend (${movingAverageWindow}-mo avg): ${activeMA === null ? '—' : formatCurrencyValue(activeMA)}`}
+              </text>
+            )}
+          </g>
+        )}
       </svg>
     </article>
   );
