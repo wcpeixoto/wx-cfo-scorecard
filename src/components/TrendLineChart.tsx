@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { computeRollingMovingAverage } from '../lib/charts/movingAverage';
+import { computeExponentialMovingAverage } from '../lib/charts/movingAverage';
 import { toMonthLabel } from '../lib/kpis/compute';
 import type { CashFlowMode, TrendPoint } from '../lib/data/contract';
 
@@ -154,7 +154,7 @@ function timeframeLabel(value: TimeframeOption): string {
   return TIMEFRAME_OPTIONS.find((option) => option.value === value)?.label ?? 'Last 24 months';
 }
 
-function getAutoMovingAverageWindow(timeframe: TimeframeOption): number {
+function getAutoEmaPeriod(timeframe: TimeframeOption): number {
   if (timeframe === 6 || timeframe === 12) return 3;
   if (timeframe === 24) return 6;
   return 12;
@@ -391,7 +391,7 @@ export default function TrendLineChart({
     metric === 'net' &&
     typeof onCashFlowModeChange === 'function' &&
     (cashFlowMode === 'operating' || cashFlowMode === 'total');
-  const movingAverageWindow = getAutoMovingAverageWindow(timeframe);
+  const emaPeriod = getAutoEmaPeriod(timeframe);
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -425,14 +425,14 @@ export default function TrendLineChart({
   const innerWidth = WIDTH - PADDING_X * 2;
   const innerHeight = HEIGHT - PADDING_TOP - PADDING_BOTTOM;
 
-  const { points, linePath, areaPath, maPath, maValues, axisMin, axisMax, yTicks, xTickIndices } = useMemo(() => {
+  const { points, linePath, areaPath, emaPath, emaValues, axisMin, axisMax, yTicks, xTickIndices } = useMemo(() => {
     if (scopedData.length === 0) {
       return {
         points: [],
         linePath: '',
         areaPath: '',
-        maPath: '',
-        maValues: [] as Array<number | null>,
+        emaPath: '',
+        emaValues: [] as number[],
         axisMin: 0,
         axisMax: 0,
         yTicks: [0],
@@ -472,22 +472,20 @@ export default function TrendLineChart({
         ? `${line} L ${computedPoints[computedPoints.length - 1].x} ${zeroY} L ${computedPoints[0].x} ${zeroY} Z`
         : '';
 
-    const rolling = showNetEnhancements && values.length >= movingAverageWindow
-      ? computeRollingMovingAverage(values, movingAverageWindow)
-      : values.map(() => null);
+    const ema = showNetEnhancements ? computeExponentialMovingAverage(values, emaPeriod) : [];
 
     return {
       points: computedPoints,
       linePath: line,
       areaPath: area,
-      maPath: buildNullablePath(computedPoints, rolling, axis.max, range, innerHeight),
-      maValues: rolling,
+      emaPath: buildNullablePath(computedPoints, ema, axis.max, range, innerHeight),
+      emaValues: ema,
       axisMin: axis.min,
       axisMax: axis.max,
       yTicks: axis.ticks,
       xTickIndices: buildAdaptiveXAxisTickIndices(computedPoints, innerWidth),
     };
-  }, [scopedData, metric, innerHeight, innerWidth, showNetEnhancements, movingAverageWindow]);
+  }, [scopedData, metric, innerHeight, innerWidth, showNetEnhancements, emaPeriod]);
 
   useEffect(() => {
     if (points.length === 0) {
@@ -499,6 +497,18 @@ export default function TrendLineChart({
       setActiveIndex(null);
     }
   }, [activeIndex, points.length]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV || !showNetEnhancements) return;
+    console.info('[EMA Sanity Check]', {
+      timeframe,
+      emaPeriod,
+      visibleMonths: points.length,
+      emaLength: emaValues.length,
+      firstExists: emaValues.length > 0 ? Number.isFinite(emaValues[0]) : false,
+      lastExists: emaValues.length > 0 ? Number.isFinite(emaValues[emaValues.length - 1]) : false,
+    });
+  }, [emaPeriod, emaValues, points.length, showNetEnhancements, timeframe]);
 
   if (scopedData.length === 0) {
     return (
@@ -515,8 +525,8 @@ export default function TrendLineChart({
   const activePointIndex =
     activeIndex !== null && activeIndex >= 0 && activeIndex < points.length ? activeIndex : null;
   const activePoint = activePointIndex !== null ? points[activePointIndex] ?? null : null;
-  const activeMA = activePointIndex !== null ? maValues[activePointIndex] ?? null : null;
-  const hasMA = maValues.some((value) => value !== null);
+  const activeEMA = activePointIndex !== null ? emaValues[activePointIndex] ?? null : null;
+  const hasEMA = emaValues.length === points.length && emaValues.length > 0;
 
   const momBadge: MoMBadge = (() => {
     if (!showNetEnhancements || points.length < 2) {
@@ -619,7 +629,7 @@ export default function TrendLineChart({
             </div>
           )}
           <p className="subtle">{rangeLabel}</p>
-          {showNetEnhancements && <p className="subtle trend-note">Trend: {movingAverageWindow}-mo avg</p>}
+          {showNetEnhancements && <p className="subtle trend-note">Trend: {emaPeriod}-mo EMA</p>}
         </div>
       </div>
 
@@ -648,7 +658,7 @@ export default function TrendLineChart({
 
         <path d={areaPath} fill={`url(#${gradientId})`} />
 
-        {showNetEnhancements && hasMA && <path d={maPath} className="ma-path" />}
+        {showNetEnhancements && hasEMA && <path d={emaPath} className="ma-path" />}
         <path d={linePath} className="trend-path" />
 
         {points.map((point, index) => {
@@ -721,7 +731,7 @@ export default function TrendLineChart({
             </text>
             {showNetEnhancements && (
               <text x={tooltipBoxX(activePoint.x) + 10} y={tooltipBoxY(activePoint.y, 3) + 42} className="tooltip-line">
-                {`Trend (${movingAverageWindow}-mo avg): ${activeMA === null ? '—' : formatCurrencyValue(activeMA)}`}
+                {`Trend (${emaPeriod}-mo EMA): ${activeEMA === null ? '—' : formatCurrencyValue(activeEMA)}`}
               </text>
             )}
           </g>

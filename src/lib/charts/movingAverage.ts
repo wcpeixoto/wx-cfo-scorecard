@@ -1,23 +1,13 @@
-export function computeRollingMovingAverage(values: number[], window: number): Array<number | null> {
-  if (window <= 1) {
-    return values.map((value) => value);
-  }
+export function computeExponentialMovingAverage(values: number[], period: number): number[] {
+  if (values.length === 0) return [];
+  if (period <= 1) return [...values];
 
-  const results: Array<number | null> = [];
-  let runningSum = 0;
+  const alpha = 2 / (period + 1);
+  const results: number[] = new Array(values.length);
+  results[0] = values[0];
 
-  for (let index = 0; index < values.length; index += 1) {
-    runningSum += values[index];
-
-    if (index >= window) {
-      runningSum -= values[index - window];
-    }
-
-    if (index >= window - 1) {
-      results.push(runningSum / window);
-    } else {
-      results.push(null);
-    }
+  for (let index = 1; index < values.length; index += 1) {
+    results[index] = alpha * values[index] + (1 - alpha) * results[index - 1];
   }
 
   return results;
