@@ -380,8 +380,11 @@ export default function TrendLineChart({
       setActiveIndex(null);
       return;
     }
-    setActiveIndex(points.length - 1);
-  }, [points.length, timeframe]);
+
+    if (activeIndex !== null && (activeIndex < 0 || activeIndex >= points.length)) {
+      setActiveIndex(null);
+    }
+  }, [activeIndex, points.length]);
 
   if (scopedData.length === 0) {
     return (
@@ -395,9 +398,10 @@ export default function TrendLineChart({
   }
 
   const rangeLabel = `${toMonthLabel(scopedData[0].month)} – ${toMonthLabel(scopedData[scopedData.length - 1].month)}`;
-  const activePointIndex = activeIndex !== null && activeIndex >= 0 && activeIndex < points.length ? activeIndex : points.length - 1;
-  const activePoint = points[activePointIndex] ?? null;
-  const activeMA = activePointIndex >= 0 ? maValues[activePointIndex] ?? null : null;
+  const activePointIndex =
+    activeIndex !== null && activeIndex >= 0 && activeIndex < points.length ? activeIndex : null;
+  const activePoint = activePointIndex !== null ? points[activePointIndex] ?? null : null;
+  const activeMA = activePointIndex !== null ? maValues[activePointIndex] ?? null : null;
   const hasMA = maValues.some((value) => value !== null);
 
   const momBadge: MoMBadge = (() => {
@@ -505,7 +509,13 @@ export default function TrendLineChart({
         </div>
       </div>
 
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="trend-svg" role="img" aria-label={title}>
+      <svg
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        className="trend-svg"
+        role="img"
+        aria-label={title}
+        onMouseLeave={() => setActiveIndex(null)}
+      >
         <defs>
           <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="rgba(93, 132, 247, 0.18)" />
