@@ -6,6 +6,7 @@ import type {
   KpiComparisonMap,
   KpiComparisonTimeframe,
   KpiCard,
+  KpiHeaderLabelMap,
   KpiMetricComparison,
   KpiTimeframe,
   KpiTimeframeComparison,
@@ -82,6 +83,19 @@ function monthLabel(month: string): string {
 
   const date = new Date(Date.UTC(year, monthIndex, 1));
   return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+function monthLabelStable(month: string): string {
+  const parsed = parseMonthParts(month);
+  if (!parsed) return month;
+  const date = new Date(Date.UTC(parsed.year, parsed.month - 1, 1));
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+function formatMonthRangeStable(startMonth: string | null, endMonth: string | null): string {
+  if (!startMonth || !endMonth) return 'n/a';
+  if (startMonth === endMonth) return monthLabelStable(startMonth);
+  return `${monthLabelStable(startMonth)} – ${monthLabelStable(endMonth)}`;
 }
 
 function addMonths(month: string, offset: number): string {
@@ -318,6 +332,40 @@ export function computeKpiComparisons(monthlyRollups: MonthlyRollup[]): KpiCompa
   }, {} as KpiComparisonMap);
 }
 
+export function computeKpiHeaderLabels(comparisons: KpiComparisonMap): KpiHeaderLabelMap {
+  return KPI_COMPARISON_TIMEFRAMES.reduce<KpiHeaderLabelMap>((result, timeframe) => {
+    const item = comparisons[timeframe];
+    const currentRange = formatMonthRangeStable(item.currentStartMonth, item.currentEndMonth);
+    const previousRange = formatMonthRangeStable(item.previousStartMonth, item.previousEndMonth);
+
+    if (timeframe === 'thisMonth') {
+      result[timeframe] = `${currentRange} · vs ${previousRange}`;
+      return result;
+    }
+
+    if (timeframe === 'last3Months') {
+      result[timeframe] = `${currentRange} · vs ${previousRange}`;
+      return result;
+    }
+
+    if (timeframe === 'ytd') {
+      const currentEnd = item.currentEndMonth ? monthLabelStable(item.currentEndMonth) : 'n/a';
+      const previousEnd = item.previousEndMonth ? monthLabelStable(item.previousEndMonth) : 'n/a';
+      result[timeframe] = `YTD through ${currentEnd} · vs YTD through ${previousEnd}`;
+      return result;
+    }
+
+    if (timeframe === 'ttm') {
+      const currentEnd = item.currentEndMonth ? monthLabelStable(item.currentEndMonth) : 'n/a';
+      result[timeframe] = `TTM through ${currentEnd} · vs prior TTM`;
+      return result;
+    }
+
+    result[timeframe] = `${currentRange} · vs ${previousRange}`;
+    return result;
+  }, {} as KpiHeaderLabelMap);
+}
+
 function buildKpis(current: KpiAggregate, previous: KpiAggregate): KpiCard[] {
   const prevRevenue = previous.revenue;
   const prevExpenses = previous.expenses;
@@ -529,12 +577,14 @@ export function computeDashboardModel(txns: Txn[]): DashboardModel {
   if (monthlyRollups.length === 0) {
     const emptyAggregations = computeKpiAggregations([]);
     const emptyComparisons = computeKpiComparisons([]);
+    const emptyHeaderLabels = computeKpiHeaderLabels(emptyComparisons);
     return {
       latestMonth: '',
       previousMonth: null,
       monthlyRollups: [],
       kpiAggregationByTimeframe: emptyAggregations,
       kpiComparisonByTimeframe: emptyComparisons,
+      kpiHeaderLabelByTimeframe: emptyHeaderLabels,
       kpiCards: [],
       trend: [],
       expenseSlices: [],
@@ -551,6 +601,7 @@ export function computeDashboardModel(txns: Txn[]): DashboardModel {
   const previous = monthlyRollups.length > 1 ? monthlyRollups[monthlyRollups.length - 2] : null;
   const kpiAggregationByTimeframe = computeKpiAggregations(monthlyRollups);
   const kpiComparisonByTimeframe = computeKpiComparisons(monthlyRollups);
+  const kpiHeaderLabelByTimeframe = computeKpiHeaderLabels(kpiComparisonByTimeframe);
 
   const latestMonthTxns = txns.filter((txn) => txn.month === latest.month);
   const previousMonthTxns = previous ? txns.filter((txn) => txn.month === previous.month) : [];
@@ -564,6 +615,7 @@ export function computeDashboardModel(txns: Txn[]): DashboardModel {
     monthlyRollups,
     kpiAggregationByTimeframe,
     kpiComparisonByTimeframe,
+    kpiHeaderLabelByTimeframe,
     kpiCards: buildKpis(kpiAggregationByTimeframe.thisMonth, kpiAggregationByTimeframe.lastMonth),
     trend: monthlyRollups.map<TrendPoint>((rollup) => ({
       month: rollup.month,

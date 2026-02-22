@@ -88,6 +88,7 @@ export type KpiTimeframeComparison = {
 };
 
 export type KpiComparisonMap = Record<KpiComparisonTimeframe, KpiTimeframeComparison>;
+export type KpiHeaderLabelMap = Record<KpiComparisonTimeframe, string>;
 
 export type MonthlyRollup = {
   month: string;
@@ -138,6 +139,7 @@ export type DashboardModel = {
   monthlyRollups: MonthlyRollup[];
   kpiAggregationByTimeframe: KpiAggregationMap;
   kpiComparisonByTimeframe: KpiComparisonMap;
+  kpiHeaderLabelByTimeframe: KpiHeaderLabelMap;
   kpiCards: KpiCard[];
   trend: TrendPoint[];
   expenseSlices: ExpenseSlice[];

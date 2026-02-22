@@ -140,6 +140,7 @@ export default function Dashboard() {
 
     const comparisonRows = Object.values(model.kpiComparisonByTimeframe).map((item) => ({
       timeframe: item.timeframe,
+      headerLabel: model.kpiHeaderLabelByTimeframe[item.timeframe],
       currentRange: item.currentStartMonth && item.currentEndMonth ? `${item.currentStartMonth}..${item.currentEndMonth}` : 'n/a',
       previousRange: item.previousStartMonth && item.previousEndMonth ? `${item.previousStartMonth}..${item.previousEndMonth}` : 'n/a',
       revenueDelta: item.revenue.delta,
@@ -155,7 +156,7 @@ export default function Dashboard() {
     console.groupCollapsed('[KPI Comparisons]');
     console.table(comparisonRows);
     console.groupEnd();
-  }, [model.kpiAggregationByTimeframe, model.kpiComparisonByTimeframe]);
+  }, [model.kpiAggregationByTimeframe, model.kpiComparisonByTimeframe, model.kpiHeaderLabelByTimeframe]);
 
   const scenarioProjection = useMemo(() => projectScenario(model, scenarioInput), [model, scenarioInput]);
   const scenarioTrend = useMemo<TrendPoint[]>(
