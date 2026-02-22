@@ -41,6 +41,7 @@ export type KpiTimeframe =
   | 'ytd'
   | 'last12Months'
   | 'last24Months'
+  | 'last36Months'
   | 'allDates';
 
 export type KpiAggregate = {
@@ -56,6 +57,37 @@ export type KpiAggregate = {
 };
 
 export type KpiAggregationMap = Record<KpiTimeframe, KpiAggregate>;
+
+export type KpiComparisonTimeframe =
+  | 'thisMonth'
+  | 'last3Months'
+  | 'ytd'
+  | 'ttm'
+  | 'last24Months'
+  | 'last36Months';
+
+export type KpiMetricComparison = {
+  current: number;
+  previous: number;
+  delta: number;
+  percentChange: number | null;
+};
+
+export type KpiTimeframeComparison = {
+  timeframe: KpiComparisonTimeframe;
+  currentStartMonth: string | null;
+  currentEndMonth: string | null;
+  previousStartMonth: string | null;
+  previousEndMonth: string | null;
+  currentMonthCount: number;
+  previousMonthCount: number;
+  revenue: KpiMetricComparison;
+  expenses: KpiMetricComparison;
+  netCashFlow: KpiMetricComparison;
+  savingsRate: KpiMetricComparison;
+};
+
+export type KpiComparisonMap = Record<KpiComparisonTimeframe, KpiTimeframeComparison>;
 
 export type MonthlyRollup = {
   month: string;
@@ -105,6 +137,7 @@ export type DashboardModel = {
   previousMonth: string | null;
   monthlyRollups: MonthlyRollup[];
   kpiAggregationByTimeframe: KpiAggregationMap;
+  kpiComparisonByTimeframe: KpiComparisonMap;
   kpiCards: KpiCard[];
   trend: TrendPoint[];
   expenseSlices: ExpenseSlice[];

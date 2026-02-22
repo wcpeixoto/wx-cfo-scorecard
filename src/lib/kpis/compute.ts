@@ -3,8 +3,12 @@ import type {
   ExpenseSlice,
   KpiAggregate,
   KpiAggregationMap,
+  KpiComparisonMap,
+  KpiComparisonTimeframe,
   KpiCard,
+  KpiMetricComparison,
   KpiTimeframe,
+  KpiTimeframeComparison,
   MonthlyRollup,
   Mover,
   OpportunityItem,
@@ -25,7 +29,16 @@ const KPI_TIMEFRAMES: KpiTimeframe[] = [
   'ytd',
   'last12Months',
   'last24Months',
+  'last36Months',
   'allDates',
+];
+const KPI_COMPARISON_TIMEFRAMES: KpiComparisonTimeframe[] = [
+  'thisMonth',
+  'last3Months',
+  'ytd',
+  'ttm',
+  'last24Months',
+  'last36Months',
 ];
 
 function trendFromDelta(delta: number): TrendDirection {
@@ -46,6 +59,17 @@ function round2(value: number): number {
 
 function sortMonths(a: string, b: string): number {
   return a.localeCompare(b);
+}
+
+function parseMonthParts(month: string): { year: number; month: number } | null {
+  const match = month.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number.parseInt(match[1], 10);
+  const monthNumber = Number.parseInt(match[2], 10);
+  if (!Number.isFinite(year) || !Number.isFinite(monthNumber) || monthNumber < 1 || monthNumber > 12) {
+    return null;
+  }
+  return { year, month: monthNumber };
 }
 
 function monthLabel(month: string): string {
@@ -110,25 +134,11 @@ export function computeMonthlyRollups(txns: Txn[]): MonthlyRollup[] {
     }));
 }
 
-function selectRollupsForTimeframe(monthlyRollups: MonthlyRollup[], timeframe: KpiTimeframe): MonthlyRollup[] {
-  if (monthlyRollups.length === 0) return [];
+type RollupSummary = Omit<KpiAggregate, 'timeframe'>;
 
-  if (timeframe === 'allDates') return monthlyRollups;
-  if (timeframe === 'thisMonth') return monthlyRollups.slice(-1);
-  if (timeframe === 'lastMonth') return monthlyRollups.length > 1 ? [monthlyRollups[monthlyRollups.length - 2]] : [];
-  if (timeframe === 'last3Months') return monthlyRollups.slice(-3);
-  if (timeframe === 'last12Months') return monthlyRollups.slice(-12);
-  if (timeframe === 'last24Months') return monthlyRollups.slice(-24);
-
-  const latest = monthlyRollups[monthlyRollups.length - 1];
-  const latestYear = latest.month.slice(0, 4);
-  return monthlyRollups.filter((rollup) => rollup.month.startsWith(`${latestYear}-`));
-}
-
-function aggregateRollups(timeframe: KpiTimeframe, rollups: MonthlyRollup[]): KpiAggregate {
+function summarizeRollups(rollups: MonthlyRollup[]): RollupSummary {
   if (rollups.length === 0) {
     return {
-      timeframe,
       startMonth: null,
       endMonth: null,
       monthCount: 0,
@@ -146,7 +156,6 @@ function aggregateRollups(timeframe: KpiTimeframe, rollups: MonthlyRollup[]): Kp
   const transactionCount = rollups.reduce((sum, rollup) => sum + rollup.transactionCount, 0);
 
   return {
-    timeframe,
     startMonth: rollups[0].month,
     endMonth: rollups[rollups.length - 1].month,
     monthCount: rollups.length,
@@ -158,11 +167,155 @@ function aggregateRollups(timeframe: KpiTimeframe, rollups: MonthlyRollup[]): Kp
   };
 }
 
+function selectTrailingRollups(monthlyRollups: MonthlyRollup[], count: number): MonthlyRollup[] {
+  if (count <= 0) return [];
+  return monthlyRollups.slice(-count);
+}
+
+function selectPriorTrailingBlock(monthlyRollups: MonthlyRollup[], count: number): MonthlyRollup[] {
+  if (count <= 0) return [];
+  if (monthlyRollups.length < count * 2) return [];
+
+  const endExclusive = monthlyRollups.length - count;
+  const start = endExclusive - count;
+  return monthlyRollups.slice(start, endExclusive);
+}
+
+function selectYtdRollupsForYear(monthlyRollups: MonthlyRollup[], year: number, throughMonth: number): MonthlyRollup[] {
+  return monthlyRollups.filter((rollup) => {
+    const parsed = parseMonthParts(rollup.month);
+    if (!parsed) return false;
+    return parsed.year === year && parsed.month <= throughMonth;
+  });
+}
+
+function selectRollupsForTimeframe(monthlyRollups: MonthlyRollup[], timeframe: KpiTimeframe): MonthlyRollup[] {
+  if (monthlyRollups.length === 0) return [];
+
+  if (timeframe === 'allDates') return monthlyRollups;
+  if (timeframe === 'thisMonth') return selectTrailingRollups(monthlyRollups, 1);
+  if (timeframe === 'lastMonth') return monthlyRollups.length > 1 ? [monthlyRollups[monthlyRollups.length - 2]] : [];
+  if (timeframe === 'last3Months') return selectTrailingRollups(monthlyRollups, 3);
+  if (timeframe === 'last12Months') return selectTrailingRollups(monthlyRollups, 12);
+  if (timeframe === 'last24Months') return selectTrailingRollups(monthlyRollups, 24);
+  if (timeframe === 'last36Months') return selectTrailingRollups(monthlyRollups, 36);
+
+  const latest = monthlyRollups[monthlyRollups.length - 1];
+  const parsedLatest = parseMonthParts(latest.month);
+  if (!parsedLatest) return selectTrailingRollups(monthlyRollups, 1);
+  return selectYtdRollupsForYear(monthlyRollups, parsedLatest.year, parsedLatest.month);
+}
+
+function aggregateRollups(timeframe: KpiTimeframe, rollups: MonthlyRollup[]): KpiAggregate {
+  const summary = summarizeRollups(rollups);
+  return {
+    timeframe,
+    ...summary,
+  };
+}
+
 export function computeKpiAggregations(monthlyRollups: MonthlyRollup[]): KpiAggregationMap {
   return KPI_TIMEFRAMES.reduce<KpiAggregationMap>((result, timeframe) => {
     result[timeframe] = aggregateRollups(timeframe, selectRollupsForTimeframe(monthlyRollups, timeframe));
     return result;
   }, {} as KpiAggregationMap);
+}
+
+function selectComparisonBlocks(
+  monthlyRollups: MonthlyRollup[],
+  timeframe: KpiComparisonTimeframe
+): { current: MonthlyRollup[]; previous: MonthlyRollup[] } {
+  if (monthlyRollups.length === 0) {
+    return { current: [], previous: [] };
+  }
+
+  if (timeframe === 'thisMonth') {
+    return {
+      current: selectTrailingRollups(monthlyRollups, 1),
+      previous: selectPriorTrailingBlock(monthlyRollups, 1),
+    };
+  }
+
+  if (timeframe === 'last3Months') {
+    return {
+      current: selectTrailingRollups(monthlyRollups, 3),
+      previous: selectPriorTrailingBlock(monthlyRollups, 3),
+    };
+  }
+
+  if (timeframe === 'ttm') {
+    return {
+      current: selectTrailingRollups(monthlyRollups, 12),
+      previous: selectPriorTrailingBlock(monthlyRollups, 12),
+    };
+  }
+
+  if (timeframe === 'last24Months') {
+    return {
+      current: selectTrailingRollups(monthlyRollups, 24),
+      previous: selectPriorTrailingBlock(monthlyRollups, 24),
+    };
+  }
+
+  if (timeframe === 'last36Months') {
+    return {
+      current: selectTrailingRollups(monthlyRollups, 36),
+      previous: selectPriorTrailingBlock(monthlyRollups, 36),
+    };
+  }
+
+  const latest = monthlyRollups[monthlyRollups.length - 1];
+  const parsedLatest = parseMonthParts(latest.month);
+  if (!parsedLatest) {
+    return {
+      current: selectTrailingRollups(monthlyRollups, 1),
+      previous: selectPriorTrailingBlock(monthlyRollups, 1),
+    };
+  }
+
+  return {
+    current: selectYtdRollupsForYear(monthlyRollups, parsedLatest.year, parsedLatest.month),
+    previous: selectYtdRollupsForYear(monthlyRollups, parsedLatest.year - 1, parsedLatest.month),
+  };
+}
+
+function compareMetric(current: number, previous: number): KpiMetricComparison {
+  return {
+    current: round2(current),
+    previous: round2(previous),
+    delta: round2(current - previous),
+    percentChange: pctDelta(current, previous),
+  };
+}
+
+function buildTimeframeComparison(
+  timeframe: KpiComparisonTimeframe,
+  currentSummary: RollupSummary,
+  previousSummary: RollupSummary
+): KpiTimeframeComparison {
+  return {
+    timeframe,
+    currentStartMonth: currentSummary.startMonth,
+    currentEndMonth: currentSummary.endMonth,
+    previousStartMonth: previousSummary.startMonth,
+    previousEndMonth: previousSummary.endMonth,
+    currentMonthCount: currentSummary.monthCount,
+    previousMonthCount: previousSummary.monthCount,
+    revenue: compareMetric(currentSummary.revenue, previousSummary.revenue),
+    expenses: compareMetric(currentSummary.expenses, previousSummary.expenses),
+    netCashFlow: compareMetric(currentSummary.netCashFlow, previousSummary.netCashFlow),
+    savingsRate: compareMetric(currentSummary.savingsRate, previousSummary.savingsRate),
+  };
+}
+
+export function computeKpiComparisons(monthlyRollups: MonthlyRollup[]): KpiComparisonMap {
+  return KPI_COMPARISON_TIMEFRAMES.reduce<KpiComparisonMap>((result, timeframe) => {
+    const blocks = selectComparisonBlocks(monthlyRollups, timeframe);
+    const currentSummary = summarizeRollups(blocks.current);
+    const previousSummary = summarizeRollups(blocks.previous);
+    result[timeframe] = buildTimeframeComparison(timeframe, currentSummary, previousSummary);
+    return result;
+  }, {} as KpiComparisonMap);
 }
 
 function buildKpis(current: KpiAggregate, previous: KpiAggregate): KpiCard[] {
@@ -375,11 +528,13 @@ export function computeDashboardModel(txns: Txn[]): DashboardModel {
 
   if (monthlyRollups.length === 0) {
     const emptyAggregations = computeKpiAggregations([]);
+    const emptyComparisons = computeKpiComparisons([]);
     return {
       latestMonth: '',
       previousMonth: null,
       monthlyRollups: [],
       kpiAggregationByTimeframe: emptyAggregations,
+      kpiComparisonByTimeframe: emptyComparisons,
       kpiCards: [],
       trend: [],
       expenseSlices: [],
@@ -395,6 +550,7 @@ export function computeDashboardModel(txns: Txn[]): DashboardModel {
   const latest = monthlyRollups[monthlyRollups.length - 1];
   const previous = monthlyRollups.length > 1 ? monthlyRollups[monthlyRollups.length - 2] : null;
   const kpiAggregationByTimeframe = computeKpiAggregations(monthlyRollups);
+  const kpiComparisonByTimeframe = computeKpiComparisons(monthlyRollups);
 
   const latestMonthTxns = txns.filter((txn) => txn.month === latest.month);
   const previousMonthTxns = previous ? txns.filter((txn) => txn.month === previous.month) : [];
@@ -407,6 +563,7 @@ export function computeDashboardModel(txns: Txn[]): DashboardModel {
     previousMonth: previous?.month ?? null,
     monthlyRollups,
     kpiAggregationByTimeframe,
+    kpiComparisonByTimeframe,
     kpiCards: buildKpis(kpiAggregationByTimeframe.thisMonth, kpiAggregationByTimeframe.lastMonth),
     trend: monthlyRollups.map<TrendPoint>((rollup) => ({
       month: rollup.month,

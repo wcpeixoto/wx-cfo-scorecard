@@ -137,7 +137,25 @@ export default function Dashboard() {
     console.groupCollapsed('[KPI Aggregations]');
     console.table(summaryRows);
     console.groupEnd();
-  }, [model.kpiAggregationByTimeframe]);
+
+    const comparisonRows = Object.values(model.kpiComparisonByTimeframe).map((item) => ({
+      timeframe: item.timeframe,
+      currentRange: item.currentStartMonth && item.currentEndMonth ? `${item.currentStartMonth}..${item.currentEndMonth}` : 'n/a',
+      previousRange: item.previousStartMonth && item.previousEndMonth ? `${item.previousStartMonth}..${item.previousEndMonth}` : 'n/a',
+      revenueDelta: item.revenue.delta,
+      revenuePct: item.revenue.percentChange,
+      expensesDelta: item.expenses.delta,
+      expensesPct: item.expenses.percentChange,
+      netDelta: item.netCashFlow.delta,
+      netPct: item.netCashFlow.percentChange,
+      savingsRateDelta: item.savingsRate.delta,
+      savingsRatePct: item.savingsRate.percentChange,
+    }));
+
+    console.groupCollapsed('[KPI Comparisons]');
+    console.table(comparisonRows);
+    console.groupEnd();
+  }, [model.kpiAggregationByTimeframe, model.kpiComparisonByTimeframe]);
 
   const scenarioProjection = useMemo(() => projectScenario(model, scenarioInput), [model, scenarioInput]);
   const scenarioTrend = useMemo<TrendPoint[]>(
