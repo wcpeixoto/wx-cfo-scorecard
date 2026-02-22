@@ -8,7 +8,7 @@ import TrendLineChart from '../components/TrendLineChart';
 import { buildDataSet, splitActualsAndProjections } from '../lib/data/normalize';
 import { fetchSheetCsv } from '../lib/data/fetchCsv';
 import { computeDashboardModel, projectScenario, toMonthLabel } from '../lib/kpis/compute';
-import type { DataSet, ScenarioInput, TrendPoint } from '../lib/data/contract';
+import type { DataSet, KpiCard, KpiComparisonTimeframe, ScenarioInput, TrendPoint } from '../lib/data/contract';
 
 type TabId =
   | 'big-picture'
@@ -25,6 +25,7 @@ type NavItem = {
 };
 
 type DataViewMode = 'actuals' | 'all';
+type KpiFrameOption = { value: KpiComparisonTimeframe; label: string };
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'big-picture', label: 'Big Picture', shortLabel: 'Big Picture' },
@@ -40,6 +41,15 @@ const DEFAULT_SCENARIO: ScenarioInput = {
   expenseReductionPct: 3,
   months: 12,
 };
+const KPI_FRAME_OPTIONS: KpiFrameOption[] = [
+  { value: 'thisMonth', label: 'Month' },
+  { value: 'last3Months', label: '3M' },
+  { value: 'ytd', label: 'YTD' },
+  { value: 'ttm', label: 'TTM' },
+  { value: 'last24Months', label: '24M' },
+  { value: 'last36Months', label: '36M' },
+];
+const EPSILON = 0.00001;
 
 function formatCurrency(value: number): string {
   return value.toLocaleString(undefined, {
@@ -74,6 +84,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(DEFAULT_SCENARIO);
   const [dataViewMode, setDataViewMode] = useState<DataViewMode>('actuals');
+  const [kpiTimeframe, setKpiTimeframe] = useState<KpiComparisonTimeframe>('ttm');
 
   const runSync = useCallback(async () => {
     setLoading(true);
@@ -172,16 +183,45 @@ export default function Dashboard() {
 
   const latestRollup = model.monthlyRollups[model.monthlyRollups.length - 1] ?? null;
   const previousRollup = model.monthlyRollups[model.monthlyRollups.length - 2] ?? null;
+  const selectedKpiComparison = model.kpiComparisonByTimeframe[kpiTimeframe];
+
+  const selectedKpiCards = useMemo<KpiCard[]>(() => {
+    if (!selectedKpiComparison) return model.kpiCards;
+
+    const metricToCard = (
+      id: KpiCard['id'],
+      label: string,
+      metric: { current: number; previous: number; percentChange: number | null }
+    ): KpiCard => {
+      const delta = metric.current - metric.previous;
+      return {
+        id,
+        label,
+        value: metric.current,
+        previousValue: metric.previous,
+        deltaPercent: metric.percentChange,
+        trend: Math.abs(delta) <= EPSILON ? 'flat' : delta > 0 ? 'up' : 'down',
+        format: id === 'savingsRate' ? 'percent' : 'currency',
+      };
+    };
+
+    return [
+      metricToCard('income', 'Revenue', selectedKpiComparison.revenue),
+      metricToCard('expense', 'Expenses', selectedKpiComparison.expenses),
+      metricToCard('net', 'Net Cash Flow', selectedKpiComparison.netCashFlow),
+      metricToCard('savingsRate', 'Savings Rate', selectedKpiComparison.savingsRate),
+    ];
+  }, [selectedKpiComparison, model.kpiCards]);
 
   const sustainability = useMemo(
     () => [
       {
         label: 'Revenue Momentum',
-        value: model.kpiCards.find((card) => card.id === 'income')?.trend === 'up' ? 'Getting Better' : 'Getting Worse',
+        value: selectedKpiCards.find((card) => card.id === 'income')?.trend === 'up' ? 'Getting Better' : 'Getting Worse',
       },
       {
         label: 'Cost Discipline',
-        value: model.kpiCards.find((card) => card.id === 'expense')?.trend === 'down' ? 'Getting Better' : 'Needs Attention',
+        value: selectedKpiCards.find((card) => card.id === 'expense')?.trend === 'down' ? 'Getting Better' : 'Needs Attention',
       },
       {
         label: 'Net Cash Position',
@@ -192,7 +232,7 @@ export default function Dashboard() {
         value: model.monthlyRollups.length >= 6 ? 'Long-term Visible' : 'Need More History',
       },
     ],
-    [latestRollup?.netCashFlow, model.kpiCards, model.monthlyRollups.length]
+    [latestRollup?.netCashFlow, selectedKpiCards, model.monthlyRollups.length]
   );
 
   const rightPanelActions = model.digHerePreview.slice(0, 4);
@@ -269,6 +309,18 @@ export default function Dashboard() {
           </div>
 
           <div className="top-controls">
+            <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
+              {KPI_FRAME_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={kpiTimeframe === option.value ? 'is-active' : ''}
+                  onClick={() => setKpiTimeframe(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
             <input
               type="search"
               value={query}
@@ -303,7 +355,7 @@ export default function Dashboard() {
 
         {activeTab === 'big-picture' && (
           <>
-            <KpiCards cards={model.kpiCards} />
+            <KpiCards cards={selectedKpiCards} />
 
             <TrendLineChart data={model.trend} metric="net" title="Monthly Net Cash Flow" enableTimeframeControl />
 

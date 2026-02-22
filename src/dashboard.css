@@ -169,7 +169,7 @@ body {
 }
 
 .top-controls {
-  width: min(360px, 100%);
+  width: min(620px, 100%);
   display: grid;
   gap: 8px;
 }
@@ -191,6 +191,35 @@ body {
   border-radius: 12px;
   padding: 3px;
   gap: 4px;
+}
+
+.kpi-timeframe-toggle {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: #edf3ff;
+  border: 1px solid #d5e2f6;
+  border-radius: 12px;
+  padding: 3px;
+}
+
+.kpi-timeframe-toggle button {
+  border: none;
+  background: transparent;
+  color: #4e6076;
+  border-radius: 9px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  min-width: 52px;
+}
+
+.kpi-timeframe-toggle button.is-active {
+  background: #ffffff;
+  color: #1d3f84;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(31, 58, 107, 0.1);
 }
 
 .view-toggle button {
