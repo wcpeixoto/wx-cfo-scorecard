@@ -34,6 +34,29 @@ export type KpiCard = {
   format: 'currency' | 'percent' | 'number';
 };
 
+export type KpiTimeframe =
+  | 'thisMonth'
+  | 'lastMonth'
+  | 'last3Months'
+  | 'ytd'
+  | 'last12Months'
+  | 'last24Months'
+  | 'allDates';
+
+export type KpiAggregate = {
+  timeframe: KpiTimeframe;
+  startMonth: string | null;
+  endMonth: string | null;
+  monthCount: number;
+  transactionCount: number;
+  revenue: number;
+  expenses: number;
+  netCashFlow: number;
+  savingsRate: number;
+};
+
+export type KpiAggregationMap = Record<KpiTimeframe, KpiAggregate>;
+
 export type MonthlyRollup = {
   month: string;
   revenue: number;
@@ -81,6 +104,7 @@ export type DashboardModel = {
   latestMonth: string;
   previousMonth: string | null;
   monthlyRollups: MonthlyRollup[];
+  kpiAggregationByTimeframe: KpiAggregationMap;
   kpiCards: KpiCard[];
   trend: TrendPoint[];
   expenseSlices: ExpenseSlice[];

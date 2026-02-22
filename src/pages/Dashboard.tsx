@@ -120,6 +120,25 @@ export default function Dashboard() {
 
   const model = useMemo(() => computeDashboardModel(filteredTxns), [filteredTxns]);
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+
+    const summaryRows = Object.values(model.kpiAggregationByTimeframe).map((item) => ({
+      timeframe: item.timeframe,
+      range: item.startMonth && item.endMonth ? `${item.startMonth}..${item.endMonth}` : 'n/a',
+      months: item.monthCount,
+      txns: item.transactionCount,
+      revenue: item.revenue,
+      expenses: item.expenses,
+      netCashFlow: item.netCashFlow,
+      savingsRate: item.savingsRate,
+    }));
+
+    console.groupCollapsed('[KPI Aggregations]');
+    console.table(summaryRows);
+    console.groupEnd();
+  }, [model.kpiAggregationByTimeframe]);
+
   const scenarioProjection = useMemo(() => projectScenario(model, scenarioInput), [model, scenarioInput]);
   const scenarioTrend = useMemo<TrendPoint[]>(
     () =>

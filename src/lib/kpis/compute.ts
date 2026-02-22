@@ -1,7 +1,10 @@
 import type {
   DashboardModel,
   ExpenseSlice,
+  KpiAggregate,
+  KpiAggregationMap,
   KpiCard,
+  KpiTimeframe,
   MonthlyRollup,
   Mover,
   OpportunityItem,
@@ -15,6 +18,15 @@ import type {
 
 const EPSILON = 0.00001;
 const EXPENSE_COLORS = ['#76a8ff', '#5e84f1', '#4f6fdd', '#3f58c1', '#2f479f', '#243b82', '#1b2f67'];
+const KPI_TIMEFRAMES: KpiTimeframe[] = [
+  'thisMonth',
+  'lastMonth',
+  'last3Months',
+  'ytd',
+  'last12Months',
+  'last24Months',
+  'allDates',
+];
 
 function trendFromDelta(delta: number): TrendDirection {
   if (Math.abs(delta) <= EPSILON) return 'flat';
@@ -98,47 +110,102 @@ export function computeMonthlyRollups(txns: Txn[]): MonthlyRollup[] {
     }));
 }
 
-function buildKpis(latest: MonthlyRollup, previous: MonthlyRollup | null): KpiCard[] {
-  const prevRevenue = previous?.revenue ?? 0;
-  const prevExpenses = previous?.expenses ?? 0;
-  const prevNetCashFlow = previous?.netCashFlow ?? 0;
-  const prevSavingsRate = previous?.savingsRate ?? 0;
+function selectRollupsForTimeframe(monthlyRollups: MonthlyRollup[], timeframe: KpiTimeframe): MonthlyRollup[] {
+  if (monthlyRollups.length === 0) return [];
+
+  if (timeframe === 'allDates') return monthlyRollups;
+  if (timeframe === 'thisMonth') return monthlyRollups.slice(-1);
+  if (timeframe === 'lastMonth') return monthlyRollups.length > 1 ? [monthlyRollups[monthlyRollups.length - 2]] : [];
+  if (timeframe === 'last3Months') return monthlyRollups.slice(-3);
+  if (timeframe === 'last12Months') return monthlyRollups.slice(-12);
+  if (timeframe === 'last24Months') return monthlyRollups.slice(-24);
+
+  const latest = monthlyRollups[monthlyRollups.length - 1];
+  const latestYear = latest.month.slice(0, 4);
+  return monthlyRollups.filter((rollup) => rollup.month.startsWith(`${latestYear}-`));
+}
+
+function aggregateRollups(timeframe: KpiTimeframe, rollups: MonthlyRollup[]): KpiAggregate {
+  if (rollups.length === 0) {
+    return {
+      timeframe,
+      startMonth: null,
+      endMonth: null,
+      monthCount: 0,
+      transactionCount: 0,
+      revenue: 0,
+      expenses: 0,
+      netCashFlow: 0,
+      savingsRate: 0,
+    };
+  }
+
+  const revenue = rollups.reduce((sum, rollup) => sum + rollup.revenue, 0);
+  const expenses = rollups.reduce((sum, rollup) => sum + rollup.expenses, 0);
+  const netCashFlow = revenue - expenses;
+  const transactionCount = rollups.reduce((sum, rollup) => sum + rollup.transactionCount, 0);
+
+  return {
+    timeframe,
+    startMonth: rollups[0].month,
+    endMonth: rollups[rollups.length - 1].month,
+    monthCount: rollups.length,
+    transactionCount,
+    revenue: round2(revenue),
+    expenses: round2(expenses),
+    netCashFlow: round2(netCashFlow),
+    savingsRate: round2(revenue > EPSILON ? (netCashFlow / revenue) * 100 : 0),
+  };
+}
+
+export function computeKpiAggregations(monthlyRollups: MonthlyRollup[]): KpiAggregationMap {
+  return KPI_TIMEFRAMES.reduce<KpiAggregationMap>((result, timeframe) => {
+    result[timeframe] = aggregateRollups(timeframe, selectRollupsForTimeframe(monthlyRollups, timeframe));
+    return result;
+  }, {} as KpiAggregationMap);
+}
+
+function buildKpis(current: KpiAggregate, previous: KpiAggregate): KpiCard[] {
+  const prevRevenue = previous.revenue;
+  const prevExpenses = previous.expenses;
+  const prevNetCashFlow = previous.netCashFlow;
+  const prevSavingsRate = previous.savingsRate;
 
   const cards: KpiCard[] = [
     {
       id: 'income',
       label: 'Revenue',
-      value: round2(latest.revenue),
+      value: round2(current.revenue),
       previousValue: round2(prevRevenue),
-      deltaPercent: pctDelta(latest.revenue, prevRevenue),
-      trend: trendFromDelta(latest.revenue - prevRevenue),
+      deltaPercent: pctDelta(current.revenue, prevRevenue),
+      trend: trendFromDelta(current.revenue - prevRevenue),
       format: 'currency',
     },
     {
       id: 'expense',
       label: 'Expenses',
-      value: round2(latest.expenses),
+      value: round2(current.expenses),
       previousValue: round2(prevExpenses),
-      deltaPercent: pctDelta(latest.expenses, prevExpenses),
-      trend: trendFromDelta(latest.expenses - prevExpenses),
+      deltaPercent: pctDelta(current.expenses, prevExpenses),
+      trend: trendFromDelta(current.expenses - prevExpenses),
       format: 'currency',
     },
     {
       id: 'net',
       label: 'Net Cash Flow',
-      value: round2(latest.netCashFlow),
+      value: round2(current.netCashFlow),
       previousValue: round2(prevNetCashFlow),
-      deltaPercent: pctDelta(latest.netCashFlow, prevNetCashFlow),
-      trend: trendFromDelta(latest.netCashFlow - prevNetCashFlow),
+      deltaPercent: pctDelta(current.netCashFlow, prevNetCashFlow),
+      trend: trendFromDelta(current.netCashFlow - prevNetCashFlow),
       format: 'currency',
     },
     {
       id: 'savingsRate',
       label: 'Savings Rate',
-      value: round2(latest.savingsRate),
+      value: round2(current.savingsRate),
       previousValue: round2(prevSavingsRate),
-      deltaPercent: pctDelta(latest.savingsRate, prevSavingsRate),
-      trend: trendFromDelta(latest.savingsRate - prevSavingsRate),
+      deltaPercent: pctDelta(current.savingsRate, prevSavingsRate),
+      trend: trendFromDelta(current.savingsRate - prevSavingsRate),
       format: 'percent',
     },
   ];
@@ -307,10 +374,12 @@ export function computeDashboardModel(txns: Txn[]): DashboardModel {
   const monthlyRollups = computeMonthlyRollups(txns);
 
   if (monthlyRollups.length === 0) {
+    const emptyAggregations = computeKpiAggregations([]);
     return {
       latestMonth: '',
       previousMonth: null,
       monthlyRollups: [],
+      kpiAggregationByTimeframe: emptyAggregations,
       kpiCards: [],
       trend: [],
       expenseSlices: [],
@@ -325,6 +394,7 @@ export function computeDashboardModel(txns: Txn[]): DashboardModel {
 
   const latest = monthlyRollups[monthlyRollups.length - 1];
   const previous = monthlyRollups.length > 1 ? monthlyRollups[monthlyRollups.length - 2] : null;
+  const kpiAggregationByTimeframe = computeKpiAggregations(monthlyRollups);
 
   const latestMonthTxns = txns.filter((txn) => txn.month === latest.month);
   const previousMonthTxns = previous ? txns.filter((txn) => txn.month === previous.month) : [];
@@ -336,7 +406,8 @@ export function computeDashboardModel(txns: Txn[]): DashboardModel {
     latestMonth: latest.month,
     previousMonth: previous?.month ?? null,
     monthlyRollups,
-    kpiCards: buildKpis(latest, previous),
+    kpiAggregationByTimeframe,
+    kpiCards: buildKpis(kpiAggregationByTimeframe.thisMonth, kpiAggregationByTimeframe.lastMonth),
     trend: monthlyRollups.map<TrendPoint>((rollup) => ({
       month: rollup.month,
       income: rollup.revenue,
