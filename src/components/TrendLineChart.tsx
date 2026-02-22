@@ -20,6 +20,7 @@ type PlotPoint = {
   y: number;
   value: number;
   label: string;
+  axisLabel: string;
   month: string;
 };
 
@@ -217,28 +218,115 @@ function formatSignedPercent(value: number | null): string {
   return `${sign}${value.toFixed(1)}%`;
 }
 
-function buildXAxisTickIndices(pointCount: number, width: number): number[] {
+function buildXAxisTickIndices(pointCount: number): number[] {
   if (pointCount === 0) return [];
   if (pointCount === 1) return [0];
 
-  let cadence = 1;
-  if (pointCount <= 12) {
-    const step = width / (pointCount - 1);
-    cadence = step >= 56 ? 1 : 2;
-  } else if (pointCount <= 24) {
-    cadence = 3;
-  } else {
-    cadence = 6;
-  }
-
   const indices = new Set<number>();
+  const cadence = pointCount <= 18 ? 3 : pointCount <= 36 ? 6 : 12;
   indices.add(0);
   for (let index = 0; index < pointCount; index += cadence) {
     indices.add(index);
   }
   indices.add(pointCount - 1);
-
   return [...indices].sort((a, b) => a - b);
+}
+
+function parseYearMonth(month: string): { year: number; month: number } | null {
+  const match = month.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number.parseInt(match[1], 10);
+  const monthNumber = Number.parseInt(match[2], 10);
+  if (!Number.isFinite(year) || !Number.isFinite(monthNumber) || monthNumber < 1 || monthNumber > 12) return null;
+  return { year, month: monthNumber };
+}
+
+function formatShortMonthLabel(month: string): string {
+  const parsed = parseYearMonth(month);
+  if (!parsed) return month;
+  const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const yy = String(parsed.year).slice(-2);
+  return `${shortMonths[parsed.month - 1]} ’${yy}`;
+}
+
+function buildYearlyJanuaryIndices(points: PlotPoint[]): number[] {
+  const indices = new Set<number>();
+  if (points.length === 0) return [];
+  indices.add(0);
+  points.forEach((point, index) => {
+    const parsed = parseYearMonth(point.month);
+    if (parsed?.month === 1) {
+      indices.add(index);
+    }
+  });
+  indices.add(points.length - 1);
+  return [...indices].sort((a, b) => a - b);
+}
+
+function hasOverlaps(indices: number[], points: PlotPoint[], minGap: number): boolean {
+  for (let index = 1; index < indices.length; index += 1) {
+    const left = points[indices[index - 1]];
+    const right = points[indices[index]];
+    if (!left || !right) continue;
+    if (right.x - left.x < minGap) return true;
+  }
+  return false;
+}
+
+function reduceOverlaps(indices: number[], points: PlotPoint[], minGap: number): number[] {
+  if (indices.length <= 2) return indices;
+  const reduced = [...indices];
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let idx = 1; idx < reduced.length; idx += 1) {
+      const leftIndex = reduced[idx - 1];
+      const rightIndex = reduced[idx];
+      const leftPoint = points[leftIndex];
+      const rightPoint = points[rightIndex];
+      if (!leftPoint || !rightPoint) continue;
+
+      if (rightPoint.x - leftPoint.x >= minGap) continue;
+
+      const leftProtected = leftIndex === 0;
+      const rightProtected = rightIndex === points.length - 1;
+
+      if (!rightProtected) {
+        reduced.splice(idx, 1);
+        changed = true;
+        break;
+      }
+
+      if (!leftProtected) {
+        reduced.splice(idx - 1, 1);
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  return reduced;
+}
+
+function buildAdaptiveXAxisTickIndices(points: PlotPoint[], width: number): number[] {
+  if (points.length === 0) return [];
+
+  const monthCount = points.length;
+  const baseIndices =
+    monthCount > 36
+      ? buildYearlyJanuaryIndices(points)
+      : buildXAxisTickIndices(monthCount);
+
+  const baseGap = width < 560 ? 90 : width < 660 ? 80 : 68;
+  let reduced = reduceOverlaps(baseIndices, points, baseGap);
+
+  if (hasOverlaps(reduced, points, baseGap) && monthCount > 12) {
+    const yearlyFallback = buildYearlyJanuaryIndices(points);
+    reduced = reduceOverlaps(yearlyFallback, points, Math.max(baseGap, 72));
+  }
+
+  return reduced;
 }
 
 function tooltipBoxX(anchorX: number): number {
@@ -347,6 +435,7 @@ export default function TrendLineChart({
         y,
         value,
         label: toMonthLabel(item.month),
+        axisLabel: formatShortMonthLabel(item.month),
         month: item.month,
       };
     });
@@ -371,7 +460,7 @@ export default function TrendLineChart({
       axisMin: axis.min,
       axisMax: axis.max,
       yTicks: axis.ticks,
-      xTickIndices: buildXAxisTickIndices(computedPoints.length, innerWidth),
+      xTickIndices: buildAdaptiveXAxisTickIndices(computedPoints, innerWidth),
     };
   }, [scopedData, metric, innerHeight, innerWidth, showNetEnhancements, movingAverageWindow]);
 
@@ -574,7 +663,7 @@ export default function TrendLineChart({
           if (!point) return null;
           return (
             <text key={`${point.label}-${index}`} x={point.x} y={HEIGHT - 10} textAnchor="middle" className="axis-label">
-              {point.label}
+              {point.axisLabel}
             </text>
           );
         })}
