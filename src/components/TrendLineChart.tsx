@@ -218,19 +218,9 @@ function formatSignedPercent(value: number | null): string {
   return `${sign}${value.toFixed(1)}%`;
 }
 
-function buildXAxisTickIndices(pointCount: number): number[] {
-  if (pointCount === 0) return [];
-  if (pointCount === 1) return [0];
+type XAxisCadence = 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
 
-  const indices = new Set<number>();
-  const cadence = pointCount <= 18 ? 3 : pointCount <= 36 ? 6 : 12;
-  indices.add(0);
-  for (let index = 0; index < pointCount; index += cadence) {
-    indices.add(index);
-  }
-  indices.add(pointCount - 1);
-  return [...indices].sort((a, b) => a - b);
-}
+const X_AXIS_CADENCE_ORDER: XAxisCadence[] = ['monthly', 'quarterly', 'semiannual', 'yearly'];
 
 function parseYearMonth(month: string): { year: number; month: number } | null {
   const match = month.match(/^(\d{4})-(\d{2})$/);
@@ -259,6 +249,42 @@ function buildYearlyJanuaryIndices(points: PlotPoint[]): number[] {
       indices.add(index);
     }
   });
+  indices.add(points.length - 1);
+  return [...indices].sort((a, b) => a - b);
+}
+
+function stepForCadence(cadence: Exclude<XAxisCadence, 'yearly'>): number {
+  if (cadence === 'monthly') return 1;
+  if (cadence === 'quarterly') return 3;
+  return 6;
+}
+
+function preferredCadenceByMonthCount(monthCount: number): XAxisCadence {
+  if (monthCount <= 6) return 'monthly';
+  if (monthCount <= 18) return 'quarterly';
+  if (monthCount <= 36) return 'semiannual';
+  return 'yearly';
+}
+
+function fallbackCadences(preferred: XAxisCadence): XAxisCadence[] {
+  const startIndex = X_AXIS_CADENCE_ORDER.indexOf(preferred);
+  return X_AXIS_CADENCE_ORDER.slice(startIndex >= 0 ? startIndex : 0);
+}
+
+function buildTickIndicesForCadence(points: PlotPoint[], cadence: XAxisCadence): number[] {
+  if (points.length === 0) return [];
+  if (points.length === 1) return [0];
+
+  if (cadence === 'yearly') {
+    return buildYearlyJanuaryIndices(points);
+  }
+
+  const indices = new Set<number>();
+  indices.add(0);
+  const step = stepForCadence(cadence);
+  for (let index = 0; index < points.length; index += step) {
+    indices.add(index);
+  }
   indices.add(points.length - 1);
   return [...indices].sort((a, b) => a - b);
 }
@@ -311,22 +337,21 @@ function reduceOverlaps(indices: number[], points: PlotPoint[], minGap: number):
 
 function buildAdaptiveXAxisTickIndices(points: PlotPoint[], width: number): number[] {
   if (points.length === 0) return [];
+  if (points.length === 1) return [0];
 
-  const monthCount = points.length;
-  const baseIndices =
-    monthCount > 36
-      ? buildYearlyJanuaryIndices(points)
-      : buildXAxisTickIndices(monthCount);
+  const preferredCadence = preferredCadenceByMonthCount(points.length);
+  const minGap = width < 560 ? 86 : width < 660 ? 78 : 70;
 
-  const baseGap = width < 560 ? 90 : width < 660 ? 80 : 68;
-  let reduced = reduceOverlaps(baseIndices, points, baseGap);
-
-  if (hasOverlaps(reduced, points, baseGap) && monthCount > 12) {
-    const yearlyFallback = buildYearlyJanuaryIndices(points);
-    reduced = reduceOverlaps(yearlyFallback, points, Math.max(baseGap, 72));
+  for (const cadence of fallbackCadences(preferredCadence)) {
+    const candidate = buildTickIndicesForCadence(points, cadence);
+    if (!hasOverlaps(candidate, points, minGap)) {
+      return candidate;
+    }
   }
 
-  return reduced;
+  const yearly = buildTickIndicesForCadence(points, 'yearly');
+  const reduced = reduceOverlaps(yearly, points, minGap);
+  return reduced.length > 0 ? reduced : [0, points.length - 1];
 }
 
 function tooltipBoxX(anchorX: number): number {
