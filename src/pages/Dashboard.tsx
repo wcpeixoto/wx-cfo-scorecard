@@ -65,6 +65,21 @@ function formatTimestamp(iso: string | null): string {
   return date.toLocaleString();
 }
 
+function isCapitalDistributionCategory(category: string): boolean {
+  const normalized = category
+    .toLowerCase()
+    .replace(/[^a-z0-9: ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) return false;
+  if (normalized === 'capital distribution') return true;
+  return normalized
+    .split(':')
+    .map((segment) => segment.trim())
+    .some((segment) => segment === 'capital distribution');
+}
+
 function getStoredCsvUrl(): string {
   if (typeof window === 'undefined') return SHEET_CSV_URL;
   try {
@@ -173,7 +188,17 @@ export default function Dashboard() {
     console.groupCollapsed('[KPI Comparisons]');
     console.table(comparisonRows);
     console.groupEnd();
-  }, [cashFlowMode, model.kpiAggregationByTimeframe, model.kpiComparisonByTimeframe, model.kpiHeaderLabelByTimeframe]);
+
+    const matchedCapitalDistribution = filteredTxns.filter(
+      (txn) => txn.type === 'expense' && isCapitalDistributionCategory(txn.category)
+    );
+    const matchedExpenseTotal = matchedCapitalDistribution.reduce((sum, txn) => sum + txn.amount, 0);
+    console.info('[Cash Flow Mode Debug]', {
+      cashFlowMode,
+      matchedRows: matchedCapitalDistribution.length,
+      matchedExpenseTotal,
+    });
+  }, [cashFlowMode, filteredTxns, model.kpiAggregationByTimeframe, model.kpiComparisonByTimeframe, model.kpiHeaderLabelByTimeframe]);
 
   const scenarioProjection = useMemo(() => projectScenario(model, scenarioInput), [model, scenarioInput]);
   const scenarioTrend = useMemo<TrendPoint[]>(

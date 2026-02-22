@@ -110,8 +110,22 @@ function addMonths(month: string, offset: number): string {
   return `${nextYear}-${nextMonth}`;
 }
 
+function normalizeCategory(category: string): string {
+  return category
+    .toLowerCase()
+    .replace(/[^a-z0-9: ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function isCapitalDistribution(category: string): boolean {
-  return category.trim().toLowerCase() === 'capital distribution';
+  const normalized = normalizeCategory(category);
+  if (!normalized) return false;
+
+  if (normalized === 'capital distribution') return true;
+
+  const segments = normalized.split(':').map((segment) => segment.trim()).filter(Boolean);
+  return segments.some((segment) => segment === 'capital distribution');
 }
 
 type InternalMonthlyRollup = MonthlyRollup & {
