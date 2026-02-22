@@ -66,9 +66,10 @@ export function computeMonthlyRollups(txns: Txn[]): MonthlyRollup[] {
     if (!monthMap.has(txn.month)) {
       monthMap.set(txn.month, {
         month: txn.month,
-        income: 0,
-        expense: 0,
-        net: 0,
+        revenue: 0,
+        expenses: 0,
+        netCashFlow: 0,
+        savingsRate: 0,
         transactionCount: 0,
       });
     }
@@ -77,12 +78,12 @@ export function computeMonthlyRollups(txns: Txn[]): MonthlyRollup[] {
     if (!rollup) return;
 
     if (txn.type === 'income') {
-      rollup.income += txn.amount;
+      rollup.revenue += txn.amount;
     } else {
-      rollup.expense += txn.amount;
+      rollup.expenses += txn.amount;
     }
 
-    rollup.net = rollup.income - rollup.expense;
+    rollup.netCashFlow = rollup.revenue - rollup.expenses;
     rollup.transactionCount += 1;
   });
 
@@ -90,55 +91,54 @@ export function computeMonthlyRollups(txns: Txn[]): MonthlyRollup[] {
     .sort((a, b) => sortMonths(a.month, b.month))
     .map((rollup) => ({
       ...rollup,
-      income: round2(rollup.income),
-      expense: round2(rollup.expense),
-      net: round2(rollup.net),
+      revenue: round2(rollup.revenue),
+      expenses: round2(rollup.expenses),
+      netCashFlow: round2(rollup.netCashFlow),
+      savingsRate: round2(rollup.revenue > EPSILON ? (rollup.netCashFlow / rollup.revenue) * 100 : 0),
     }));
 }
 
 function buildKpis(latest: MonthlyRollup, previous: MonthlyRollup | null): KpiCard[] {
-  const prevIncome = previous?.income ?? 0;
-  const prevExpense = previous?.expense ?? 0;
-  const prevNet = previous?.net ?? 0;
-
-  const currentSavingsRate = latest.income > EPSILON ? (latest.net / latest.income) * 100 : 0;
-  const prevSavingsRate = previous && previous.income > EPSILON ? (previous.net / previous.income) * 100 : 0;
+  const prevRevenue = previous?.revenue ?? 0;
+  const prevExpenses = previous?.expenses ?? 0;
+  const prevNetCashFlow = previous?.netCashFlow ?? 0;
+  const prevSavingsRate = previous?.savingsRate ?? 0;
 
   const cards: KpiCard[] = [
     {
       id: 'income',
       label: 'Revenue',
-      value: round2(latest.income),
-      previousValue: round2(prevIncome),
-      deltaPercent: pctDelta(latest.income, prevIncome),
-      trend: trendFromDelta(latest.income - prevIncome),
+      value: round2(latest.revenue),
+      previousValue: round2(prevRevenue),
+      deltaPercent: pctDelta(latest.revenue, prevRevenue),
+      trend: trendFromDelta(latest.revenue - prevRevenue),
       format: 'currency',
     },
     {
       id: 'expense',
       label: 'Expenses',
-      value: round2(latest.expense),
-      previousValue: round2(prevExpense),
-      deltaPercent: pctDelta(latest.expense, prevExpense),
-      trend: trendFromDelta(latest.expense - prevExpense),
+      value: round2(latest.expenses),
+      previousValue: round2(prevExpenses),
+      deltaPercent: pctDelta(latest.expenses, prevExpenses),
+      trend: trendFromDelta(latest.expenses - prevExpenses),
       format: 'currency',
     },
     {
       id: 'net',
       label: 'Net Cash Flow',
-      value: round2(latest.net),
-      previousValue: round2(prevNet),
-      deltaPercent: pctDelta(latest.net, prevNet),
-      trend: trendFromDelta(latest.net - prevNet),
+      value: round2(latest.netCashFlow),
+      previousValue: round2(prevNetCashFlow),
+      deltaPercent: pctDelta(latest.netCashFlow, prevNetCashFlow),
+      trend: trendFromDelta(latest.netCashFlow - prevNetCashFlow),
       format: 'currency',
     },
     {
       id: 'savingsRate',
       label: 'Savings Rate',
-      value: round2(currentSavingsRate),
+      value: round2(latest.savingsRate),
       previousValue: round2(prevSavingsRate),
-      deltaPercent: pctDelta(currentSavingsRate, prevSavingsRate),
-      trend: trendFromDelta(currentSavingsRate - prevSavingsRate),
+      deltaPercent: pctDelta(latest.savingsRate, prevSavingsRate),
+      trend: trendFromDelta(latest.savingsRate - prevSavingsRate),
       format: 'percent',
     },
   ];
@@ -277,15 +277,15 @@ function buildOpportunities(latestMonthTxns: Txn[], monthlyRollups: MonthlyRollu
 
 function buildSummary(latest: MonthlyRollup, previous: MonthlyRollup | null, opportunities: OpportunityItem[], txCount: number): string[] {
   const bullets: string[] = [];
-  const netDirection = previous ? latest.net - previous.net : latest.net;
+  const netDirection = previous ? latest.netCashFlow - previous.netCashFlow : latest.netCashFlow;
 
   bullets.push(
-    `Processed ${txCount.toLocaleString()} transactions through ${monthLabel(latest.month)} with net ${latest.net >= 0 ? 'positive' : 'negative'} cash flow.`
+    `Processed ${txCount.toLocaleString()} transactions through ${monthLabel(latest.month)} with net ${latest.netCashFlow >= 0 ? 'positive' : 'negative'} cash flow.`
   );
 
   if (previous) {
     bullets.push(
-      `Revenue moved ${latest.income >= previous.income ? 'up' : 'down'} ${Math.abs(round2(latest.income - previous.income)).toLocaleString(undefined, {
+      `Revenue moved ${latest.revenue >= previous.revenue ? 'up' : 'down'} ${Math.abs(round2(latest.revenue - previous.revenue)).toLocaleString(undefined, {
         style: 'currency',
         currency: 'USD',
         maximumFractionDigits: 0,
@@ -339,9 +339,9 @@ export function computeDashboardModel(txns: Txn[]): DashboardModel {
     kpiCards: buildKpis(latest, previous),
     trend: monthlyRollups.map<TrendPoint>((rollup) => ({
       month: rollup.month,
-      income: rollup.income,
-      expense: rollup.expense,
-      net: rollup.net,
+      income: rollup.revenue,
+      expense: rollup.expenses,
+      net: rollup.netCashFlow,
     })),
     expenseSlices: buildExpenseSlices(latestMonthTxns),
     topPayees: buildTopPayees(latestMonthTxns),
@@ -359,11 +359,11 @@ export function projectScenario(model: DashboardModel, input: ScenarioInput): Sc
   }
 
   const baselineMonths = model.monthlyRollups.slice(-3);
-  const baselineIncome =
-    baselineMonths.reduce((sum, month) => sum + month.income, 0) /
+  const baselineRevenue =
+    baselineMonths.reduce((sum, month) => sum + month.revenue, 0) /
     Math.max(baselineMonths.length, 1);
   const baselineExpense =
-    baselineMonths.reduce((sum, month) => sum + month.expense, 0) /
+    baselineMonths.reduce((sum, month) => sum + month.expenses, 0) /
     Math.max(baselineMonths.length, 1);
 
   const growthFactor = 1 + input.revenueGrowthPct / 100;
@@ -374,7 +374,7 @@ export function projectScenario(model: DashboardModel, input: ScenarioInput): Sc
 
   for (let index = 1; index <= input.months; index += 1) {
     const month = addMonths(model.latestMonth, index);
-    const projectedIncome = round2(baselineIncome * growthFactor ** index);
+    const projectedIncome = round2(baselineRevenue * growthFactor ** index);
     const projectedExpense = round2(baselineExpense * expenseFactor ** index);
     const projectedNet = round2(projectedIncome - projectedExpense);
     cumulativeNet = round2(cumulativeNet + projectedNet);

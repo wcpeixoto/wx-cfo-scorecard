@@ -36,9 +36,10 @@ export type KpiCard = {
 
 export type MonthlyRollup = {
   month: string;
-  income: number;
-  expense: number;
-  net: number;
+  revenue: number;
+  expenses: number;
+  netCashFlow: number;
+  savingsRate: number;
   transactionCount: number;
 };
 

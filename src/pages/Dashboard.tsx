@@ -147,14 +147,14 @@ export default function Dashboard() {
       },
       {
         label: 'Net Cash Position',
-        value: (latestRollup?.net ?? 0) >= 0 ? 'Healthy' : 'Negative',
+        value: (latestRollup?.netCashFlow ?? 0) >= 0 ? 'Healthy' : 'Negative',
       },
       {
         label: 'Consistency',
         value: model.monthlyRollups.length >= 6 ? 'Long-term Visible' : 'Need More History',
       },
     ],
-    [latestRollup?.net, model.kpiCards, model.monthlyRollups.length]
+    [latestRollup?.netCashFlow, model.kpiCards, model.monthlyRollups.length]
   );
 
   const rightPanelActions = model.digHerePreview.slice(0, 4);
@@ -362,15 +362,16 @@ export default function Dashboard() {
             <article className="card table-card">
               <div className="card-head">
                 <h3>Monthly Rollups</h3>
-                <p className="subtle">Income, expense, net and transaction count by month</p>
+                <p className="subtle">Canonical monthly dataset: revenue, expenses, net cash flow, savings rate and transaction count</p>
               </div>
               <table>
                 <thead>
                   <tr>
                     <th>Month</th>
-                    <th>Income</th>
-                    <th>Expense</th>
-                    <th>Net</th>
+                    <th>Revenue</th>
+                    <th>Expenses</th>
+                    <th>Net Cash Flow</th>
+                    <th>Savings Rate</th>
                     <th>Txns</th>
                   </tr>
                 </thead>
@@ -378,9 +379,10 @@ export default function Dashboard() {
                   {model.monthlyRollups.map((rollup) => (
                     <tr key={rollup.month}>
                       <td>{toMonthLabel(rollup.month)}</td>
-                      <td>{formatCurrency(rollup.income)}</td>
-                      <td>{formatCurrency(rollup.expense)}</td>
-                      <td>{formatCurrency(rollup.net)}</td>
+                      <td>{formatCurrency(rollup.revenue)}</td>
+                      <td>{formatCurrency(rollup.expenses)}</td>
+                      <td>{formatCurrency(rollup.netCashFlow)}</td>
+                      <td>{rollup.savingsRate.toFixed(1)}%</td>
                       <td>{rollup.transactionCount}</td>
                     </tr>
                   ))}
@@ -512,7 +514,7 @@ export default function Dashboard() {
       <aside className="right-panel">
         <section className="right-hero">
           <p className="eyebrow">Current Net</p>
-          <h3>{latestRollup ? formatCurrency(latestRollup.net) : '$0'}</h3>
+          <h3>{latestRollup ? formatCurrency(latestRollup.netCashFlow) : '$0'}</h3>
           <p>
             {latestRollup
               ? `for ${toMonthLabel(latestRollup.month)} (${latestRollup.transactionCount.toLocaleString()} transactions)`
@@ -520,9 +522,9 @@ export default function Dashboard() {
           </p>
 
           <div className="delta-chip">
-            <span>{(latestRollup?.net ?? 0) >= (previousRollup?.net ?? 0) ? '▲' : '▼'}</span>
+            <span>{(latestRollup?.netCashFlow ?? 0) >= (previousRollup?.netCashFlow ?? 0) ? '▲' : '▼'}</span>
             <span>
-              vs previous {previousRollup ? formatCurrency(previousRollup.net) : 'n/a'}
+              vs previous {previousRollup ? formatCurrency(previousRollup.netCashFlow) : 'n/a'}
             </span>
           </div>
         </section>
@@ -543,10 +545,13 @@ export default function Dashboard() {
           <h4>Quick Health</h4>
           <div className="mini-metrics">
             <p>
-              Revenue <strong>{formatCurrency(latestRollup?.income ?? 0)}</strong>
+              Revenue <strong>{formatCurrency(latestRollup?.revenue ?? 0)}</strong>
             </p>
             <p>
-              Expense <strong>{formatCurrency(latestRollup?.expense ?? 0)}</strong>
+              Expense <strong>{formatCurrency(latestRollup?.expenses ?? 0)}</strong>
+            </p>
+            <p>
+              Savings Rate <strong>{(latestRollup?.savingsRate ?? 0).toFixed(1)}%</strong>
             </p>
             <p>
               Opportunity <strong>{formatCurrency(model.opportunityTotal)}</strong>
