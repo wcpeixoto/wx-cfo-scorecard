@@ -184,6 +184,7 @@ export default function Dashboard() {
   const latestRollup = model.monthlyRollups[model.monthlyRollups.length - 1] ?? null;
   const previousRollup = model.monthlyRollups[model.monthlyRollups.length - 2] ?? null;
   const selectedKpiComparison = model.kpiComparisonByTimeframe[kpiTimeframe];
+  const selectedHeaderComparisonLabel = model.kpiHeaderLabelByTimeframe[kpiTimeframe] ?? 'Comparison unavailable';
 
   const selectedKpiCards = useMemo<KpiCard[]>(() => {
     if (!selectedKpiComparison) return model.kpiCards;
@@ -304,7 +305,7 @@ export default function Dashboard() {
               {model.latestMonth ? toMonthLabel(model.latestMonth) : 'No Data Yet'}
             </h2>
             <p>
-              {model.previousMonth ? `Compared with ${toMonthLabel(model.previousMonth)}` : 'Load CSV history to unlock comparisons.'}
+              {selectedHeaderComparisonLabel}
             </p>
           </div>
 
