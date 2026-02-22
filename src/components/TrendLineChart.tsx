@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { computeRollingMovingAverage } from '../lib/charts/movingAverage';
 import { toMonthLabel } from '../lib/kpis/compute';
-import type { TrendPoint } from '../lib/data/contract';
+import type { CashFlowMode, TrendPoint } from '../lib/data/contract';
 
 type TrendMetric = 'income' | 'expense' | 'net';
 
@@ -10,6 +10,9 @@ type TrendLineChartProps = {
   metric: TrendMetric;
   title: string;
   enableTimeframeControl?: boolean;
+  showCashFlowToggle?: boolean;
+  cashFlowMode?: CashFlowMode;
+  onCashFlowModeChange?: (nextMode: CashFlowMode) => void;
 };
 
 type PlotPoint = {
@@ -254,13 +257,27 @@ function gradientIdFor(title: string, metric: TrendMetric): string {
   return `trend-fill-${metric}-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 }
 
-export default function TrendLineChart({ data, metric, title, enableTimeframeControl = false }: TrendLineChartProps) {
+export default function TrendLineChart({
+  data,
+  metric,
+  title,
+  enableTimeframeControl = false,
+  showCashFlowToggle = false,
+  cashFlowMode,
+  onCashFlowModeChange,
+}: TrendLineChartProps) {
   const [timeframe, setTimeframe] = useState<TimeframeOption>(24);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const cashFlowTooltipId = useId();
 
   const showNetEnhancements = enableTimeframeControl && metric === 'net';
+  const showCashFlowControl =
+    showCashFlowToggle &&
+    metric === 'net' &&
+    typeof onCashFlowModeChange === 'function' &&
+    (cashFlowMode === 'operating' || cashFlowMode === 'total');
   const movingAverageWindow = getAutoMovingAverageWindow(timeframe);
 
   useEffect(() => {
@@ -406,8 +423,49 @@ export default function TrendLineChart({ data, metric, title, enableTimeframeCon
       <div className="card-head chart-head">
         <h3>{title}</h3>
         <div className="chart-head-right">
-          {enableTimeframeControl && (
+          {(enableTimeframeControl || showCashFlowControl) && (
             <div className="chart-control-row">
+              {showCashFlowControl && (
+                <div className="chart-cashflow-toggle-wrap" role="group" aria-label="Cash Flow mode selector">
+                  <span className="cashflow-label">Cash Flow:</span>
+                  <div className="cashflow-toggle">
+                    <button
+                      type="button"
+                      className={cashFlowMode === 'operating' ? 'is-active' : ''}
+                      onClick={() => onCashFlowModeChange?.('operating')}
+                    >
+                      Operating
+                    </button>
+                    <button
+                      type="button"
+                      className={cashFlowMode === 'total' ? 'is-active' : ''}
+                      onClick={() => onCashFlowModeChange?.('total')}
+                    >
+                      Total
+                    </button>
+                  </div>
+                  <div className="cashflow-help">
+                    <button
+                      type="button"
+                      className="cashflow-tooltip"
+                      aria-label="Cash flow mode help"
+                      aria-describedby={cashFlowTooltipId}
+                    >
+                      ⓘ
+                    </button>
+                    <div id={cashFlowTooltipId} role="tooltip" className="cashflow-tooltip-panel">
+                      <ul className="cashflow-tooltip-list">
+                        <li>
+                          <strong>Operating</strong> excludes capital distribution
+                        </li>
+                        <li>
+                          <strong>Total</strong> includes them
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="timeframe-menu" ref={menuRef}>
                 <button
                   type="button"

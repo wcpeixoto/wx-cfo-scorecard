@@ -341,32 +341,6 @@ export default function Dashboard() {
           </div>
 
           <div className="top-controls">
-            <div className="cashflow-toggle-wrap" role="group" aria-label="Cash Flow mode selector">
-              <span className="cashflow-label">Cash Flow:</span>
-              <div className="cashflow-toggle">
-                <button
-                  type="button"
-                  className={cashFlowMode === 'operating' ? 'is-active' : ''}
-                  onClick={() => setCashFlowMode('operating')}
-                >
-                  Operating
-                </button>
-                <button
-                  type="button"
-                  className={cashFlowMode === 'total' ? 'is-active' : ''}
-                  onClick={() => setCashFlowMode('total')}
-                >
-                  Total
-                </button>
-              </div>
-              <span
-                className="cashflow-tooltip"
-                title={'- Operating excludes capital distribution\n- Total includes them'}
-                aria-label="Cash flow mode help"
-              >
-                ⓘ
-              </span>
-            </div>
             <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
               {KPI_FRAME_OPTIONS.map((option) => (
                 <button
@@ -415,7 +389,15 @@ export default function Dashboard() {
           <>
             <KpiCards cards={selectedKpiCards} />
 
-            <TrendLineChart data={model.trend} metric="net" title="Monthly Net Cash Flow" enableTimeframeControl />
+            <TrendLineChart
+              data={model.trend}
+              metric="net"
+              title="Monthly Net Cash Flow"
+              enableTimeframeControl
+              showCashFlowToggle
+              cashFlowMode={cashFlowMode}
+              onCashFlowModeChange={setCashFlowMode}
+            />
 
             <div className="two-col-grid">
               <article className="card preview-card">

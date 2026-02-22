@@ -229,6 +229,13 @@ body {
   flex-wrap: wrap;
 }
 
+.chart-cashflow-toggle-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .cashflow-label {
   color: #4b617f;
   font-size: 0.82rem;
@@ -264,17 +271,84 @@ body {
 }
 
 .cashflow-tooltip {
+  appearance: none;
+  border: 1px solid #d5e2f6;
   display: inline-grid;
   place-items: center;
   width: 20px;
   height: 20px;
   border-radius: 999px;
   color: #6a7f98;
-  border: 1px solid #d5e2f6;
   background: #f7faff;
   font-size: 0.8rem;
   cursor: help;
   user-select: none;
+  line-height: 1;
+  padding: 0;
+}
+
+.cashflow-help {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.cashflow-tooltip-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 260px;
+  border: 1px solid #d4def1;
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(248, 251, 255, 0.98) 0%, rgba(238, 244, 255, 0.96) 100%);
+  box-shadow: 0 10px 22px rgba(24, 49, 89, 0.14);
+  color: #2f4a6b;
+  padding: 10px 12px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  display: none;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.cashflow-tooltip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.cashflow-tooltip-list li {
+  margin: 0;
+  position: relative;
+  padding-left: 12px;
+}
+
+.cashflow-tooltip-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.45em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #6d8fed;
+}
+
+.cashflow-tooltip-list strong {
+  color: #1f3c80;
+  font-weight: 700;
+}
+
+.cashflow-help:hover .cashflow-tooltip-panel,
+.cashflow-help:focus-within .cashflow-tooltip-panel {
+  display: block;
+}
+
+.cashflow-tooltip:focus-visible {
+  outline: 2px solid #6a8eef;
+  outline-offset: 2px;
 }
 
 .view-toggle button {
