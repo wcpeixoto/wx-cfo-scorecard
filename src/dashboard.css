@@ -222,6 +222,61 @@ body {
   box-shadow: 0 2px 10px rgba(31, 58, 107, 0.1);
 }
 
+.cashflow-toggle-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cashflow-label {
+  color: #4b617f;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.cashflow-toggle {
+  display: inline-flex;
+  background: #edf3ff;
+  border: 1px solid #d5e2f6;
+  border-radius: 12px;
+  padding: 3px;
+  gap: 4px;
+}
+
+.cashflow-toggle button {
+  border: none;
+  background: transparent;
+  color: #4e6076;
+  border-radius: 9px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.cashflow-toggle button.is-active {
+  background: #ffffff;
+  color: #1d3f84;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(31, 58, 107, 0.1);
+}
+
+.cashflow-tooltip {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  color: #6a7f98;
+  border: 1px solid #d5e2f6;
+  background: #f7faff;
+  font-size: 0.8rem;
+  cursor: help;
+  user-select: none;
+}
+
 .view-toggle button {
   border: none;
   background: transparent;

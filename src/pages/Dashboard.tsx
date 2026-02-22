@@ -25,6 +25,7 @@ type NavItem = {
 };
 
 type DataViewMode = 'actuals' | 'all';
+type CashFlowMode = 'operating' | 'total';
 type KpiFrameOption = { value: KpiComparisonTimeframe; label: string };
 
 const NAV_ITEMS: NavItem[] = [
@@ -85,6 +86,7 @@ export default function Dashboard() {
   const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(DEFAULT_SCENARIO);
   const [dataViewMode, setDataViewMode] = useState<DataViewMode>('actuals');
   const [kpiTimeframe, setKpiTimeframe] = useState<KpiComparisonTimeframe>('ttm');
+  const [cashFlowMode, setCashFlowMode] = useState<CashFlowMode>('operating');
 
   const runSync = useCallback(async () => {
     setLoading(true);
@@ -310,6 +312,32 @@ export default function Dashboard() {
           </div>
 
           <div className="top-controls">
+            <div className="cashflow-toggle-wrap" role="group" aria-label="Cash Flow mode selector">
+              <span className="cashflow-label">Cash Flow:</span>
+              <div className="cashflow-toggle">
+                <button
+                  type="button"
+                  className={cashFlowMode === 'operating' ? 'is-active' : ''}
+                  onClick={() => setCashFlowMode('operating')}
+                >
+                  Operating
+                </button>
+                <button
+                  type="button"
+                  className={cashFlowMode === 'total' ? 'is-active' : ''}
+                  onClick={() => setCashFlowMode('total')}
+                >
+                  Total
+                </button>
+              </div>
+              <span
+                className="cashflow-tooltip"
+                title={'- Operating excludes capital distribution\n- Total includes them'}
+                aria-label="Cash flow mode help"
+              >
+                ⓘ
+              </span>
+            </div>
             <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
               {KPI_FRAME_OPTIONS.map((option) => (
                 <button
