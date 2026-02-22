@@ -1,4 +1,5 @@
 export type TxnType = 'income' | 'expense';
+export type CashFlowMode = 'operating' | 'total';
 
 export type Txn = {
   id: string;

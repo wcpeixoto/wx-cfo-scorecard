@@ -8,7 +8,7 @@ import TrendLineChart from '../components/TrendLineChart';
 import { buildDataSet, splitActualsAndProjections } from '../lib/data/normalize';
 import { fetchSheetCsv } from '../lib/data/fetchCsv';
 import { computeDashboardModel, projectScenario, toMonthLabel } from '../lib/kpis/compute';
-import type { DataSet, KpiCard, KpiComparisonTimeframe, ScenarioInput, TrendPoint } from '../lib/data/contract';
+import type { CashFlowMode, DataSet, KpiCard, KpiComparisonTimeframe, ScenarioInput, TrendPoint } from '../lib/data/contract';
 
 type TabId =
   | 'big-picture'
@@ -25,7 +25,6 @@ type NavItem = {
 };
 
 type DataViewMode = 'actuals' | 'all';
-type CashFlowMode = 'operating' | 'total';
 type KpiFrameOption = { value: KpiComparisonTimeframe; label: string };
 
 const NAV_ITEMS: NavItem[] = [
@@ -131,12 +130,16 @@ export default function Dashboard() {
     });
   }, [baseTxns, query]);
 
-  const model = useMemo(() => computeDashboardModel(filteredTxns), [filteredTxns]);
+  const model = useMemo(
+    () => computeDashboardModel(filteredTxns, { cashFlowMode }),
+    [filteredTxns, cashFlowMode]
+  );
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
 
     const summaryRows = Object.values(model.kpiAggregationByTimeframe).map((item) => ({
+      cashFlowMode,
       timeframe: item.timeframe,
       range: item.startMonth && item.endMonth ? `${item.startMonth}..${item.endMonth}` : 'n/a',
       months: item.monthCount,
@@ -152,6 +155,7 @@ export default function Dashboard() {
     console.groupEnd();
 
     const comparisonRows = Object.values(model.kpiComparisonByTimeframe).map((item) => ({
+      cashFlowMode,
       timeframe: item.timeframe,
       headerLabel: model.kpiHeaderLabelByTimeframe[item.timeframe],
       currentRange: item.currentStartMonth && item.currentEndMonth ? `${item.currentStartMonth}..${item.currentEndMonth}` : 'n/a',
@@ -169,7 +173,7 @@ export default function Dashboard() {
     console.groupCollapsed('[KPI Comparisons]');
     console.table(comparisonRows);
     console.groupEnd();
-  }, [model.kpiAggregationByTimeframe, model.kpiComparisonByTimeframe, model.kpiHeaderLabelByTimeframe]);
+  }, [cashFlowMode, model.kpiAggregationByTimeframe, model.kpiComparisonByTimeframe, model.kpiHeaderLabelByTimeframe]);
 
   const scenarioProjection = useMemo(() => projectScenario(model, scenarioInput), [model, scenarioInput]);
   const scenarioTrend = useMemo<TrendPoint[]>(

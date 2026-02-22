@@ -1,4 +1,5 @@
 import type {
+  CashFlowMode,
   DashboardModel,
   ExpenseSlice,
   KpiAggregate,
@@ -109,8 +110,16 @@ function addMonths(month: string, offset: number): string {
   return `${nextYear}-${nextMonth}`;
 }
 
-export function computeMonthlyRollups(txns: Txn[]): MonthlyRollup[] {
-  const monthMap = new Map<string, MonthlyRollup>();
+function isCapitalDistribution(category: string): boolean {
+  return category.trim().toLowerCase() === 'capital distribution';
+}
+
+type InternalMonthlyRollup = MonthlyRollup & {
+  capitalDistribution: number;
+};
+
+export function computeMonthlyRollups(txns: Txn[], cashFlowMode: CashFlowMode = 'operating'): MonthlyRollup[] {
+  const monthMap = new Map<string, InternalMonthlyRollup>();
 
   txns.forEach((txn) => {
     if (!monthMap.has(txn.month)) {
@@ -121,6 +130,7 @@ export function computeMonthlyRollups(txns: Txn[]): MonthlyRollup[] {
         netCashFlow: 0,
         savingsRate: 0,
         transactionCount: 0,
+        capitalDistribution: 0,
       });
     }
 
@@ -131,20 +141,28 @@ export function computeMonthlyRollups(txns: Txn[]): MonthlyRollup[] {
       rollup.revenue += txn.amount;
     } else {
       rollup.expenses += txn.amount;
+      if (isCapitalDistribution(txn.category)) {
+        rollup.capitalDistribution += txn.amount;
+      }
     }
 
-    rollup.netCashFlow = rollup.revenue - rollup.expenses;
+    const effectiveExpenses =
+      cashFlowMode === 'operating'
+        ? rollup.expenses - rollup.capitalDistribution
+        : rollup.expenses;
+    rollup.netCashFlow = rollup.revenue - effectiveExpenses;
     rollup.transactionCount += 1;
   });
 
   return [...monthMap.values()]
     .sort((a, b) => sortMonths(a.month, b.month))
     .map((rollup) => ({
-      ...rollup,
+      month: rollup.month,
       revenue: round2(rollup.revenue),
       expenses: round2(rollup.expenses),
       netCashFlow: round2(rollup.netCashFlow),
       savingsRate: round2(rollup.revenue > EPSILON ? (rollup.netCashFlow / rollup.revenue) * 100 : 0),
+      transactionCount: rollup.transactionCount,
     }));
 }
 
@@ -571,8 +589,9 @@ function buildSummary(latest: MonthlyRollup, previous: MonthlyRollup | null, opp
   return bullets;
 }
 
-export function computeDashboardModel(txns: Txn[]): DashboardModel {
-  const monthlyRollups = computeMonthlyRollups(txns);
+export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: CashFlowMode }): DashboardModel {
+  const cashFlowMode = options?.cashFlowMode ?? 'operating';
+  const monthlyRollups = computeMonthlyRollups(txns, cashFlowMode);
 
   if (monthlyRollups.length === 0) {
     const emptyAggregations = computeKpiAggregations([]);
