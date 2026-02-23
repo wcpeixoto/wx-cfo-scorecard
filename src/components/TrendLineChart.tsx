@@ -563,7 +563,6 @@ export default function TrendLineChart({
   const activePointIndex =
     activeIndex !== null && activeIndex >= 0 && activeIndex < points.length ? activeIndex : null;
   const activePoint = activePointIndex !== null ? points[activePointIndex] ?? null : null;
-  const activeTrendValue = activePointIndex !== null ? trendValues[activePointIndex] ?? null : null;
   const hasTrend = trendValues.length === points.length && trendValues.length > 0;
   const trendNoteLabel =
     trendMode === 'linear' ? 'Trend: linear' : `Trend: ${trendWindow ?? getAdaptiveAverageWindow(scopedData.length)}-mo avg`;
@@ -774,10 +773,8 @@ export default function TrendLineChart({
               {`Net cash flow: ${formatCurrencyValue(activePoint.value)}`}
             </text>
             {showNetEnhancements && (
-              <text x={tooltipBoxX(activePoint.x) + 10} y={tooltipBoxY(activePoint.y, 3) + 42} className="tooltip-line">
-                {`Trend (${trendMode === 'linear' ? 'linear' : `${trendWindow ?? getAdaptiveAverageWindow(scopedData.length)}-mo avg`}): ${
-                  activeTrendValue === null ? '—' : formatCurrencyValue(activeTrendValue)
-                }`}
+              <text x={tooltipBoxX(activePoint.x) + 10} y={tooltipBoxY(activePoint.y, 3) + 42} className="tooltip-hint">
+                Click the chart to view details
               </text>
             )}
           </g>

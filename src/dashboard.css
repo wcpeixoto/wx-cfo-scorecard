@@ -871,6 +871,11 @@ body {
   font-size: 11px;
 }
 
+.tooltip-hint {
+  fill: #7b8da5;
+  font-size: 10px;
+}
+
 .axis-label {
   fill: #6a7f98;
   font-size: 12px;
