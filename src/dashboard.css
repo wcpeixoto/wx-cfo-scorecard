@@ -963,6 +963,7 @@ body {
 
 .tooltip-line-value {
   fill: #556e8c;
+  font-weight: 700;
 }
 
 .tooltip-line-value.is-positive {
