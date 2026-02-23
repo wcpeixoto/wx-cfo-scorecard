@@ -201,7 +201,7 @@ export default function Dashboard() {
   const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(DEFAULT_SCENARIO);
   const [dataViewMode, setDataViewMode] = useState<DataViewMode>('actuals');
   const [kpiTimeframe, setKpiTimeframe] = useState<KpiComparisonTimeframe>('ttm');
-  const [cashFlowMode, setCashFlowMode] = useState<CashFlowMode>('operating');
+  const [cashFlowMode, setCashFlowMode] = useState<CashFlowMode>('total');
 
   const runSync = useCallback(async () => {
     setLoading(true);
@@ -241,7 +241,7 @@ export default function Dashboard() {
 
       setActiveTab(tab ?? 'big-picture');
       setDataViewMode(view ?? 'actuals');
-      setCashFlowMode(cashFlow ?? 'operating');
+      setCashFlowMode(cashFlow ?? 'total');
       setQuery(nextQuery ?? '');
       setDigHereFocusMonth(validRange ? null : month);
       setDigHereStartMonth(validRange ? startMonth : null);

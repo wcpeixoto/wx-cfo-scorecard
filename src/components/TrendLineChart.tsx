@@ -549,7 +549,7 @@ export default function TrendLineChart({
   const activePoint = activePointIndex !== null ? points[activePointIndex] ?? null : null;
   const hasTrend = trendValues.length === points.length && trendValues.length > 0;
   const trendNoteLabel =
-    trendMode === 'linear' ? 'Trend: linear' : `Trend: ${trendWindow ?? getAdaptiveAverageWindow(scopedData.length)}-mo avg`;
+    trendMode === 'linear' ? null : `Trend: ${trendWindow ?? getAdaptiveAverageWindow(scopedData.length)}-mo avg`;
 
   const gradientId = gradientIdFor(title, metric);
 
@@ -566,17 +566,17 @@ export default function TrendLineChart({
                   <div className="cashflow-toggle">
                     <button
                       type="button"
-                      className={cashFlowMode === 'operating' ? 'is-active' : ''}
-                      onClick={() => onCashFlowModeChange?.('operating')}
-                    >
-                      Operating
-                    </button>
-                    <button
-                      type="button"
                       className={cashFlowMode === 'total' ? 'is-active' : ''}
                       onClick={() => onCashFlowModeChange?.('total')}
                     >
                       Total
+                    </button>
+                    <button
+                      type="button"
+                      className={cashFlowMode === 'operating' ? 'is-active' : ''}
+                      onClick={() => onCashFlowModeChange?.('operating')}
+                    >
+                      Operating
                     </button>
                   </div>
                   <div className="cashflow-help">
@@ -591,10 +591,10 @@ export default function TrendLineChart({
                     <div id={cashFlowTooltipId} role="tooltip" className="cashflow-tooltip-panel">
                       <ul className="cashflow-tooltip-list">
                         <li>
-                          <strong>Operating</strong> excludes capital distribution
+                          <strong>Total</strong> includes them
                         </li>
                         <li>
-                          <strong>Total</strong> includes them
+                          <strong>Operating</strong> excludes capital distribution
                         </li>
                       </ul>
                     </div>
@@ -635,7 +635,7 @@ export default function TrendLineChart({
             </div>
           )}
           <p className="subtle">{rangeLabel}</p>
-          {hasTrend && <p className="subtle trend-note">{trendNoteLabel}</p>}
+          {hasTrend && trendNoteLabel && <p className="subtle trend-note">{trendNoteLabel}</p>}
         </div>
       </div>
 
