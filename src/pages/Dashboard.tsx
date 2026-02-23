@@ -291,6 +291,11 @@ export default function Dashboard() {
     [filteredTxns, cashFlowMode]
   );
 
+  const totalModeModel = useMemo(
+    () => computeDashboardModel(filteredTxns, { cashFlowMode: 'total' }),
+    [filteredTxns]
+  );
+
   const digHereTxns = useMemo(() => {
     if (digHereStartMonth && digHereEndMonth) {
       return filteredTxns.filter((txn) => txn.month >= digHereStartMonth && txn.month <= digHereEndMonth);
@@ -994,6 +999,7 @@ export default function Dashboard() {
             <TrajectoryPanel signals={model.trajectorySignals} />
             <TrendLineChart
               data={model.trend}
+              axisDomainData={totalModeModel.trend}
               metric="net"
               title="Monthly Net Cash Flow"
               enableTimeframeControl

@@ -7,6 +7,7 @@ type TrendMetric = 'income' | 'expense' | 'net';
 
 type TrendLineChartProps = {
   data: TrendPoint[];
+  axisDomainData?: TrendPoint[];
   metric: TrendMetric;
   title: string;
   enableTimeframeControl?: boolean;
@@ -175,6 +176,42 @@ function buildPositiveAxis(maxRaw: number): AxisConfig {
     min: 0,
     max: roundedMax,
     ticks: [0, quarter, quarter * 2, quarter * 3, roundedMax],
+  };
+}
+
+function chooseNetTickStep(range: number): number {
+  if (range < 15000) return 2500;
+  if (range <= 40000) return 5000;
+  return 10000;
+}
+
+function buildStableNetAxis(values: number[], trendValues: number[]): AxisConfig {
+  if (values.length === 0) {
+    return {
+      min: -5000,
+      max: 5000,
+      ticks: [-5000, -2500, 0, 2500, 5000],
+    };
+  }
+
+  const allValues = [...values, ...trendValues];
+  const minRaw = Math.min(...allValues, 0);
+  const maxRaw = Math.max(...allValues, 0);
+  const span = Math.max(maxRaw - minRaw, 1);
+  const paddedMin = minRaw - span * 0.12;
+  const paddedMax = maxRaw + span * 0.12;
+  const step = chooseNetTickStep(paddedMax - paddedMin);
+  const min = Math.floor(Math.min(paddedMin, 0) / step) * step;
+  const max = Math.ceil(Math.max(paddedMax, 0) / step) * step;
+  const ticks: number[] = [];
+  for (let current = min; current <= max + step * 0.1; current += step) {
+    ticks.push(current);
+  }
+
+  return {
+    min,
+    max,
+    ticks,
   };
 }
 
@@ -350,6 +387,7 @@ function gradientIdFor(title: string, metric: TrendMetric): string {
 
 export default function TrendLineChart({
   data,
+  axisDomainData,
   metric,
   title,
   enableTimeframeControl = false,
@@ -400,6 +438,13 @@ export default function TrendLineChart({
     return data.slice(-timeframe);
   }, [data, enableTimeframeControl, timeframe]);
 
+  const scopedAxisDomainData = useMemo(() => {
+    const source = axisDomainData ?? data;
+    if (!enableTimeframeControl) return source;
+    if (timeframe === 'all') return source;
+    return source.slice(-timeframe);
+  }, [axisDomainData, data, enableTimeframeControl, timeframe]);
+
   const innerWidth = WIDTH - PADDING_X * 2;
   const innerHeight = HEIGHT - PADDING_TOP - PADDING_BOTTOM;
 
@@ -439,9 +484,38 @@ export default function TrendLineChart({
       return Number.isFinite(numeric) ? numeric : 0;
     });
 
+    const averageScope: TimeframeOption | number = enableTimeframeControl ? timeframe : scopedData.length;
+    const averageWindow = getAdaptiveAverageWindow(averageScope);
+    const isNetMetric = metric === 'net';
+
+    let computedTrendValues: number[] = [];
+    let computedTrendMode: 'ma' | 'linear' = 'ma';
+    let computedTrendWindow: number | null = null;
+    let computedTrendSlope: number | null = null;
+
+    if (isNetMetric) {
+      const linear = computeLinearTrendLine(values);
+      computedTrendValues = linear.values;
+      computedTrendMode = 'linear';
+      computedTrendSlope = linear.slopePerMonth;
+    } else {
+      computedTrendValues = computeProgressiveMovingAverage(values, averageWindow);
+      computedTrendMode = 'ma';
+      computedTrendWindow = averageWindow;
+    }
+
     const minRaw = Math.min(...values, 0);
     const maxRaw = Math.max(...values, 0);
-    const axis = metric === 'net' ? buildSymmetricNetAxis(Math.max(Math.abs(minRaw), Math.abs(maxRaw))) : buildPositiveAxis(maxRaw);
+    const axisDomainValues = isNetMetric
+      ? scopedAxisDomainData.map((item) => {
+          const numeric = Number(item.net);
+          return Number.isFinite(numeric) ? numeric : 0;
+        })
+      : [];
+    const axisDomainTrendValues = isNetMetric ? computeLinearTrendLine(axisDomainValues).values : [];
+    const axis = isNetMetric
+      ? buildStableNetAxis(axisDomainValues, axisDomainTrendValues)
+      : buildPositiveAxis(maxRaw);
     const range = Math.max(axis.max - axis.min, 1);
 
     const step = scopedData.length > 1 ? innerWidth / (scopedData.length - 1) : 0;
@@ -466,26 +540,6 @@ export default function TrendLineChart({
         ? `${line} L ${computedPoints[computedPoints.length - 1].x} ${zeroY} L ${computedPoints[0].x} ${zeroY} Z`
         : '';
 
-    const averageScope: TimeframeOption | number = enableTimeframeControl ? timeframe : scopedData.length;
-    const averageWindow = getAdaptiveAverageWindow(averageScope);
-    const isNetMetric = metric === 'net';
-
-    let computedTrendValues: number[] = [];
-    let computedTrendMode: 'ma' | 'linear' = 'ma';
-    let computedTrendWindow: number | null = null;
-    let computedTrendSlope: number | null = null;
-
-    if (isNetMetric) {
-      const linear = computeLinearTrendLine(values);
-      computedTrendValues = linear.values;
-      computedTrendMode = 'linear';
-      computedTrendSlope = linear.slopePerMonth;
-    } else {
-      computedTrendValues = computeProgressiveMovingAverage(values, averageWindow);
-      computedTrendMode = 'ma';
-      computedTrendWindow = averageWindow;
-    }
-
     const computedTrendPath = isNetMetric
       ? buildLinearTrendPath(computedPoints, computedTrendValues, axis.max, range, innerHeight)
       : buildTrendPath(computedPoints, computedTrendValues, axis.max, range, innerHeight);
@@ -504,7 +558,7 @@ export default function TrendLineChart({
       yTicks: axis.ticks,
       xTickIndices: buildAdaptiveXAxisTickIndices(computedPoints, innerWidth),
     };
-  }, [scopedData, metric, innerHeight, innerWidth, enableTimeframeControl, timeframe]);
+  }, [scopedData, scopedAxisDomainData, metric, innerHeight, innerWidth, enableTimeframeControl, timeframe]);
 
   useEffect(() => {
     if (points.length === 0) {
