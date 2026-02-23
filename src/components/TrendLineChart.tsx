@@ -38,11 +38,6 @@ type TimeframeItem = {
   label: string;
 };
 
-type MoMBadge = {
-  text: string;
-  tone: 'up' | 'down' | 'neutral';
-};
-
 const WIDTH = 760;
 const HEIGHT = 280;
 const PADDING_X = 74;
@@ -199,17 +194,6 @@ function formatCurrencyValue(value: number): string {
     currency: 'USD',
     maximumFractionDigits: 0,
   });
-}
-
-function formatSignedCurrency(value: number): string {
-  const sign = value > EPSILON ? '+' : value < -EPSILON ? '-' : '';
-  return `${sign}${formatCurrencyValue(Math.abs(value))}`;
-}
-
-function formatSignedPercent(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return '—';
-  const sign = value > EPSILON ? '+' : '';
-  return `${sign}${value.toFixed(1)}%`;
 }
 
 type XAxisCadence = 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
@@ -567,22 +551,6 @@ export default function TrendLineChart({
   const trendNoteLabel =
     trendMode === 'linear' ? 'Trend: linear' : `Trend: ${trendWindow ?? getAdaptiveAverageWindow(scopedData.length)}-mo avg`;
 
-  const momBadge: MoMBadge = (() => {
-    if (!showNetEnhancements || points.length < 2) {
-      return { text: 'MoM: —', tone: 'neutral' };
-    }
-
-    const latest = points[points.length - 1].value;
-    const previous = points[points.length - 2].value;
-    const delta = latest - previous;
-    const pct = Math.abs(previous) > EPSILON ? (delta / Math.abs(previous)) * 100 : null;
-
-    return {
-      text: `MoM: ${formatSignedCurrency(delta)} (${formatSignedPercent(pct)})`,
-      tone: delta > EPSILON ? 'up' : delta < -EPSILON ? 'down' : 'neutral',
-    };
-  })();
-
   const gradientId = gradientIdFor(title, metric);
 
   return (
@@ -664,7 +632,6 @@ export default function TrendLineChart({
                   </ul>
                 )}
               </div>
-              {showNetEnhancements && <span className={`mom-badge is-${momBadge.tone}`}>{momBadge.text}</span>}
             </div>
           )}
           <p className="subtle">{rangeLabel}</p>

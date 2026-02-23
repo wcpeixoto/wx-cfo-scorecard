@@ -794,7 +794,7 @@ body {
 }
 
 .chart-head {
-  align-items: center;
+  align-items: flex-start;
 }
 
 .chart-head-right {
@@ -864,33 +864,6 @@ body {
   background: #e7efff;
   color: #1d3f84;
   font-weight: 700;
-}
-
-.mom-badge {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  min-height: 30px;
-  padding: 0 10px;
-  font-size: 0.79rem;
-  border: 1px solid #d8e3f7;
-}
-
-.mom-badge.is-up {
-  color: #1f8e5f;
-  background: #e9f6ef;
-  border-color: #cdebdc;
-}
-
-.mom-badge.is-down {
-  color: #c85067;
-  background: #fdeef2;
-  border-color: #f4d3dc;
-}
-
-.mom-badge.is-neutral {
-  color: #5c718c;
-  background: #edf3ff;
 }
 
 .trend-note {
