@@ -678,7 +678,7 @@ body {
   font-size: 0.86rem;
 }
 
-.dig-here-focus-card button {
+.dig-here-focus-card > .dig-here-focus-actions > button {
   border: 1px solid #c7d7f1;
   background: #f4f8ff;
   color: #254675;
@@ -689,6 +689,104 @@ body {
   font-size: 0.8rem;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.dig-here-focus-actions {
+  position: relative;
+}
+
+.dig-here-month-picker {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 310px;
+  border: 1px solid #d5e2f7;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 14px 30px rgba(18, 40, 76, 0.14);
+  padding: 10px;
+  z-index: 40;
+  display: grid;
+  gap: 10px;
+}
+
+.dig-here-picker-mode {
+  border: 1px solid #d8e5f8;
+  background: #f5f8ff;
+  border-radius: 12px;
+  padding: 3px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.dig-here-picker-mode button {
+  border: none;
+  background: transparent;
+  color: #476282;
+  border-radius: 9px;
+  min-height: 30px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dig-here-picker-mode button.is-active {
+  background: #ffffff;
+  color: #1f4588;
+  box-shadow: 0 1px 4px rgba(30, 61, 117, 0.12);
+}
+
+.dig-here-picker-field {
+  color: #4b617d;
+  font-size: 0.76rem;
+  display: grid;
+  gap: 4px;
+}
+
+.dig-here-picker-field select {
+  border: 1px solid #d0dff5;
+  background: #f9fbff;
+  border-radius: 10px;
+  min-height: 34px;
+  padding: 0 10px;
+  color: #2e496a;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.dig-here-picker-period-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.dig-here-picker-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.dig-here-picker-buttons button {
+  border: none;
+  border-radius: 10px;
+  min-height: 32px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dig-here-picker-buttons .is-primary {
+  background: linear-gradient(120deg, #4f79ff 0%, #2f4ca4 100%);
+  color: #ffffff;
+}
+
+.dig-here-picker-buttons .is-ghost {
+  border: 1px solid #d3e1f6;
+  background: #f5f9ff;
+  color: #355679;
 }
 
 .chart-card {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { APP_TITLE, SHEET_CSV_FALLBACK_URL, SHEET_CSV_URL, STORAGE_KEYS } from '../config';
 import ExpenseDonut from '../components/ExpenseDonut';
 import DigHereHighlights from '../components/DigHereHighlights';
@@ -65,10 +65,12 @@ type DigHereHighlight = {
   deltaPercent: number | null;
 };
 
-type DigHereFocusContext = 'category-shifts' | 'month-drilldown' | null;
+type DigHereFocusContext = 'category-shifts' | 'month-drilldown' | 'custom-period' | null;
 type DigHereNavigationOptions = {
   category?: string;
   month?: string | null;
+  startMonth?: string | null;
+  endMonth?: string | null;
   focusContext?: DigHereFocusContext;
 };
 
@@ -182,7 +184,17 @@ export default function Dashboard() {
   const [draftCsvUrl, setDraftCsvUrl] = useState(getStoredCsvUrl);
   const [query, setQuery] = useState('');
   const [digHereFocusMonth, setDigHereFocusMonth] = useState<string | null>(null);
+  const [digHereStartMonth, setDigHereStartMonth] = useState<string | null>(null);
+  const [digHereEndMonth, setDigHereEndMonth] = useState<string | null>(null);
   const [digHereFocusContext, setDigHereFocusContext] = useState<DigHereFocusContext>(null);
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [monthPickerMode, setMonthPickerMode] = useState<'month' | 'period'>('month');
+  const [monthPickerDraftMonth, setMonthPickerDraftMonth] = useState<string>('');
+  const [monthPickerDraftStart, setMonthPickerDraftStart] = useState<string>('');
+  const [monthPickerDraftEnd, setMonthPickerDraftEnd] = useState<string>('');
+  const [shouldScrollDigHereFocus, setShouldScrollDigHereFocus] = useState(false);
+  const digHereFocusRef = useRef<HTMLElement>(null);
+  const monthPickerRef = useRef<HTMLDivElement>(null);
   const [dataSet, setDataSet] = useState<DataSet | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -221,14 +233,21 @@ export default function Dashboard() {
       const cashFlow = parseCashFlowMode(params.get('cf'));
       const nextQuery = params.get('q');
       const month = parseMonthToken(params.get('month'));
+      const startMonth = parseMonthToken(params.get('start'));
+      const endMonth = parseMonthToken(params.get('end'));
       const focusContext = parseDigHereFocusContext(params.get('focus'));
+
+      const validRange = startMonth && endMonth && startMonth <= endMonth;
 
       setActiveTab(tab ?? 'big-picture');
       setDataViewMode(view ?? 'actuals');
       setCashFlowMode(cashFlow ?? 'operating');
       setQuery(nextQuery ?? '');
-      setDigHereFocusMonth(month);
+      setDigHereFocusMonth(validRange ? null : month);
+      setDigHereStartMonth(validRange ? startMonth : null);
+      setDigHereEndMonth(validRange ? endMonth : null);
       setDigHereFocusContext(focusContext);
+      setShouldScrollDigHereFocus(Boolean((tab ?? 'big-picture') === 'dig-here' && (month || validRange)));
     };
 
     syncStateFromUrl();
@@ -259,12 +278,23 @@ export default function Dashboard() {
     });
   }, [baseTxns, query]);
 
+  const availableMonths = useMemo(
+    () =>
+      [...new Set(baseTxns.map((txn) => txn.month))]
+        .filter((month) => /^\d{4}-\d{2}$/.test(month))
+        .sort((a, b) => b.localeCompare(a)),
+    [baseTxns]
+  );
+
   const model = useMemo(
     () => computeDashboardModel(filteredTxns, { cashFlowMode }),
     [filteredTxns, cashFlowMode]
   );
 
   const digHereTxns = useMemo(() => {
+    if (digHereStartMonth && digHereEndMonth) {
+      return filteredTxns.filter((txn) => txn.month >= digHereStartMonth && txn.month <= digHereEndMonth);
+    }
     if (!digHereFocusMonth) return filteredTxns;
     const months = new Set<string>([digHereFocusMonth]);
     const previousMonth = previousMonthToken(digHereFocusMonth);
@@ -273,7 +303,7 @@ export default function Dashboard() {
     }
 
     return filteredTxns.filter((txn) => months.has(txn.month));
-  }, [digHereFocusMonth, filteredTxns]);
+  }, [digHereEndMonth, digHereFocusMonth, digHereStartMonth, filteredTxns]);
 
   const digHereModel = useMemo(
     () => computeDashboardModel(digHereTxns, { cashFlowMode }),
@@ -491,10 +521,17 @@ export default function Dashboard() {
   const selectedKpiComparison = model.kpiComparisonByTimeframe[kpiTimeframe];
   const selectedHeaderComparisonLabel = model.kpiHeaderLabelByTimeframe[kpiTimeframe] ?? 'Comparison unavailable';
   const selectedKpiFrameLabel = KPI_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? 'TTM';
-  const digHereFocusMonthLabel = digHereFocusMonth ? toMonthLabel(digHereFocusMonth) : null;
+  const digHereFocusPeriodLabel = useMemo(() => {
+    if (digHereStartMonth && digHereEndMonth) {
+      return `${toMonthLabel(digHereStartMonth)} – ${toMonthLabel(digHereEndMonth)}`;
+    }
+    if (digHereFocusMonth) return toMonthLabel(digHereFocusMonth);
+    return null;
+  }, [digHereEndMonth, digHereFocusMonth, digHereStartMonth]);
   const digHereFocusSummary = useMemo(() => {
     if (digHereFocusContext === 'category-shifts') return 'Focused from Dig Here Highlights';
     if (digHereFocusContext === 'month-drilldown') return 'Focused from Monthly Net Cash Flow';
+    if (digHereFocusContext === 'custom-period') return 'Focused custom period';
     return null;
   }, [digHereFocusContext]);
 
@@ -610,6 +647,61 @@ export default function Dashboard() {
     [latestRollup?.netCashFlow, selectedKpiCards, model.monthlyRollups.length]
   );
 
+  useEffect(() => {
+    if (!isMonthPickerOpen) return;
+
+    const preferredMonth = digHereFocusMonth ?? availableMonths[0] ?? '';
+    const preferredStart =
+      digHereStartMonth ??
+      availableMonths[availableMonths.length - 1] ??
+      availableMonths[0] ??
+      '';
+    const preferredEnd = digHereEndMonth ?? preferredMonth;
+
+    setMonthPickerDraftMonth(preferredMonth);
+    setMonthPickerDraftStart(preferredStart);
+    setMonthPickerDraftEnd(preferredEnd);
+    if (digHereStartMonth && digHereEndMonth) {
+      setMonthPickerMode('period');
+    }
+  }, [availableMonths, digHereEndMonth, digHereFocusMonth, digHereStartMonth, isMonthPickerOpen]);
+
+  useEffect(() => {
+    if (!isMonthPickerOpen) return;
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!monthPickerRef.current?.contains(event.target as Node)) {
+        setIsMonthPickerOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMonthPickerOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isMonthPickerOpen]);
+
+  useEffect(() => {
+    if (!shouldScrollDigHereFocus) return;
+    if (activeTab !== 'dig-here') return;
+    if (!digHereFocusRef.current) return;
+
+    const raf = window.requestAnimationFrame(() => {
+      digHereFocusRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      setShouldScrollDigHereFocus(false);
+    });
+
+    return () => window.cancelAnimationFrame(raf);
+  }, [activeTab, shouldScrollDigHereFocus]);
+
   const writeDashboardUrlState = useCallback(
     (
       next: {
@@ -618,6 +710,8 @@ export default function Dashboard() {
         cashFlow: CashFlowMode;
         queryText?: string;
         month?: string | null;
+        startMonth?: string | null;
+        endMonth?: string | null;
         focusContext?: DigHereFocusContext;
       },
       mode: 'push' | 'replace' = 'push'
@@ -640,6 +734,18 @@ export default function Dashboard() {
         url.searchParams.delete('month');
       }
 
+      if (next.startMonth) {
+        url.searchParams.set('start', next.startMonth);
+      } else {
+        url.searchParams.delete('start');
+      }
+
+      if (next.endMonth) {
+        url.searchParams.set('end', next.endMonth);
+      } else {
+        url.searchParams.delete('end');
+      }
+
       if (next.focusContext) {
         url.searchParams.set('focus', next.focusContext);
       } else {
@@ -658,12 +764,21 @@ export default function Dashboard() {
   const navigateToDigHere = useCallback(
     (options?: DigHereNavigationOptions) => {
       const nextQuery = options?.category?.trim() ?? query.trim();
-      const focusMonth =
-        options?.month ??
-        selectedKpiComparison?.currentEndMonth ??
-        model.latestMonth ??
-        null;
-      const focusContext = options?.focusContext ?? 'category-shifts';
+      const hasCustomRange = Boolean(
+        options?.startMonth &&
+          options?.endMonth &&
+          options.startMonth <= options.endMonth
+      );
+      const focusMonth = hasCustomRange
+        ? null
+        : options?.month ??
+          selectedKpiComparison?.currentEndMonth ??
+          model.latestMonth ??
+          null;
+      const startMonth = hasCustomRange ? options?.startMonth ?? null : null;
+      const endMonth = hasCustomRange ? options?.endMonth ?? null : null;
+      const focusContext =
+        options?.focusContext ?? (hasCustomRange ? 'custom-period' : 'category-shifts');
 
       writeDashboardUrlState(
         {
@@ -672,6 +787,8 @@ export default function Dashboard() {
           cashFlow: cashFlowMode,
           queryText: query,
           month: digHereFocusMonth,
+          startMonth: digHereStartMonth,
+          endMonth: digHereEndMonth,
           focusContext: digHereFocusContext,
         },
         'replace'
@@ -680,7 +797,10 @@ export default function Dashboard() {
       setActiveTab('dig-here');
       setQuery(nextQuery);
       setDigHereFocusMonth(focusMonth);
+      setDigHereStartMonth(startMonth);
+      setDigHereEndMonth(endMonth);
       setDigHereFocusContext(focusContext);
+      setShouldScrollDigHereFocus(true);
 
       writeDashboardUrlState({
         tab: 'dig-here',
@@ -688,6 +808,8 @@ export default function Dashboard() {
         cashFlow: cashFlowMode,
         queryText: nextQuery,
         month: focusMonth,
+        startMonth,
+        endMonth,
         focusContext,
       });
     },
@@ -696,7 +818,9 @@ export default function Dashboard() {
       cashFlowMode,
       dataViewMode,
       digHereFocusContext,
+      digHereEndMonth,
       digHereFocusMonth,
+      digHereStartMonth,
       model.latestMonth,
       query,
       selectedKpiComparison?.currentEndMonth,
@@ -704,18 +828,49 @@ export default function Dashboard() {
     ]
   );
 
-  const clearDigHereFocus = useCallback(() => {
-    setQuery('');
+  const resetDigHereFocus = useCallback(() => {
     setDigHereFocusMonth(null);
+    setDigHereStartMonth(null);
+    setDigHereEndMonth(null);
     setDigHereFocusContext(null);
     writeDashboardUrlState({
       tab: 'dig-here',
       view: dataViewMode,
       cashFlow: cashFlowMode,
       month: null,
+      startMonth: null,
+      endMonth: null,
       focusContext: null,
     });
   }, [cashFlowMode, dataViewMode, writeDashboardUrlState]);
+
+  const applyMonthChoice = useCallback(() => {
+    if (!monthPickerDraftMonth) return;
+    navigateToDigHere({
+      month: monthPickerDraftMonth,
+      focusContext: 'month-drilldown',
+    });
+    setIsMonthPickerOpen(false);
+  }, [monthPickerDraftMonth, navigateToDigHere]);
+
+  const applyPeriodChoice = useCallback(() => {
+    if (!monthPickerDraftStart || !monthPickerDraftEnd) return;
+    const startMonth =
+      monthPickerDraftStart <= monthPickerDraftEnd
+        ? monthPickerDraftStart
+        : monthPickerDraftEnd;
+    const endMonth =
+      monthPickerDraftStart <= monthPickerDraftEnd
+        ? monthPickerDraftEnd
+        : monthPickerDraftStart;
+
+    navigateToDigHere({
+      startMonth,
+      endMonth,
+      focusContext: 'custom-period',
+    });
+    setIsMonthPickerOpen(false);
+  }, [monthPickerDraftEnd, monthPickerDraftStart, navigateToDigHere]);
 
   function handleSaveCsvUrl() {
     const nextUrl = draftCsvUrl.trim();
@@ -945,18 +1100,108 @@ export default function Dashboard() {
 
         {activeTab === 'dig-here' && (
           <div className="stack-grid">
-            {(digHereFocusSummary || digHereFocusMonthLabel) && (
-              <article className="card dig-here-focus-card">
-                <p>
-                  {digHereFocusSummary ? `${digHereFocusSummary}` : 'Dig Here focus'}
-                  {digHereFocusMonthLabel ? ` • ${digHereFocusMonthLabel}` : ''}
-                  {query.trim() ? ` • "${query.trim()}"` : ''}
-                </p>
-                <button type="button" onClick={clearDigHereFocus}>
-                  Clear focus
+            <article className="card dig-here-focus-card" ref={digHereFocusRef}>
+              <p>
+                {digHereFocusSummary ? `${digHereFocusSummary}` : 'Choose a month or custom period for Dig Here'}
+                {digHereFocusPeriodLabel ? ` • ${digHereFocusPeriodLabel}` : ''}
+                {query.trim() ? ` • "${query.trim()}"` : ''}
+              </p>
+              <div className="dig-here-focus-actions" ref={monthPickerRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsMonthPickerOpen((current) => !current)}
+                  aria-expanded={isMonthPickerOpen}
+                  aria-haspopup="dialog"
+                >
+                  Choose Month
                 </button>
-              </article>
-            )}
+                {isMonthPickerOpen && (
+                  <div className="dig-here-month-picker" role="dialog" aria-label="Choose Dig Here month or period">
+                    <div className="dig-here-picker-mode" role="group" aria-label="Focus mode">
+                      <button
+                        type="button"
+                        className={monthPickerMode === 'month' ? 'is-active' : ''}
+                        onClick={() => setMonthPickerMode('month')}
+                      >
+                        Month
+                      </button>
+                      <button
+                        type="button"
+                        className={monthPickerMode === 'period' ? 'is-active' : ''}
+                        onClick={() => setMonthPickerMode('period')}
+                      >
+                        Custom period
+                      </button>
+                    </div>
+
+                    {monthPickerMode === 'month' ? (
+                      <label className="dig-here-picker-field">
+                        Month
+                        <select
+                          value={monthPickerDraftMonth}
+                          onChange={(event) => setMonthPickerDraftMonth(event.target.value)}
+                        >
+                          {availableMonths.map((month) => (
+                            <option key={month} value={month}>
+                              {toMonthLabel(month)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <div className="dig-here-picker-period-grid">
+                        <label className="dig-here-picker-field">
+                          Start
+                          <select
+                            value={monthPickerDraftStart}
+                            onChange={(event) => setMonthPickerDraftStart(event.target.value)}
+                          >
+                            {availableMonths.map((month) => (
+                              <option key={`start-${month}`} value={month}>
+                                {toMonthLabel(month)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="dig-here-picker-field">
+                          End
+                          <select
+                            value={monthPickerDraftEnd}
+                            onChange={(event) => setMonthPickerDraftEnd(event.target.value)}
+                          >
+                            {availableMonths.map((month) => (
+                              <option key={`end-${month}`} value={month}>
+                                {toMonthLabel(month)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    )}
+
+                    <div className="dig-here-picker-buttons">
+                      <button
+                        type="button"
+                        className="is-primary"
+                        onClick={monthPickerMode === 'month' ? applyMonthChoice : applyPeriodChoice}
+                      >
+                        Apply
+                      </button>
+                      <button
+                        type="button"
+                        className="is-ghost"
+                        onClick={() => {
+                          resetDigHereFocus();
+                          setIsMonthPickerOpen(false);
+                        }}
+                      >
+                        All Dates
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </article>
             <div className="tab-grid">
               <MoversList movers={digHereModel.movers} title="Dig Here Actions" />
               <TopPayeesTable payees={digHereModel.topPayees} />
