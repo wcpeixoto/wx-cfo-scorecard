@@ -139,7 +139,7 @@ function buildLinearTrendPath(points: PlotPoint[], values: number[], axisMax: nu
 }
 
 function timeframeLabel(value: TimeframeOption): string {
-  return TIMEFRAME_OPTIONS.find((option) => option.value === value)?.label ?? 'Last 24 months';
+  return TIMEFRAME_OPTIONS.find((option) => option.value === value)?.label ?? 'Last 12 months';
 }
 
 function getAdaptiveAverageWindow(timeframe: TimeframeOption | number): number {
@@ -358,7 +358,7 @@ export default function TrendLineChart({
   onCashFlowModeChange,
   onMonthPointClick,
 }: TrendLineChartProps) {
-  const [timeframe, setTimeframe] = useState<TimeframeOption>(24);
+  const [timeframe, setTimeframe] = useState<TimeframeOption>(12);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);

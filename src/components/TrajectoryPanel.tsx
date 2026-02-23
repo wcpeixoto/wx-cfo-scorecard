@@ -68,8 +68,7 @@ export default function TrajectoryPanel({ signals }: TrajectoryPanelProps) {
   return (
     <section className="card trajectory-card" aria-label="Trajectory three lights">
       <div className="card-head">
-        <h3>Trajectory</h3>
-        <p className="subtle">Three Lights · Net Cash Flow %</p>
+        <h3>Trajectory (Net Cash Flow)</h3>
       </div>
 
       <div className="trajectory-grid">
