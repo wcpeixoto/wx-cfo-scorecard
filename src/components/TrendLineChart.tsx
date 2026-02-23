@@ -575,63 +575,59 @@ export default function TrendLineChart({
                 Operating
               </button>
             </div>
+            <div className="cashflow-help">
+              <button
+                type="button"
+                className="cashflow-tooltip"
+                aria-label="Cash flow mode help"
+                aria-describedby={cashFlowTooltipId}
+              >
+                ⓘ
+              </button>
+              <div id={cashFlowTooltipId} role="tooltip" className="cashflow-tooltip-panel">
+                <ul className="cashflow-tooltip-list">
+                  <li>
+                    <strong>Operating</strong> excludes capital distribution
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
         )}
         <div className="chart-head-right">
-          {(enableTimeframeControl || showCashFlowControl) && (
+          {enableTimeframeControl && (
             <div className="chart-control-row">
-              {showCashFlowControl && (
-                <div className="cashflow-help">
-                  <button
-                    type="button"
-                    className="cashflow-tooltip"
-                    aria-label="Cash flow mode help"
-                    aria-describedby={cashFlowTooltipId}
-                  >
-                    ⓘ
-                  </button>
-                  <div id={cashFlowTooltipId} role="tooltip" className="cashflow-tooltip-panel">
-                    <ul className="cashflow-tooltip-list">
-                      <li>
-                        <strong>Operating</strong> excludes capital distribution
+              <div className="timeframe-menu" ref={menuRef}>
+                <button
+                  type="button"
+                  className="timeframe-trigger"
+                  onClick={() => setMenuOpen((current) => !current)}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                >
+                  {timeframeLabel(timeframe)} ▾
+                </button>
+                {menuOpen && (
+                  <ul className="timeframe-list" role="menu" aria-label="Select timeframe">
+                    {TIMEFRAME_OPTIONS.map((option) => (
+                      <li key={option.label}>
+                        <button
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={timeframe === option.value}
+                          className={timeframe === option.value ? 'is-active' : ''}
+                          onClick={() => {
+                            setTimeframe(option.value);
+                            setMenuOpen(false);
+                          }}
+                        >
+                          {option.label}
+                        </button>
                       </li>
-                    </ul>
-                  </div>
-                </div>
-              )}
-              {enableTimeframeControl && (
-                <div className="timeframe-menu" ref={menuRef}>
-                  <button
-                    type="button"
-                    className="timeframe-trigger"
-                    onClick={() => setMenuOpen((current) => !current)}
-                    aria-haspopup="menu"
-                    aria-expanded={menuOpen}
-                  >
-                    {timeframeLabel(timeframe)} ▾
-                  </button>
-                  {menuOpen && (
-                    <ul className="timeframe-list" role="menu" aria-label="Select timeframe">
-                      {TIMEFRAME_OPTIONS.map((option) => (
-                        <li key={option.label}>
-                          <button
-                            type="button"
-                            role="menuitemradio"
-                            aria-checked={timeframe === option.value}
-                            className={timeframe === option.value ? 'is-active' : ''}
-                            onClick={() => {
-                              setTimeframe(option.value);
-                              setMenuOpen(false);
-                            }}
-                          >
-                            {option.label}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
           <p className="subtle">{rangeLabel}</p>

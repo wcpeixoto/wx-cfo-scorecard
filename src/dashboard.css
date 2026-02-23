@@ -804,8 +804,9 @@ body {
 
 .chart-head-middle {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   justify-self: center;
+  gap: 10px;
 }
 
 .chart-head-has-center .chart-head-right {
