@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { APP_TITLE, SHEET_CSV_FALLBACK_URL, SHEET_CSV_URL, STORAGE_KEYS } from '../config';
 import ExpenseDonut from '../components/ExpenseDonut';
+import DigHereHighlights from '../components/DigHereHighlights';
 import KpiCards from '../components/KpiCards';
 import MoversList from '../components/MoversList';
 import TopPayeesTable from '../components/TopPayeesTable';
@@ -54,6 +55,46 @@ const KPI_FRAME_OPTIONS: KpiFrameOption[] = [
 const EPSILON = 0.00001;
 type TrendTimeframeOption = 6 | 12 | 24 | 36 | 'all';
 const TREND_TIMEFRAMES: TrendTimeframeOption[] = [6, 12, 24, 36, 'all'];
+const HIGHLIGHT_MIN_ABS_DELTA = 25;
+
+type DigHereHighlight = {
+  category: string;
+  current: number;
+  previous: number;
+  delta: number;
+  deltaPercent: number | null;
+};
+
+type DigHereFocusContext = 'category-shifts' | null;
+
+function parseTabId(value: string | null): TabId | null {
+  switch (value) {
+    case 'big-picture':
+    case 'money-left':
+    case 'dig-here':
+    case 'trends':
+    case 'what-if':
+    case 'settings':
+      return value;
+    default:
+      return null;
+  }
+}
+
+function parseDataViewMode(value: string | null): DataViewMode | null {
+  if (value === 'actuals' || value === 'all') return value;
+  return null;
+}
+
+function parseMonthToken(value: string | null): string | null {
+  if (!value) return null;
+  return /^\d{4}-\d{2}$/.test(value) ? value : null;
+}
+
+function parseDigHereFocusContext(value: string | null): DigHereFocusContext {
+  if (value === 'category-shifts') return value;
+  return null;
+}
 
 function adaptiveMaWindowByTimeframe(timeframe: TrendTimeframeOption): number {
   if (timeframe === 'all') return 12;
@@ -91,6 +132,16 @@ function isCapitalDistributionCategory(category: string): boolean {
     .some((segment) => segment === 'capital distribution');
 }
 
+function inMonthRange(month: string, startMonth: string | null, endMonth: string | null): boolean {
+  if (!startMonth || !endMonth) return false;
+  return month >= startMonth && month <= endMonth;
+}
+
+function toDeltaPercent(current: number, previous: number): number | null {
+  if (Math.abs(previous) <= EPSILON) return null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
 function getStoredCsvUrl(): string {
   if (typeof window === 'undefined') return SHEET_CSV_URL;
   try {
@@ -105,6 +156,8 @@ export default function Dashboard() {
   const [csvUrl, setCsvUrl] = useState(getStoredCsvUrl);
   const [draftCsvUrl, setDraftCsvUrl] = useState(getStoredCsvUrl);
   const [query, setQuery] = useState('');
+  const [digHereFocusMonth, setDigHereFocusMonth] = useState<string | null>(null);
+  const [digHereFocusContext, setDigHereFocusContext] = useState<DigHereFocusContext>(null);
   const [dataSet, setDataSet] = useState<DataSet | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -133,6 +186,29 @@ export default function Dashboard() {
     void runSync();
   }, [runSync]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncStateFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tab = parseTabId(params.get('tab'));
+      const view = parseDataViewMode(params.get('view'));
+      const nextQuery = params.get('q');
+      const month = parseMonthToken(params.get('month'));
+      const focusContext = parseDigHereFocusContext(params.get('focus'));
+
+      setActiveTab(tab ?? 'big-picture');
+      setDataViewMode(view ?? 'actuals');
+      setQuery(nextQuery ?? '');
+      setDigHereFocusMonth(month);
+      setDigHereFocusContext(focusContext);
+    };
+
+    syncStateFromUrl();
+    window.addEventListener('popstate', syncStateFromUrl);
+    return () => window.removeEventListener('popstate', syncStateFromUrl);
+  }, []);
+
   const dataSplit = useMemo(
     () => splitActualsAndProjections(dataSet?.txns ?? []),
     [dataSet?.txns]
@@ -159,6 +235,16 @@ export default function Dashboard() {
   const model = useMemo(
     () => computeDashboardModel(filteredTxns, { cashFlowMode }),
     [filteredTxns, cashFlowMode]
+  );
+
+  const digHereTxns = useMemo(() => {
+    if (!digHereFocusMonth) return filteredTxns;
+    return filteredTxns.filter((txn) => txn.month === digHereFocusMonth);
+  }, [digHereFocusMonth, filteredTxns]);
+
+  const digHereModel = useMemo(
+    () => computeDashboardModel(digHereTxns, { cashFlowMode }),
+    [digHereTxns, cashFlowMode]
   );
 
   useEffect(() => {
@@ -371,6 +457,72 @@ export default function Dashboard() {
   const previousRollup = model.monthlyRollups[model.monthlyRollups.length - 2] ?? null;
   const selectedKpiComparison = model.kpiComparisonByTimeframe[kpiTimeframe];
   const selectedHeaderComparisonLabel = model.kpiHeaderLabelByTimeframe[kpiTimeframe] ?? 'Comparison unavailable';
+  const selectedKpiFrameLabel = KPI_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? 'TTM';
+  const digHereFocusMonthLabel = digHereFocusMonth ? toMonthLabel(digHereFocusMonth) : null;
+  const digHereFocusSummary =
+    digHereFocusContext === 'category-shifts' ? 'Focused from Dig Here Highlights' : null;
+
+  const digHereHighlights = useMemo<DigHereHighlight[]>(() => {
+    if (!selectedKpiComparison) return [];
+    if (!selectedKpiComparison.currentEndMonth || !selectedKpiComparison.currentStartMonth) return [];
+
+    const includeCategory = (category: string) =>
+      cashFlowMode === 'total' || !isCapitalDistributionCategory(category);
+
+    const currentTotals = new Map<string, number>();
+    const previousTotals = new Map<string, number>();
+
+    filteredTxns.forEach((txn) => {
+      if (txn.type !== 'expense') return;
+      if (!includeCategory(txn.category)) return;
+
+      if (
+        inMonthRange(
+          txn.month,
+          selectedKpiComparison.currentStartMonth,
+          selectedKpiComparison.currentEndMonth
+        )
+      ) {
+        currentTotals.set(txn.category, (currentTotals.get(txn.category) ?? 0) + txn.amount);
+      }
+
+      if (
+        inMonthRange(
+          txn.month,
+          selectedKpiComparison.previousStartMonth,
+          selectedKpiComparison.previousEndMonth
+        )
+      ) {
+        previousTotals.set(txn.category, (previousTotals.get(txn.category) ?? 0) + txn.amount);
+      }
+    });
+
+    const categories = new Set<string>([...currentTotals.keys(), ...previousTotals.keys()]);
+    const highlights = [...categories].map<DigHereHighlight>((category) => {
+      const current = currentTotals.get(category) ?? 0;
+      const previous = previousTotals.get(category) ?? 0;
+      const delta = current - previous;
+      return {
+        category,
+        current,
+        previous,
+        delta,
+        deltaPercent: toDeltaPercent(current, previous),
+      };
+    });
+
+    return highlights
+      .filter((item) => Math.abs(item.delta) >= HIGHLIGHT_MIN_ABS_DELTA)
+      .sort((a, b) => {
+        const aNegativePriority = a.delta > EPSILON ? 1 : 0;
+        const bNegativePriority = b.delta > EPSILON ? 1 : 0;
+        if (aNegativePriority !== bNegativePriority) {
+          return bNegativePriority - aNegativePriority;
+        }
+        return Math.abs(b.delta) - Math.abs(a.delta);
+      })
+      .slice(0, 5);
+  }, [cashFlowMode, filteredTxns, selectedKpiComparison]);
 
   const selectedKpiCards = useMemo<KpiCard[]>(() => {
     if (!selectedKpiComparison) return model.kpiCards;
@@ -422,7 +574,54 @@ export default function Dashboard() {
     [latestRollup?.netCashFlow, selectedKpiCards, model.monthlyRollups.length]
   );
 
-  const rightPanelActions = model.digHerePreview.slice(0, 4);
+  const navigateToDigHere = useCallback(
+    (category?: string) => {
+      const nextQuery = category?.trim() ?? query.trim();
+      const focusMonth = selectedKpiComparison?.currentEndMonth ?? model.latestMonth ?? null;
+
+      setActiveTab('dig-here');
+      setDataViewMode(dataViewMode);
+      setQuery(nextQuery);
+      setDigHereFocusMonth(focusMonth);
+      setDigHereFocusContext('category-shifts');
+
+      if (typeof window === 'undefined') return;
+
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', 'dig-here');
+      url.searchParams.set('view', dataViewMode);
+      url.searchParams.set('focus', 'category-shifts');
+      if (nextQuery) {
+        url.searchParams.set('q', nextQuery);
+      } else {
+        url.searchParams.delete('q');
+      }
+      if (focusMonth) {
+        url.searchParams.set('month', focusMonth);
+      } else {
+        url.searchParams.delete('month');
+      }
+
+      window.history.pushState({}, '', url);
+    },
+    [dataViewMode, model.latestMonth, query, selectedKpiComparison?.currentEndMonth]
+  );
+
+  const clearDigHereFocus = useCallback(() => {
+    setQuery('');
+    setDigHereFocusMonth(null);
+    setDigHereFocusContext(null);
+
+    if (typeof window === 'undefined') return;
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', 'dig-here');
+    url.searchParams.set('view', dataViewMode);
+    url.searchParams.delete('q');
+    url.searchParams.delete('month');
+    url.searchParams.delete('focus');
+    window.history.pushState({}, '', url);
+  }, [dataViewMode]);
 
   function handleSaveCsvUrl() {
     const nextUrl = draftCsvUrl.trim();
@@ -544,6 +743,12 @@ export default function Dashboard() {
           <>
             <KpiCards cards={selectedKpiCards} />
             <TrajectoryPanel signals={model.trajectorySignals} />
+            <DigHereHighlights
+              items={digHereHighlights}
+              timeframeLabel={`${selectedKpiFrameLabel} comparison`}
+              onTitleClick={() => navigateToDigHere()}
+              onItemClick={(item) => navigateToDigHere(item.category)}
+            />
 
             <TrendLineChart
               data={model.trend}
@@ -572,7 +777,7 @@ export default function Dashboard() {
                 </ul>
               </article>
 
-              <MoversList movers={model.movers.slice(0, 5)} title="Dig Here (Preview)" />
+              <TopPayeesTable payees={model.topPayees} />
             </div>
 
             <div className="two-col-grid">
@@ -634,9 +839,23 @@ export default function Dashboard() {
         )}
 
         {activeTab === 'dig-here' && (
-          <div className="tab-grid">
-            <MoversList movers={model.movers} title="Dig Here Actions" />
-            <TopPayeesTable payees={model.topPayees} />
+          <div className="stack-grid">
+            {(digHereFocusSummary || digHereFocusMonthLabel) && (
+              <article className="card dig-here-focus-card">
+                <p>
+                  {digHereFocusSummary ? `${digHereFocusSummary}` : 'Dig Here focus'}
+                  {digHereFocusMonthLabel ? ` • ${digHereFocusMonthLabel}` : ''}
+                  {query.trim() ? ` • "${query.trim()}"` : ''}
+                </p>
+                <button type="button" onClick={clearDigHereFocus}>
+                  Clear focus
+                </button>
+              </article>
+            )}
+            <div className="tab-grid">
+              <MoversList movers={digHereModel.movers} title="Dig Here Actions" />
+              <TopPayeesTable payees={digHereModel.topPayees} />
+            </div>
           </div>
         )}
 
@@ -813,18 +1032,6 @@ export default function Dashboard() {
               vs previous {previousRollup ? formatCurrency(previousRollup.netCashFlow) : 'n/a'}
             </span>
           </div>
-        </section>
-
-        <section className="right-card">
-          <h4>Dig Here Priorities</h4>
-          <ul>
-            {rightPanelActions.map((item) => (
-              <li key={item.title}>
-                <span>{item.title}</span>
-                <strong>{formatCurrency(item.savings)}</strong>
-              </li>
-            ))}
-          </ul>
         </section>
 
         <section className="right-card">
