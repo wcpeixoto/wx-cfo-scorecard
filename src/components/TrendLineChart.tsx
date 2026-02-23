@@ -591,10 +591,10 @@ export default function TrendLineChart({
                     <div id={cashFlowTooltipId} role="tooltip" className="cashflow-tooltip-panel">
                       <ul className="cashflow-tooltip-list">
                         <li>
-                          <strong>Total</strong> includes them
+                          <strong>Total</strong> includes capital distribution
                         </li>
                         <li>
-                          <strong>Operating</strong> excludes capital distribution
+                          <strong>Operating</strong> excludes them
                         </li>
                       </ul>
                     </div>
