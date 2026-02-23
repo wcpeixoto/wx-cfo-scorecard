@@ -65,7 +65,12 @@ type DigHereHighlight = {
   deltaPercent: number | null;
 };
 
-type DigHereFocusContext = 'category-shifts' | null;
+type DigHereFocusContext = 'category-shifts' | 'month-drilldown' | null;
+type DigHereNavigationOptions = {
+  category?: string;
+  month?: string | null;
+  focusContext?: DigHereFocusContext;
+};
 
 function parseTabId(value: string | null): TabId | null {
   switch (value) {
@@ -92,7 +97,12 @@ function parseMonthToken(value: string | null): string | null {
 }
 
 function parseDigHereFocusContext(value: string | null): DigHereFocusContext {
-  if (value === 'category-shifts') return value;
+  if (value === 'category-shifts' || value === 'month-drilldown') return value;
+  return null;
+}
+
+function parseCashFlowMode(value: string | null): CashFlowMode | null {
+  if (value === 'operating' || value === 'total') return value;
   return null;
 }
 
@@ -193,12 +203,14 @@ export default function Dashboard() {
       const params = new URLSearchParams(window.location.search);
       const tab = parseTabId(params.get('tab'));
       const view = parseDataViewMode(params.get('view'));
+      const cashFlow = parseCashFlowMode(params.get('cf'));
       const nextQuery = params.get('q');
       const month = parseMonthToken(params.get('month'));
       const focusContext = parseDigHereFocusContext(params.get('focus'));
 
       setActiveTab(tab ?? 'big-picture');
       setDataViewMode(view ?? 'actuals');
+      setCashFlowMode(cashFlow ?? 'operating');
       setQuery(nextQuery ?? '');
       setDigHereFocusMonth(month);
       setDigHereFocusContext(focusContext);
@@ -459,8 +471,11 @@ export default function Dashboard() {
   const selectedHeaderComparisonLabel = model.kpiHeaderLabelByTimeframe[kpiTimeframe] ?? 'Comparison unavailable';
   const selectedKpiFrameLabel = KPI_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? 'TTM';
   const digHereFocusMonthLabel = digHereFocusMonth ? toMonthLabel(digHereFocusMonth) : null;
-  const digHereFocusSummary =
-    digHereFocusContext === 'category-shifts' ? 'Focused from Dig Here Highlights' : null;
+  const digHereFocusSummary = useMemo(() => {
+    if (digHereFocusContext === 'category-shifts') return 'Focused from Dig Here Highlights';
+    if (digHereFocusContext === 'month-drilldown') return 'Focused from Monthly Net Cash Flow';
+    return null;
+  }, [digHereFocusContext]);
 
   const digHereHighlights = useMemo<DigHereHighlight[]>(() => {
     if (!selectedKpiComparison) return [];
@@ -574,54 +589,112 @@ export default function Dashboard() {
     [latestRollup?.netCashFlow, selectedKpiCards, model.monthlyRollups.length]
   );
 
-  const navigateToDigHere = useCallback(
-    (category?: string) => {
-      const nextQuery = category?.trim() ?? query.trim();
-      const focusMonth = selectedKpiComparison?.currentEndMonth ?? model.latestMonth ?? null;
-
-      setActiveTab('dig-here');
-      setDataViewMode(dataViewMode);
-      setQuery(nextQuery);
-      setDigHereFocusMonth(focusMonth);
-      setDigHereFocusContext('category-shifts');
-
+  const writeDashboardUrlState = useCallback(
+    (
+      next: {
+        tab: TabId;
+        view: DataViewMode;
+        cashFlow: CashFlowMode;
+        queryText?: string;
+        month?: string | null;
+        focusContext?: DigHereFocusContext;
+      },
+      mode: 'push' | 'replace' = 'push'
+    ) => {
       if (typeof window === 'undefined') return;
-
       const url = new URL(window.location.href);
-      url.searchParams.set('tab', 'dig-here');
-      url.searchParams.set('view', dataViewMode);
-      url.searchParams.set('focus', 'category-shifts');
-      if (nextQuery) {
-        url.searchParams.set('q', nextQuery);
+      url.searchParams.set('tab', next.tab);
+      url.searchParams.set('view', next.view);
+      url.searchParams.set('cf', next.cashFlow);
+
+      if (next.queryText?.trim()) {
+        url.searchParams.set('q', next.queryText.trim());
       } else {
         url.searchParams.delete('q');
       }
-      if (focusMonth) {
-        url.searchParams.set('month', focusMonth);
+
+      if (next.month) {
+        url.searchParams.set('month', next.month);
       } else {
         url.searchParams.delete('month');
       }
 
-      window.history.pushState({}, '', url);
+      if (next.focusContext) {
+        url.searchParams.set('focus', next.focusContext);
+      } else {
+        url.searchParams.delete('focus');
+      }
+
+      if (mode === 'replace') {
+        window.history.replaceState({}, '', url);
+      } else {
+        window.history.pushState({}, '', url);
+      }
     },
-    [dataViewMode, model.latestMonth, query, selectedKpiComparison?.currentEndMonth]
+    []
+  );
+
+  const navigateToDigHere = useCallback(
+    (options?: DigHereNavigationOptions) => {
+      const nextQuery = options?.category?.trim() ?? query.trim();
+      const focusMonth =
+        options?.month ??
+        selectedKpiComparison?.currentEndMonth ??
+        model.latestMonth ??
+        null;
+      const focusContext = options?.focusContext ?? 'category-shifts';
+
+      writeDashboardUrlState(
+        {
+          tab: activeTab,
+          view: dataViewMode,
+          cashFlow: cashFlowMode,
+          queryText: query,
+          month: digHereFocusMonth,
+          focusContext: digHereFocusContext,
+        },
+        'replace'
+      );
+
+      setActiveTab('dig-here');
+      setQuery(nextQuery);
+      setDigHereFocusMonth(focusMonth);
+      setDigHereFocusContext(focusContext);
+
+      writeDashboardUrlState({
+        tab: 'dig-here',
+        view: dataViewMode,
+        cashFlow: cashFlowMode,
+        queryText: nextQuery,
+        month: focusMonth,
+        focusContext,
+      });
+    },
+    [
+      activeTab,
+      cashFlowMode,
+      dataViewMode,
+      digHereFocusContext,
+      digHereFocusMonth,
+      model.latestMonth,
+      query,
+      selectedKpiComparison?.currentEndMonth,
+      writeDashboardUrlState,
+    ]
   );
 
   const clearDigHereFocus = useCallback(() => {
     setQuery('');
     setDigHereFocusMonth(null);
     setDigHereFocusContext(null);
-
-    if (typeof window === 'undefined') return;
-
-    const url = new URL(window.location.href);
-    url.searchParams.set('tab', 'dig-here');
-    url.searchParams.set('view', dataViewMode);
-    url.searchParams.delete('q');
-    url.searchParams.delete('month');
-    url.searchParams.delete('focus');
-    window.history.pushState({}, '', url);
-  }, [dataViewMode]);
+    writeDashboardUrlState({
+      tab: 'dig-here',
+      view: dataViewMode,
+      cashFlow: cashFlowMode,
+      month: null,
+      focusContext: null,
+    });
+  }, [cashFlowMode, dataViewMode, writeDashboardUrlState]);
 
   function handleSaveCsvUrl() {
     const nextUrl = draftCsvUrl.trim();
@@ -747,7 +820,12 @@ export default function Dashboard() {
               items={digHereHighlights}
               timeframeLabel={`${selectedKpiFrameLabel} comparison`}
               onTitleClick={() => navigateToDigHere()}
-              onItemClick={(item) => navigateToDigHere(item.category)}
+              onItemClick={(item) =>
+                navigateToDigHere({
+                  category: item.category,
+                  focusContext: 'category-shifts',
+                })
+              }
             />
 
             <TrendLineChart
@@ -758,6 +836,12 @@ export default function Dashboard() {
               showCashFlowToggle
               cashFlowMode={cashFlowMode}
               onCashFlowModeChange={setCashFlowMode}
+              onMonthPointClick={(month) =>
+                navigateToDigHere({
+                  month,
+                  focusContext: 'month-drilldown',
+                })
+              }
             />
 
             <div className="two-col-grid">

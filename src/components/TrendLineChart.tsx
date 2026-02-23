@@ -13,6 +13,7 @@ type TrendLineChartProps = {
   showCashFlowToggle?: boolean;
   cashFlowMode?: CashFlowMode;
   onCashFlowModeChange?: (nextMode: CashFlowMode) => void;
+  onMonthPointClick?: (month: string) => void;
 };
 
 type PlotPoint = {
@@ -371,6 +372,7 @@ export default function TrendLineChart({
   showCashFlowToggle = false,
   cashFlowMode,
   onCashFlowModeChange,
+  onMonthPointClick,
 }: TrendLineChartProps) {
   const [timeframe, setTimeframe] = useState<TimeframeOption>(24);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -710,6 +712,8 @@ export default function TrendLineChart({
                 r={isLatest ? 5.1 : 3.8}
                 className={isLatest ? 'trend-dot-latest' : 'trend-dot'}
                 onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => onMonthPointClick?.(point.month)}
+                style={onMonthPointClick ? { cursor: 'pointer' } : undefined}
               />
             </g>
           );
@@ -727,6 +731,8 @@ export default function TrendLineChart({
               height={innerHeight}
               fill="transparent"
               onMouseEnter={() => setActiveIndex(index)}
+              onClick={() => onMonthPointClick?.(point.month)}
+              style={onMonthPointClick ? { cursor: 'pointer' } : undefined}
             />
           );
         })}
