@@ -791,12 +791,26 @@ body {
   align-items: flex-start;
 }
 
-.chart-head-left {
+.chart-head-title {
+  margin: 0;
+}
+
+.chart-head-has-center {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 12px;
+}
+
+.chart-head-middle {
   display: inline-flex;
   align-items: baseline;
-  gap: 10px;
-  min-height: 36px;
-  flex-wrap: wrap;
+  justify-self: center;
+}
+
+.chart-head-has-center .chart-head-right {
+  grid-column: 3;
+  justify-self: end;
 }
 
 .chart-head-right {
@@ -1393,6 +1407,20 @@ body {
 
   .chart-head-right {
     align-items: flex-start;
+  }
+
+  .chart-head-has-center {
+    grid-template-columns: 1fr;
+    row-gap: 10px;
+  }
+
+  .chart-head-middle {
+    justify-self: start;
+  }
+
+  .chart-head-has-center .chart-head-right {
+    grid-column: 1;
+    justify-self: start;
   }
 
   .chart-control-row {

@@ -555,30 +555,28 @@ export default function TrendLineChart({
 
   return (
     <article className="card chart-card">
-      <div className="card-head chart-head">
-        <div className="chart-head-left">
-          <h3>{title}</h3>
-          {showCashFlowControl && (
-            <div className="chart-cashflow-toggle-wrap" role="group" aria-label="Cash Flow mode selector">
-              <div className="cashflow-toggle">
-                <button
-                  type="button"
-                  className={cashFlowMode === 'total' ? 'is-active' : ''}
-                  onClick={() => onCashFlowModeChange?.('total')}
-                >
-                  Total
-                </button>
-                <button
-                  type="button"
-                  className={cashFlowMode === 'operating' ? 'is-active' : ''}
-                  onClick={() => onCashFlowModeChange?.('operating')}
-                >
-                  Operating
-                </button>
-              </div>
+      <div className={`card-head chart-head${showCashFlowControl ? ' chart-head-has-center' : ''}`}>
+        <h3 className="chart-head-title">{title}</h3>
+        {showCashFlowControl && (
+          <div className="chart-head-middle" role="group" aria-label="Cash Flow mode selector">
+            <div className="cashflow-toggle">
+              <button
+                type="button"
+                className={cashFlowMode === 'total' ? 'is-active' : ''}
+                onClick={() => onCashFlowModeChange?.('total')}
+              >
+                Total
+              </button>
+              <button
+                type="button"
+                className={cashFlowMode === 'operating' ? 'is-active' : ''}
+                onClick={() => onCashFlowModeChange?.('operating')}
+              >
+                Operating
+              </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
         <div className="chart-head-right">
           {(enableTimeframeControl || showCashFlowControl) && (
             <div className="chart-control-row">
