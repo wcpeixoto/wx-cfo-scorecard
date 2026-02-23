@@ -556,79 +556,84 @@ export default function TrendLineChart({
   return (
     <article className="card chart-card">
       <div className="card-head chart-head">
-        <h3>{title}</h3>
+        <div className="chart-head-left">
+          <h3>{title}</h3>
+          {showCashFlowControl && (
+            <div className="chart-cashflow-toggle-wrap" role="group" aria-label="Cash Flow mode selector">
+              <div className="cashflow-toggle">
+                <button
+                  type="button"
+                  className={cashFlowMode === 'total' ? 'is-active' : ''}
+                  onClick={() => onCashFlowModeChange?.('total')}
+                >
+                  Total
+                </button>
+                <button
+                  type="button"
+                  className={cashFlowMode === 'operating' ? 'is-active' : ''}
+                  onClick={() => onCashFlowModeChange?.('operating')}
+                >
+                  Operating
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
         <div className="chart-head-right">
           {(enableTimeframeControl || showCashFlowControl) && (
             <div className="chart-control-row">
               {showCashFlowControl && (
-                <div className="chart-cashflow-toggle-wrap" role="group" aria-label="Cash Flow mode selector">
-                  <span className="cashflow-label">Cash Flow:</span>
-                  <div className="cashflow-toggle">
-                    <button
-                      type="button"
-                      className={cashFlowMode === 'total' ? 'is-active' : ''}
-                      onClick={() => onCashFlowModeChange?.('total')}
-                    >
-                      Total
-                    </button>
-                    <button
-                      type="button"
-                      className={cashFlowMode === 'operating' ? 'is-active' : ''}
-                      onClick={() => onCashFlowModeChange?.('operating')}
-                    >
-                      Operating
-                    </button>
-                  </div>
-                  <div className="cashflow-help">
-                    <button
-                      type="button"
-                      className="cashflow-tooltip"
-                      aria-label="Cash flow mode help"
-                      aria-describedby={cashFlowTooltipId}
-                    >
-                      ⓘ
-                    </button>
-                    <div id={cashFlowTooltipId} role="tooltip" className="cashflow-tooltip-panel">
-                      <ul className="cashflow-tooltip-list">
-                        <li>
-                          <strong>Operating</strong> excludes capital distribution
-                        </li>
-                      </ul>
-                    </div>
+                <div className="cashflow-help">
+                  <button
+                    type="button"
+                    className="cashflow-tooltip"
+                    aria-label="Cash flow mode help"
+                    aria-describedby={cashFlowTooltipId}
+                  >
+                    ⓘ
+                  </button>
+                  <div id={cashFlowTooltipId} role="tooltip" className="cashflow-tooltip-panel">
+                    <ul className="cashflow-tooltip-list">
+                      <li>
+                        <strong>Operating</strong> excludes capital distribution
+                      </li>
+                    </ul>
                   </div>
                 </div>
               )}
-              <div className="timeframe-menu" ref={menuRef}>
-                <button
-                  type="button"
-                  className="timeframe-trigger"
-                  onClick={() => setMenuOpen((current) => !current)}
-                  aria-haspopup="menu"
-                  aria-expanded={menuOpen}
-                >
-                  {timeframeLabel(timeframe)} ▾
-                </button>
-                {menuOpen && (
-                  <ul className="timeframe-list" role="menu" aria-label="Select timeframe">
-                    {TIMEFRAME_OPTIONS.map((option) => (
-                      <li key={option.label}>
-                        <button
-                          type="button"
-                          role="menuitemradio"
-                          aria-checked={timeframe === option.value}
-                          className={timeframe === option.value ? 'is-active' : ''}
-                          onClick={() => {
-                            setTimeframe(option.value);
-                            setMenuOpen(false);
-                          }}
-                        >
-                          {option.label}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              {enableTimeframeControl && (
+                <div className="timeframe-menu" ref={menuRef}>
+                  <button
+                    type="button"
+                    className="timeframe-trigger"
+                    onClick={() => setMenuOpen((current) => !current)}
+                    aria-haspopup="menu"
+                    aria-expanded={menuOpen}
+                  >
+                    {timeframeLabel(timeframe)} ▾
+                  </button>
+                  {menuOpen && (
+                    <ul className="timeframe-list" role="menu" aria-label="Select timeframe">
+                      {TIMEFRAME_OPTIONS.map((option) => (
+                        <li key={option.label}>
+                          <button
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={timeframe === option.value}
+                            className={timeframe === option.value ? 'is-active' : ''}
+                            onClick={() => {
+                              setTimeframe(option.value);
+                              setMenuOpen(false);
+                            }}
+                          >
+                            {option.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <p className="subtle">{rangeLabel}</p>

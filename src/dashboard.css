@@ -236,12 +236,6 @@ body {
   flex-wrap: wrap;
 }
 
-.cashflow-label {
-  color: #4b617f;
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
 .cashflow-toggle {
   display: inline-flex;
   background: #edf3ff;
@@ -797,18 +791,28 @@ body {
   align-items: flex-start;
 }
 
+.chart-head-left {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 36px;
+  flex-wrap: wrap;
+}
+
 .chart-head-right {
-  display: grid;
-  justify-items: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 6px;
 }
 
 .chart-control-row {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  min-height: 36px;
 }
 
 .timeframe-menu {
@@ -1388,7 +1392,7 @@ body {
   }
 
   .chart-head-right {
-    justify-items: start;
+    align-items: flex-start;
   }
 
   .chart-control-row {
