@@ -992,18 +992,6 @@ export default function Dashboard() {
           <>
             <KpiCards cards={selectedKpiCards} />
             <TrajectoryPanel signals={model.trajectorySignals} />
-            <DigHereHighlights
-              items={digHereHighlights}
-              timeframeLabel={`${selectedKpiFrameLabel} comparison`}
-              onTitleClick={() => navigateToDigHere()}
-              onItemClick={(item) =>
-                navigateToDigHere({
-                  category: item.category,
-                  focusContext: 'category-shifts',
-                })
-              }
-            />
-
             <TrendLineChart
               data={model.trend}
               metric="net"
@@ -1016,6 +1004,18 @@ export default function Dashboard() {
                 navigateToDigHere({
                   month,
                   focusContext: 'month-drilldown',
+                })
+              }
+            />
+
+            <DigHereHighlights
+              items={digHereHighlights}
+              timeframeLabel={`${selectedKpiFrameLabel} comparison`}
+              onTitleClick={() => navigateToDigHere()}
+              onItemClick={(item) =>
+                navigateToDigHere({
+                  category: item.category,
+                  focusContext: 'category-shifts',
                 })
               }
             />
