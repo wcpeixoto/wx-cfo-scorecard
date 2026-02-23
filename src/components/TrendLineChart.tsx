@@ -733,7 +733,18 @@ export default function TrendLineChart({
               {toMonthLabel(activePoint.month)}
             </text>
             <text x={tooltipBoxX(activePoint.x) + 10} y={tooltipBoxY(activePoint.y, showNetEnhancements ? 3 : 2) + 28} className="tooltip-line">
-              {`Net cash flow: ${formatCurrencyValue(activePoint.value)}`}
+              <tspan>Net cash flow: </tspan>
+              <tspan
+                className={
+                  activePoint.value > EPSILON
+                    ? 'tooltip-line-value is-positive'
+                    : activePoint.value < -EPSILON
+                      ? 'tooltip-line-value is-negative'
+                      : 'tooltip-line-value'
+                }
+              >
+                {formatCurrencyValue(activePoint.value)}
+              </tspan>
             </text>
             {showNetEnhancements && (
               <text x={tooltipBoxX(activePoint.x) + 10} y={tooltipBoxY(activePoint.y, 3) + 42} className="tooltip-hint">

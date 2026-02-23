@@ -961,6 +961,18 @@ body {
   font-size: 11px;
 }
 
+.tooltip-line-value {
+  fill: #556e8c;
+}
+
+.tooltip-line-value.is-positive {
+  fill: #4f78ff;
+}
+
+.tooltip-line-value.is-negative {
+  fill: #cf4f68;
+}
+
 .tooltip-hint {
   fill: #7b8da5;
   font-size: 10px;
