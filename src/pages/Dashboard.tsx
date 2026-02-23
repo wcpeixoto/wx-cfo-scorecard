@@ -96,6 +96,21 @@ function parseMonthToken(value: string | null): string | null {
   return /^\d{4}-\d{2}$/.test(value) ? value : null;
 }
 
+function previousMonthToken(month: string): string | null {
+  const match = month.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number.parseInt(match[1], 10);
+  const monthNumber = Number.parseInt(match[2], 10);
+  if (!Number.isFinite(year) || !Number.isFinite(monthNumber) || monthNumber < 1 || monthNumber > 12) {
+    return null;
+  }
+
+  const date = new Date(Date.UTC(year, monthNumber - 2, 1));
+  const prevYear = date.getUTCFullYear();
+  const prevMonth = String(date.getUTCMonth() + 1).padStart(2, '0');
+  return `${prevYear}-${prevMonth}`;
+}
+
 function parseDigHereFocusContext(value: string | null): DigHereFocusContext {
   if (value === 'category-shifts' || value === 'month-drilldown') return value;
   return null;
@@ -251,7 +266,13 @@ export default function Dashboard() {
 
   const digHereTxns = useMemo(() => {
     if (!digHereFocusMonth) return filteredTxns;
-    return filteredTxns.filter((txn) => txn.month === digHereFocusMonth);
+    const months = new Set<string>([digHereFocusMonth]);
+    const previousMonth = previousMonthToken(digHereFocusMonth);
+    if (previousMonth) {
+      months.add(previousMonth);
+    }
+
+    return filteredTxns.filter((txn) => months.has(txn.month));
   }, [digHereFocusMonth, filteredTxns]);
 
   const digHereModel = useMemo(
