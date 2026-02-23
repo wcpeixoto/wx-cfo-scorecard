@@ -5,9 +5,11 @@ import KpiCards from '../components/KpiCards';
 import MoversList from '../components/MoversList';
 import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
+import TrajectoryPanel from '../components/TrajectoryPanel';
+import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { buildDataSet, splitActualsAndProjections } from '../lib/data/normalize';
 import { fetchSheetCsv } from '../lib/data/fetchCsv';
-import { computeDashboardModel, projectScenario, toMonthLabel } from '../lib/kpis/compute';
+import { buildPrePhase4DebugReport, computeDashboardModel, projectScenario, toMonthLabel } from '../lib/kpis/compute';
 import type { CashFlowMode, DataSet, KpiCard, KpiComparisonTimeframe, ScenarioInput, TrendPoint } from '../lib/data/contract';
 
 type TabId =
@@ -50,6 +52,15 @@ const KPI_FRAME_OPTIONS: KpiFrameOption[] = [
   { value: 'last36Months', label: '36M' },
 ];
 const EPSILON = 0.00001;
+type TrendTimeframeOption = 6 | 12 | 24 | 36 | 'all';
+const TREND_TIMEFRAMES: TrendTimeframeOption[] = [6, 12, 24, 36, 'all'];
+
+function adaptiveMaWindowByTimeframe(timeframe: TrendTimeframeOption): number {
+  if (timeframe === 'all') return 12;
+  if (timeframe <= 6) return 3;
+  if (timeframe <= 24) return 6;
+  return 12;
+}
 
 function formatCurrency(value: number): string {
   return value.toLocaleString(undefined, {
@@ -152,53 +163,197 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
+    const debug = buildPrePhase4DebugReport(model.monthlyRollups, filteredTxns);
 
-    const summaryRows = Object.values(model.kpiAggregationByTimeframe).map((item) => ({
-      cashFlowMode,
-      timeframe: item.timeframe,
-      range: item.startMonth && item.endMonth ? `${item.startMonth}..${item.endMonth}` : 'n/a',
-      months: item.monthCount,
-      txns: item.transactionCount,
-      revenue: item.revenue,
-      expenses: item.expenses,
-      netCashFlow: item.netCashFlow,
-      savingsRate: item.savingsRate,
-    }));
+    const trendValidationRows = TREND_TIMEFRAMES.flatMap((timeframe) => {
+      const scopedTrend = timeframe === 'all' ? model.trend : model.trend.slice(-timeframe);
+      const metrics: Array<'income' | 'expense' | 'net'> = ['income', 'expense', 'net'];
 
-    console.groupCollapsed('[KPI Aggregations]');
-    console.table(summaryRows);
-    console.groupEnd();
+      return metrics.map((metric) => {
+        const values = scopedTrend.map((point) => point[metric]);
+        if (metric === 'net') {
+          const linear = computeLinearTrendLine(values);
+          const slopeSign =
+            linear.slopePerMonth > EPSILON ? 'up' : linear.slopePerMonth < -EPSILON ? 'down' : 'flat';
+          return {
+            timeframe: timeframe === 'all' ? 'all' : `${timeframe}m`,
+            metric,
+            trendType: 'linear',
+            trendWindow: 'n/a',
+            visibleMonths: values.length,
+            trendLength: linear.values.length,
+            firstExists: values.length > 0 ? Number.isFinite(linear.values[0]) : false,
+            lastExists: values.length > 0 ? Number.isFinite(linear.values[linear.values.length - 1]) : false,
+            slopePerMonth: Number(linear.slopePerMonth.toFixed(2)),
+            slopeSign,
+          };
+        }
 
-    const comparisonRows = Object.values(model.kpiComparisonByTimeframe).map((item) => ({
-      cashFlowMode,
-      timeframe: item.timeframe,
-      headerLabel: model.kpiHeaderLabelByTimeframe[item.timeframe],
-      currentRange: item.currentStartMonth && item.currentEndMonth ? `${item.currentStartMonth}..${item.currentEndMonth}` : 'n/a',
-      previousRange: item.previousStartMonth && item.previousEndMonth ? `${item.previousStartMonth}..${item.previousEndMonth}` : 'n/a',
-      revenueDelta: item.revenue.delta,
-      revenuePct: item.revenue.percentChange,
-      expensesDelta: item.expenses.delta,
-      expensesPct: item.expenses.percentChange,
-      netDelta: item.netCashFlow.delta,
-      netPct: item.netCashFlow.percentChange,
-      savingsRateDelta: item.savingsRate.delta,
-      savingsRatePct: item.savingsRate.percentChange,
-    }));
+        const window = adaptiveMaWindowByTimeframe(timeframe);
+        const ma = computeProgressiveMovingAverage(values, window);
+        return {
+          timeframe: timeframe === 'all' ? 'all' : `${timeframe}m`,
+          metric,
+          trendType: 'ma',
+          trendWindow: window,
+          visibleMonths: values.length,
+          trendLength: ma.length,
+          firstExists: values.length > 0 ? Number.isFinite(ma[0]) : false,
+          lastExists: values.length > 0 ? Number.isFinite(ma[ma.length - 1]) : false,
+          slopePerMonth: 'n/a',
+          slopeSign: 'n/a',
+        };
+      });
+    });
 
-    console.groupCollapsed('[KPI Comparisons]');
-    console.table(comparisonRows);
-    console.groupEnd();
+    const runEdgeCase = (label: string, txnsForCase: typeof filteredTxns, caseCashFlowMode: CashFlowMode) => {
+      try {
+        const caseModel = computeDashboardModel(txnsForCase, { cashFlowMode: caseCashFlowMode });
+        const caseDebug = buildPrePhase4DebugReport(caseModel.monthlyRollups, txnsForCase);
+        return {
+          case: label,
+          status: 'ok',
+          months: caseModel.monthlyRollups.length,
+          latestMonth: caseModel.latestMonth || 'n/a',
+          latestUsesMaxDate: caseDebug.latestMonthUsesMaxDate,
+          thisMonthRevenue: caseDebug.windowRows.find((row) => row.timeframe === 'thisMonth')?.revenue ?? 0,
+          ttmNet: caseDebug.windowRows.find((row) => row.timeframe === 'last12Months')?.netCashFlow ?? 0,
+        };
+      } catch (caseError) {
+        return {
+          case: label,
+          status: 'error',
+          message: caseError instanceof Error ? caseError.message : 'unknown error',
+        };
+      }
+    };
+
+    const oppositeCashFlowMode: CashFlowMode = cashFlowMode === 'operating' ? 'total' : 'operating';
+    const edgeCaseRows = [
+      runEdgeCase('Short history (1 month)', filteredTxns.slice(-1), cashFlowMode),
+      runEdgeCase('Short history (2 months)', filteredTxns.slice(-2), cashFlowMode),
+      runEdgeCase('All dates window', filteredTxns, cashFlowMode),
+      {
+        case: 'Rapid timeframe switch simulation',
+        status: 'ok',
+        simulatedTimeframes: TREND_TIMEFRAMES.map((item) => (item === 'all' ? 'all' : `${item}m`)).join(', '),
+      },
+      runEdgeCase('Search filter applied (live state)', filteredTxns, cashFlowMode),
+      runEdgeCase(`Cash Flow toggled (${oppositeCashFlowMode})`, filteredTxns, oppositeCashFlowMode),
+    ];
 
     const matchedCapitalDistribution = filteredTxns.filter(
       (txn) => txn.type === 'expense' && isCapitalDistributionCategory(txn.category)
     );
     const matchedExpenseTotal = matchedCapitalDistribution.reduce((sum, txn) => sum + txn.amount, 0);
-    console.info('[Cash Flow Mode Debug]', {
+
+    const failureReasons: string[] = [];
+
+    if (!debug.latestMonthUsesMaxDate) {
+      failureReasons.push('Latest month in rollups does not match max month from transactions.');
+    }
+
+    debug.windowRows.forEach((row) => {
+      if (row.monthCount > 0 && (row.startMonth === 'n/a' || row.endMonth === 'n/a')) {
+        failureReasons.push(`Timeframe ${row.timeframe} has months but missing start/end month labels.`);
+      }
+      if (![row.revenue, row.expenses, row.netCashFlow, row.savingsRate].every((value) => Number.isFinite(value))) {
+        failureReasons.push(`Timeframe ${row.timeframe} has non-finite KPI totals.`);
+      }
+    });
+
+    debug.comparisonRows.forEach((row) => {
+      const metricSnapshots = [row.revenue, row.expenses, row.netCashFlow, row.savingsRate];
+      metricSnapshots.forEach((metric, index) => {
+        const metricName = ['revenue', 'expenses', 'netCashFlow', 'savingsRate'][index];
+        if (!Number.isFinite(metric.current) || !Number.isFinite(metric.previous) || !Number.isFinite(metric.delta)) {
+          failureReasons.push(`Comparison ${row.timeframe} has non-finite ${metricName} values.`);
+        }
+        if (metric.previous === 0 && metric.percentChange !== null) {
+          failureReasons.push(`Comparison ${row.timeframe} has percentChange for ${metricName} while previous is 0.`);
+        }
+      });
+    });
+
+    trendValidationRows.forEach((row) => {
+      if (row.trendLength !== row.visibleMonths) {
+        failureReasons.push(
+          `Trend ${row.metric} ${row.timeframe} length mismatch (${row.trendLength} vs ${row.visibleMonths}).`
+        );
+      }
+      if (row.visibleMonths > 0 && (!row.firstExists || !row.lastExists)) {
+        failureReasons.push(`Trend ${row.metric} ${row.timeframe} is missing first/last point.`);
+      }
+      if (row.metric === 'net' && row.trendType !== 'linear') {
+        failureReasons.push(`Net trend for ${row.timeframe} is not linear.`);
+      }
+    });
+
+    const edgeCaseFailures = edgeCaseRows.filter((row) => row.status === 'error');
+    edgeCaseFailures.forEach((row) => {
+      failureReasons.push(`Edge case failed: ${row.case}`);
+    });
+
+    debug.trajectoryRows.forEach((row) => {
+      if (!row.hasSufficientHistory && row.light !== 'neutral') {
+        failureReasons.push(`Trajectory ${row.id} should be neutral when history is insufficient.`);
+      }
+      if (row.percentChange !== null && !Number.isFinite(row.percentChange)) {
+        failureReasons.push(`Trajectory ${row.id} has non-finite percent change.`);
+      }
+      if (![row.currentNetCashFlow, row.previousNetCashFlow, row.delta].every((value) => Number.isFinite(value))) {
+        failureReasons.push(`Trajectory ${row.id} has non-finite net cash-flow values.`);
+      }
+    });
+
+    const debugVerdict = failureReasons.length === 0 ? 'OK' : 'FAIL';
+    const debugSummaryRow = {
+      verdict: debugVerdict,
+      checksRun:
+        debug.windowRows.length +
+        debug.comparisonRows.length +
+        trendValidationRows.length +
+        edgeCaseRows.length +
+        1,
+      failureCount: failureReasons.length,
+      latestMonthUsesMaxDate: debug.latestMonthUsesMaxDate,
+      windowRows: debug.windowRows.length,
+      comparisonRows: debug.comparisonRows.length,
+      trendRows: trendValidationRows.length,
+      edgeCases: edgeCaseRows.length,
+    };
+
+    console.groupCollapsed('[Pre-Phase 4 Debug Report]');
+    if (debugVerdict === 'OK') {
+      console.info('[Debug Verdict] OK');
+    } else {
+      console.error('[Debug Verdict] FAIL');
+    }
+    console.table([debugSummaryRow]);
+    if (failureReasons.length > 0) {
+      console.warn('Failure reasons');
+      failureReasons.forEach((reason) => console.warn(`- ${reason}`));
+    }
+    console.info('Context', {
       cashFlowMode,
+      searchQuery: query,
+      dataViewMode,
+      rowCount: filteredTxns.length,
+      latestMonthFromRollups: debug.latestMonthFromRollups || 'n/a',
+      maxMonthFromTxns: debug.maxMonthFromTxns || 'n/a',
+      latestMonthUsesMaxDate: debug.latestMonthUsesMaxDate,
+    });
+    console.table(debug.windowRows);
+    console.table(debug.comparisonRows);
+    console.table(debug.trajectoryRows);
+    console.table(trendValidationRows);
+    console.table(edgeCaseRows);
+    console.info('Capital Distribution Match (current filtered scope)', {
       matchedRows: matchedCapitalDistribution.length,
       matchedExpenseTotal,
     });
-  }, [cashFlowMode, filteredTxns, model.kpiAggregationByTimeframe, model.kpiComparisonByTimeframe, model.kpiHeaderLabelByTimeframe]);
+    console.groupEnd();
+  }, [cashFlowMode, dataViewMode, filteredTxns, model.monthlyRollups, model.trend, query]);
 
   const scenarioProjection = useMemo(() => projectScenario(model, scenarioInput), [model, scenarioInput]);
   const scenarioTrend = useMemo<TrendPoint[]>(
@@ -388,6 +543,7 @@ export default function Dashboard() {
         {activeTab === 'big-picture' && (
           <>
             <KpiCards cards={selectedKpiCards} />
+            <TrajectoryPanel signals={model.trajectorySignals} />
 
             <TrendLineChart
               data={model.trend}

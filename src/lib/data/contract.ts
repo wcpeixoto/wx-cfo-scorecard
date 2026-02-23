@@ -91,6 +91,28 @@ export type KpiTimeframeComparison = {
 export type KpiComparisonMap = Record<KpiComparisonTimeframe, KpiTimeframeComparison>;
 export type KpiHeaderLabelMap = Record<KpiComparisonTimeframe, string>;
 
+export type TrajectoryLight = 'green' | 'red' | 'neutral';
+export type TrajectorySignalId = 'monthlyTrend' | 'shortTermTrend' | 'longTermTrend';
+
+export type TrajectorySignal = {
+  id: TrajectorySignalId;
+  label: string;
+  timeframe: KpiComparisonTimeframe;
+  currentStartMonth: string | null;
+  currentEndMonth: string | null;
+  previousStartMonth: string | null;
+  previousEndMonth: string | null;
+  currentMonthCount: number;
+  previousMonthCount: number;
+  currentNetCashFlow: number;
+  previousNetCashFlow: number;
+  delta: number;
+  percentChange: number | null;
+  direction: TrendDirection;
+  light: TrajectoryLight;
+  hasSufficientHistory: boolean;
+};
+
 export type MonthlyRollup = {
   month: string;
   revenue: number;
@@ -141,6 +163,7 @@ export type DashboardModel = {
   kpiAggregationByTimeframe: KpiAggregationMap;
   kpiComparisonByTimeframe: KpiComparisonMap;
   kpiHeaderLabelByTimeframe: KpiHeaderLabelMap;
+  trajectorySignals: TrajectorySignal[];
   kpiCards: KpiCard[];
   trend: TrendPoint[];
   expenseSlices: ExpenseSlice[];

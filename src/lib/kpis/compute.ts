@@ -17,6 +17,8 @@ import type {
   PayeeTotal,
   ScenarioInput,
   ScenarioPoint,
+  TrajectorySignal,
+  TrajectorySignalId,
   TrendDirection,
   TrendPoint,
   Txn,
@@ -24,7 +26,7 @@ import type {
 
 const EPSILON = 0.00001;
 const EXPENSE_COLORS = ['#76a8ff', '#5e84f1', '#4f6fdd', '#3f58c1', '#2f479f', '#243b82', '#1b2f67'];
-const KPI_TIMEFRAMES: KpiTimeframe[] = [
+export const KPI_TIMEFRAMES: KpiTimeframe[] = [
   'thisMonth',
   'lastMonth',
   'last3Months',
@@ -34,7 +36,7 @@ const KPI_TIMEFRAMES: KpiTimeframe[] = [
   'last36Months',
   'allDates',
 ];
-const KPI_COMPARISON_TIMEFRAMES: KpiComparisonTimeframe[] = [
+export const KPI_COMPARISON_TIMEFRAMES: KpiComparisonTimeframe[] = [
   'thisMonth',
   'last3Months',
   'ytd',
@@ -398,6 +400,278 @@ export function computeKpiHeaderLabels(comparisons: KpiComparisonMap): KpiHeader
   }, {} as KpiHeaderLabelMap);
 }
 
+type TrajectorySignalConfig = {
+  id: TrajectorySignalId;
+  label: string;
+  timeframe: KpiComparisonTimeframe;
+};
+
+const TRAJECTORY_SIGNALS: TrajectorySignalConfig[] = [
+  { id: 'monthlyTrend', label: 'Monthly Trend', timeframe: 'thisMonth' },
+  { id: 'shortTermTrend', label: 'Short-Term Trend', timeframe: 'last3Months' },
+  { id: 'longTermTrend', label: 'Long-Term Trend', timeframe: 'ttm' },
+];
+
+export function computeTrajectorySignals(comparisons: KpiComparisonMap): TrajectorySignal[] {
+  return TRAJECTORY_SIGNALS.map((signal) => {
+    const source = comparisons[signal.timeframe];
+    const net = source?.netCashFlow;
+
+    const hasSufficientHistory =
+      Boolean(source) &&
+      (source.currentMonthCount ?? 0) > 0 &&
+      (source.previousMonthCount ?? 0) > 0;
+
+    const currentNetCashFlow = net?.current ?? 0;
+    const previousNetCashFlow = net?.previous ?? 0;
+    const delta = net?.delta ?? 0;
+    const percentChange = hasSufficientHistory ? net?.percentChange ?? null : null;
+
+    const direction: TrendDirection = hasSufficientHistory ? trendFromDelta(delta) : 'flat';
+    const light: 'green' | 'red' | 'neutral' =
+      !hasSufficientHistory ? 'neutral' : direction === 'up' ? 'green' : direction === 'down' ? 'red' : 'neutral';
+
+    return {
+      id: signal.id,
+      label: signal.label,
+      timeframe: signal.timeframe,
+      currentStartMonth: source?.currentStartMonth ?? null,
+      currentEndMonth: source?.currentEndMonth ?? null,
+      previousStartMonth: source?.previousStartMonth ?? null,
+      previousEndMonth: source?.previousEndMonth ?? null,
+      currentMonthCount: source?.currentMonthCount ?? 0,
+      previousMonthCount: source?.previousMonthCount ?? 0,
+      currentNetCashFlow: round2(currentNetCashFlow),
+      previousNetCashFlow: round2(previousNetCashFlow),
+      delta: round2(delta),
+      percentChange,
+      direction,
+      light,
+      hasSufficientHistory,
+    };
+  });
+}
+
+type DebugMetricSnapshot = {
+  current: number;
+  previous: number;
+  delta: number;
+  percentChange: number | null;
+};
+
+export type TimeframeDebugWindowRow = {
+  timeframe: KpiTimeframe;
+  startMonth: string;
+  endMonth: string;
+  monthCount: number;
+  revenue: number;
+  expenses: number;
+  netCashFlow: number;
+  savingsRate: number;
+};
+
+export type TimeframeDebugComparisonRow = {
+  timeframe: KpiTimeframe;
+  rule: string;
+  currentStartMonth: string;
+  currentEndMonth: string;
+  currentMonthCount: number;
+  previousStartMonth: string;
+  previousEndMonth: string;
+  previousMonthCount: number;
+  revenue: DebugMetricSnapshot;
+  expenses: DebugMetricSnapshot;
+  netCashFlow: DebugMetricSnapshot;
+  savingsRate: DebugMetricSnapshot;
+};
+
+export type PrePhase4DebugReport = {
+  latestMonthFromRollups: string;
+  maxMonthFromTxns: string;
+  latestMonthUsesMaxDate: boolean;
+  windowRows: TimeframeDebugWindowRow[];
+  comparisonRows: TimeframeDebugComparisonRow[];
+  trajectoryRows: Array<{
+    id: TrajectorySignalId;
+    label: string;
+    timeframe: KpiComparisonTimeframe;
+    currentRange: string;
+    previousRange: string;
+    currentNetCashFlow: number;
+    previousNetCashFlow: number;
+    delta: number;
+    percentChange: number | null;
+    direction: TrendDirection;
+    light: 'green' | 'red' | 'neutral';
+    hasSufficientHistory: boolean;
+  }>;
+};
+
+function toDebugMonth(value: string | null): string {
+  if (!value) return 'n/a';
+  return monthLabelStable(value);
+}
+
+function toDebugMetricSnapshot(current: number, previous: number): DebugMetricSnapshot {
+  return {
+    current: round2(current),
+    previous: round2(previous),
+    delta: round2(current - previous),
+    percentChange: pctDelta(current, previous),
+  };
+}
+
+function selectDebugComparisonForTimeframe(
+  monthlyRollups: MonthlyRollup[],
+  timeframe: KpiTimeframe
+): { rule: string; current: MonthlyRollup[]; previous: MonthlyRollup[] } {
+  if (timeframe === 'thisMonth') {
+    return {
+      rule: 'This Month vs Last Month',
+      current: selectTrailingRollups(monthlyRollups, 1),
+      previous: selectPriorTrailingBlock(monthlyRollups, 1),
+    };
+  }
+
+  if (timeframe === 'lastMonth') {
+    return {
+      rule: 'Last Month vs Month Before Last',
+      current: monthlyRollups.length > 1 ? [monthlyRollups[monthlyRollups.length - 2]] : [],
+      previous: monthlyRollups.length > 2 ? [monthlyRollups[monthlyRollups.length - 3]] : [],
+    };
+  }
+
+  if (timeframe === 'last3Months') {
+    return {
+      rule: 'Rolling 3M vs Prior 3M Block',
+      current: selectTrailingRollups(monthlyRollups, 3),
+      previous: selectPriorTrailingBlock(monthlyRollups, 3),
+    };
+  }
+
+  if (timeframe === 'ytd') {
+    const latest = monthlyRollups[monthlyRollups.length - 1];
+    const parsedLatest = latest ? parseMonthParts(latest.month) : null;
+    if (!parsedLatest) {
+      return {
+        rule: 'YTD vs Prior-Year YTD',
+        current: [],
+        previous: [],
+      };
+    }
+    return {
+      rule: 'YTD vs Prior-Year YTD',
+      current: selectYtdRollupsForYear(monthlyRollups, parsedLatest.year, parsedLatest.month),
+      previous: selectYtdRollupsForYear(monthlyRollups, parsedLatest.year - 1, parsedLatest.month),
+    };
+  }
+
+  if (timeframe === 'last12Months') {
+    return {
+      rule: 'Last 12 Months vs Prior 12-Month Block',
+      current: selectTrailingRollups(monthlyRollups, 12),
+      previous: selectPriorTrailingBlock(monthlyRollups, 12),
+    };
+  }
+
+  if (timeframe === 'last24Months') {
+    return {
+      rule: 'Rolling 24M vs Prior 24M Block',
+      current: selectTrailingRollups(monthlyRollups, 24),
+      previous: selectPriorTrailingBlock(monthlyRollups, 24),
+    };
+  }
+
+  if (timeframe === 'last36Months') {
+    return {
+      rule: 'Rolling 36M vs Prior 36M Block',
+      current: selectTrailingRollups(monthlyRollups, 36),
+      previous: selectPriorTrailingBlock(monthlyRollups, 36),
+    };
+  }
+
+  const allDatesCurrent = monthlyRollups;
+  const allDatesCount = allDatesCurrent.length;
+  const allDatesPrevious =
+    allDatesCount > 0 && monthlyRollups.length >= allDatesCount * 2
+      ? monthlyRollups.slice(monthlyRollups.length - allDatesCount * 2, monthlyRollups.length - allDatesCount)
+      : [];
+
+  return {
+    rule: 'All Dates vs Prior Equal-Length Block',
+    current: allDatesCurrent,
+    previous: allDatesPrevious,
+  };
+}
+
+export function buildPrePhase4DebugReport(monthlyRollups: MonthlyRollup[], txns: Txn[]): PrePhase4DebugReport {
+  const maxMonthFromTxns = txns.reduce((latest, txn) => {
+    if (!latest) return txn.month;
+    return txn.month > latest ? txn.month : latest;
+  }, '');
+  const latestMonthFromRollups = monthlyRollups[monthlyRollups.length - 1]?.month ?? '';
+
+  const windowRows = KPI_TIMEFRAMES.map<TimeframeDebugWindowRow>((timeframe) => {
+    const selected = selectRollupsForTimeframe(monthlyRollups, timeframe);
+    const summary = summarizeRollups(selected);
+    return {
+      timeframe,
+      startMonth: toDebugMonth(summary.startMonth),
+      endMonth: toDebugMonth(summary.endMonth),
+      monthCount: summary.monthCount,
+      revenue: summary.revenue,
+      expenses: summary.expenses,
+      netCashFlow: summary.netCashFlow,
+      savingsRate: summary.savingsRate,
+    };
+  });
+
+  const comparisonRows = KPI_TIMEFRAMES.map<TimeframeDebugComparisonRow>((timeframe) => {
+    const blocks = selectDebugComparisonForTimeframe(monthlyRollups, timeframe);
+    const current = summarizeRollups(blocks.current);
+    const previous = summarizeRollups(blocks.previous);
+    return {
+      timeframe,
+      rule: blocks.rule,
+      currentStartMonth: toDebugMonth(current.startMonth),
+      currentEndMonth: toDebugMonth(current.endMonth),
+      currentMonthCount: current.monthCount,
+      previousStartMonth: toDebugMonth(previous.startMonth),
+      previousEndMonth: toDebugMonth(previous.endMonth),
+      previousMonthCount: previous.monthCount,
+      revenue: toDebugMetricSnapshot(current.revenue, previous.revenue),
+      expenses: toDebugMetricSnapshot(current.expenses, previous.expenses),
+      netCashFlow: toDebugMetricSnapshot(current.netCashFlow, previous.netCashFlow),
+      savingsRate: toDebugMetricSnapshot(current.savingsRate, previous.savingsRate),
+    };
+  });
+
+  const comparisonMap = computeKpiComparisons(monthlyRollups);
+  const trajectoryRows = computeTrajectorySignals(comparisonMap).map((signal) => ({
+    id: signal.id,
+    label: signal.label,
+    timeframe: signal.timeframe,
+    currentRange: formatMonthRangeStable(signal.currentStartMonth, signal.currentEndMonth),
+    previousRange: formatMonthRangeStable(signal.previousStartMonth, signal.previousEndMonth),
+    currentNetCashFlow: signal.currentNetCashFlow,
+    previousNetCashFlow: signal.previousNetCashFlow,
+    delta: signal.delta,
+    percentChange: signal.percentChange,
+    direction: signal.direction,
+    light: signal.light,
+    hasSufficientHistory: signal.hasSufficientHistory,
+  }));
+
+  return {
+    latestMonthFromRollups,
+    maxMonthFromTxns,
+    latestMonthUsesMaxDate: !maxMonthFromTxns || latestMonthFromRollups === maxMonthFromTxns,
+    windowRows,
+    comparisonRows,
+    trajectoryRows,
+  };
+}
+
 function buildKpis(current: KpiAggregate, previous: KpiAggregate): KpiCard[] {
   const prevRevenue = previous.revenue;
   const prevExpenses = previous.expenses;
@@ -611,6 +885,7 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
     const emptyAggregations = computeKpiAggregations([]);
     const emptyComparisons = computeKpiComparisons([]);
     const emptyHeaderLabels = computeKpiHeaderLabels(emptyComparisons);
+    const emptyTrajectory = computeTrajectorySignals(emptyComparisons);
     return {
       latestMonth: '',
       previousMonth: null,
@@ -618,6 +893,7 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
       kpiAggregationByTimeframe: emptyAggregations,
       kpiComparisonByTimeframe: emptyComparisons,
       kpiHeaderLabelByTimeframe: emptyHeaderLabels,
+      trajectorySignals: emptyTrajectory,
       kpiCards: [],
       trend: [],
       expenseSlices: [],
@@ -635,6 +911,7 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
   const kpiAggregationByTimeframe = computeKpiAggregations(monthlyRollups);
   const kpiComparisonByTimeframe = computeKpiComparisons(monthlyRollups);
   const kpiHeaderLabelByTimeframe = computeKpiHeaderLabels(kpiComparisonByTimeframe);
+  const trajectorySignals = computeTrajectorySignals(kpiComparisonByTimeframe);
 
   const latestMonthTxns = txns.filter((txn) => txn.month === latest.month);
   const previousMonthTxns = previous ? txns.filter((txn) => txn.month === previous.month) : [];
@@ -649,6 +926,7 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
     kpiAggregationByTimeframe,
     kpiComparisonByTimeframe,
     kpiHeaderLabelByTimeframe,
+    trajectorySignals,
     kpiCards: buildKpis(kpiAggregationByTimeframe.thisMonth, kpiAggregationByTimeframe.lastMonth),
     trend: monthlyRollups.map<TrendPoint>((rollup) => ({
       month: rollup.month,
