@@ -913,18 +913,19 @@ body {
 .trend-path {
   fill: none;
   stroke: #4f78ff;
-  stroke-width: 3;
+  stroke-width: 2.65;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .ma-path {
   fill: none;
-  stroke: #6f87b8;
-  stroke-width: 2;
+  stroke: #7f8792;
+  stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 6 5;
+  stroke-dasharray: 5 4;
+  opacity: 0.66;
 }
 
 .trend-dot {

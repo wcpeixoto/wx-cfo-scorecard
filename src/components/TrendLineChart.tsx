@@ -385,6 +385,14 @@ function gradientIdFor(title: string, metric: TrendMetric): string {
   return `trend-fill-${metric}-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 }
 
+function clampRatio(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function toOffset(value: number): string {
+  return `${(clampRatio(value) * 100).toFixed(2)}%`;
+}
+
 export default function TrendLineChart({
   data,
   axisDomainData,
@@ -605,7 +613,13 @@ export default function TrendLineChart({
   const trendNoteLabel =
     trendMode === 'linear' ? null : `Trend: ${trendWindow ?? getAdaptiveAverageWindow(scopedData.length)}-mo avg`;
 
-  const gradientId = gradientIdFor(title, metric);
+  const areaGradientId = gradientIdFor(title, metric);
+  const lineGradientId = `${areaGradientId}-line`;
+  const isNetSeries = metric === 'net';
+  const zeroOffset = clampRatio((axisMax - 0) / Math.max(axisMax - axisMin, 1));
+  const transitionBand = 0.03;
+  const transitionStart = clampRatio(zeroOffset - transitionBand);
+  const transitionEnd = clampRatio(zeroOffset + transitionBand);
 
   return (
     <article className="card chart-card">
@@ -697,10 +711,29 @@ export default function TrendLineChart({
         onMouseLeave={() => setActiveIndex(null)}
       >
         <defs>
-          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="rgba(93, 132, 247, 0.18)" />
-            <stop offset="100%" stopColor="rgba(93, 132, 247, 0.02)" />
-          </linearGradient>
+          {isNetSeries ? (
+            <>
+              <linearGradient id={areaGradientId} x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="rgba(93, 132, 247, 0.14)" />
+                <stop offset={toOffset(transitionStart)} stopColor="rgba(93, 132, 247, 0.12)" />
+                <stop offset={toOffset(zeroOffset)} stopColor="rgba(93, 132, 247, 0)" />
+                <stop offset={toOffset(transitionEnd)} stopColor="rgba(212, 147, 98, 0.1)" />
+                <stop offset="100%" stopColor="rgba(212, 147, 98, 0)" />
+              </linearGradient>
+              <linearGradient id={lineGradientId} x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#4f78ff" />
+                <stop offset={toOffset(transitionStart)} stopColor="#4f78ff" />
+                <stop offset={toOffset(transitionEnd)} stopColor="#c85b72" />
+                <stop offset="100%" stopColor="#c85b72" />
+              </linearGradient>
+            </>
+          ) : (
+            <linearGradient id={areaGradientId} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="rgba(93, 132, 247, 0.14)" />
+              <stop offset="82%" stopColor="rgba(93, 132, 247, 0)" />
+              <stop offset="100%" stopColor="rgba(93, 132, 247, 0)" />
+            </linearGradient>
+          )}
         </defs>
 
         <line x1={PADDING_X} x2={WIDTH - PADDING_X} y1={PADDING_TOP + innerHeight} y2={PADDING_TOP + innerHeight} className="axis-line" />
@@ -712,24 +745,39 @@ export default function TrendLineChart({
           return <line key={`grid-${tick}`} x1={PADDING_X} x2={WIDTH - PADDING_X} y1={y} y2={y} className={lineClass} />;
         })}
 
-        <path d={areaPath} fill={`url(#${gradientId})`} />
+        <path d={areaPath} fill={`url(#${areaGradientId})`} />
 
         {hasTrend && <path d={trendPath} className="ma-path" />}
-        <path d={linePath} className="trend-path" />
+        <path d={linePath} className="trend-path" stroke={isNetSeries ? `url(#${lineGradientId})` : undefined} />
 
         {points.map((point, index) => {
           const isLatest = index === points.length - 1;
+          const isNegative = metric === 'net' && point.value < -EPSILON;
+          const dotFill = metric === 'net' ? (isNegative ? '#c85b72' : '#4f78ff') : undefined;
+          const dotStyle =
+            metric === 'net' || onMonthPointClick
+              ? {
+                  ...(dotFill ? { fill: dotFill } : {}),
+                  ...(onMonthPointClick ? { cursor: 'pointer' } : {}),
+                }
+              : undefined;
+          const ringStyle =
+            metric === 'net'
+              ? {
+                  fill: isNegative ? 'rgba(200, 91, 114, 0.22)' : 'rgba(79, 120, 255, 0.2)',
+                }
+              : undefined;
           return (
             <g key={`${point.month}-${index}`}>
-              {isLatest && <circle cx={point.x} cy={point.y} r={7.2} className="trend-dot-latest-ring" />}
+              {isLatest && <circle cx={point.x} cy={point.y} r={7.2} className="trend-dot-latest-ring" style={ringStyle} />}
               <circle
                 cx={point.x}
                 cy={point.y}
-                r={isLatest ? 5.1 : 3.8}
+                r={isLatest ? 4.7 : 3.5}
                 className={isLatest ? 'trend-dot-latest' : 'trend-dot'}
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => onMonthPointClick?.(point.month)}
-                style={onMonthPointClick ? { cursor: 'pointer' } : undefined}
+                style={dotStyle}
               />
             </g>
           );
