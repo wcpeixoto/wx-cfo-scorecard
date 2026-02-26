@@ -5,8 +5,138 @@ type FetchCsvResult = {
   sourceUrl: string;
 };
 
+type PositionalColumnMap = {
+  date: number;
+  account: number;
+  payee: number;
+  category: number;
+  amount: number;
+  memo: number;
+  tags: number;
+};
+
 function normalizeHeader(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function looksLikeDate(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  return /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(trimmed) || /^\d{4}-\d{2}-\d{2}$/.test(trimmed);
+}
+
+function looksLikeAmount(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  return /^[-(]?\$?[\d,]+(?:\.\d{1,2})?\)?$/.test(trimmed);
+}
+
+function inferPositionalColumnMap(rows: string[][]): PositionalColumnMap | null {
+  const pairScores = new Map<string, number>();
+  const sampleRows = rows.slice(0, Math.min(rows.length, 200));
+
+  sampleRows.forEach((row) => {
+    const dateIndices: number[] = [];
+    const amountIndices: number[] = [];
+
+    row.forEach((cell, index) => {
+      if (looksLikeDate(cell)) dateIndices.push(index);
+      if (looksLikeAmount(cell)) amountIndices.push(index);
+    });
+
+    dateIndices.forEach((dateIndex) => {
+      amountIndices.forEach((amountIndex) => {
+        if (amountIndex <= dateIndex) return;
+        const key = `${dateIndex}:${amountIndex}`;
+        pairScores.set(key, (pairScores.get(key) ?? 0) + 1);
+      });
+    });
+  });
+
+  let bestKey: string | null = null;
+  let bestScore = 0;
+  pairScores.forEach((score, key) => {
+    if (score > bestScore) {
+      bestScore = score;
+      bestKey = key;
+    }
+  });
+
+  if (!bestKey || bestScore < 2) return null;
+  const key = String(bestKey);
+  const [dateToken, amountToken] = key.split(':');
+  const date = Number.parseInt(dateToken, 10);
+  const amount = Number.parseInt(amountToken, 10);
+  if (!Number.isFinite(date) || !Number.isFinite(amount) || amount <= date) return null;
+
+  return {
+    date,
+    account: date + 1,
+    payee: date + 2,
+    category: date + 3,
+    amount,
+    memo: amount + 1,
+    tags: amount + 2,
+  };
+}
+
+function rowsToRecordsFromPositionalMap(rows: string[][]): CsvRecord[] {
+  const map = inferPositionalColumnMap(rows);
+  if (!map) return [];
+
+  const records: CsvRecord[] = [];
+  rows.forEach((row) => {
+    const date = (row[map.date] ?? '').trim();
+    const amount = (row[map.amount] ?? '').trim();
+    if (!looksLikeDate(date) || !looksLikeAmount(amount)) return;
+
+    const record: CsvRecord = {
+      Date: date,
+      Amount: amount,
+      Account: (row[map.account] ?? '').trim(),
+      Payee: (row[map.payee] ?? '').trim(),
+      Category: (row[map.category] ?? '').trim(),
+      'Memo/Notes': (row[map.memo] ?? '').trim(),
+      Tags: (row[map.tags] ?? '').trim(),
+    };
+    records.push(record);
+  });
+
+  return records;
+}
+
+function toGoogleSheetsExportUrl(input: string): string | null {
+  try {
+    const url = new URL(input);
+    if (url.hostname !== 'docs.google.com') return null;
+
+    const match = url.pathname.match(/\/spreadsheets\/d\/([^/]+)\/edit/);
+    if (!match) return null;
+
+    const sheetId = match[1];
+    const queryGid = url.searchParams.get('gid');
+    const hashMatch = url.hash.match(/gid=(\d+)/);
+    const gid = queryGid ?? hashMatch?.[1] ?? '0';
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+  } catch {
+    return null;
+  }
+}
+
+function buildCandidateUrls(primaryUrl: string, fallbackUrl?: string): string[] {
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+  const add = (url: string | undefined | null) => {
+    if (!url) return;
+    if (seen.has(url)) return;
+    seen.add(url);
+    candidates.push(url);
+  };
+
+  add(primaryUrl);
+  add(toGoogleSheetsExportUrl(primaryUrl));
+  add(fallbackUrl);
+  return candidates;
 }
 
 function parseCsvRows(text: string): string[][] {
@@ -68,6 +198,11 @@ function rowsToRecords(rows: string[][]): CsvRecord[] {
     return normalizedCells.includes('date') && normalizedCells.includes('amount');
   });
 
+  if (headerIndex < 0) {
+    const positionalRecords = rowsToRecordsFromPositionalMap(cleanedRows);
+    if (positionalRecords.length > 0) return positionalRecords;
+  }
+
   const index = headerIndex >= 0 ? headerIndex : 0;
   const headers = cleanedRows[index].map((header) => header.trim());
 
@@ -98,7 +233,7 @@ async function fetchCsvText(url: string): Promise<string> {
 }
 
 export async function fetchSheetCsv(primaryUrl: string, fallbackUrl?: string): Promise<FetchCsvResult> {
-  const urls = [primaryUrl, fallbackUrl].filter((value): value is string => Boolean(value));
+  const urls = buildCandidateUrls(primaryUrl, fallbackUrl);
   let lastError: Error | null = null;
 
   for (const url of urls) {
