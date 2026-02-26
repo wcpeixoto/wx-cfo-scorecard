@@ -71,6 +71,8 @@ function toTransaction(record: CsvRecord): Txn | null {
   const category = pickValue(lookup, ['Category', 'Categories']) || 'Uncategorized';
   const memo = pickValue(lookup, ['Memo/Notes', 'Memo / Notes', 'Memo', 'Notes']);
   const tags = parseTags(pickValue(lookup, ['Tags', 'Tag']));
+  const balanceValue = pickValue(lookup, ['Balance', 'Running Balance', 'Current Balance', 'Account Balance']);
+  const parsedBalance = parseAmount(balanceValue);
 
   const type = classifyType(rawAmount);
   const amount = Math.abs(rawAmount);
@@ -88,6 +90,7 @@ function toTransaction(record: CsvRecord): Txn | null {
     account: account || undefined,
     tags: tags.length > 0 ? tags : undefined,
     rawAmount,
+    balance: parsedBalance ?? undefined,
   };
 }
 
@@ -147,47 +150,6 @@ export function toISODateOnly(input: string | Date): string | null {
   const fallback = new Date(value);
   if (Number.isNaN(fallback.getTime())) return null;
   return formatLocalIsoDate(fallback.getFullYear(), fallback.getMonth() + 1, fallback.getDate());
-}
-
-export function isFutureDate(dateISO: string, todayISO: string): boolean {
-  return dateISO > todayISO;
-}
-
-export function splitActualsAndProjections(rows: Txn[]) {
-  const todayISO = toISODateOnly(new Date());
-  const safeTodayISO = todayISO ?? '9999-12-31';
-  const actuals: Txn[] = [];
-  const projections: Txn[] = [];
-  let invalidDateRows = 0;
-
-  rows.forEach((row) => {
-    const normalizedDate = toISODateOnly(row.date);
-    if (!normalizedDate) {
-      invalidDateRows += 1;
-      return;
-    }
-
-    const normalizedRow =
-      row.date === normalizedDate && row.month === normalizedDate.slice(0, 7)
-        ? row
-        : {
-            ...row,
-            date: normalizedDate,
-            month: normalizedDate.slice(0, 7),
-          };
-
-    if (isFutureDate(normalizedDate, safeTodayISO)) {
-      projections.push(normalizedRow);
-    } else {
-      actuals.push(normalizedRow);
-    }
-  });
-
-  if (invalidDateRows > 0) {
-    console.warn(`[data] Ignored ${invalidDateRows} row(s) with invalid date values.`);
-  }
-
-  return { actuals, projections, todayISO: safeTodayISO, invalidDateRows };
 }
 
 export function buildDataSet(records: CsvRecord[], sourceUrl: string): DataSet {

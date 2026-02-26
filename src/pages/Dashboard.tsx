@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { APP_TITLE, SHEET_CSV_FALLBACK_URL, SHEET_CSV_URL, STORAGE_KEYS } from '../config';
+import { SHEET_CSV_FALLBACK_URL, SHEET_CSV_URL, STORAGE_KEYS } from '../config';
+import gracieSportsLogo from '../assets/gracie-sports-logo.svg';
+import type { IconType } from 'react-icons';
+import { FiGrid, FiLayers, FiSearch, FiSettings, FiSliders, FiTrendingUp } from 'react-icons/fi';
+import CashFlowForecastModule from '../components/CashFlowForecastModule';
 import ExpenseDonut from '../components/ExpenseDonut';
 import DigHereHighlights from '../components/DigHereHighlights';
 import KpiCards from '../components/KpiCards';
@@ -8,10 +12,18 @@ import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import TrajectoryPanel from '../components/TrajectoryPanel';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
-import { buildDataSet, splitActualsAndProjections } from '../lib/data/normalize';
+import { buildDataSet } from '../lib/data/normalize';
 import { fetchSheetCsv } from '../lib/data/fetchCsv';
 import { buildPrePhase4DebugReport, computeDashboardModel, projectScenario, toMonthLabel } from '../lib/kpis/compute';
-import type { CashFlowMode, DataSet, KpiCard, KpiComparisonTimeframe, ScenarioInput, TrendPoint } from '../lib/data/contract';
+import type {
+  CashFlowForecastStatus,
+  CashFlowMode,
+  DataSet,
+  KpiCard,
+  KpiComparisonTimeframe,
+  ScenarioInput,
+  TrendPoint,
+} from '../lib/data/contract';
 
 type TabId =
   | 'big-picture'
@@ -24,31 +36,30 @@ type TabId =
 type NavItem = {
   id: TabId;
   label: string;
-  shortLabel: string;
+  icon: IconType;
 };
 
-type DataViewMode = 'actuals' | 'all';
 type KpiFrameOption = { value: KpiComparisonTimeframe; label: string };
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'big-picture', label: 'Big Picture', shortLabel: 'Big Picture' },
-  { id: 'money-left', label: 'Money Left on the Table', shortLabel: 'MLOT' },
-  { id: 'dig-here', label: 'Dig Here', shortLabel: 'Dig Here' },
-  { id: 'trends', label: 'Trends', shortLabel: 'Trends' },
-  { id: 'what-if', label: 'What-If Scenarios', shortLabel: 'What-If' },
-  { id: 'settings', label: 'Settings', shortLabel: 'Settings' },
+  { id: 'big-picture', label: 'Big Picture', icon: FiGrid },
+  { id: 'money-left', label: 'MLOT', icon: FiLayers },
+  { id: 'dig-here', label: 'Dig Here', icon: FiSearch },
+  { id: 'trends', label: 'Trends', icon: FiTrendingUp },
+  { id: 'what-if', label: 'What-If Scenarios', icon: FiSliders },
+  { id: 'settings', label: 'Settings', icon: FiSettings },
 ];
 
 const DEFAULT_SCENARIO: ScenarioInput = {
-  revenueGrowthPct: 4,
-  expenseReductionPct: 3,
+  revenueGrowthPct: 0,
+  expenseReductionPct: 0,
   months: 12,
 };
 const KPI_FRAME_OPTIONS: KpiFrameOption[] = [
   { value: 'thisMonth', label: 'Month' },
   { value: 'last3Months', label: '3M' },
   { value: 'ytd', label: 'YTD' },
-  { value: 'ttm', label: 'TTM' },
+  { value: 'ttm', label: '12M' },
   { value: 'last24Months', label: '24M' },
   { value: 'last36Months', label: '36M' },
 ];
@@ -56,6 +67,18 @@ const EPSILON = 0.00001;
 type TrendTimeframeOption = 6 | 12 | 24 | 36 | 'all';
 const TREND_TIMEFRAMES: TrendTimeframeOption[] = [6, 12, 24, 36, 'all'];
 const HIGHLIGHT_MIN_ABS_DELTA = 25;
+type ForecastRangeValue = '30d' | '60d' | '90d' | '6m' | '1y' | '2y' | '3y';
+type ForecastRangeOption = { value: ForecastRangeValue; label: string; months: number };
+const FORECAST_RANGE_OPTIONS: ForecastRangeOption[] = [
+  // Forecasts are monthly; day horizons are mapped to the nearest whole month.
+  { value: '30d', label: 'Next 30 Days', months: 1 },
+  { value: '60d', label: 'Next 60 Days', months: 2 },
+  { value: '90d', label: 'Next 90 Days', months: 3 },
+  { value: '6m', label: 'Next 6 Months', months: 6 },
+  { value: '1y', label: 'Next 1 Year', months: 12 },
+  { value: '2y', label: 'Next 2 Years', months: 24 },
+  { value: '3y', label: 'Next 3 Years', months: 36 },
+];
 
 type DigHereHighlight = {
   category: string;
@@ -88,11 +111,6 @@ function parseTabId(value: string | null): TabId | null {
   }
 }
 
-function parseDataViewMode(value: string | null): DataViewMode | null {
-  if (value === 'actuals' || value === 'all') return value;
-  return null;
-}
-
 function parseMonthToken(value: string | null): string | null {
   if (!value) return null;
   return /^\d{4}-\d{2}$/.test(value) ? value : null;
@@ -120,6 +138,13 @@ function parseDigHereFocusContext(value: string | null): DigHereFocusContext {
 
 function parseCashFlowMode(value: string | null): CashFlowMode | null {
   if (value === 'operating' || value === 'total') return value;
+  return null;
+}
+
+function parseForecastRangeValue(value: string): ForecastRangeValue | null {
+  if (value === '30d' || value === '60d' || value === '90d' || value === '6m' || value === '1y' || value === '2y' || value === '3y') {
+    return value;
+  }
   return null;
 }
 
@@ -169,6 +194,10 @@ function toDeltaPercent(current: number, previous: number): number | null {
   return ((current - previous) / Math.abs(previous)) * 100;
 }
 
+function roundCurrency(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 function getStoredCsvUrl(): string {
   if (typeof window === 'undefined') return SHEET_CSV_URL;
   try {
@@ -199,9 +228,10 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(DEFAULT_SCENARIO);
-  const [dataViewMode, setDataViewMode] = useState<DataViewMode>('actuals');
   const [kpiTimeframe, setKpiTimeframe] = useState<KpiComparisonTimeframe>('ttm');
   const [cashFlowMode, setCashFlowMode] = useState<CashFlowMode>('total');
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
 
   const runSync = useCallback(async () => {
     setLoading(true);
@@ -229,7 +259,6 @@ export default function Dashboard() {
     const syncStateFromUrl = () => {
       const params = new URLSearchParams(window.location.search);
       const tab = parseTabId(params.get('tab'));
-      const view = parseDataViewMode(params.get('view'));
       const cashFlow = parseCashFlowMode(params.get('cf'));
       const nextQuery = params.get('q');
       const month = parseMonthToken(params.get('month'));
@@ -240,7 +269,6 @@ export default function Dashboard() {
       const validRange = startMonth && endMonth && startMonth <= endMonth;
 
       setActiveTab(tab ?? 'big-picture');
-      setDataViewMode(view ?? 'actuals');
       setCashFlowMode(cashFlow ?? 'total');
       setQuery(nextQuery ?? '');
       setDigHereFocusMonth(validRange ? null : month);
@@ -255,15 +283,7 @@ export default function Dashboard() {
     return () => window.removeEventListener('popstate', syncStateFromUrl);
   }, []);
 
-  const dataSplit = useMemo(
-    () => splitActualsAndProjections(dataSet?.txns ?? []),
-    [dataSet?.txns]
-  );
-
-  const baseTxns = useMemo(
-    () => (dataViewMode === 'all' ? [...dataSplit.actuals, ...dataSplit.projections] : dataSplit.actuals),
-    [dataSplit.actuals, dataSplit.projections, dataViewMode]
-  );
+  const baseTxns = useMemo(() => dataSet?.txns ?? [], [dataSet?.txns]);
 
   const filteredTxns = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -285,6 +305,15 @@ export default function Dashboard() {
         .sort((a, b) => b.localeCompare(a)),
     [baseTxns]
   );
+  const currentCashBalance = useMemo(() => {
+    for (let index = baseTxns.length - 1; index >= 0; index -= 1) {
+      const candidate = baseTxns[index].balance;
+      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+        return candidate;
+      }
+    }
+    return 0;
+  }, [baseTxns]);
 
   const model = useMemo(
     () => computeDashboardModel(filteredTxns, { cashFlowMode }),
@@ -491,7 +520,6 @@ export default function Dashboard() {
     console.info('Context', {
       cashFlowMode,
       searchQuery: query,
-      dataViewMode,
       rowCount: filteredTxns.length,
       latestMonthFromRollups: debug.latestMonthFromRollups || 'n/a',
       maxMonthFromTxns: debug.maxMonthFromTxns || 'n/a',
@@ -502,30 +530,93 @@ export default function Dashboard() {
     console.table(debug.trajectoryRows);
     console.table(trendValidationRows);
     console.table(edgeCaseRows);
+    const recentActualForecastRows = model.cashFlowForecastSeries
+      .filter((row) => row.status === 'actual')
+      .slice(-3);
+    const initialProjectedForecastRows = model.cashFlowForecastSeries
+      .filter((row) => row.status === 'projected')
+      .slice(0, 3);
+    console.info('Future Cash Flow Forecast Verification', {
+      totalRows: model.cashFlowForecastSeries.length,
+      actualRows: model.cashFlowForecastSeries.filter((row) => row.status === 'actual').length,
+      projectedRows: model.cashFlowForecastSeries.filter((row) => row.status === 'projected').length,
+    });
+    console.info('Future Cash Flow Forecast Model Notes', model.cashFlowForecastModelNotes);
+    console.table([...recentActualForecastRows, ...initialProjectedForecastRows]);
     console.info('Capital Distribution Match (current filtered scope)', {
       matchedRows: matchedCapitalDistribution.length,
       matchedExpenseTotal,
     });
     console.groupEnd();
-  }, [cashFlowMode, dataViewMode, filteredTxns, model.monthlyRollups, model.trend, query]);
+  }, [cashFlowMode, filteredTxns, model.cashFlowForecastModelNotes, model.cashFlowForecastSeries, model.monthlyRollups, model.trend, query]);
+
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [activeTab]);
 
   const scenarioProjection = useMemo(() => projectScenario(model, scenarioInput), [model, scenarioInput]);
-  const scenarioTrend = useMemo<TrendPoint[]>(
-    () =>
-      scenarioProjection.map((point) => ({
-        month: point.month,
-        income: point.projectedIncome,
-        expense: point.projectedExpense,
-        net: point.projectedNet,
-      })),
-    [scenarioProjection]
+  const forecastRangeMonths = useMemo(
+    () => FORECAST_RANGE_OPTIONS.find((option) => option.value === forecastRange)?.months ?? 3,
+    [forecastRange]
   );
+  const projectedRevenueMultiplier = useMemo(() => 1 + scenarioInput.revenueGrowthPct / 100, [scenarioInput.revenueGrowthPct]);
+  const projectedExpenseMultiplier = useMemo(() => 1 - scenarioInput.expenseReductionPct / 100, [scenarioInput.expenseReductionPct]);
+  const visibleCashFlowForecastSeries = useMemo(() => {
+    const projected = model.cashFlowForecastSeries
+      .filter((point) => point.status === 'projected')
+      .slice(0, forecastRangeMonths)
+      .map((point) => {
+        // Keep baseline output unchanged and apply What-If slider adjustments as a projected-only layer.
+        const adjustedProjectedRevenue = roundCurrency(point.revenue * projectedRevenueMultiplier);
+        const adjustedProjectedExpenses = roundCurrency(point.expenses * projectedExpenseMultiplier);
+        const adjustedProjectedNetCashFlow = roundCurrency(adjustedProjectedRevenue - adjustedProjectedExpenses);
+
+        return {
+          ...point,
+          revenue: adjustedProjectedRevenue,
+          expenses: adjustedProjectedExpenses,
+          netCashFlow: adjustedProjectedNetCashFlow,
+        };
+      });
+    return projected;
+  }, [forecastRangeMonths, model.cashFlowForecastSeries, projectedExpenseMultiplier, projectedRevenueMultiplier]);
+  const cashFlowForecastTrend = useMemo<TrendPoint[]>(
+    () =>
+      visibleCashFlowForecastSeries.map((point) => ({
+        month: point.month,
+        income: point.revenue,
+        expense: point.expenses,
+        net: point.netCashFlow,
+      })),
+    [visibleCashFlowForecastSeries]
+  );
+  const cashFlowForecastStatusByMonth = useMemo<Partial<Record<string, CashFlowForecastStatus>>>(() => {
+    const statuses: Partial<Record<string, CashFlowForecastStatus>> = {};
+    visibleCashFlowForecastSeries.forEach((point) => {
+      statuses[point.month] = point.status;
+    });
+    return statuses;
+  }, [visibleCashFlowForecastSeries]);
 
   const latestRollup = model.monthlyRollups[model.monthlyRollups.length - 1] ?? null;
   const previousRollup = model.monthlyRollups[model.monthlyRollups.length - 2] ?? null;
   const selectedKpiComparison = model.kpiComparisonByTimeframe[kpiTimeframe];
   const selectedHeaderComparisonLabel = model.kpiHeaderLabelByTimeframe[kpiTimeframe] ?? 'Comparison unavailable';
-  const selectedKpiFrameLabel = KPI_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? 'TTM';
+  const selectedKpiFrameLabel = KPI_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? '12M';
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const timeframeTabLabels = KPI_FRAME_OPTIONS.map((option) => option.label);
+    const labelsToCheck = [
+      ...timeframeTabLabels,
+      ...Object.values(model.kpiHeaderLabelByTimeframe),
+      selectedHeaderComparisonLabel,
+      `${selectedKpiFrameLabel} comparison`,
+    ];
+    const containsTTM = labelsToCheck.some((label) => /\bTTM\b/i.test(label));
+    console.info('TTM label verification', { timeframeTabLabels, containsTTM });
+  }, [model.kpiHeaderLabelByTimeframe, selectedHeaderComparisonLabel, selectedKpiFrameLabel]);
+
   const digHereFocusPeriodLabel = useMemo(() => {
     if (digHereStartMonth && digHereEndMonth) {
       return `${toMonthLabel(digHereStartMonth)} – ${toMonthLabel(digHereEndMonth)}`;
@@ -711,7 +802,6 @@ export default function Dashboard() {
     (
       next: {
         tab: TabId;
-        view: DataViewMode;
         cashFlow: CashFlowMode;
         queryText?: string;
         month?: string | null;
@@ -724,7 +814,7 @@ export default function Dashboard() {
       if (typeof window === 'undefined') return;
       const url = new URL(window.location.href);
       url.searchParams.set('tab', next.tab);
-      url.searchParams.set('view', next.view);
+      url.searchParams.delete('view');
       url.searchParams.set('cf', next.cashFlow);
 
       if (next.queryText?.trim()) {
@@ -788,7 +878,6 @@ export default function Dashboard() {
       writeDashboardUrlState(
         {
           tab: activeTab,
-          view: dataViewMode,
           cashFlow: cashFlowMode,
           queryText: query,
           month: digHereFocusMonth,
@@ -809,7 +898,6 @@ export default function Dashboard() {
 
       writeDashboardUrlState({
         tab: 'dig-here',
-        view: dataViewMode,
         cashFlow: cashFlowMode,
         queryText: nextQuery,
         month: focusMonth,
@@ -821,7 +909,6 @@ export default function Dashboard() {
     [
       activeTab,
       cashFlowMode,
-      dataViewMode,
       digHereFocusContext,
       digHereEndMonth,
       digHereFocusMonth,
@@ -840,14 +927,13 @@ export default function Dashboard() {
     setDigHereFocusContext(null);
     writeDashboardUrlState({
       tab: 'dig-here',
-      view: dataViewMode,
       cashFlow: cashFlowMode,
       month: null,
       startMonth: null,
       endMonth: null,
       focusContext: null,
     });
-  }, [cashFlowMode, dataViewMode, writeDashboardUrlState]);
+  }, [cashFlowMode, writeDashboardUrlState]);
 
   const applyMonthChoice = useCallback(() => {
     if (!monthPickerDraftMonth) return;
@@ -903,39 +989,55 @@ export default function Dashboard() {
 
   return (
     <div className="finance-app">
-      <aside className="left-nav glass-panel">
-        <div className="brand-wrap">
-          <div className="brand-badge" aria-hidden="true">
-            GS
+      <header className="app-top-nav">
+        <div className="app-top-nav-inner">
+          <div className="brand-wrap">
+            <img className="brand-logo" src={gracieSportsLogo} alt="Gracie Sports logo" />
+            <div>
+              <h1>Financial Dashboard</h1>
+            </div>
           </div>
-          <div>
-            <h1>{APP_TITLE}</h1>
-            <p>Personal CFO Scorecard</p>
+
+          <button
+            type="button"
+            className="app-nav-toggle"
+            aria-label="Toggle navigation menu"
+            aria-controls="app-top-nav-menu"
+            aria-expanded={isMobileNavOpen}
+            onClick={() => setIsMobileNavOpen((current) => !current)}
+          >
+            ☰
+          </button>
+
+          <nav id="app-top-nav-menu" className={isMobileNavOpen ? 'app-nav is-open' : 'app-nav'} aria-label="Main navigation">
+            <ul>
+              {NAV_ITEMS.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className={activeTab === item.id ? 'top-nav-item is-active' : 'top-nav-item'}
+                    onClick={() => setActiveTab(item.id)}
+                  >
+                    <item.icon className="top-nav-icon" aria-hidden="true" />
+                    <span>{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <div className="app-top-nav-search">
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search payee, category, memo..."
+              aria-label="Search transactions"
+            />
           </div>
+
         </div>
-
-        <nav aria-label="Main navigation">
-          <ul>
-            {NAV_ITEMS.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  className={activeTab === item.id ? 'nav-item is-active' : 'nav-item'}
-                  onClick={() => setActiveTab(item.id)}
-                >
-                  <span>{item.shortLabel}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        <button type="button" className="sync-btn" onClick={() => void runSync()} disabled={loading}>
-          {loading ? 'Syncing...' : 'Sync now'}
-        </button>
-
-        <p className="meta-note">Last sync: {formatTimestamp(dataSet?.fetchedAtIso ?? null)}</p>
-      </aside>
+      </header>
 
       <section className="main-zone">
         <header className="top-bar glass-panel">
@@ -948,7 +1050,7 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <div className="top-controls">
+          <div className="top-controls top-controls-timeframe">
             <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
               {KPI_FRAME_OPTIONS.map((option) => (
                 <button
@@ -961,33 +1063,6 @@ export default function Dashboard() {
                 </button>
               ))}
             </div>
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search payee, category, memo..."
-              aria-label="Search transactions"
-            />
-            <div className="view-toggle" role="group" aria-label="Data view mode">
-              <button
-                type="button"
-                className={dataViewMode === 'actuals' ? 'is-active' : ''}
-                onClick={() => setDataViewMode('actuals')}
-              >
-                Actuals
-              </button>
-              <button
-                type="button"
-                className={dataViewMode === 'all' ? 'is-active' : ''}
-                onClick={() => setDataViewMode('all')}
-              >
-                Actuals + Projections
-              </button>
-            </div>
-            <p className="data-count-note">
-              Actuals: {dataSplit.actuals.length.toLocaleString()} rows • Projections:{' '}
-              {dataSplit.projections.length.toLocaleString()} rows
-            </p>
           </div>
         </header>
 
@@ -1255,55 +1330,36 @@ export default function Dashboard() {
 
         {activeTab === 'what-if' && (
           <div className="stack-grid">
-            <article className="card scenario-card">
-              <div className="card-head">
-                <h3>What-If Scenario</h3>
-                <p className="subtle">Adjust assumptions and project the next 12 months</p>
-              </div>
-
-              <div className="slider-grid">
-                <label>
-                  Revenue growth ({scenarioInput.revenueGrowthPct.toFixed(1)}%)
-                  <input
-                    type="range"
-                    min={-10}
-                    max={20}
-                    step={0.5}
-                    value={scenarioInput.revenueGrowthPct}
-                    onChange={(event) =>
-                      setScenarioInput((prev) => ({
-                        ...prev,
-                        revenueGrowthPct: Number.parseFloat(event.target.value),
-                      }))
-                    }
-                  />
-                </label>
-
-                <label>
-                  Expense reduction ({scenarioInput.expenseReductionPct.toFixed(1)}%)
-                  <input
-                    type="range"
-                    min={0}
-                    max={20}
-                    step={0.5}
-                    value={scenarioInput.expenseReductionPct}
-                    onChange={(event) =>
-                      setScenarioInput((prev) => ({
-                        ...prev,
-                        expenseReductionPct: Number.parseFloat(event.target.value),
-                      }))
-                    }
-                  />
-                </label>
-              </div>
-            </article>
-
-            <TrendLineChart data={scenarioTrend} metric="net" title="Projected Monthly Net (12 Months)" />
+            <CashFlowForecastModule
+              data={cashFlowForecastTrend}
+              pointStatusByMonth={cashFlowForecastStatusByMonth}
+              currentCashBalance={currentCashBalance}
+              forecastRangeMonths={forecastRangeMonths}
+              forecastRangeValue={forecastRange}
+              forecastRangeOptions={FORECAST_RANGE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+              onForecastRangeChange={(nextValue) => {
+                const parsed = parseForecastRangeValue(nextValue);
+                if (parsed) setForecastRange(parsed);
+              }}
+              revenueGrowthPct={scenarioInput.revenueGrowthPct}
+              expenseReductionPct={scenarioInput.expenseReductionPct}
+              onRevenueGrowthChange={(nextValue) =>
+                setScenarioInput((prev) => ({
+                  ...prev,
+                  revenueGrowthPct: nextValue,
+                }))
+              }
+              onExpenseReductionChange={(nextValue) =>
+                setScenarioInput((prev) => ({
+                  ...prev,
+                  expenseReductionPct: nextValue,
+                }))
+              }
+            />
 
             <article className="card table-card">
               <div className="card-head">
                 <h3>Projection Table</h3>
-                <p className="subtle">Scenario output using trailing 3-month baseline</p>
               </div>
               <table>
                 <thead>
@@ -1321,8 +1377,8 @@ export default function Dashboard() {
                       <td>{toMonthLabel(row.month)}</td>
                       <td>{formatCurrency(row.projectedIncome)}</td>
                       <td>{formatCurrency(row.projectedExpense)}</td>
-                      <td>{formatCurrency(row.projectedNet)}</td>
-                      <td>{formatCurrency(row.cumulativeNet)}</td>
+                      <td className={row.projectedNet < 0 ? 'is-negative' : undefined}>{formatCurrency(row.projectedNet)}</td>
+                      <td className={row.cumulativeNet < 0 ? 'is-negative' : undefined}>{formatCurrency(row.cumulativeNet)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -1,4 +1,6 @@
 import type {
+  CashFlowForecastModelNotes,
+  CashFlowForecastPoint,
   CashFlowMode,
   DashboardModel,
   ExpenseSlice,
@@ -61,6 +63,20 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+function average(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function averageMonthOverMonthDelta(values: number[]): number {
+  if (values.length < 2) return 0;
+  let totalDelta = 0;
+  for (let index = 1; index < values.length; index += 1) {
+    totalDelta += values[index] - values[index - 1];
+  }
+  return totalDelta / (values.length - 1);
+}
+
 function sortMonths(a: string, b: string): number {
   return a.localeCompare(b);
 }
@@ -110,6 +126,340 @@ function addMonths(month: string, offset: number): string {
   const nextYear = date.getUTCFullYear();
   const nextMonth = String(date.getUTCMonth() + 1).padStart(2, '0');
   return `${nextYear}-${nextMonth}`;
+}
+
+function standardDeviation(values: number[]): number {
+  if (values.length === 0) return 0;
+  const mean = average(values);
+  const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
+  return Math.sqrt(variance);
+}
+
+function autocorrelation(values: number[], lag: number): number {
+  if (values.length <= lag || lag <= 0) return 0;
+  const mean = average(values);
+  let numerator = 0;
+  let denominator = 0;
+
+  for (let index = lag; index < values.length; index += 1) {
+    numerator += (values[index] - mean) * (values[index - lag] - mean);
+  }
+  for (let index = 0; index < values.length; index += 1) {
+    denominator += (values[index] - mean) ** 2;
+  }
+
+  if (Math.abs(denominator) <= EPSILON) return 0;
+  return numerator / denominator;
+}
+
+type LinearRegressionResult = {
+  slope: number;
+  intercept: number;
+  rSquared: number;
+};
+
+function linearRegression(values: number[]): LinearRegressionResult {
+  if (values.length === 0) {
+    return { slope: 0, intercept: 0, rSquared: 0 };
+  }
+
+  const n = values.length;
+  const xMean = (n - 1) / 2;
+  const yMean = average(values);
+  let numerator = 0;
+  let denominator = 0;
+
+  for (let index = 0; index < n; index += 1) {
+    const xDelta = index - xMean;
+    numerator += xDelta * (values[index] - yMean);
+    denominator += xDelta * xDelta;
+  }
+
+  const slope = Math.abs(denominator) <= EPSILON ? 0 : numerator / denominator;
+  const intercept = yMean - slope * xMean;
+  const fitted = values.map((_, index) => intercept + slope * index);
+  const ssRes = values.reduce((sum, value, index) => sum + (value - fitted[index]) ** 2, 0);
+  const ssTot = values.reduce((sum, value) => sum + (value - yMean) ** 2, 0);
+  const rSquared = Math.abs(ssTot) <= EPSILON ? 0 : Math.max(0, 1 - ssRes / ssTot);
+
+  return { slope, intercept, rSquared };
+}
+
+type TrendModel = {
+  method: 'linear-trend' | 'rolling-average';
+  slope: number;
+  rSquared: number;
+  rollingWindow: number;
+  fitAtIndex: (index: number) => number;
+  projectAtOffset: (offset: number) => number;
+};
+
+function buildTrendModel(values: number[]): TrendModel {
+  const rollingWindow = Math.max(1, Math.min(3, values.length));
+  const rollingBaseline = average(values.slice(-rollingWindow));
+  const regression = linearRegression(values);
+  const valueRange =
+    values.length > 0 ? Math.max(...values) - Math.min(...values) : 0;
+  const minSlopeThreshold = Math.max(valueRange * 0.03, Math.abs(rollingBaseline) * 0.005, 1);
+  const hasConfidentTrend =
+    values.length >= 6 &&
+    regression.rSquared >= 0.35 &&
+    Math.abs(regression.slope) >= minSlopeThreshold;
+
+  if (hasConfidentTrend) {
+    return {
+      method: 'linear-trend',
+      slope: regression.slope,
+      rSquared: regression.rSquared,
+      rollingWindow,
+      fitAtIndex: (index) => regression.intercept + regression.slope * index,
+      projectAtOffset: (offset) => regression.intercept + regression.slope * (values.length - 1 + offset),
+    };
+  }
+
+  return {
+    method: 'rolling-average',
+    slope: averageMonthOverMonthDelta(values.slice(-Math.max(2, Math.min(6, values.length)))),
+    rSquared: regression.rSquared,
+    rollingWindow,
+    fitAtIndex: () => rollingBaseline,
+    projectAtOffset: () => rollingBaseline,
+  };
+}
+
+type SeasonalityDetection = {
+  isConfident: boolean;
+  adjustmentsByMonth: number[];
+  seasonalStrength: number;
+  autocorrelation12: number;
+  uniqueMonths: number;
+  reason: string;
+};
+
+function detectExpenseSeasonality(monthlyRollups: MonthlyRollup[], expenseTrendModel: TrendModel): SeasonalityDetection {
+  const monthNumbers = monthlyRollups.map((rollup) => parseMonthParts(rollup.month)?.month ?? 0);
+  const expenseValues = monthlyRollups.map((rollup) => rollup.expenses);
+  const groups = new Map<number, number[]>();
+
+  for (let index = 0; index < monthlyRollups.length; index += 1) {
+    const monthNumber = monthNumbers[index];
+    if (monthNumber < 1 || monthNumber > 12) continue;
+    const residual = expenseValues[index] - expenseTrendModel.fitAtIndex(index);
+    const current = groups.get(monthNumber) ?? [];
+    current.push(residual);
+    groups.set(monthNumber, current);
+  }
+
+  const adjustmentsByMonth = new Array(13).fill(0);
+  let weightedSum = 0;
+  let weightedCount = 0;
+  groups.forEach((values, monthNumber) => {
+    const adjustment = average(values);
+    adjustmentsByMonth[monthNumber] = adjustment;
+    weightedSum += adjustment * values.length;
+    weightedCount += values.length;
+  });
+
+  const centeredOffset = weightedCount > 0 ? weightedSum / weightedCount : 0;
+  groups.forEach((_, monthNumber) => {
+    adjustmentsByMonth[monthNumber] -= centeredOffset;
+  });
+
+  const adjustedResiduals = expenseValues.map((value, index) => {
+    const monthNumber = monthNumbers[index];
+    const seasonal = monthNumber >= 1 && monthNumber <= 12 ? adjustmentsByMonth[monthNumber] : 0;
+    return value - expenseTrendModel.fitAtIndex(index) - seasonal;
+  });
+
+  const uniqueMonths = groups.size;
+  const seasonalValues = [...groups.keys()].map((monthNumber) => adjustmentsByMonth[monthNumber]);
+  const seasonalStrength =
+    standardDeviation(adjustedResiduals) <= EPSILON
+      ? 0
+      : standardDeviation(seasonalValues) / standardDeviation(adjustedResiduals);
+  const autocorrelation12 = autocorrelation(expenseValues, 12);
+  const hasEnoughHistory = monthlyRollups.length >= 18;
+  const hasCoverage = uniqueMonths >= 10;
+  const hasSignal = seasonalStrength >= 0.45 || autocorrelation12 >= 0.35;
+  const isConfident = hasEnoughHistory && hasCoverage && hasSignal;
+
+  let reason = 'no recurring pattern detected';
+  if (!hasEnoughHistory) {
+    reason = 'insufficient history for seasonality detection';
+  } else if (!hasCoverage) {
+    reason = 'insufficient month-of-year coverage';
+  } else if (!hasSignal) {
+    reason = 'recurring pattern confidence is low';
+  }
+
+  return {
+    isConfident,
+    adjustmentsByMonth,
+    seasonalStrength,
+    autocorrelation12,
+    uniqueMonths,
+    reason,
+  };
+}
+
+type CashFlowForecastBuildResult = {
+  series: CashFlowForecastPoint[];
+  modelNotes: CashFlowForecastModelNotes;
+};
+
+type SuggestedMarginRecommendation = {
+  suggestedRevenueMargin: number;
+  suggestedExpenseMargin: number;
+  suggestedMarginJustification: string;
+};
+
+function formatSignedPercent(value: number): string {
+  if (value > 0) return `+${value}%`;
+  return `${value}%`;
+}
+
+function mapRevenueVolatilityToMargin(volatilityScore: number): number {
+  if (volatilityScore < 0.08) return 0;
+  if (volatilityScore < 0.14) return -5;
+  if (volatilityScore < 0.2) return -10;
+  if (volatilityScore < 0.28) return -15;
+  if (volatilityScore < 0.36) return -20;
+  if (volatilityScore < 0.46) return -25;
+  if (volatilityScore < 0.58) return -30;
+  if (volatilityScore < 0.72) return -35;
+  return -40;
+}
+
+function mapExpenseVolatilityToMargin(volatilityScore: number): number {
+  if (volatilityScore < 0.08) return 0;
+  if (volatilityScore < 0.14) return 5;
+  if (volatilityScore < 0.2) return 10;
+  if (volatilityScore < 0.28) return 15;
+  return 20;
+}
+
+function computeVolatilityScore(values: number[]): number {
+  if (values.length < 2) return 0;
+
+  const meanAbs = average(values.map((value) => Math.abs(value)));
+  const coefficientOfVariation = meanAbs <= EPSILON ? 0 : standardDeviation(values) / meanAbs;
+  const monthOverMonthChanges: number[] = [];
+
+  for (let index = 1; index < values.length; index += 1) {
+    const previousAbs = Math.abs(values[index - 1]);
+    if (previousAbs <= EPSILON) continue;
+    monthOverMonthChanges.push(Math.abs(values[index] - values[index - 1]) / previousAbs);
+  }
+
+  const averageChangeMagnitude = monthOverMonthChanges.length > 0 ? average(monthOverMonthChanges) : 0;
+  return coefficientOfVariation * 0.6 + averageChangeMagnitude * 0.4;
+}
+
+function suggestForecastMargins(monthlyRollups: MonthlyRollup[]): SuggestedMarginRecommendation {
+  const window = monthlyRollups.slice(-Math.min(12, monthlyRollups.length));
+  const monthCount = window.length;
+
+  if (monthCount < 6) {
+    const monthLabel = monthCount === 1 ? 'month' : 'months';
+    return {
+      suggestedRevenueMargin: 0,
+      suggestedExpenseMargin: 0,
+      suggestedMarginJustification: `Suggested margins default to 0% for revenue and 0% for expenses because only ${monthCount} actual ${monthLabel} are available, which is not enough history for a stable volatility estimate.`,
+    };
+  }
+
+  const revenueVolatility = computeVolatilityScore(window.map((rollup) => rollup.revenue));
+  const expenseVolatility = computeVolatilityScore(window.map((rollup) => rollup.expenses));
+  const suggestedRevenueMargin = mapRevenueVolatilityToMargin(revenueVolatility);
+  const suggestedExpenseMargin = mapExpenseVolatilityToMargin(expenseVolatility);
+
+  return {
+    suggestedRevenueMargin,
+    suggestedExpenseMargin,
+    suggestedMarginJustification: `Using the last ${monthCount} actual months, revenue volatility is ${(revenueVolatility * 100).toFixed(
+      1
+    )}% and expense volatility is ${(expenseVolatility * 100).toFixed(1)}%. Suggested safety margins are ${formatSignedPercent(
+      suggestedRevenueMargin
+    )} for revenue and ${formatSignedPercent(suggestedExpenseMargin)} for expenses.`,
+  };
+}
+
+function buildCashFlowForecastSeries(monthlyRollups: MonthlyRollup[], projectionMonths = 12): CashFlowForecastBuildResult {
+  if (monthlyRollups.length === 0) {
+    return {
+      series: [],
+      modelNotes: {
+        revenue: 'Revenue forecast unavailable (no historical months).',
+        expenses: 'Expenses forecast unavailable (no historical months).',
+      },
+    };
+  }
+
+  const actualRows: CashFlowForecastPoint[] = monthlyRollups.map((rollup) => ({
+    month: rollup.month,
+    revenue: rollup.revenue,
+    expenses: rollup.expenses,
+    netCashFlow: rollup.netCashFlow,
+    status: 'actual',
+  }));
+
+  const revenueValues = monthlyRollups.map((rollup) => rollup.revenue);
+  const expenseValues = monthlyRollups.map((rollup) => rollup.expenses);
+  const revenueTrendModel = buildTrendModel(revenueValues);
+  const expenseTrendModel = buildTrendModel(expenseValues);
+  const expenseSeasonality = detectExpenseSeasonality(monthlyRollups, expenseTrendModel);
+  const latestMonth = monthlyRollups[monthlyRollups.length - 1].month;
+
+  const projectedRows: CashFlowForecastPoint[] = [];
+  for (let index = 1; index <= projectionMonths; index += 1) {
+    const month = addMonths(latestMonth, index);
+    const monthNumber = parseMonthParts(month)?.month ?? 0;
+    const projectedRevenue = round2(Math.max(revenueTrendModel.projectAtOffset(index), 0));
+    const seasonalExpenseAdjustment =
+      expenseSeasonality.isConfident && monthNumber >= 1 && monthNumber <= 12
+        ? expenseSeasonality.adjustmentsByMonth[monthNumber]
+        : 0;
+    const projectedExpenses = round2(
+      Math.max(expenseTrendModel.projectAtOffset(index) + seasonalExpenseAdjustment, 0)
+    );
+    projectedRows.push({
+      month,
+      revenue: projectedRevenue,
+      expenses: projectedExpenses,
+      netCashFlow: round2(projectedRevenue - projectedExpenses),
+      status: 'projected',
+    });
+  }
+
+  const revenueModelNote =
+    revenueTrendModel.method === 'linear-trend'
+      ? `Revenue uses linear trend (R²=${revenueTrendModel.rSquared.toFixed(2)}, slope=${round2(
+          revenueTrendModel.slope
+        ).toLocaleString()}/month).`
+      : `Revenue uses rolling average (${revenueTrendModel.rollingWindow}-month window); trend confidence is low (R²=${revenueTrendModel.rSquared.toFixed(
+          2
+        )}).`;
+
+  const expenseTrendNote =
+    expenseTrendModel.method === 'linear-trend'
+      ? `trend base = linear (R²=${expenseTrendModel.rSquared.toFixed(2)}, slope=${round2(
+          expenseTrendModel.slope
+        ).toLocaleString()}/month)`
+      : `trend base = rolling average (${expenseTrendModel.rollingWindow}-month window)`;
+
+  const expenseModelNote = expenseSeasonality.isConfident
+    ? `Expenses uses ${expenseTrendNote} + recurring monthly pattern (strength=${expenseSeasonality.seasonalStrength.toFixed(
+        2
+      )}, autocorr12=${expenseSeasonality.autocorrelation12.toFixed(2)}).`
+    : `Expenses uses ${expenseTrendNote}; fallback applied (${expenseSeasonality.reason}).`;
+
+  return {
+    series: [...actualRows, ...projectedRows],
+    modelNotes: {
+      revenue: revenueModelNote,
+      expenses: expenseModelNote,
+    },
+  };
 }
 
 function normalizeCategory(category: string): string {
@@ -391,7 +741,7 @@ export function computeKpiHeaderLabels(comparisons: KpiComparisonMap): KpiHeader
 
     if (timeframe === 'ttm') {
       const currentEnd = item.currentEndMonth ? monthLabelStable(item.currentEndMonth) : 'n/a';
-      result[timeframe] = `TTM through ${currentEnd} · vs prior TTM`;
+      result[timeframe] = `Last 12 Months through ${currentEnd} vs prior 12 Months`;
       return result;
     }
 
@@ -896,6 +1246,15 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
       trajectorySignals: emptyTrajectory,
       kpiCards: [],
       trend: [],
+      cashFlowForecastSeries: [],
+      cashFlowForecastModelNotes: {
+        revenue: 'Revenue forecast unavailable (no historical months).',
+        expenses: 'Expenses forecast unavailable (no historical months).',
+      },
+      suggestedRevenueMargin: 0,
+      suggestedExpenseMargin: 0,
+      suggestedMarginJustification:
+        'Suggested margins default to 0% for revenue and 0% for expenses because there are no actual months available yet.',
       expenseSlices: [],
       topPayees: [],
       movers: [],
@@ -918,6 +1277,10 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
 
   const opportunities = buildOpportunities(latestMonthTxns, monthlyRollups, txns);
   const opportunityTotal = round2(opportunities.reduce((sum, item) => sum + item.savings, 0));
+  // Precompute up to 36 projected months so UI horizon controls can expand
+  // from 30-day equivalents through 3 years without recalculating the model.
+  const cashFlowForecast = buildCashFlowForecastSeries(monthlyRollups, 36);
+  const suggestedMargins = suggestForecastMargins(monthlyRollups);
 
   return {
     latestMonth: latest.month,
@@ -934,6 +1297,11 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
       expense: rollup.expenses,
       net: rollup.netCashFlow,
     })),
+    cashFlowForecastSeries: cashFlowForecast.series,
+    cashFlowForecastModelNotes: cashFlowForecast.modelNotes,
+    suggestedRevenueMargin: suggestedMargins.suggestedRevenueMargin,
+    suggestedExpenseMargin: suggestedMargins.suggestedExpenseMargin,
+    suggestedMarginJustification: suggestedMargins.suggestedMarginJustification,
     expenseSlices: buildExpenseSlices(latestMonthTxns),
     topPayees: buildTopPayees(latestMonthTxns),
     movers: buildMovers(latestMonthTxns, previousMonthTxns),

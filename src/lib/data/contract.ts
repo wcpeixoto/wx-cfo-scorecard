@@ -13,6 +13,7 @@ export type Txn = {
   account?: string;
   tags?: string[];
   rawAmount: number;
+  balance?: number;
 };
 
 export type CsvRecord = Record<string, string>;
@@ -127,6 +128,26 @@ export type TrendPoint = {
   income: number;
   expense: number;
   net: number;
+  granularity?: 'month' | 'week';
+  axisLabel?: string;
+  tooltipLabel?: string;
+  periodStart?: string;
+  periodEnd?: string;
+};
+
+export type CashFlowForecastStatus = 'actual' | 'projected';
+
+export type CashFlowForecastPoint = {
+  month: string;
+  revenue: number;
+  expenses: number;
+  netCashFlow: number;
+  status: CashFlowForecastStatus;
+};
+
+export type CashFlowForecastModelNotes = {
+  revenue: string;
+  expenses: string;
 };
 
 export type ExpenseSlice = {
@@ -166,6 +187,11 @@ export type DashboardModel = {
   trajectorySignals: TrajectorySignal[];
   kpiCards: KpiCard[];
   trend: TrendPoint[];
+  cashFlowForecastSeries: CashFlowForecastPoint[];
+  cashFlowForecastModelNotes: CashFlowForecastModelNotes;
+  suggestedRevenueMargin: number;
+  suggestedExpenseMargin: number;
+  suggestedMarginJustification: string;
   expenseSlices: ExpenseSlice[];
   topPayees: PayeeTotal[];
   movers: Mover[];

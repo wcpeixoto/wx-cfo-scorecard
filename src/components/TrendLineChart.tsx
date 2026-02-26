@@ -1,18 +1,42 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { toMonthLabel } from '../lib/kpis/compute';
-import type { CashFlowMode, TrendPoint } from '../lib/data/contract';
+import type { CashFlowForecastStatus, CashFlowMode, TrendPoint } from '../lib/data/contract';
 
 type TrendMetric = 'income' | 'expense' | 'net';
+type TooltipVariant = 'default' | 'forecast';
+type ForecastRangeOption = { value: string; label: string };
+type RevenueMarginOption = { value: string; label: string };
+type ExpenseMarginOption = { value: string; label: string };
 
 type TrendLineChartProps = {
   data: TrendPoint[];
   axisDomainData?: TrendPoint[];
   metric: TrendMetric;
   title: string;
+  subtitle?: string;
+  rangeLabelOverride?: string;
   enableTimeframeControl?: boolean;
   showCashFlowToggle?: boolean;
   cashFlowMode?: CashFlowMode;
+  pointStatusByMonth?: Partial<Record<string, CashFlowForecastStatus>>;
+  showRevenueExpenseInTooltip?: boolean;
+  tooltipVariant?: TooltipVariant;
+  forecastRangeLabel?: string;
+  forecastRangeValue?: string;
+  forecastRangeOptions?: ForecastRangeOption[];
+  onForecastRangeChange?: (nextValue: string) => void;
+  revenueMarginLabel?: string;
+  revenueMarginValue?: string;
+  revenueMarginOptions?: RevenueMarginOption[];
+  onRevenueMarginChange?: (nextValue: string) => void;
+  expenseMarginLabel?: string;
+  expenseMarginValue?: string;
+  expenseMarginOptions?: ExpenseMarginOption[];
+  onExpenseMarginChange?: (nextValue: string) => void;
+  suggestedMarginsText?: string;
+  applySuggestionLabel?: string;
+  onApplySuggestion?: () => void;
   onCashFlowModeChange?: (nextMode: CashFlowMode) => void;
   onMonthPointClick?: (month: string) => void;
 };
@@ -24,6 +48,9 @@ type PlotPoint = {
   label: string;
   axisLabel: string;
   month: string;
+  income: number;
+  expense: number;
+  status: CashFlowForecastStatus;
 };
 
 type AxisConfig = {
@@ -286,6 +313,36 @@ function fallbackCadences(preferred: XAxisCadence): XAxisCadence[] {
   return X_AXIS_CADENCE_ORDER.slice(startIndex >= 0 ? startIndex : 0);
 }
 
+function buildEvenTickIndices(pointCount: number, maxTicks: number): number[] {
+  if (pointCount <= 0) return [];
+  if (pointCount <= maxTicks) return Array.from({ length: pointCount }, (_, index) => index);
+
+  const safeMaxTicks = Math.max(2, maxTicks);
+  const indices = new Set<number>([0, pointCount - 1]);
+
+  for (let i = 1; i < safeMaxTicks - 1; i += 1) {
+    const index = Math.round((i * (pointCount - 1)) / (safeMaxTicks - 1));
+    indices.add(index);
+  }
+
+  return [...indices].sort((a, b) => a - b);
+}
+
+function preferredWeeklyTickCount(pointCount: number): number {
+  if (pointCount <= 6) return pointCount;
+  if (pointCount <= 10) return 5;
+  if (pointCount <= 14) return 6;
+  if (pointCount <= 20) return 7;
+  return 8;
+}
+
+function buildWeeklyTickIndices(points: PlotPoint[], width: number): number[] {
+  if (points.length === 0) return [];
+  const candidate = buildEvenTickIndices(points.length, preferredWeeklyTickCount(points.length));
+  const minGap = width < 560 ? 72 : width < 700 ? 82 : 90;
+  return reduceOverlaps(candidate, points, minGap);
+}
+
 function buildTickIndicesForCadence(points: PlotPoint[], cadence: XAxisCadence): number[] {
   if (points.length === 0) return [];
   if (points.length === 1) return [0];
@@ -369,14 +426,12 @@ function buildAdaptiveXAxisTickIndices(points: PlotPoint[], width: number): numb
   return reduced.length > 0 ? reduced : [0, points.length - 1];
 }
 
-function tooltipBoxX(anchorX: number): number {
-  const width = 196;
+function tooltipBoxX(anchorX: number, width = 196): number {
   const preferred = anchorX + 12;
   return Math.max(PADDING_X + 6, Math.min(preferred, WIDTH - width - 8));
 }
 
-function tooltipBoxY(anchorY: number, lineCount: number): number {
-  const height = 16 + lineCount * 14;
+function tooltipBoxY(anchorY: number, height: number): number {
   const preferred = anchorY - height - 10;
   return Math.max(PADDING_TOP + 6, Math.min(preferred, HEIGHT - PADDING_BOTTOM - height - 4));
 }
@@ -389,6 +444,10 @@ function clampRatio(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+function clampValue(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(value, max));
+}
+
 function toOffset(value: number): string {
   return `${(clampRatio(value) * 100).toFixed(2)}%`;
 }
@@ -398,9 +457,29 @@ export default function TrendLineChart({
   axisDomainData,
   metric,
   title,
+  subtitle,
+  rangeLabelOverride,
   enableTimeframeControl = false,
   showCashFlowToggle = false,
   cashFlowMode,
+  pointStatusByMonth,
+  showRevenueExpenseInTooltip = false,
+  tooltipVariant = 'default',
+  forecastRangeLabel = 'Forecast range',
+  forecastRangeValue,
+  forecastRangeOptions,
+  onForecastRangeChange,
+  revenueMarginLabel = 'Revenue margin',
+  revenueMarginValue,
+  revenueMarginOptions,
+  onRevenueMarginChange,
+  expenseMarginLabel = 'Expense margin',
+  expenseMarginValue,
+  expenseMarginOptions,
+  onExpenseMarginChange,
+  suggestedMarginsText,
+  applySuggestionLabel = 'Apply suggestion',
+  onApplySuggestion,
   onCashFlowModeChange,
   onMonthPointClick,
 }: TrendLineChartProps) {
@@ -416,6 +495,26 @@ export default function TrendLineChart({
     metric === 'net' &&
     typeof onCashFlowModeChange === 'function' &&
     (cashFlowMode === 'operating' || cashFlowMode === 'total');
+  const showForecastRangeControl =
+    metric === 'net' &&
+    typeof onForecastRangeChange === 'function' &&
+    typeof forecastRangeValue === 'string' &&
+    Array.isArray(forecastRangeOptions) &&
+    forecastRangeOptions.length > 0;
+  const showRevenueMarginControl =
+    metric === 'net' &&
+    typeof onRevenueMarginChange === 'function' &&
+    typeof revenueMarginValue === 'string' &&
+    Array.isArray(revenueMarginOptions) &&
+    revenueMarginOptions.length > 0;
+  const showExpenseMarginControl =
+    metric === 'net' &&
+    typeof onExpenseMarginChange === 'function' &&
+    typeof expenseMarginValue === 'string' &&
+    Array.isArray(expenseMarginOptions) &&
+    expenseMarginOptions.length > 0;
+  const showSuggestedMargins =
+    metric === 'net' && typeof suggestedMarginsText === 'string' && suggestedMarginsText.trim().length > 0;
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -458,7 +557,9 @@ export default function TrendLineChart({
 
   const {
     points,
-    linePath,
+    actualLinePath,
+    forecastLinePath,
+    hasProjectedSegment,
     areaPath,
     trendPath,
     trendValues,
@@ -473,7 +574,9 @@ export default function TrendLineChart({
     if (scopedData.length === 0) {
       return {
         points: [],
-        linePath: '',
+        actualLinePath: '',
+        forecastLinePath: '',
+        hasProjectedSegment: false,
         areaPath: '',
         trendPath: '',
         trendValues: [] as number[],
@@ -531,30 +634,57 @@ export default function TrendLineChart({
       const value = values[index];
       const x = PADDING_X + index * step;
       const y = PADDING_TOP + ((axis.max - value) / range) * innerHeight;
+      const rawIncome = Number(item.income);
+      const rawExpense = Number(item.expense);
+      const status: CashFlowForecastStatus =
+        pointStatusByMonth?.[item.month] === 'projected' ? 'projected' : 'actual';
       return {
         x,
         y,
         value,
-        label: toMonthLabel(item.month),
-        axisLabel: formatShortMonthLabel(item.month),
+        label: item.tooltipLabel ?? toMonthLabel(item.month),
+        axisLabel: item.axisLabel ?? formatShortMonthLabel(item.month),
         month: item.month,
+        income: Number.isFinite(rawIncome) ? rawIncome : 0,
+        expense: Number.isFinite(rawExpense) ? rawExpense : 0,
+        status,
       };
     });
 
-    const line = buildPath(computedPoints);
+    const fullLinePath = buildPath(computedPoints);
+    const firstProjectedIndex = computedPoints.findIndex((point) => point.status === 'projected');
+    let computedActualLinePath = fullLinePath;
+    let computedForecastLinePath = '';
+    let computedHasProjectedSegment = false;
+
+    if (firstProjectedIndex >= 0) {
+      computedHasProjectedSegment = true;
+      if (firstProjectedIndex === 0) {
+        computedActualLinePath = '';
+        computedForecastLinePath = fullLinePath;
+      } else {
+        computedActualLinePath = buildPath(computedPoints.slice(0, firstProjectedIndex));
+        computedForecastLinePath = buildPath(computedPoints.slice(firstProjectedIndex - 1));
+      }
+    }
+
     const zeroY = PADDING_TOP + ((axis.max - 0) / range) * innerHeight;
     const area =
       computedPoints.length > 0
-        ? `${line} L ${computedPoints[computedPoints.length - 1].x} ${zeroY} L ${computedPoints[0].x} ${zeroY} Z`
+        ? `${fullLinePath} L ${computedPoints[computedPoints.length - 1].x} ${zeroY} L ${computedPoints[0].x} ${zeroY} Z`
         : '';
 
     const computedTrendPath = isNetMetric
       ? buildLinearTrendPath(computedPoints, computedTrendValues, axis.max, range, innerHeight)
       : buildTrendPath(computedPoints, computedTrendValues, axis.max, range, innerHeight);
 
+    const hasWeeklyGranularity = scopedData.some((item) => item.granularity === 'week');
+
     return {
       points: computedPoints,
-      linePath: line,
+      actualLinePath: computedActualLinePath,
+      forecastLinePath: computedForecastLinePath,
+      hasProjectedSegment: computedHasProjectedSegment,
       areaPath: area,
       trendPath: computedTrendPath,
       trendValues: computedTrendValues,
@@ -564,9 +694,11 @@ export default function TrendLineChart({
       axisMin: axis.min,
       axisMax: axis.max,
       yTicks: axis.ticks,
-      xTickIndices: buildAdaptiveXAxisTickIndices(computedPoints, innerWidth),
+      xTickIndices: hasWeeklyGranularity
+        ? buildWeeklyTickIndices(computedPoints, innerWidth)
+        : buildAdaptiveXAxisTickIndices(computedPoints, innerWidth),
     };
-  }, [scopedData, scopedAxisDomainData, metric, innerHeight, innerWidth, enableTimeframeControl, timeframe]);
+  }, [scopedData, scopedAxisDomainData, metric, innerHeight, innerWidth, enableTimeframeControl, timeframe, pointStatusByMonth]);
 
   useEffect(() => {
     if (points.length === 0) {
@@ -605,13 +737,33 @@ export default function TrendLineChart({
     );
   }
 
-  const rangeLabel = `${toMonthLabel(scopedData[0].month)} – ${toMonthLabel(scopedData[scopedData.length - 1].month)}`;
+  const rangeLabel = rangeLabelOverride || `${toMonthLabel(scopedData[0].month)} – ${toMonthLabel(scopedData[scopedData.length - 1].month)}`;
   const activePointIndex =
     activeIndex !== null && activeIndex >= 0 && activeIndex < points.length ? activeIndex : null;
   const activePoint = activePointIndex !== null ? points[activePointIndex] ?? null : null;
   const hasTrend = trendValues.length === points.length && trendValues.length > 0;
   const trendNoteLabel =
     trendMode === 'linear' ? null : `Trend: ${trendWindow ?? getAdaptiveAverageWindow(scopedData.length)}-mo avg`;
+  const hasProjectedPoints = points.some((point) => point.status === 'projected');
+  const isForecastTooltip = tooltipVariant === 'forecast' && metric === 'net';
+  const showStatusInTooltip = hasProjectedPoints && !isForecastTooltip;
+  const showMetricBreakdownInTooltip = metric === 'net' && (showRevenueExpenseInTooltip || isForecastTooltip);
+  const tooltipLineCount = 2 + (showStatusInTooltip ? 1 : 0) + (showMetricBreakdownInTooltip ? 2 : 0) + (showNetEnhancements ? 1 : 0);
+  const tooltipWidth = isForecastTooltip ? 232 : 192;
+  const tooltipHeight = isForecastTooltip ? (showNetEnhancements ? 98 : 84) : 16 + tooltipLineCount * 14;
+  const metricLabel = metric === 'income' ? 'Revenue' : metric === 'expense' ? 'Expenses' : 'Net cash flow';
+  const showForecastPointLabels = isForecastTooltip && points.length > 0;
+  const lastForecastPoint = showForecastPointLabels ? points[points.length - 1] : null;
+  const worstForecastPoint = showForecastPointLabels
+    ? points.reduce((worst, point) => (point.value < worst.value ? point : worst), points[0])
+    : null;
+  const chartMinLabelX = PADDING_X + 18;
+  const chartMaxLabelX = WIDTH - PADDING_X - 18;
+
+  const positionForecastLabelY = (value: number, y: number): number => {
+    const raw = y + (value < 0 ? 18 : -12);
+    return clampValue(raw, PADDING_TOP + 12, HEIGHT - PADDING_BOTTOM - 6);
+  };
 
   const areaGradientId = gradientIdFor(title, metric);
   const lineGradientId = `${areaGradientId}-line`;
@@ -624,7 +776,10 @@ export default function TrendLineChart({
   return (
     <article className="card chart-card">
       <div className={`card-head chart-head${showCashFlowControl ? ' chart-head-has-center' : ''}`}>
-        <h3 className="chart-head-title">{title}</h3>
+        <div className="chart-head-left">
+          <h3 className="chart-head-title">{title}</h3>
+          {subtitle && <p className="subtle chart-head-subtitle">{subtitle}</p>}
+        </div>
         {showCashFlowControl && (
           <div className="chart-head-middle" role="group" aria-label="Cash Flow mode selector">
             <div className="cashflow-toggle">
@@ -663,39 +818,89 @@ export default function TrendLineChart({
           </div>
         )}
         <div className="chart-head-right">
-          {enableTimeframeControl && (
+          {(enableTimeframeControl || showForecastRangeControl || showRevenueMarginControl || showExpenseMarginControl || showSuggestedMargins) && (
             <div className="chart-control-row">
               <div className="timeframe-menu" ref={menuRef}>
-                <button
-                  type="button"
-                  className="timeframe-trigger"
-                  onClick={() => setMenuOpen((current) => !current)}
-                  aria-haspopup="menu"
-                  aria-expanded={menuOpen}
-                >
-                  {timeframeLabel(timeframe)} ▾
-                </button>
-                {menuOpen && (
-                  <ul className="timeframe-list" role="menu" aria-label="Select timeframe">
-                    {TIMEFRAME_OPTIONS.map((option) => (
-                      <li key={option.label}>
-                        <button
-                          type="button"
-                          role="menuitemradio"
-                          aria-checked={timeframe === option.value}
-                          className={timeframe === option.value ? 'is-active' : ''}
-                          onClick={() => {
-                            setTimeframe(option.value);
-                            setMenuOpen(false);
-                          }}
-                        >
-                          {option.label}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                {enableTimeframeControl && (
+                  <>
+                    <button
+                      type="button"
+                      className="timeframe-trigger"
+                      onClick={() => setMenuOpen((current) => !current)}
+                      aria-haspopup="menu"
+                      aria-expanded={menuOpen}
+                    >
+                      {timeframeLabel(timeframe)} ▾
+                    </button>
+                    {menuOpen && (
+                      <ul className="timeframe-list" role="menu" aria-label="Select timeframe">
+                        {TIMEFRAME_OPTIONS.map((option) => (
+                          <li key={option.label}>
+                            <button
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={timeframe === option.value}
+                              className={timeframe === option.value ? 'is-active' : ''}
+                              onClick={() => {
+                                setTimeframe(option.value);
+                                setMenuOpen(false);
+                              }}
+                            >
+                              {option.label}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
                 )}
               </div>
+              {showForecastRangeControl && (
+                <label className="chart-select-control">
+                  <span>{forecastRangeLabel}</span>
+                  <select value={forecastRangeValue} onChange={(event) => onForecastRangeChange?.(event.target.value)}>
+                    {forecastRangeOptions?.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {showRevenueMarginControl && (
+                <label className="chart-select-control">
+                  <span>{revenueMarginLabel}</span>
+                  <select value={revenueMarginValue} onChange={(event) => onRevenueMarginChange?.(event.target.value)}>
+                    {revenueMarginOptions?.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {showExpenseMarginControl && (
+                <label className="chart-select-control">
+                  <span>{expenseMarginLabel}</span>
+                  <select value={expenseMarginValue} onChange={(event) => onExpenseMarginChange?.(event.target.value)}>
+                    {expenseMarginOptions?.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {showSuggestedMargins && (
+                <div className="chart-suggestion">
+                  <span>{suggestedMarginsText}</span>
+                  {typeof onApplySuggestion === 'function' && (
+                    <button type="button" onClick={() => onApplySuggestion()}>
+                      {applySuggestionLabel}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <p className="subtle">{rangeLabel}</p>
@@ -748,7 +953,16 @@ export default function TrendLineChart({
         <path d={areaPath} fill={`url(#${areaGradientId})`} />
 
         {hasTrend && <path d={trendPath} className="ma-path" />}
-        <path d={linePath} className="trend-path" stroke={isNetSeries ? `url(#${lineGradientId})` : undefined} />
+        {actualLinePath && (
+          <path d={actualLinePath} className="trend-path" stroke={isNetSeries ? `url(#${lineGradientId})` : undefined} />
+        )}
+        {hasProjectedSegment && forecastLinePath && (
+          <path
+            d={forecastLinePath}
+            className="trend-path trend-path-forecast"
+            stroke={isNetSeries ? `url(#${lineGradientId})` : undefined}
+          />
+        )}
 
         {points.map((point, index) => {
           const isLatest = index === points.length - 1;
@@ -801,6 +1015,33 @@ export default function TrendLineChart({
           );
         })}
 
+        {showForecastPointLabels && lastForecastPoint && (
+          <g className="forecast-point-label-layer" pointerEvents="none">
+            {worstForecastPoint && worstForecastPoint.month !== lastForecastPoint.month && (
+              <text
+                x={clampValue(worstForecastPoint.x, chartMinLabelX, chartMaxLabelX)}
+                y={positionForecastLabelY(worstForecastPoint.value, worstForecastPoint.y)}
+                textAnchor="middle"
+                className={`forecast-point-label forecast-point-label-worst${
+                  worstForecastPoint.value < -EPSILON ? ' is-negative' : ''
+                }`}
+              >
+                {formatCurrencyValue(worstForecastPoint.value)}
+              </text>
+            )}
+            <text
+              x={clampValue(lastForecastPoint.x, chartMinLabelX, chartMaxLabelX)}
+              y={positionForecastLabelY(lastForecastPoint.value, lastForecastPoint.y)}
+              textAnchor="middle"
+              className={`forecast-point-label forecast-point-label-last${
+                lastForecastPoint.value < -EPSILON ? ' is-negative' : ''
+              }`}
+            >
+              {formatCurrencyValue(lastForecastPoint.value)}
+            </text>
+          </g>
+        )}
+
         {xTickIndices.map((index) => {
           const point = points[index];
           if (!point) return null;
@@ -822,37 +1063,98 @@ export default function TrendLineChart({
 
         {activePoint && (
           <g className="chart-tooltip" pointerEvents="none">
-            <rect
-              x={tooltipBoxX(activePoint.x)}
-              y={tooltipBoxY(activePoint.y, showNetEnhancements ? 3 : 2)}
-              width={192}
-              height={showNetEnhancements ? 58 : 44}
-              rx={10}
-              ry={10}
-              className="tooltip-box"
-            />
-            <text x={tooltipBoxX(activePoint.x) + 10} y={tooltipBoxY(activePoint.y, showNetEnhancements ? 3 : 2) + 14} className="tooltip-title">
-              {toMonthLabel(activePoint.month)}
-            </text>
-            <text x={tooltipBoxX(activePoint.x) + 10} y={tooltipBoxY(activePoint.y, showNetEnhancements ? 3 : 2) + 28} className="tooltip-line">
-              <tspan>Net cash flow: </tspan>
-              <tspan
-                className={
-                  activePoint.value > EPSILON
-                    ? 'tooltip-line-value is-positive'
-                    : activePoint.value < -EPSILON
-                      ? 'tooltip-line-value is-negative'
-                      : 'tooltip-line-value'
-                }
-              >
-                {formatCurrencyValue(activePoint.value)}
-              </tspan>
-            </text>
-            {showNetEnhancements && (
-              <text x={tooltipBoxX(activePoint.x) + 10} y={tooltipBoxY(activePoint.y, 3) + 42} className="tooltip-hint">
-                Click the chart to view details
-              </text>
-            )}
+            {(() => {
+              const x = tooltipBoxX(activePoint.x, tooltipWidth);
+              const y = tooltipBoxY(activePoint.y, tooltipHeight);
+              const firstInfoLineY = y + 28;
+              const statusLineY = firstInfoLineY;
+              const valueLineY = firstInfoLineY + (showStatusInTooltip ? 14 : 0);
+              const revenueLineY = valueLineY + 14;
+              const expenseLineY = valueLineY + 28;
+              const hintLineY = y + 14 + (tooltipLineCount - 1) * 14;
+              const forecastLeftX = x + 12;
+              const forecastRightX = x + tooltipWidth - 12;
+              const forecastRevenueY = y + 34;
+              const forecastExpenseY = y + 50;
+              const forecastNetY = y + 66;
+              const forecastHintY = y + 82;
+              const netValueClassName = `tooltip-row-value tooltip-row-value-net${
+                activePoint.value < -EPSILON ? ' is-negative' : ''
+              }`;
+
+              return (
+                <>
+                  <rect x={x} y={y} width={tooltipWidth} height={tooltipHeight} rx={10} ry={10} className="tooltip-box" />
+                  <text x={x + 10} y={y + 14} className="tooltip-title">
+                    {activePoint.label}
+                  </text>
+                  {isForecastTooltip ? (
+                    <>
+                      <text x={forecastLeftX} y={forecastRevenueY} className="tooltip-row-label">
+                        Revenue
+                      </text>
+                      <text x={forecastRightX} y={forecastRevenueY} textAnchor="end" className="tooltip-row-value">
+                        {formatCurrencyValue(activePoint.income)}
+                      </text>
+                      <text x={forecastLeftX} y={forecastExpenseY} className="tooltip-row-label">
+                        Expenses
+                      </text>
+                      <text x={forecastRightX} y={forecastExpenseY} textAnchor="end" className="tooltip-row-value">
+                        {formatCurrencyValue(activePoint.expense)}
+                      </text>
+                      <text x={forecastLeftX} y={forecastNetY} className="tooltip-row-label">
+                        Net cash flow
+                      </text>
+                      <text x={forecastRightX} y={forecastNetY} textAnchor="end" className={netValueClassName}>
+                        {formatCurrencyValue(activePoint.value)}
+                      </text>
+                    </>
+                  ) : (
+                    <>
+                      {showStatusInTooltip && (
+                        <text x={x + 10} y={statusLineY} className="tooltip-line">
+                          <tspan>Status: </tspan>
+                          <tspan className="tooltip-line-value">
+                            {activePoint.status === 'projected' ? 'FORECAST' : 'ACTUAL'}
+                          </tspan>
+                        </text>
+                      )}
+                      <text x={x + 10} y={valueLineY} className="tooltip-line">
+                        <tspan>{metricLabel}: </tspan>
+                        <tspan
+                          className={
+                            activePoint.value > EPSILON
+                              ? 'tooltip-line-value is-positive'
+                              : activePoint.value < -EPSILON
+                                ? 'tooltip-line-value is-negative'
+                                : 'tooltip-line-value'
+                          }
+                        >
+                          {formatCurrencyValue(activePoint.value)}
+                        </tspan>
+                      </text>
+                      {showMetricBreakdownInTooltip && (
+                        <text x={x + 10} y={revenueLineY} className="tooltip-line">
+                          <tspan>Revenue: </tspan>
+                          <tspan className="tooltip-line-value">{formatCurrencyValue(activePoint.income)}</tspan>
+                        </text>
+                      )}
+                      {showMetricBreakdownInTooltip && (
+                        <text x={x + 10} y={expenseLineY} className="tooltip-line">
+                          <tspan>Expenses: </tspan>
+                          <tspan className="tooltip-line-value">{formatCurrencyValue(activePoint.expense)}</tspan>
+                        </text>
+                      )}
+                    </>
+                  )}
+                  {showNetEnhancements && (
+                    <text x={x + 10} y={isForecastTooltip ? forecastHintY : hintLineY} className="tooltip-hint">
+                      Click the chart to view details
+                    </text>
+                  )}
+                </>
+              );
+            })()}
           </g>
         )}
       </svg>

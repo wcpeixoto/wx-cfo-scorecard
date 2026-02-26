@@ -69,15 +69,16 @@ export default function KpiCards({ cards }: KpiCardsProps) {
         return (
           <article className="kpi-card" key={card.id}>
             <p className="kpi-label">{card.label}</p>
-            <p className="kpi-value">{formatValue(card.value, card.format)}</p>
-            <p className={`kpi-delta ${trendClass}`}>
-              <span aria-hidden="true">
-                {trendClass === 'is-up' ? '▲' : trendClass === 'is-down' ? '▼' : '●'}
-              </span>
-              <span>{absoluteDelta}</span>
-              <span>•</span>
-              <span>{percentDelta}</span>
-            </p>
+            <div className="kpi-main-row">
+              <p className="kpi-value">{formatValue(card.value, card.format)}</p>
+              <p className={`kpi-change ${trendClass}`}>
+                <span aria-hidden="true" className="kpi-change-arrow">
+                  {trendClass === 'is-up' ? '▲' : trendClass === 'is-down' ? '▼' : '●'}
+                </span>
+                <span className="kpi-change-percent">{percentDelta}</span>
+              </p>
+            </div>
+            <p className={`kpi-delta-row ${trendClass}`}>{absoluteDelta}</p>
           </article>
         );
       })}
