@@ -25,6 +25,10 @@ import type {
   TrendPoint,
   Txn,
 } from '../data/contract';
+import {
+  includeExpenseCategoryForCashFlowMode,
+  isCapitalDistributionCategory,
+} from '../cashFlow';
 
 const EPSILON = 0.00001;
 const EXPENSE_COLORS = ['#76a8ff', '#5e84f1', '#4f6fdd', '#3f58c1', '#2f479f', '#243b82', '#1b2f67'];
@@ -462,24 +466,6 @@ function buildCashFlowForecastSeries(monthlyRollups: MonthlyRollup[], projection
   };
 }
 
-function normalizeCategory(category: string): string {
-  return category
-    .toLowerCase()
-    .replace(/[^a-z0-9: ]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function isCapitalDistribution(category: string): boolean {
-  const normalized = normalizeCategory(category);
-  if (!normalized) return false;
-
-  if (normalized === 'capital distribution') return true;
-
-  const segments = normalized.split(':').map((segment) => segment.trim()).filter(Boolean);
-  return segments.some((segment) => segment === 'capital distribution');
-}
-
 type InternalMonthlyRollup = MonthlyRollup & {
   capitalDistribution: number;
 };
@@ -507,7 +493,7 @@ export function computeMonthlyRollups(txns: Txn[], cashFlowMode: CashFlowMode = 
       rollup.revenue += txn.amount;
     } else {
       rollup.expenses += txn.amount;
-      if (isCapitalDistribution(txn.category)) {
+      if (isCapitalDistributionCategory(txn.category)) {
         rollup.capitalDistribution += txn.amount;
       }
     }
@@ -522,14 +508,21 @@ export function computeMonthlyRollups(txns: Txn[], cashFlowMode: CashFlowMode = 
 
   return [...monthMap.values()]
     .sort((a, b) => sortMonths(a.month, b.month))
-    .map((rollup) => ({
-      month: rollup.month,
-      revenue: round2(rollup.revenue),
-      expenses: round2(rollup.expenses),
-      netCashFlow: round2(rollup.netCashFlow),
-      savingsRate: round2(rollup.revenue > EPSILON ? (rollup.netCashFlow / rollup.revenue) * 100 : 0),
-      transactionCount: rollup.transactionCount,
-    }));
+    .map((rollup) => {
+      const effectiveExpenses =
+        cashFlowMode === 'operating'
+          ? rollup.expenses - rollup.capitalDistribution
+          : rollup.expenses;
+
+      return {
+        month: rollup.month,
+        revenue: round2(rollup.revenue),
+        expenses: round2(effectiveExpenses),
+        netCashFlow: round2(rollup.netCashFlow),
+        savingsRate: round2(rollup.revenue > EPSILON ? (rollup.netCashFlow / rollup.revenue) * 100 : 0),
+        transactionCount: rollup.transactionCount,
+      };
+    });
 }
 
 type RollupSummary = Omit<KpiAggregate, 'timeframe'>;
@@ -550,7 +543,7 @@ function summarizeRollups(rollups: MonthlyRollup[]): RollupSummary {
 
   const revenue = rollups.reduce((sum, rollup) => sum + rollup.revenue, 0);
   const expenses = rollups.reduce((sum, rollup) => sum + rollup.expenses, 0);
-  const netCashFlow = revenue - expenses;
+  const netCashFlow = rollups.reduce((sum, rollup) => sum + rollup.netCashFlow, 0);
   const transactionCount = rollups.reduce((sum, rollup) => sum + rollup.transactionCount, 0);
 
   return {
@@ -1070,18 +1063,19 @@ function buildKpis(current: KpiAggregate, previous: KpiAggregate): KpiCard[] {
   return cards;
 }
 
-function categoryTotals(txns: Txn[]): Map<string, number> {
+function categoryTotals(txns: Txn[], cashFlowMode: CashFlowMode): Map<string, number> {
   const totals = new Map<string, number>();
   txns.forEach((txn) => {
     if (txn.type !== 'expense') return;
+    if (!includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)) return;
     const current = totals.get(txn.category) ?? 0;
     totals.set(txn.category, current + txn.amount);
   });
   return totals;
 }
 
-function buildExpenseSlices(latestMonthTxns: Txn[]): ExpenseSlice[] {
-  const totals = categoryTotals(latestMonthTxns);
+function buildExpenseSlices(latestMonthTxns: Txn[], cashFlowMode: CashFlowMode): ExpenseSlice[] {
+  const totals = categoryTotals(latestMonthTxns, cashFlowMode);
   const entries = [...totals.entries()].sort((a, b) => b[1] - a[1]);
   const top = entries.slice(0, 7);
   const totalExpense = top.reduce((sum, entry) => sum + entry[1], 0);
@@ -1094,11 +1088,12 @@ function buildExpenseSlices(latestMonthTxns: Txn[]): ExpenseSlice[] {
   }));
 }
 
-function buildTopPayees(latestMonthTxns: Txn[]): PayeeTotal[] {
+function buildTopPayees(latestMonthTxns: Txn[], cashFlowMode: CashFlowMode): PayeeTotal[] {
   const map = new Map<string, PayeeTotal>();
 
   latestMonthTxns.forEach((txn) => {
     if (txn.type !== 'expense') return;
+    if (!includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)) return;
     const payee = txn.payee?.trim() || 'Unknown';
 
     if (!map.has(payee)) {
@@ -1118,9 +1113,13 @@ function buildTopPayees(latestMonthTxns: Txn[]): PayeeTotal[] {
     .map((item) => ({ ...item, amount: round2(item.amount) }));
 }
 
-function buildMovers(currentMonthTxns: Txn[], previousMonthTxns: Txn[]): Mover[] {
-  const currentTotals = categoryTotals(currentMonthTxns);
-  const previousTotals = categoryTotals(previousMonthTxns);
+function buildMovers(
+  currentMonthTxns: Txn[],
+  previousMonthTxns: Txn[],
+  cashFlowMode: CashFlowMode
+): Mover[] {
+  const currentTotals = categoryTotals(currentMonthTxns, cashFlowMode);
+  const previousTotals = categoryTotals(previousMonthTxns, cashFlowMode);
 
   const categories = new Set<string>([...currentTotals.keys(), ...previousTotals.keys()]);
   const movers: Mover[] = [];
@@ -1162,11 +1161,16 @@ function baselineForCategory(monthlyRollups: MonthlyRollup[], txns: Txn[], categ
   return total / recentMonths.length;
 }
 
-function buildOpportunities(latestMonthTxns: Txn[], monthlyRollups: MonthlyRollup[], allTxns: Txn[]): OpportunityItem[] {
+function buildOpportunities(
+  latestMonthTxns: Txn[],
+  monthlyRollups: MonthlyRollup[],
+  allTxns: Txn[],
+  cashFlowMode: CashFlowMode
+): OpportunityItem[] {
   const latestMonth = latestMonthTxns[0]?.month;
   if (!latestMonth) return [];
 
-  const totals = categoryTotals(latestMonthTxns);
+  const totals = categoryTotals(latestMonthTxns, cashFlowMode);
   const candidates: OpportunityItem[] = [];
 
   totals.forEach((currentTotal, category) => {
@@ -1184,7 +1188,9 @@ function buildOpportunities(latestMonthTxns: Txn[], monthlyRollups: MonthlyRollu
 
   if (candidates.length === 0) {
     const fallbackSavings = round2((latestMonthTxns
-      .filter((txn) => txn.type === 'expense')
+      .filter(
+        (txn) => txn.type === 'expense' && includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)
+      )
       .reduce((sum, txn) => sum + txn.amount, 0) * 0.03) || 0);
 
     return [
@@ -1275,7 +1281,7 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
   const latestMonthTxns = txns.filter((txn) => txn.month === latest.month);
   const previousMonthTxns = previous ? txns.filter((txn) => txn.month === previous.month) : [];
 
-  const opportunities = buildOpportunities(latestMonthTxns, monthlyRollups, txns);
+  const opportunities = buildOpportunities(latestMonthTxns, monthlyRollups, txns, cashFlowMode);
   const opportunityTotal = round2(opportunities.reduce((sum, item) => sum + item.savings, 0));
   // Precompute up to 36 projected months so UI horizon controls can expand
   // from 30-day equivalents through 3 years without recalculating the model.
@@ -1302,9 +1308,9 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
     suggestedRevenueMargin: suggestedMargins.suggestedRevenueMargin,
     suggestedExpenseMargin: suggestedMargins.suggestedExpenseMargin,
     suggestedMarginJustification: suggestedMargins.suggestedMarginJustification,
-    expenseSlices: buildExpenseSlices(latestMonthTxns),
-    topPayees: buildTopPayees(latestMonthTxns),
-    movers: buildMovers(latestMonthTxns, previousMonthTxns),
+    expenseSlices: buildExpenseSlices(latestMonthTxns, cashFlowMode),
+    topPayees: buildTopPayees(latestMonthTxns, cashFlowMode),
+    movers: buildMovers(latestMonthTxns, previousMonthTxns, cashFlowMode),
     opportunityTotal,
     opportunities,
     summaryBullets: buildSummary(latest, previous, opportunities, txns.length),

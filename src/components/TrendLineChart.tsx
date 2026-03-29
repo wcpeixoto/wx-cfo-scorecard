@@ -17,6 +17,7 @@ type TrendLineChartProps = {
   subtitle?: string;
   rangeLabelOverride?: string;
   enableTimeframeControl?: boolean;
+  timeframe?: TimeframeOption;
   showCashFlowToggle?: boolean;
   cashFlowMode?: CashFlowMode;
   pointStatusByMonth?: Partial<Record<string, CashFlowForecastStatus>>;
@@ -38,6 +39,7 @@ type TrendLineChartProps = {
   applySuggestionLabel?: string;
   onApplySuggestion?: () => void;
   onCashFlowModeChange?: (nextMode: CashFlowMode) => void;
+  onTimeframeChange?: (nextTimeframe: TimeframeOption) => void;
   onMonthPointClick?: (month: string) => void;
 };
 
@@ -460,6 +462,7 @@ export default function TrendLineChart({
   subtitle,
   rangeLabelOverride,
   enableTimeframeControl = false,
+  timeframe: controlledTimeframe,
   showCashFlowToggle = false,
   cashFlowMode,
   pointStatusByMonth,
@@ -481,13 +484,16 @@ export default function TrendLineChart({
   applySuggestionLabel = 'Apply suggestion',
   onApplySuggestion,
   onCashFlowModeChange,
+  onTimeframeChange,
   onMonthPointClick,
 }: TrendLineChartProps) {
-  const [timeframe, setTimeframe] = useState<TimeframeOption>(12);
+  const [internalTimeframe, setInternalTimeframe] = useState<TimeframeOption>(12);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const cashFlowTooltipId = useId();
+  const timeframe = controlledTimeframe ?? internalTimeframe;
+  const setTimeframe = onTimeframeChange ?? setInternalTimeframe;
 
   const showNetEnhancements = enableTimeframeControl && metric === 'net';
   const showCashFlowControl =
