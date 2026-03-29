@@ -755,7 +755,7 @@ export default function TrendLineChart({
   const showStatusInTooltip = hasProjectedPoints && !isForecastTooltip;
   const showMetricBreakdownInTooltip = metric === 'net' && (showRevenueExpenseInTooltip || isForecastTooltip);
   const tooltipLineCount = 2 + (showStatusInTooltip ? 1 : 0) + (showMetricBreakdownInTooltip ? 2 : 0) + (showNetEnhancements ? 1 : 0);
-  const tooltipWidth = isForecastTooltip ? 232 : 192;
+  const tooltipWidth = isForecastTooltip ? 232 : showNetEnhancements ? 214 : 192;
   const tooltipHeight = isForecastTooltip ? (showNetEnhancements ? 98 : 84) : 16 + tooltipLineCount * 14;
   const metricLabel = metric === 'income' ? 'Revenue' : metric === 'expense' ? 'Expenses' : 'Net cash flow';
   const showForecastPointLabels = isForecastTooltip && points.length > 0;
@@ -909,8 +909,10 @@ export default function TrendLineChart({
               )}
             </div>
           )}
-          <p className="subtle">{rangeLabel}</p>
-          {hasTrend && trendNoteLabel && <p className="subtle trend-note">{trendNoteLabel}</p>}
+          <div className="chart-head-meta">
+            <p className="subtle chart-range-label">{rangeLabel}</p>
+            {hasTrend && trendNoteLabel && <p className="subtle trend-note">{trendNoteLabel}</p>}
+          </div>
         </div>
       </div>
 
@@ -1155,7 +1157,7 @@ export default function TrendLineChart({
                   )}
                   {showNetEnhancements && (
                     <text x={x + 10} y={isForecastTooltip ? forecastHintY : hintLineY} className="tooltip-hint">
-                      Click the chart to view details
+                      Click a month to open Dig Here
                     </text>
                   )}
                 </>
