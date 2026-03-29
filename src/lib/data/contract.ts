@@ -1,5 +1,6 @@
 export type TxnType = 'income' | 'expense';
 export type CashFlowMode = 'operating' | 'total';
+export type TrendChartTimeframe = 6 | 12 | 24 | 36 | 'all';
 
 export type Txn = {
   id: string;

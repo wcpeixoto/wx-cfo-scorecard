@@ -8,10 +8,19 @@ import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import TrajectoryPanel from '../components/TrajectoryPanel';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
+import { includeExpenseCategoryForCashFlowMode, isCapitalDistributionCategory } from '../lib/cashFlow';
 import { buildDataSet, splitActualsAndProjections } from '../lib/data/normalize';
 import { fetchSheetCsv } from '../lib/data/fetchCsv';
 import { buildPrePhase4DebugReport, computeDashboardModel, projectScenario, toMonthLabel } from '../lib/kpis/compute';
-import type { CashFlowMode, DataSet, KpiCard, KpiComparisonTimeframe, ScenarioInput, TrendPoint } from '../lib/data/contract';
+import type {
+  CashFlowMode,
+  DataSet,
+  KpiCard,
+  KpiComparisonTimeframe,
+  ScenarioInput,
+  TrendChartTimeframe,
+  TrendPoint,
+} from '../lib/data/contract';
 
 type TabId =
   | 'big-picture'
@@ -53,8 +62,7 @@ const KPI_FRAME_OPTIONS: KpiFrameOption[] = [
   { value: 'last36Months', label: '36M' },
 ];
 const EPSILON = 0.00001;
-type TrendTimeframeOption = 6 | 12 | 24 | 36 | 'all';
-const TREND_TIMEFRAMES: TrendTimeframeOption[] = [6, 12, 24, 36, 'all'];
+const TREND_TIMEFRAMES: TrendChartTimeframe[] = [6, 12, 24, 36, 'all'];
 const HIGHLIGHT_MIN_ABS_DELTA = 25;
 
 type DigHereHighlight = {
@@ -123,7 +131,7 @@ function parseCashFlowMode(value: string | null): CashFlowMode | null {
   return null;
 }
 
-function adaptiveMaWindowByTimeframe(timeframe: TrendTimeframeOption): number {
+function adaptiveMaWindowByTimeframe(timeframe: TrendChartTimeframe): number {
   if (timeframe === 'all') return 12;
   if (timeframe <= 6) return 3;
   if (timeframe <= 24) return 6;
@@ -142,21 +150,6 @@ function formatTimestamp(iso: string | null): string {
   if (!iso) return 'Never';
   const date = new Date(iso);
   return date.toLocaleString();
-}
-
-function isCapitalDistributionCategory(category: string): boolean {
-  const normalized = category
-    .toLowerCase()
-    .replace(/[^a-z0-9: ]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (!normalized) return false;
-  if (normalized === 'capital distribution') return true;
-  return normalized
-    .split(':')
-    .map((segment) => segment.trim())
-    .some((segment) => segment === 'capital distribution');
 }
 
 function inMonthRange(month: string, startMonth: string | null, endMonth: string | null): boolean {
@@ -202,6 +195,7 @@ export default function Dashboard() {
   const [dataViewMode, setDataViewMode] = useState<DataViewMode>('actuals');
   const [kpiTimeframe, setKpiTimeframe] = useState<KpiComparisonTimeframe>('ttm');
   const [cashFlowMode, setCashFlowMode] = useState<CashFlowMode>('total');
+  const [netChartTimeframe, setNetChartTimeframe] = useState<TrendChartTimeframe>(12);
 
   const runSync = useCallback(async () => {
     setLoading(true);
@@ -545,7 +539,7 @@ export default function Dashboard() {
     if (!selectedKpiComparison.currentEndMonth || !selectedKpiComparison.currentStartMonth) return [];
 
     const includeCategory = (category: string) =>
-      cashFlowMode === 'total' || !isCapitalDistributionCategory(category);
+      includeExpenseCategoryForCashFlowMode(category, cashFlowMode);
 
     const currentTotals = new Map<string, number>();
     const previousTotals = new Map<string, number>();
@@ -1003,6 +997,8 @@ export default function Dashboard() {
               metric="net"
               title="Monthly Net Cash Flow"
               enableTimeframeControl
+              timeframe={netChartTimeframe}
+              onTimeframeChange={setNetChartTimeframe}
               showCashFlowToggle
               cashFlowMode={cashFlowMode}
               onCashFlowModeChange={setCashFlowMode}
@@ -1017,10 +1013,18 @@ export default function Dashboard() {
             <DigHereHighlights
               items={digHereHighlights}
               timeframeLabel={`${selectedKpiFrameLabel} comparison`}
-              onTitleClick={() => navigateToDigHere()}
+              onTitleClick={() =>
+                navigateToDigHere({
+                  startMonth: selectedKpiComparison?.currentStartMonth ?? null,
+                  endMonth: selectedKpiComparison?.currentEndMonth ?? null,
+                  focusContext: 'category-shifts',
+                })
+              }
               onItemClick={(item) =>
                 navigateToDigHere({
                   category: item.category,
+                  startMonth: selectedKpiComparison?.currentStartMonth ?? null,
+                  endMonth: selectedKpiComparison?.currentEndMonth ?? null,
                   focusContext: 'category-shifts',
                 })
               }

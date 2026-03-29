@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { toMonthLabel } from '../lib/kpis/compute';
-import type { CashFlowMode, TrendPoint } from '../lib/data/contract';
+import type { CashFlowMode, TrendChartTimeframe, TrendPoint } from '../lib/data/contract';
 
 type TrendMetric = 'income' | 'expense' | 'net';
 
@@ -11,6 +11,8 @@ type TrendLineChartProps = {
   metric: TrendMetric;
   title: string;
   enableTimeframeControl?: boolean;
+  timeframe?: TrendChartTimeframe;
+  onTimeframeChange?: (nextTimeframe: TrendChartTimeframe) => void;
   showCashFlowToggle?: boolean;
   cashFlowMode?: CashFlowMode;
   onCashFlowModeChange?: (nextMode: CashFlowMode) => void;
@@ -32,10 +34,8 @@ type AxisConfig = {
   ticks: number[];
 };
 
-type TimeframeOption = 6 | 12 | 24 | 36 | 'all';
-
 type TimeframeItem = {
-  value: TimeframeOption;
+  value: TrendChartTimeframe;
   label: string;
 };
 
@@ -139,15 +139,27 @@ function buildLinearTrendPath(points: PlotPoint[], values: number[], axisMax: nu
   return `M ${first.x} ${firstY} L ${last.x} ${lastY}`;
 }
 
-function timeframeLabel(value: TimeframeOption): string {
+function timeframeLabel(value: TrendChartTimeframe): string {
   return TIMEFRAME_OPTIONS.find((option) => option.value === value)?.label ?? 'Last 12 months';
 }
 
-function getAdaptiveAverageWindow(timeframe: TimeframeOption | number): number {
+function getAdaptiveAverageWindow(timeframe: TrendChartTimeframe | number): number {
   if (timeframe === 'all') return 12;
   if (timeframe <= 6) return 3;
   if (timeframe <= 24) return 6;
   return 12;
+}
+
+function metricLabel(metric: TrendMetric): string {
+  switch (metric) {
+    case 'income':
+      return 'Revenue';
+    case 'expense':
+      return 'Expenses';
+    case 'net':
+    default:
+      return 'Net Cash Flow';
+  }
 }
 
 function chooseRoundingBase(maxAbs: number): number {
@@ -391,16 +403,19 @@ export default function TrendLineChart({
   metric,
   title,
   enableTimeframeControl = false,
+  timeframe: controlledTimeframe,
+  onTimeframeChange,
   showCashFlowToggle = false,
   cashFlowMode,
   onCashFlowModeChange,
   onMonthPointClick,
 }: TrendLineChartProps) {
-  const [timeframe, setTimeframe] = useState<TimeframeOption>(12);
+  const [internalTimeframe, setInternalTimeframe] = useState<TrendChartTimeframe>(12);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const cashFlowTooltipId = useId();
+  const timeframe = controlledTimeframe ?? internalTimeframe;
 
   const showNetEnhancements = enableTimeframeControl && metric === 'net';
   const showCashFlowControl =
@@ -484,7 +499,7 @@ export default function TrendLineChart({
       return Number.isFinite(numeric) ? numeric : 0;
     });
 
-    const averageScope: TimeframeOption | number = enableTimeframeControl ? timeframe : scopedData.length;
+    const averageScope: TrendChartTimeframe | number = enableTimeframeControl ? timeframe : scopedData.length;
     const averageWindow = getAdaptiveAverageWindow(averageScope);
     const isNetMetric = metric === 'net';
 
@@ -671,7 +686,10 @@ export default function TrendLineChart({
                           aria-checked={timeframe === option.value}
                           className={timeframe === option.value ? 'is-active' : ''}
                           onClick={() => {
-                            setTimeframe(option.value);
+                            if (controlledTimeframe === undefined) {
+                              setInternalTimeframe(option.value);
+                            }
+                            onTimeframeChange?.(option.value);
                             setMenuOpen(false);
                           }}
                         >
@@ -787,7 +805,7 @@ export default function TrendLineChart({
               {toMonthLabel(activePoint.month)}
             </text>
             <text x={tooltipBoxX(activePoint.x) + 10} y={tooltipBoxY(activePoint.y, showNetEnhancements ? 3 : 2) + 28} className="tooltip-line">
-              <tspan>Net cash flow: </tspan>
+              <tspan>{metricLabel(metric)}: </tspan>
               <tspan
                 className={
                   activePoint.value > EPSILON
