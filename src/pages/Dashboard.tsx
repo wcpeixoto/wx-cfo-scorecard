@@ -15,7 +15,7 @@ import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/
 import { includeExpenseCategoryForCashFlowMode, isCapitalDistributionCategory } from '../lib/cashFlow';
 import { buildDataSet } from '../lib/data/normalize';
 import { fetchSheetCsv } from '../lib/data/fetchCsv';
-import { buildPrePhase4DebugReport, computeDashboardModel, projectScenario, toMonthLabel } from '../lib/kpis/compute';
+import { buildPrePhase4DebugReport, computeDashboardModel, computePriorityScore, projectScenario, toMonthLabel } from '../lib/kpis/compute';
 import type {
   CashFlowForecastStatus,
   CashFlowMode,
@@ -87,6 +87,7 @@ type DigHereHighlight = {
   previous: number;
   delta: number;
   deltaPercent: number | null;
+  priorityScore: number;
 };
 
 type DigHereFocusContext = 'category-shifts' | 'month-drilldown' | 'custom-period' | null;
@@ -658,12 +659,14 @@ export default function Dashboard() {
       const current = currentTotals.get(category) ?? 0;
       const previous = previousTotals.get(category) ?? 0;
       const delta = current - previous;
+      const deltaPercent = toDeltaPercent(current, previous);
       return {
         category,
         current,
         previous,
         delta,
-        deltaPercent: toDeltaPercent(current, previous),
+        deltaPercent,
+        priorityScore: computePriorityScore(delta, deltaPercent, previous, current),
       };
     });
 
@@ -675,7 +678,7 @@ export default function Dashboard() {
         if (aNegativePriority !== bNegativePriority) {
           return bNegativePriority - aNegativePriority;
         }
-        return Math.abs(b.delta) - Math.abs(a.delta);
+        return b.priorityScore - a.priorityScore;
       })
       .slice(0, 5);
   }, [cashFlowMode, filteredTxns, selectedKpiComparison]);

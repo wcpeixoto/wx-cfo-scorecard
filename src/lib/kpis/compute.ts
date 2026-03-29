@@ -1113,6 +1113,15 @@ function buildTopPayees(latestMonthTxns: Txn[], cashFlowMode: CashFlowMode): Pay
     .map((item) => ({ ...item, amount: round2(item.amount) }));
 }
 
+export function computePriorityScore(delta: number, deltaPercent: number | null, previous: number, current: number): number {
+  const absDelta = Math.abs(delta);
+  const magnitude = absDelta;
+  const noveltyBoost = Math.abs(previous) <= EPSILON && Math.abs(current) > EPSILON ? 0.25 * absDelta : 0;
+  const cappedPct = Math.min(Math.abs(deltaPercent ?? 0), 200);
+  const relativeBoost = (cappedPct / 200) * 0.15 * absDelta;
+  return round2(magnitude + noveltyBoost + relativeBoost);
+}
+
 function buildMovers(
   currentMonthTxns: Txn[],
   previousMonthTxns: Txn[],
@@ -1128,18 +1137,20 @@ function buildMovers(
     const current = round2(currentTotals.get(category) ?? 0);
     const previous = round2(previousTotals.get(category) ?? 0);
     const delta = round2(current - previous);
+    const deltaPercent = pctDelta(current, previous);
 
     movers.push({
       category,
       current,
       previous,
       delta,
-      deltaPercent: pctDelta(current, previous),
+      deltaPercent,
+      priorityScore: computePriorityScore(delta, deltaPercent, previous, current),
     });
   });
 
   return movers
-    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+    .sort((a, b) => b.priorityScore - a.priorityScore)
     .slice(0, 8);
 }
 
