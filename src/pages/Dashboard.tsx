@@ -843,6 +843,40 @@ export default function Dashboard() {
     []
   );
 
+  const navigateToTab = useCallback(
+    (nextTab: TabId) => {
+      setIsMobileNavOpen(false);
+      setShouldScrollDigHereFocus(false);
+
+      const isFreshDigHereEntry = nextTab === 'dig-here';
+
+      setActiveTab(nextTab);
+      setDigHereFocusMonth(isFreshDigHereEntry ? null : digHereFocusMonth);
+      setDigHereStartMonth(isFreshDigHereEntry ? null : digHereStartMonth);
+      setDigHereEndMonth(isFreshDigHereEntry ? null : digHereEndMonth);
+      setDigHereFocusContext(isFreshDigHereEntry ? null : digHereFocusContext);
+
+      writeDashboardUrlState({
+        tab: nextTab,
+        cashFlow: cashFlowMode,
+        queryText: query,
+        month: null,
+        startMonth: null,
+        endMonth: null,
+        focusContext: null,
+      });
+    },
+    [
+      cashFlowMode,
+      digHereEndMonth,
+      digHereFocusContext,
+      digHereFocusMonth,
+      digHereStartMonth,
+      query,
+      writeDashboardUrlState,
+    ]
+  );
+
   const navigateToDigHere = useCallback(
     (options?: DigHereNavigationOptions) => {
       const nextQuery = options?.category?.trim() ?? query.trim();
@@ -1023,7 +1057,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     className={activeTab === item.id ? 'top-nav-item is-active' : 'top-nav-item'}
-                    onClick={() => setActiveTab(item.id)}
+                    onClick={() => navigateToTab(item.id)}
                   >
                     <item.icon className="top-nav-icon" aria-hidden="true" />
                     <span>{item.label}</span>
@@ -1204,8 +1238,12 @@ export default function Dashboard() {
           <div className="stack-grid">
             <article className="card dig-here-focus-card" ref={digHereFocusRef}>
               <p>
-                {digHereFocusSummary ? `${digHereFocusSummary}` : 'Choose a month or custom period for Dig Here'}
-                {digHereFocusPeriodLabel ? ` • ${digHereFocusPeriodLabel}` : ''}
+                {digHereFocusSummary ? `${digHereFocusSummary}` : 'Showing default Dig Here view'}
+                {digHereFocusPeriodLabel
+                  ? ` • ${digHereFocusPeriodLabel}`
+                  : digHereFocusSummary
+                    ? ''
+                    : ' • All Dates'}
                 {query.trim() ? ` • "${query.trim()}"` : ''}
               </p>
               <div className="dig-here-focus-actions" ref={monthPickerRef}>
