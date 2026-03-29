@@ -1164,7 +1164,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: 4px;
 }
 
 .chart-control-row {
@@ -1173,7 +1173,22 @@ body {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
-  min-height: 36px;
+  min-height: 32px;
+}
+
+.chart-head-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.chart-range-label {
+  margin: 0;
+  color: #5c7190;
+  font-size: 0.79rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
 .chart-select-control {
@@ -1404,7 +1419,7 @@ body {
 
 .tooltip-hint {
   fill: #7b8da5;
-  font-size: 10px;
+  font-size: 9.6px;
 }
 
 .tooltip-row-label {
@@ -1958,6 +1973,10 @@ body {
 
   .chart-control-row {
     justify-content: flex-start;
+  }
+
+  .chart-head-meta {
+    align-items: flex-start;
   }
 
   .timeframe-list {
