@@ -169,6 +169,7 @@ export type Mover = {
   previous: number;
   delta: number;
   deltaPercent: number | null;
+  priorityScore: number;
 };
 
 export type OpportunityItem = {
