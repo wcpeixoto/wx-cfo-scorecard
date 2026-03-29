@@ -158,7 +158,11 @@ export function computeMonthlyRollups(txns: Txn[], cashFlowMode: CashFlowMode = 
     .map((rollup) => ({
       month: rollup.month,
       revenue: round2(rollup.revenue),
-      expenses: round2(rollup.expenses),
+      expenses: round2(
+        cashFlowMode === 'operating'
+          ? rollup.expenses - rollup.capitalDistribution
+          : rollup.expenses,
+      ),
       netCashFlow: round2(rollup.netCashFlow),
       savingsRate: round2(rollup.revenue > EPSILON ? (rollup.netCashFlow / rollup.revenue) * 100 : 0),
       transactionCount: rollup.transactionCount,
