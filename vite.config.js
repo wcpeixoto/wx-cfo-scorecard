@@ -4,6 +4,6 @@ export default defineConfig(function (_a) {
     var command = _a.command;
     return ({
         plugins: [react()],
-        base: command === 'serve' ? '/' : '/Wx-Travel-Budget-Calculator/',
+        base: command === 'serve' ? '/' : '/wx-cfo-scorecard/',
     });
 });
