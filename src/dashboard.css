@@ -1851,6 +1851,75 @@ body {
   color: #274468;
 }
 
+.settings-table-wrap {
+  overflow-x: auto;
+}
+
+.account-settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+}
+
+.account-settings-table th,
+.account-settings-table td {
+  border-bottom: 1px solid #e7edf9;
+  padding: 10px 8px;
+  text-align: left;
+  vertical-align: middle;
+  font-size: 0.88rem;
+}
+
+.account-settings-table th {
+  color: #667c94;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.settings-table-input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #d4def1;
+  border-radius: 10px;
+  padding: 0 10px;
+  background: #fff;
+  font: inherit;
+  color: inherit;
+}
+
+.settings-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.account-source-name {
+  color: #425a78;
+}
+
+.settings-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.settings-badge.is-user {
+  background: #e7f0ff;
+  color: #2c4f90;
+}
+
+.settings-badge.is-auto {
+  background: #eef4fb;
+  color: #5b728e;
+}
+
 .empty-state {
   color: var(--text-secondary);
   margin: 0;

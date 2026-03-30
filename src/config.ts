@@ -6,6 +6,7 @@ export const SHEET_CSV_FALLBACK_URL =
 
 export const STORAGE_KEYS = {
   csvUrl: 'finance_dashboard_csv_url',
+  accountSettings: 'finance_dashboard_account_settings',
 };
 
 export const APP_TITLE = 'Gracie Sports Financial Dashboard';
