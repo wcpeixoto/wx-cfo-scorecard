@@ -31,6 +31,7 @@ import type {
   DataSet,
   KpiCard,
   KpiComparisonTimeframe,
+  MoverGrouping,
   ScenarioInput,
   TrendPoint,
 } from '../lib/data/contract';
@@ -220,6 +221,11 @@ function parseCashFlowMode(value: string | null): CashFlowMode | null {
   return null;
 }
 
+function parseMoverGrouping(value: string | null): MoverGrouping | null {
+  if (value === 'subcategories' || value === 'categories') return value;
+  return null;
+}
+
 function parseForecastRangeValue(value: string): ForecastRangeValue | null {
   if (value === '30d' || value === '60d' || value === '90d' || value === '6m' || value === '1y' || value === '2y' || value === '3y') {
     return value;
@@ -295,6 +301,7 @@ export default function Dashboard() {
   const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(DEFAULT_SCENARIO);
   const [kpiTimeframe, setKpiTimeframe] = useState<KpiComparisonTimeframe>('ttm');
   const [cashFlowMode, setCashFlowMode] = useState<CashFlowMode>('total');
+  const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
 
@@ -330,6 +337,7 @@ export default function Dashboard() {
       const startMonth = parseMonthToken(params.get('start'));
       const endMonth = parseMonthToken(params.get('end'));
       const focusContext = parseDigHereFocusContext(params.get('focus'));
+      const moverGrouping = parseMoverGrouping(params.get('mg'));
 
       const validRange = startMonth && endMonth && startMonth <= endMonth;
 
@@ -340,6 +348,7 @@ export default function Dashboard() {
       setDigHereStartMonth(validRange ? startMonth : null);
       setDigHereEndMonth(validRange ? endMonth : null);
       setDigHereFocusContext(focusContext);
+      setDigHereMoverGrouping(moverGrouping ?? 'subcategories');
       setShouldScrollDigHereFocus(Boolean((tab ?? 'big-picture') === 'dig-here' && (month || validRange)));
     };
 
@@ -473,8 +482,15 @@ export default function Dashboard() {
   }, [activeDigHereEndMonth, activeDigHereMonth, activeDigHereStartMonth, filteredTxns]);
 
   const digHereInsights = useMemo(
-    () => computeDigHereInsights(digHereCurrentTxns, digHerePreviousTxns, cashFlowMode, filteredTxns),
-    [cashFlowMode, digHereCurrentTxns, digHerePreviousTxns, filteredTxns]
+    () =>
+      computeDigHereInsights(
+        digHereCurrentTxns,
+        digHerePreviousTxns,
+        cashFlowMode,
+        filteredTxns,
+        digHereMoverGrouping
+      ),
+    [cashFlowMode, digHereCurrentTxns, digHereMoverGrouping, digHerePreviousTxns, filteredTxns]
   );
 
   useEffect(() => {
@@ -758,7 +774,6 @@ export default function Dashboard() {
     if (digHereFocusContext === 'category-shifts') return 'Focused from Dig Here Highlights';
     if (digHereFocusContext === 'month-drilldown') return 'Focused from Monthly Net Cash Flow';
     if (digHereFocusContext === 'custom-period') return 'Focused custom period';
-    if (digHereFocusContext === 'period-control') return 'Showing selected Dig Here period';
     return null;
   }, [digHereFocusContext]);
   const digHereHeaderLabel = useMemo(() => {
@@ -1035,6 +1050,7 @@ export default function Dashboard() {
         startMonth?: string | null;
         endMonth?: string | null;
         focusContext?: DigHereFocusContext;
+        moverGrouping?: MoverGrouping;
       },
       mode: 'push' | 'replace' = 'push'
     ) => {
@@ -1074,6 +1090,12 @@ export default function Dashboard() {
         url.searchParams.delete('focus');
       }
 
+      if (next.moverGrouping && next.moverGrouping !== 'subcategories') {
+        url.searchParams.set('mg', next.moverGrouping);
+      } else {
+        url.searchParams.delete('mg');
+      }
+
       if (mode === 'replace') {
         window.history.replaceState({}, '', url);
       } else {
@@ -1104,6 +1126,7 @@ export default function Dashboard() {
         startMonth: null,
         endMonth: null,
         focusContext: null,
+        moverGrouping: digHereMoverGrouping,
       });
     },
     [
@@ -1112,6 +1135,7 @@ export default function Dashboard() {
       digHereFocusContext,
       digHereFocusMonth,
       digHereStartMonth,
+      digHereMoverGrouping,
       query,
       writeDashboardUrlState,
     ]
@@ -1145,6 +1169,7 @@ export default function Dashboard() {
           startMonth: digHereStartMonth,
           endMonth: digHereEndMonth,
           focusContext: digHereFocusContext,
+          moverGrouping: digHereMoverGrouping,
         },
         'replace'
       );
@@ -1165,6 +1190,7 @@ export default function Dashboard() {
         startMonth,
         endMonth,
         focusContext,
+        moverGrouping: digHereMoverGrouping,
       });
     },
     [
@@ -1175,6 +1201,7 @@ export default function Dashboard() {
       digHereFocusMonth,
       digHereStartMonth,
       model.latestMonth,
+      digHereMoverGrouping,
       query,
       selectedKpiComparison?.currentEndMonth,
       writeDashboardUrlState,
@@ -1193,8 +1220,9 @@ export default function Dashboard() {
       startMonth: null,
       endMonth: null,
       focusContext: null,
+      moverGrouping: digHereMoverGrouping,
     });
-  }, [cashFlowMode, writeDashboardUrlState]);
+  }, [cashFlowMode, digHereMoverGrouping, writeDashboardUrlState]);
 
   const applyDigHerePeriod = useCallback(
     (period: DigHerePeriodValue) => {
@@ -1257,6 +1285,34 @@ export default function Dashboard() {
     setIsMonthPickerOpen(false);
   }, [monthPickerDraftEnd, monthPickerDraftStart, navigateToDigHere]);
 
+  const handleDigHereMoverGroupingChange = useCallback(
+    (nextGrouping: MoverGrouping) => {
+      setDigHereMoverGrouping(nextGrouping);
+      writeDashboardUrlState(
+        {
+          tab: 'dig-here',
+          cashFlow: cashFlowMode,
+          queryText: query,
+          month: digHereFocusMonth,
+          startMonth: digHereStartMonth,
+          endMonth: digHereEndMonth,
+          focusContext: digHereFocusContext,
+          moverGrouping: nextGrouping,
+        },
+        'push'
+      );
+    },
+    [
+      cashFlowMode,
+      digHereEndMonth,
+      digHereFocusContext,
+      digHereFocusMonth,
+      digHereStartMonth,
+      query,
+      writeDashboardUrlState,
+    ]
+  );
+
   function handleSaveCsvUrl() {
     const nextUrl = draftCsvUrl.trim();
     setQuery('');
@@ -1268,6 +1324,7 @@ export default function Dashboard() {
       startMonth: digHereStartMonth,
       endMonth: digHereEndMonth,
       focusContext: digHereFocusContext,
+      moverGrouping: digHereMoverGrouping,
     }, 'replace');
     setCsvUrl(nextUrl);
     if (typeof window !== 'undefined') {
@@ -1290,6 +1347,7 @@ export default function Dashboard() {
       startMonth: digHereStartMonth,
       endMonth: digHereEndMonth,
       focusContext: digHereFocusContext,
+      moverGrouping: digHereMoverGrouping,
     }, 'replace');
     setCsvUrl(SHEET_CSV_URL);
     if (typeof window !== 'undefined') {
@@ -1625,19 +1683,26 @@ export default function Dashboard() {
 
         {activeTab === 'dig-here' && (
           <div className="stack-grid">
-            <article className="card dig-here-focus-card" ref={digHereFocusRef}>
-              <p>
-                {digHereFocusSummary ? `${digHereFocusSummary}` : 'Showing default Dig Here view'}
-                {digHereFocusPeriodLabel
-                  ? ` • ${digHereFocusPeriodLabel}`
-                  : digHereFocusSummary
-                    ? ''
-                    : ' • Last 12 Months'}
-                {query.trim() ? ` • "${query.trim()}"` : ''}
-              </p>
-            </article>
+            {digHereFocusContext !== 'period-control' ? (
+              <article className="card dig-here-focus-card" ref={digHereFocusRef}>
+                <p>
+                  {digHereFocusSummary ? `${digHereFocusSummary}` : 'Showing default Dig Here view'}
+                  {digHereFocusPeriodLabel
+                    ? ` • ${digHereFocusPeriodLabel}`
+                    : digHereFocusSummary
+                      ? ''
+                      : ' • Last 12 Months'}
+                  {query.trim() ? ` • "${query.trim()}"` : ''}
+                </p>
+              </article>
+            ) : null}
             <div className="tab-grid">
-              <MoversList movers={digHereInsights.movers} title="Dig Here Actions" />
+              <MoversList
+                movers={digHereInsights.movers}
+                title="Dig Here Actions"
+                grouping={digHereMoverGrouping}
+                onGroupingChange={handleDigHereMoverGroupingChange}
+              />
               <TopPayeesTable
                 payees={digHereInsights.topPayees}
                 subtitle={selectedDigHerePeriod === 'thisMonth' ? 'Highest expense recipients this month' : 'Highest expense recipients this period'}

@@ -1,14 +1,20 @@
-import type { Mover } from '../lib/data/contract';
+import type { Mover, MoverGrouping } from '../lib/data/contract';
 
 type MoversListProps = {
   movers: Mover[];
   title?: string;
+  grouping?: MoverGrouping;
+  onGroupingChange?: (grouping: MoverGrouping) => void;
 };
 
 const EPSILON = 0.00001;
 const SPARKLINE_WIDTH = 72;
 const SPARKLINE_HEIGHT = 24;
 const SPARKLINE_PADDING = 2;
+const MOVER_GROUP_OPTIONS: Array<{ value: MoverGrouping; label: string }> = [
+  { value: 'subcategories', label: 'Subcategories' },
+  { value: 'categories', label: 'Categories' },
+];
 
 function formatCurrency(value: number): string {
   return value.toLocaleString(undefined, {
@@ -49,12 +55,41 @@ function buildSparklinePath(
     .join(' ');
 }
 
-export default function MoversList({ movers, title = 'Dig Here Movers' }: MoversListProps) {
+function buildFlatSparklinePath(
+  width = SPARKLINE_WIDTH,
+  height = SPARKLINE_HEIGHT,
+  padding = SPARKLINE_PADDING
+): string {
+  const y = height / 2;
+  return `M ${padding} ${y.toFixed(2)} L ${(width - padding).toFixed(2)} ${y.toFixed(2)}`;
+}
+
+export default function MoversList({
+  movers,
+  title = 'Dig Here Movers',
+  grouping = 'subcategories',
+  onGroupingChange,
+}: MoversListProps) {
   return (
     <article className="card movers-card">
-      <div className="card-head">
-        <h3>{title}</h3>
-        <p className="subtle">Largest category shifts vs prior period</p>
+      <div className="card-head movers-card-head">
+        <div>
+          <h3>{title}</h3>
+          <p className="subtle">Largest category shifts vs prior period</p>
+        </div>
+        <div className="movers-group-toggle" role="group" aria-label="Mover grouping selector">
+          {MOVER_GROUP_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={grouping === option.value ? 'is-active' : ''}
+              onClick={() => onGroupingChange?.(option.value)}
+              aria-pressed={grouping === option.value}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {movers.length === 0 ? (
@@ -85,16 +120,16 @@ export default function MoversList({ movers, title = 'Dig Here Movers' }: Movers
                     </div>
                     <small>{formatPercent(mover.deltaPercent)}</small>
                   </div>
-                  {mover.sparkline && mover.sparkline.length >= 3 ? (
-                    <svg
-                      className="mover-sparkline"
-                      viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`}
-                      aria-hidden="true"
-                      focusable="false"
-                    >
-                      <path d={buildSparklinePath(mover.sparkline) ?? ''} />
-                    </svg>
-                  ) : null}
+                  <svg
+                    className={`mover-sparkline ${
+                      mover.sparkline && mover.sparkline.length >= 3 ? 'has-data' : 'is-placeholder'
+                    }`}
+                    viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`}
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path d={buildSparklinePath(mover.sparkline ?? []) ?? buildFlatSparklinePath()} />
+                  </svg>
                 </div>
               </li>
             );

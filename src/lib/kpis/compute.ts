@@ -15,6 +15,7 @@ import type {
   KpiTimeframeComparison,
   MonthlyRollup,
   Mover,
+  MoverGrouping,
   OpportunityItem,
   PayeeTotal,
   ScenarioInput,
@@ -1074,6 +1075,33 @@ function categoryTotals(txns: Txn[], cashFlowMode: CashFlowMode): Map<string, nu
   return totals;
 }
 
+function parentCategoryName(category: string): string {
+  const separatorIndex = category.indexOf(':');
+  if (separatorIndex === -1) return category.trim();
+  const parent = category.slice(0, separatorIndex).trim();
+  return parent || category.trim();
+}
+
+function moverCategoryName(category: string, grouping: MoverGrouping): string {
+  return grouping === 'categories' ? parentCategoryName(category) : category;
+}
+
+function categoryTotalsByGrouping(
+  txns: Txn[],
+  cashFlowMode: CashFlowMode,
+  grouping: MoverGrouping
+): Map<string, number> {
+  const totals = new Map<string, number>();
+  txns.forEach((txn) => {
+    if (txn.type !== 'expense') return;
+    if (!includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)) return;
+    const category = moverCategoryName(txn.category, grouping);
+    const current = totals.get(category) ?? 0;
+    totals.set(category, current + txn.amount);
+  });
+  return totals;
+}
+
 function buildExpenseSlices(latestMonthTxns: Txn[], cashFlowMode: CashFlowMode): ExpenseSlice[] {
   const totals = categoryTotals(latestMonthTxns, cashFlowMode);
   const entries = [...totals.entries()].sort((a, b) => b[1] - a[1]);
@@ -1126,10 +1154,11 @@ function buildMovers(
   currentMonthTxns: Txn[],
   previousMonthTxns: Txn[],
   cashFlowMode: CashFlowMode,
-  allRelevantTxns: Txn[] = currentMonthTxns
+  allRelevantTxns: Txn[] = currentMonthTxns,
+  grouping: MoverGrouping = 'subcategories'
 ): Mover[] {
-  const currentTotals = categoryTotals(currentMonthTxns, cashFlowMode);
-  const previousTotals = categoryTotals(previousMonthTxns, cashFlowMode);
+  const currentTotals = categoryTotalsByGrouping(currentMonthTxns, cashFlowMode, grouping);
+  const previousTotals = categoryTotalsByGrouping(previousMonthTxns, cashFlowMode, grouping);
   const currentMonths = [...new Set(currentMonthTxns.map((txn) => txn.month))]
     .filter((month) => /^\d{4}-\d{2}$/.test(month))
     .sort(sortMonths);
@@ -1147,12 +1176,13 @@ function buildMovers(
       if (txn.type !== 'expense') return;
       if (!includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)) return;
       if (!sparklineMonthSet.has(txn.month)) return;
+      const category = moverCategoryName(txn.category, grouping);
 
-      if (!sparklineTotalsByCategory.has(txn.category)) {
-        sparklineTotalsByCategory.set(txn.category, new Map<string, number>());
+      if (!sparklineTotalsByCategory.has(category)) {
+        sparklineTotalsByCategory.set(category, new Map<string, number>());
       }
 
-      const categoryMap = sparklineTotalsByCategory.get(txn.category);
+      const categoryMap = sparklineTotalsByCategory.get(category);
       if (!categoryMap) return;
 
       categoryMap.set(txn.month, (categoryMap.get(txn.month) ?? 0) + txn.amount);
@@ -1290,10 +1320,11 @@ export function computeDigHereInsights(
   currentTxns: Txn[],
   previousTxns: Txn[],
   cashFlowMode: CashFlowMode,
-  allRelevantTxns: Txn[] = currentTxns
+  allRelevantTxns: Txn[] = currentTxns,
+  grouping: MoverGrouping = 'subcategories'
 ): Pick<DashboardModel, 'movers' | 'topPayees'> {
   return {
-    movers: buildMovers(currentTxns, previousTxns, cashFlowMode, allRelevantTxns),
+    movers: buildMovers(currentTxns, previousTxns, cashFlowMode, allRelevantTxns, grouping),
     topPayees: buildTopPayees(currentTxns, cashFlowMode),
   };
 }

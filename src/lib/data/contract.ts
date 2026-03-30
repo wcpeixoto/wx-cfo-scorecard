@@ -163,6 +163,8 @@ export type PayeeTotal = {
   transactionCount: number;
 };
 
+export type MoverGrouping = 'subcategories' | 'categories';
+
 export type Mover = {
   category: string;
   current: number;
