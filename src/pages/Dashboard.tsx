@@ -292,8 +292,6 @@ export default function Dashboard() {
   const [monthPickerDraftMonth, setMonthPickerDraftMonth] = useState<string>('');
   const [monthPickerDraftStart, setMonthPickerDraftStart] = useState<string>('');
   const [monthPickerDraftEnd, setMonthPickerDraftEnd] = useState<string>('');
-  const [shouldScrollDigHereFocus, setShouldScrollDigHereFocus] = useState(false);
-  const digHereFocusRef = useRef<HTMLElement>(null);
   const monthPickerRef = useRef<HTMLDivElement>(null);
   const [dataSet, setDataSet] = useState<DataSet | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -349,7 +347,6 @@ export default function Dashboard() {
       setDigHereEndMonth(validRange ? endMonth : null);
       setDigHereFocusContext(focusContext);
       setDigHereMoverGrouping(moverGrouping ?? 'subcategories');
-      setShouldScrollDigHereFocus(Boolean((tab ?? 'big-picture') === 'dig-here' && (month || validRange)));
     };
 
     syncStateFromUrl();
@@ -763,19 +760,6 @@ export default function Dashboard() {
     console.info('TTM label verification', { timeframeTabLabels, containsTTM });
   }, [model.kpiHeaderLabelByTimeframe, selectedHeaderComparisonLabel, selectedKpiFrameLabel]);
 
-  const digHereFocusPeriodLabel = useMemo(() => {
-    if (activeDigHereStartMonth && activeDigHereEndMonth) {
-      return `${toMonthLabel(activeDigHereStartMonth)} – ${toMonthLabel(activeDigHereEndMonth)}`;
-    }
-    if (activeDigHereMonth) return toMonthLabel(activeDigHereMonth);
-    return null;
-  }, [activeDigHereEndMonth, activeDigHereMonth, activeDigHereStartMonth]);
-  const digHereFocusSummary = useMemo(() => {
-    if (digHereFocusContext === 'category-shifts') return 'Focused from Dig Here Highlights';
-    if (digHereFocusContext === 'month-drilldown') return 'Focused from Monthly Net Cash Flow';
-    if (digHereFocusContext === 'custom-period') return 'Focused custom period';
-    return null;
-  }, [digHereFocusContext]);
   const digHereHeaderLabel = useMemo(() => {
     if (selectedDigHerePeriod === 'thisMonth' && activeDigHereMonth) {
       const previousMonth = previousMonthToken(activeDigHereMonth);
@@ -1027,19 +1011,6 @@ export default function Dashboard() {
     };
   }, [isMonthPickerOpen]);
 
-  useEffect(() => {
-    if (!shouldScrollDigHereFocus) return;
-    if (activeTab !== 'dig-here') return;
-    if (!digHereFocusRef.current) return;
-
-    const raf = window.requestAnimationFrame(() => {
-      digHereFocusRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-      setShouldScrollDigHereFocus(false);
-    });
-
-    return () => window.cancelAnimationFrame(raf);
-  }, [activeTab, shouldScrollDigHereFocus]);
-
   const writeDashboardUrlState = useCallback(
     (
       next: {
@@ -1108,7 +1079,6 @@ export default function Dashboard() {
   const navigateToTab = useCallback(
     (nextTab: TabId) => {
       setIsMobileNavOpen(false);
-      setShouldScrollDigHereFocus(false);
 
       const isFreshDigHereEntry = nextTab === 'dig-here';
 
@@ -1180,7 +1150,6 @@ export default function Dashboard() {
       setDigHereStartMonth(startMonth);
       setDigHereEndMonth(endMonth);
       setDigHereFocusContext(focusContext);
-      setShouldScrollDigHereFocus(true);
 
       writeDashboardUrlState({
         tab: 'dig-here',
@@ -1683,19 +1652,6 @@ export default function Dashboard() {
 
         {activeTab === 'dig-here' && (
           <div className="stack-grid">
-            {digHereFocusContext !== 'period-control' ? (
-              <article className="card dig-here-focus-card" ref={digHereFocusRef}>
-                <p>
-                  {digHereFocusSummary ? `${digHereFocusSummary}` : 'Showing default Dig Here view'}
-                  {digHereFocusPeriodLabel
-                    ? ` • ${digHereFocusPeriodLabel}`
-                    : digHereFocusSummary
-                      ? ''
-                      : ' • Last 12 Months'}
-                  {query.trim() ? ` • "${query.trim()}"` : ''}
-                </p>
-              </article>
-            ) : null}
             <div className="tab-grid">
               <MoversList
                 movers={digHereInsights.movers}
