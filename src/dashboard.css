@@ -337,6 +337,41 @@ body {
   flex-wrap: nowrap;
 }
 
+.dig-here-period-control {
+  position: relative;
+  display: grid;
+  justify-items: end;
+}
+
+.dig-here-period-toggle {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: #edf3ff;
+  border: 1px solid #d5e2f6;
+  border-radius: 12px;
+  padding: 3px;
+}
+
+.dig-here-period-toggle button {
+  border: none;
+  background: transparent;
+  color: #4e6076;
+  border-radius: 9px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  min-width: 50px;
+}
+
+.dig-here-period-toggle button.is-active {
+  background: #ffffff;
+  color: #1d3f84;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(31, 58, 107, 0.1);
+}
+
 .top-controls input {
   width: 100%;
   border: 1px solid #d4dff1;
@@ -1006,19 +1041,6 @@ body {
   font-size: 0.86rem;
 }
 
-.dig-here-focus-card > .dig-here-focus-actions > button {
-  border: 1px solid #c7d7f1;
-  background: #f4f8ff;
-  color: #254675;
-  border-radius: 10px;
-  min-height: 32px;
-  padding: 0 10px;
-  font: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
 .dig-here-focus-actions {
   position: relative;
 }
@@ -1036,6 +1058,10 @@ body {
   z-index: 40;
   display: grid;
   gap: 10px;
+}
+
+.dig-here-period-control .dig-here-month-picker {
+  min-width: 310px;
 }
 
 .dig-here-picker-mode {

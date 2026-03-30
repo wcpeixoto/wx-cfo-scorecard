@@ -24,7 +24,7 @@ export default function MoversList({ movers, title = 'Dig Here Movers' }: Movers
     <article className="card movers-card">
       <div className="card-head">
         <h3>{title}</h3>
-        <p className="subtle">Largest category shifts vs prior month</p>
+        <p className="subtle">Largest category shifts vs prior period</p>
       </div>
 
       {movers.length === 0 ? (
