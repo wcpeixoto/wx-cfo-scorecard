@@ -50,8 +50,10 @@ export default function MoversList({ movers, title = 'Dig Here Movers' }: Movers
                 <div
                   className={`mover-delta ${mover.delta > 0 ? 'is-up' : mover.delta < 0 ? 'is-down' : 'is-flat'}`}
                 >
-                  <span>{mover.delta > 0 ? '▲' : mover.delta < 0 ? '▼' : '●'}</span>
-                  <strong>{formatCurrency(mover.delta)}</strong>
+                  <div className="mover-delta-main">
+                    <span>{mover.delta > 0 ? '▲' : mover.delta < 0 ? '▼' : '●'}</span>
+                    <strong>{formatCurrency(mover.delta)}</strong>
+                  </div>
                   <small>{formatPercent(mover.deltaPercent)}</small>
                 </div>
               </li>
