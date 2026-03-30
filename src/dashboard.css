@@ -1672,6 +1672,13 @@ body {
   font-size: 0.82rem;
 }
 
+.mover-delta-main {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .mover-delta strong {
   font-size: 0.92rem;
 }
