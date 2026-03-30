@@ -1244,6 +1244,17 @@ function buildSummary(latest: MonthlyRollup, previous: MonthlyRollup | null, opp
   return bullets;
 }
 
+export function computeDigHereInsights(
+  currentTxns: Txn[],
+  previousTxns: Txn[],
+  cashFlowMode: CashFlowMode
+): Pick<DashboardModel, 'movers' | 'topPayees'> {
+  return {
+    movers: buildMovers(currentTxns, previousTxns, cashFlowMode),
+    topPayees: buildTopPayees(currentTxns, cashFlowMode),
+  };
+}
+
 export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: CashFlowMode }): DashboardModel {
   const cashFlowMode = options?.cashFlowMode ?? 'operating';
   const monthlyRollups = computeMonthlyRollups(txns, cashFlowMode);

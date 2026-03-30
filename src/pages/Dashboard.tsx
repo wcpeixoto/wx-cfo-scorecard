@@ -15,7 +15,16 @@ import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/
 import { includeExpenseCategoryForCashFlowMode, isCapitalDistributionCategory } from '../lib/cashFlow';
 import { buildDataSet } from '../lib/data/normalize';
 import { fetchSheetCsv } from '../lib/data/fetchCsv';
-import { buildPrePhase4DebugReport, computeDashboardModel, computePriorityScore, projectScenario, toMonthLabel } from '../lib/kpis/compute';
+import {
+  buildPrePhase4DebugReport,
+  computeDashboardModel,
+  computeDigHereInsights,
+  computeKpiComparisons,
+  computePriorityScore,
+  computeMonthlyRollups,
+  projectScenario,
+  toMonthLabel,
+} from '../lib/kpis/compute';
 import type {
   CashFlowForecastStatus,
   CashFlowMode,
@@ -41,6 +50,8 @@ type NavItem = {
 };
 
 type KpiFrameOption = { value: KpiComparisonTimeframe; label: string };
+type DigHerePeriodValue = KpiComparisonTimeframe | 'custom';
+type DigHerePeriodOption = { value: DigHerePeriodValue; label: string };
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'big-picture', label: 'Big Picture', icon: FiGrid },
@@ -63,6 +74,10 @@ const KPI_FRAME_OPTIONS: KpiFrameOption[] = [
   { value: 'ttm', label: '12M' },
   { value: 'last24Months', label: '24M' },
   { value: 'last36Months', label: '36M' },
+];
+const DIG_HERE_PERIOD_OPTIONS: DigHerePeriodOption[] = [
+  ...KPI_FRAME_OPTIONS,
+  { value: 'custom', label: 'Custom' },
 ];
 const EPSILON = 0.00001;
 type TrendTimeframeOption = 6 | 12 | 24 | 36 | 'all';
@@ -90,7 +105,7 @@ type DigHereHighlight = {
   priorityScore: number;
 };
 
-type DigHereFocusContext = 'category-shifts' | 'month-drilldown' | 'custom-period' | null;
+type DigHereFocusContext = 'category-shifts' | 'month-drilldown' | 'custom-period' | 'period-control' | null;
 type DigHereNavigationOptions = {
   category?: string;
   month?: string | null;
@@ -133,9 +148,71 @@ function previousMonthToken(month: string): string | null {
   return `${prevYear}-${prevMonth}`;
 }
 
+function addMonthsToToken(month: string, offset: number): string | null {
+  const match = month.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number.parseInt(match[1], 10);
+  const monthNumber = Number.parseInt(match[2], 10);
+  if (!Number.isFinite(year) || !Number.isFinite(monthNumber) || monthNumber < 1 || monthNumber > 12) {
+    return null;
+  }
+
+  const date = new Date(Date.UTC(year, monthNumber - 1 + offset, 1));
+  const nextYear = date.getUTCFullYear();
+  const nextMonth = String(date.getUTCMonth() + 1).padStart(2, '0');
+  return `${nextYear}-${nextMonth}`;
+}
+
+function inclusiveMonthSpan(startMonth: string, endMonth: string): number {
+  const startMatch = startMonth.match(/^(\d{4})-(\d{2})$/);
+  const endMatch = endMonth.match(/^(\d{4})-(\d{2})$/);
+  if (!startMatch || !endMatch) return 0;
+
+  const startYear = Number.parseInt(startMatch[1], 10);
+  const startMonthNumber = Number.parseInt(startMatch[2], 10);
+  const endYear = Number.parseInt(endMatch[1], 10);
+  const endMonthNumber = Number.parseInt(endMatch[2], 10);
+  if (
+    !Number.isFinite(startYear) ||
+    !Number.isFinite(startMonthNumber) ||
+    !Number.isFinite(endYear) ||
+    !Number.isFinite(endMonthNumber)
+  ) {
+    return 0;
+  }
+
+  return (endYear - startYear) * 12 + (endMonthNumber - startMonthNumber) + 1;
+}
+
+function previousEquivalentRange(
+  startMonth: string | null,
+  endMonth: string | null
+): { startMonth: string; endMonth: string } | null {
+  if (!startMonth || !endMonth) return null;
+  const span = inclusiveMonthSpan(startMonth, endMonth);
+  if (span <= 0) return null;
+
+  const previousEndMonth = addMonthsToToken(startMonth, -1);
+  const previousStartMonth = addMonthsToToken(startMonth, -span);
+  if (!previousStartMonth || !previousEndMonth) return null;
+
+  return { startMonth: previousStartMonth, endMonth: previousEndMonth };
+}
+
 function parseDigHereFocusContext(value: string | null): DigHereFocusContext {
-  if (value === 'category-shifts' || value === 'month-drilldown') return value;
+  if (value === 'category-shifts' || value === 'month-drilldown' || value === 'custom-period' || value === 'period-control') {
+    return value;
+  }
   return null;
+}
+
+function sameMonthRange(
+  startMonth: string | null,
+  endMonth: string | null,
+  targetStartMonth: string | null,
+  targetEndMonth: string | null
+): boolean {
+  return startMonth === targetStartMonth && endMonth === targetEndMonth;
 }
 
 function parseCashFlowMode(value: string | null): CashFlowMode | null {
@@ -313,23 +390,91 @@ export default function Dashboard() {
     [filteredTxns]
   );
 
-  const digHereTxns = useMemo(() => {
-    if (digHereStartMonth && digHereEndMonth) {
-      return filteredTxns.filter((txn) => txn.month >= digHereStartMonth && txn.month <= digHereEndMonth);
-    }
-    if (!digHereFocusMonth) return filteredTxns;
-    const months = new Set<string>([digHereFocusMonth]);
-    const previousMonth = previousMonthToken(digHereFocusMonth);
-    if (previousMonth) {
-      months.add(previousMonth);
+  const selectedKpiComparison = model.kpiComparisonByTimeframe[kpiTimeframe];
+  const selectedHeaderComparisonLabel = model.kpiHeaderLabelByTimeframe[kpiTimeframe] ?? 'Comparison unavailable';
+  const selectedKpiFrameLabel = KPI_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? '12M';
+  const digHerePresetComparisons = useMemo(() => {
+    const monthlyRollups = computeMonthlyRollups(baseTxns, cashFlowMode);
+    return computeKpiComparisons(monthlyRollups);
+  }, [baseTxns, cashFlowMode]);
+
+  const defaultDigHereRange = useMemo(() => {
+    const ttm = digHerePresetComparisons.ttm;
+    return {
+      startMonth: ttm?.currentStartMonth ?? null,
+      endMonth: ttm?.currentEndMonth ?? null,
+    };
+  }, [digHerePresetComparisons]);
+
+  const activeDigHereMonth = digHereFocusMonth;
+  const activeDigHereStartMonth =
+    !digHereFocusMonth && activeTab === 'dig-here'
+      ? digHereStartMonth ?? defaultDigHereRange.startMonth
+      : digHereStartMonth;
+  const activeDigHereEndMonth =
+    !digHereFocusMonth && activeTab === 'dig-here'
+      ? digHereEndMonth ?? defaultDigHereRange.endMonth
+      : digHereEndMonth;
+
+  const selectedDigHerePeriod = useMemo<DigHerePeriodValue>(() => {
+    if (activeDigHereMonth) {
+      return 'thisMonth';
     }
 
-    return filteredTxns.filter((txn) => months.has(txn.month));
-  }, [digHereEndMonth, digHereFocusMonth, digHereStartMonth, filteredTxns]);
+    if (!activeDigHereStartMonth || !activeDigHereEndMonth) {
+      return 'ttm';
+    }
 
-  const digHereModel = useMemo(
-    () => computeDashboardModel(digHereTxns, { cashFlowMode }),
-    [digHereTxns, cashFlowMode]
+    const standardPeriods: KpiComparisonTimeframe[] = [
+      'last3Months',
+      'ytd',
+      'ttm',
+      'last24Months',
+      'last36Months',
+    ];
+
+    for (const period of standardPeriods) {
+      const comparison = digHerePresetComparisons[period];
+      if (
+        sameMonthRange(
+          activeDigHereStartMonth,
+          activeDigHereEndMonth,
+          comparison?.currentStartMonth ?? null,
+          comparison?.currentEndMonth ?? null
+        )
+      ) {
+        return period;
+      }
+    }
+
+    return 'custom';
+  }, [activeDigHereEndMonth, activeDigHereMonth, activeDigHereStartMonth, digHerePresetComparisons]);
+
+  const digHereCurrentTxns = useMemo(() => {
+    if (activeDigHereStartMonth && activeDigHereEndMonth) {
+      return filteredTxns.filter((txn) => txn.month >= activeDigHereStartMonth && txn.month <= activeDigHereEndMonth);
+    }
+    if (!activeDigHereMonth) return filteredTxns;
+    return filteredTxns.filter((txn) => txn.month === activeDigHereMonth);
+  }, [activeDigHereEndMonth, activeDigHereMonth, activeDigHereStartMonth, filteredTxns]);
+
+  const digHerePreviousTxns = useMemo(() => {
+    if (activeDigHereStartMonth && activeDigHereEndMonth) {
+      const previousRange = previousEquivalentRange(activeDigHereStartMonth, activeDigHereEndMonth);
+      if (!previousRange) return [];
+      return filteredTxns.filter(
+        (txn) => txn.month >= previousRange.startMonth && txn.month <= previousRange.endMonth
+      );
+    }
+    if (!activeDigHereMonth) return [];
+    const previousMonth = previousMonthToken(activeDigHereMonth);
+    if (!previousMonth) return [];
+    return filteredTxns.filter((txn) => txn.month === previousMonth);
+  }, [activeDigHereEndMonth, activeDigHereMonth, activeDigHereStartMonth, filteredTxns]);
+
+  const digHereInsights = useMemo(
+    () => computeDigHereInsights(digHereCurrentTxns, digHerePreviousTxns, cashFlowMode),
+    [cashFlowMode, digHereCurrentTxns, digHerePreviousTxns]
   );
 
   useEffect(() => {
@@ -588,9 +733,6 @@ export default function Dashboard() {
 
   const latestRollup = model.monthlyRollups[model.monthlyRollups.length - 1] ?? null;
   const previousRollup = model.monthlyRollups[model.monthlyRollups.length - 2] ?? null;
-  const selectedKpiComparison = model.kpiComparisonByTimeframe[kpiTimeframe];
-  const selectedHeaderComparisonLabel = model.kpiHeaderLabelByTimeframe[kpiTimeframe] ?? 'Comparison unavailable';
-  const selectedKpiFrameLabel = KPI_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? '12M';
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -606,18 +748,113 @@ export default function Dashboard() {
   }, [model.kpiHeaderLabelByTimeframe, selectedHeaderComparisonLabel, selectedKpiFrameLabel]);
 
   const digHereFocusPeriodLabel = useMemo(() => {
-    if (digHereStartMonth && digHereEndMonth) {
-      return `${toMonthLabel(digHereStartMonth)} – ${toMonthLabel(digHereEndMonth)}`;
+    if (activeDigHereStartMonth && activeDigHereEndMonth) {
+      return `${toMonthLabel(activeDigHereStartMonth)} – ${toMonthLabel(activeDigHereEndMonth)}`;
     }
-    if (digHereFocusMonth) return toMonthLabel(digHereFocusMonth);
+    if (activeDigHereMonth) return toMonthLabel(activeDigHereMonth);
     return null;
-  }, [digHereEndMonth, digHereFocusMonth, digHereStartMonth]);
+  }, [activeDigHereEndMonth, activeDigHereMonth, activeDigHereStartMonth]);
   const digHereFocusSummary = useMemo(() => {
     if (digHereFocusContext === 'category-shifts') return 'Focused from Dig Here Highlights';
     if (digHereFocusContext === 'month-drilldown') return 'Focused from Monthly Net Cash Flow';
     if (digHereFocusContext === 'custom-period') return 'Focused custom period';
+    if (digHereFocusContext === 'period-control') return 'Showing selected Dig Here period';
     return null;
   }, [digHereFocusContext]);
+  const digHereHeaderLabel = useMemo(() => {
+    if (selectedDigHerePeriod === 'thisMonth' && activeDigHereMonth) {
+      const previousMonth = previousMonthToken(activeDigHereMonth);
+      return previousMonth
+        ? `${toMonthLabel(activeDigHereMonth)} · vs ${toMonthLabel(previousMonth)}`
+        : `${toMonthLabel(activeDigHereMonth)} · comparison unavailable`;
+    }
+
+    const previousRange = previousEquivalentRange(activeDigHereStartMonth, activeDigHereEndMonth);
+    if (
+      activeDigHereStartMonth &&
+      activeDigHereEndMonth &&
+      previousRange &&
+      (digHereFocusContext === 'category-shifts' || digHereFocusContext === 'custom-period')
+    ) {
+      const currentRange =
+        activeDigHereStartMonth === activeDigHereEndMonth
+          ? toMonthLabel(activeDigHereStartMonth)
+          : `${toMonthLabel(activeDigHereStartMonth)} – ${toMonthLabel(activeDigHereEndMonth)}`;
+      const previousRangeLabel =
+        previousRange.startMonth === previousRange.endMonth
+          ? toMonthLabel(previousRange.startMonth)
+          : `${toMonthLabel(previousRange.startMonth)} – ${toMonthLabel(previousRange.endMonth)}`;
+      return `${currentRange} · vs ${previousRangeLabel}`;
+    }
+
+    if (selectedDigHerePeriod !== 'custom' && selectedDigHerePeriod !== 'thisMonth') {
+      const comparison = digHerePresetComparisons[selectedDigHerePeriod];
+      const currentStartMonth = comparison?.currentStartMonth ?? null;
+      const currentEndMonth = comparison?.currentEndMonth ?? null;
+      const previousStartMonth = comparison?.previousStartMonth ?? null;
+      const previousEndMonth = comparison?.previousEndMonth ?? null;
+
+      if (selectedDigHerePeriod === 'ytd') {
+        if (currentEndMonth && previousEndMonth) {
+          return `YTD through ${toMonthLabel(currentEndMonth)} · vs YTD through ${toMonthLabel(previousEndMonth)}`;
+        }
+        if (currentEndMonth) {
+          return `YTD through ${toMonthLabel(currentEndMonth)} · comparison unavailable`;
+        }
+        return 'YTD · comparison unavailable';
+      }
+
+      if (selectedDigHerePeriod === 'ttm') {
+        if (currentEndMonth) {
+          return `Last 12 Months through ${toMonthLabel(currentEndMonth)} vs prior 12 Months`;
+        }
+        return 'Last 12 Months vs prior period';
+      }
+
+      if (currentStartMonth && currentEndMonth && previousStartMonth && previousEndMonth) {
+        const currentRange =
+          currentStartMonth === currentEndMonth
+            ? toMonthLabel(currentStartMonth)
+            : `${toMonthLabel(currentStartMonth)} – ${toMonthLabel(currentEndMonth)}`;
+        const previousRangeLabel =
+          previousStartMonth === previousEndMonth
+            ? toMonthLabel(previousStartMonth)
+            : `${toMonthLabel(previousStartMonth)} – ${toMonthLabel(previousEndMonth)}`;
+        return `${currentRange} · vs ${previousRangeLabel}`;
+      }
+
+      if (currentStartMonth && currentEndMonth) {
+        const currentRange =
+          currentStartMonth === currentEndMonth
+            ? toMonthLabel(currentStartMonth)
+            : `${toMonthLabel(currentStartMonth)} – ${toMonthLabel(currentEndMonth)}`;
+        return `${currentRange} · comparison unavailable`;
+      }
+
+      return 'Comparison unavailable';
+    }
+
+    if (activeDigHereStartMonth && activeDigHereEndMonth && previousRange) {
+      const currentRange =
+        activeDigHereStartMonth === activeDigHereEndMonth
+          ? toMonthLabel(activeDigHereStartMonth)
+          : `${toMonthLabel(activeDigHereStartMonth)} – ${toMonthLabel(activeDigHereEndMonth)}`;
+      const previousRangeLabel =
+        previousRange.startMonth === previousRange.endMonth
+          ? toMonthLabel(previousRange.startMonth)
+          : `${toMonthLabel(previousRange.startMonth)} – ${toMonthLabel(previousRange.endMonth)}`;
+      return `${currentRange} · vs ${previousRangeLabel}`;
+    }
+
+    return 'Last 12 Months vs prior period';
+  }, [
+    activeDigHereEndMonth,
+    activeDigHereMonth,
+    activeDigHereStartMonth,
+    digHereFocusContext,
+    digHerePresetComparisons,
+    selectedDigHerePeriod,
+  ]);
 
   const digHereHighlights = useMemo<DigHereHighlight[]>(() => {
     if (!selectedKpiComparison) return [];
@@ -736,21 +973,21 @@ export default function Dashboard() {
   useEffect(() => {
     if (!isMonthPickerOpen) return;
 
-    const preferredMonth = digHereFocusMonth ?? availableMonths[0] ?? '';
+    const preferredMonth = activeDigHereMonth ?? availableMonths[0] ?? '';
     const preferredStart =
-      digHereStartMonth ??
+      activeDigHereStartMonth ??
       availableMonths[availableMonths.length - 1] ??
       availableMonths[0] ??
       '';
-    const preferredEnd = digHereEndMonth ?? preferredMonth;
+    const preferredEnd = activeDigHereEndMonth ?? preferredMonth;
 
     setMonthPickerDraftMonth(preferredMonth);
     setMonthPickerDraftStart(preferredStart);
     setMonthPickerDraftEnd(preferredEnd);
-    if (digHereStartMonth && digHereEndMonth) {
+    if (activeDigHereStartMonth && activeDigHereEndMonth) {
       setMonthPickerMode('period');
     }
-  }, [availableMonths, digHereEndMonth, digHereFocusMonth, digHereStartMonth, isMonthPickerOpen]);
+  }, [activeDigHereEndMonth, activeDigHereMonth, activeDigHereStartMonth, availableMonths, isMonthPickerOpen]);
 
   useEffect(() => {
     if (!isMonthPickerOpen) return;
@@ -959,11 +1196,44 @@ export default function Dashboard() {
     });
   }, [cashFlowMode, writeDashboardUrlState]);
 
+  const applyDigHerePeriod = useCallback(
+    (period: DigHerePeriodValue) => {
+      if (period === 'custom') {
+        setIsMonthPickerOpen((current) => !current);
+        return;
+      }
+
+      if (period === 'thisMonth') {
+        const month = model.kpiComparisonByTimeframe.thisMonth.currentEndMonth ?? model.latestMonth ?? null;
+        if (!month) return;
+        navigateToDigHere({
+          month,
+          focusContext: 'period-control',
+        });
+        setIsMonthPickerOpen(false);
+        return;
+      }
+
+      const comparison = model.kpiComparisonByTimeframe[period];
+      const startMonth = comparison?.currentStartMonth ?? null;
+      const endMonth = comparison?.currentEndMonth ?? null;
+      if (!startMonth || !endMonth) return;
+
+      navigateToDigHere({
+        startMonth,
+        endMonth,
+        focusContext: 'period-control',
+      });
+      setIsMonthPickerOpen(false);
+    },
+    [model.kpiComparisonByTimeframe, model.latestMonth, navigateToDigHere]
+  );
+
   const applyMonthChoice = useCallback(() => {
     if (!monthPickerDraftMonth) return;
     navigateToDigHere({
       month: monthPickerDraftMonth,
-      focusContext: 'month-drilldown',
+      focusContext: 'period-control',
     });
     setIsMonthPickerOpen(false);
   }, [monthPickerDraftMonth, navigateToDigHere]);
@@ -1087,26 +1357,142 @@ export default function Dashboard() {
         <header className="top-bar glass-panel">
           <div>
             <h2>
-              {model.latestMonth ? toMonthLabel(model.latestMonth) : 'No Data Yet'}
+              {activeTab === 'dig-here'
+                ? 'Dig Here'
+                : model.latestMonth
+                  ? toMonthLabel(model.latestMonth)
+                  : 'No Data Yet'}
             </h2>
             <p>
-              {selectedHeaderComparisonLabel}
+              {activeTab === 'dig-here' ? digHereHeaderLabel : selectedHeaderComparisonLabel}
             </p>
           </div>
 
           <div className="top-controls top-controls-timeframe">
-            <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
-              {KPI_FRAME_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={kpiTimeframe === option.value ? 'is-active' : ''}
-                  onClick={() => setKpiTimeframe(option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+            {activeTab === 'dig-here' ? (
+              <div className="dig-here-period-control" ref={monthPickerRef}>
+                <div className="dig-here-period-toggle" role="group" aria-label="Dig Here period selector">
+                  {DIG_HERE_PERIOD_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={
+                        option.value === 'custom'
+                          ? isMonthPickerOpen
+                            ? 'is-active'
+                            : ''
+                          : selectedDigHerePeriod === option.value
+                            ? 'is-active'
+                            : ''
+                      }
+                      onClick={() => applyDigHerePeriod(option.value)}
+                      aria-expanded={option.value === 'custom' ? isMonthPickerOpen : undefined}
+                      aria-haspopup={option.value === 'custom' ? 'dialog' : undefined}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {isMonthPickerOpen && (
+                  <div className="dig-here-month-picker" role="dialog" aria-label="Choose Dig Here month or period">
+                    <div className="dig-here-picker-mode" role="group" aria-label="Focus mode">
+                      <button
+                        type="button"
+                        className={monthPickerMode === 'month' ? 'is-active' : ''}
+                        onClick={() => setMonthPickerMode('month')}
+                      >
+                        Month
+                      </button>
+                      <button
+                        type="button"
+                        className={monthPickerMode === 'period' ? 'is-active' : ''}
+                        onClick={() => setMonthPickerMode('period')}
+                      >
+                        Custom period
+                      </button>
+                    </div>
+
+                    {monthPickerMode === 'month' ? (
+                      <label className="dig-here-picker-field">
+                        Month
+                        <select
+                          value={monthPickerDraftMonth}
+                          onChange={(event) => setMonthPickerDraftMonth(event.target.value)}
+                        >
+                          {availableMonths.map((month) => (
+                            <option key={month} value={month}>
+                              {toMonthLabel(month)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <div className="dig-here-picker-period-grid">
+                        <label className="dig-here-picker-field">
+                          Start
+                          <select
+                            value={monthPickerDraftStart}
+                            onChange={(event) => setMonthPickerDraftStart(event.target.value)}
+                          >
+                            {availableMonths.map((month) => (
+                              <option key={`start-${month}`} value={month}>
+                                {toMonthLabel(month)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="dig-here-picker-field">
+                          End
+                          <select
+                            value={monthPickerDraftEnd}
+                            onChange={(event) => setMonthPickerDraftEnd(event.target.value)}
+                          >
+                            {availableMonths.map((month) => (
+                              <option key={`end-${month}`} value={month}>
+                                {toMonthLabel(month)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    )}
+
+                    <div className="dig-here-picker-buttons">
+                      <button
+                        type="button"
+                        className="is-primary"
+                        onClick={monthPickerMode === 'month' ? applyMonthChoice : applyPeriodChoice}
+                      >
+                        Apply
+                      </button>
+                      <button
+                        type="button"
+                        className="is-ghost"
+                        onClick={() => {
+                          resetDigHereFocus();
+                          setIsMonthPickerOpen(false);
+                        }}
+                      >
+                        Reset to default
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
+                {KPI_FRAME_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={kpiTimeframe === option.value ? 'is-active' : ''}
+                    onClick={() => setKpiTimeframe(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </header>
 
@@ -1246,108 +1632,16 @@ export default function Dashboard() {
                   ? ` • ${digHereFocusPeriodLabel}`
                   : digHereFocusSummary
                     ? ''
-                    : ' • All Dates'}
+                    : ' • Last 12 Months'}
                 {query.trim() ? ` • "${query.trim()}"` : ''}
               </p>
-              <div className="dig-here-focus-actions" ref={monthPickerRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsMonthPickerOpen((current) => !current)}
-                  aria-expanded={isMonthPickerOpen}
-                  aria-haspopup="dialog"
-                >
-                  Choose Month
-                </button>
-                {isMonthPickerOpen && (
-                  <div className="dig-here-month-picker" role="dialog" aria-label="Choose Dig Here month or period">
-                    <div className="dig-here-picker-mode" role="group" aria-label="Focus mode">
-                      <button
-                        type="button"
-                        className={monthPickerMode === 'month' ? 'is-active' : ''}
-                        onClick={() => setMonthPickerMode('month')}
-                      >
-                        Month
-                      </button>
-                      <button
-                        type="button"
-                        className={monthPickerMode === 'period' ? 'is-active' : ''}
-                        onClick={() => setMonthPickerMode('period')}
-                      >
-                        Custom period
-                      </button>
-                    </div>
-
-                    {monthPickerMode === 'month' ? (
-                      <label className="dig-here-picker-field">
-                        Month
-                        <select
-                          value={monthPickerDraftMonth}
-                          onChange={(event) => setMonthPickerDraftMonth(event.target.value)}
-                        >
-                          {availableMonths.map((month) => (
-                            <option key={month} value={month}>
-                              {toMonthLabel(month)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : (
-                      <div className="dig-here-picker-period-grid">
-                        <label className="dig-here-picker-field">
-                          Start
-                          <select
-                            value={monthPickerDraftStart}
-                            onChange={(event) => setMonthPickerDraftStart(event.target.value)}
-                          >
-                            {availableMonths.map((month) => (
-                              <option key={`start-${month}`} value={month}>
-                                {toMonthLabel(month)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="dig-here-picker-field">
-                          End
-                          <select
-                            value={monthPickerDraftEnd}
-                            onChange={(event) => setMonthPickerDraftEnd(event.target.value)}
-                          >
-                            {availableMonths.map((month) => (
-                              <option key={`end-${month}`} value={month}>
-                                {toMonthLabel(month)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                    )}
-
-                    <div className="dig-here-picker-buttons">
-                      <button
-                        type="button"
-                        className="is-primary"
-                        onClick={monthPickerMode === 'month' ? applyMonthChoice : applyPeriodChoice}
-                      >
-                        Apply
-                      </button>
-                      <button
-                        type="button"
-                        className="is-ghost"
-                        onClick={() => {
-                          resetDigHereFocus();
-                          setIsMonthPickerOpen(false);
-                        }}
-                      >
-                        All Dates
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
             </article>
             <div className="tab-grid">
-              <MoversList movers={digHereModel.movers} title="Dig Here Actions" />
-              <TopPayeesTable payees={digHereModel.topPayees} />
+              <MoversList movers={digHereInsights.movers} title="Dig Here Actions" />
+              <TopPayeesTable
+                payees={digHereInsights.topPayees}
+                subtitle={selectedDigHerePeriod === 'thisMonth' ? 'Highest expense recipients this month' : 'Highest expense recipients this period'}
+              />
             </div>
           </div>
         )}

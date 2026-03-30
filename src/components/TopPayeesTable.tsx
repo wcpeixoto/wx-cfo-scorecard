@@ -2,6 +2,7 @@ import type { PayeeTotal } from '../lib/data/contract';
 
 type TopPayeesTableProps = {
   payees: PayeeTotal[];
+  subtitle?: string;
 };
 
 function formatCurrency(value: number): string {
@@ -12,12 +13,15 @@ function formatCurrency(value: number): string {
   });
 }
 
-export default function TopPayeesTable({ payees }: TopPayeesTableProps) {
+export default function TopPayeesTable({
+  payees,
+  subtitle = 'Highest expense recipients this month',
+}: TopPayeesTableProps) {
   return (
     <article className="card table-card">
       <div className="card-head">
         <h3>Top Payees</h3>
-        <p className="subtle">Highest expense recipients this month</p>
+        <p className="subtle">{subtitle}</p>
       </div>
 
       {payees.length === 0 ? (
