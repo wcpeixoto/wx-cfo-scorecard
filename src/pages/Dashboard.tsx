@@ -264,10 +264,6 @@ function toDeltaPercent(current: number, previous: number): number | null {
   return ((current - previous) / Math.abs(previous)) * 100;
 }
 
-function roundCurrency(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 function getStoredCsvUrl(): string {
   if (typeof window === 'undefined') return SHEET_CSV_URL;
   try {
@@ -385,6 +381,10 @@ export default function Dashboard() {
     }
     return 0;
   }, [baseTxns]);
+  const hasCurrentCashBalance = useMemo(
+    () => baseTxns.some((txn) => typeof txn.balance === 'number' && Number.isFinite(txn.balance)),
+    [baseTxns]
+  );
 
   const model = useMemo(
     () => computeDashboardModel(filteredTxns, { cashFlowMode }),
@@ -700,49 +700,43 @@ export default function Dashboard() {
     setIsMobileNavOpen(false);
   }, [activeTab]);
 
-  const scenarioProjection = useMemo(() => projectScenario(model, scenarioInput), [model, scenarioInput]);
   const forecastRangeMonths = useMemo(
     () => FORECAST_RANGE_OPTIONS.find((option) => option.value === forecastRange)?.months ?? 3,
     [forecastRange]
   );
-  const projectedRevenueMultiplier = useMemo(() => 1 + scenarioInput.revenueGrowthPct / 100, [scenarioInput.revenueGrowthPct]);
-  const projectedExpenseMultiplier = useMemo(() => 1 - scenarioInput.expenseReductionPct / 100, [scenarioInput.expenseReductionPct]);
-  const visibleCashFlowForecastSeries = useMemo(() => {
-    const projected = model.cashFlowForecastSeries
-      .filter((point) => point.status === 'projected')
-      .slice(0, forecastRangeMonths)
-      .map((point) => {
-        // Keep baseline output unchanged and apply What-If slider adjustments as a projected-only layer.
-        const adjustedProjectedRevenue = roundCurrency(point.revenue * projectedRevenueMultiplier);
-        const adjustedProjectedExpenses = roundCurrency(point.expenses * projectedExpenseMultiplier);
-        const adjustedProjectedNetCashFlow = roundCurrency(adjustedProjectedRevenue - adjustedProjectedExpenses);
-
-        return {
-          ...point,
-          revenue: adjustedProjectedRevenue,
-          expenses: adjustedProjectedExpenses,
-          netCashFlow: adjustedProjectedNetCashFlow,
-        };
-      });
-    return projected;
-  }, [forecastRangeMonths, model.cashFlowForecastSeries, projectedExpenseMultiplier, projectedRevenueMultiplier]);
+  const scenarioProjection = useMemo(
+    () =>
+      projectScenario(
+        model,
+        {
+          ...scenarioInput,
+          months: Math.max(scenarioInput.months, forecastRangeMonths),
+        },
+        currentCashBalance
+      ),
+    [currentCashBalance, forecastRangeMonths, model, scenarioInput]
+  );
+  const visibleScenarioProjection = useMemo(
+    () => scenarioProjection.slice(0, forecastRangeMonths),
+    [forecastRangeMonths, scenarioProjection]
+  );
   const cashFlowForecastTrend = useMemo<TrendPoint[]>(
     () =>
-      visibleCashFlowForecastSeries.map((point) => ({
+      visibleScenarioProjection.map((point) => ({
         month: point.month,
-        income: point.revenue,
-        expense: point.expenses,
-        net: point.netCashFlow,
+        income: point.projectedIncome,
+        expense: point.projectedExpense,
+        net: point.projectedNet,
       })),
-    [visibleCashFlowForecastSeries]
+    [visibleScenarioProjection]
   );
   const cashFlowForecastStatusByMonth = useMemo<Partial<Record<string, CashFlowForecastStatus>>>(() => {
     const statuses: Partial<Record<string, CashFlowForecastStatus>> = {};
-    visibleCashFlowForecastSeries.forEach((point) => {
-      statuses[point.month] = point.status;
+    visibleScenarioProjection.forEach((point) => {
+      statuses[point.month] = 'projected';
     });
     return statuses;
-  }, [visibleCashFlowForecastSeries]);
+  }, [visibleScenarioProjection]);
 
   const latestRollup = model.monthlyRollups[model.monthlyRollups.length - 1] ?? null;
   const previousRollup = model.monthlyRollups[model.monthlyRollups.length - 2] ?? null;
@@ -1711,6 +1705,7 @@ export default function Dashboard() {
               data={cashFlowForecastTrend}
               pointStatusByMonth={cashFlowForecastStatusByMonth}
               currentCashBalance={currentCashBalance}
+              hasCurrentCashBalance={hasCurrentCashBalance}
               forecastRangeMonths={forecastRangeMonths}
               forecastRangeValue={forecastRange}
               forecastRangeOptions={FORECAST_RANGE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
@@ -1745,11 +1740,11 @@ export default function Dashboard() {
                     <th>Projected Income</th>
                     <th>Projected Expense</th>
                     <th>Projected Net</th>
-                    <th>Cumulative Net</th>
+                    <th>{hasCurrentCashBalance ? 'Projected Cash Balance' : 'Cumulative Net Change'}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {scenarioProjection.map((row) => (
+                  {visibleScenarioProjection.map((row) => (
                     <tr key={row.month}>
                       <td>{toMonthLabel(row.month)}</td>
                       <td>{formatCurrency(row.projectedIncome)}</td>

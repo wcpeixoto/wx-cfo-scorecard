@@ -9,6 +9,7 @@ type CashFlowForecastModuleProps = {
   data: TrendPoint[];
   pointStatusByMonth: Partial<Record<string, CashFlowForecastStatus>>;
   currentCashBalance: number;
+  hasCurrentCashBalance: boolean;
   forecastRangeMonths: number;
   forecastRangeValue: string;
   forecastRangeOptions: SelectOption[];
@@ -186,6 +187,7 @@ export default function CashFlowForecastModule({
   data,
   pointStatusByMonth,
   currentCashBalance,
+  hasCurrentCashBalance,
   forecastRangeMonths,
   forecastRangeValue,
   forecastRangeOptions,
@@ -233,7 +235,12 @@ export default function CashFlowForecastModule({
     });
     return statusByWeek;
   }, [displaySeries, granularity, pointStatusByMonth]);
-  const chartTitle = viewMode === 'cumulative' ? 'Cash Balance Forecast' : 'Monthly Cash Flow Forecast';
+  const chartTitle =
+    viewMode === 'cumulative'
+      ? hasCurrentCashBalance
+        ? 'Cash Balance Forecast'
+        : 'Cumulative Cash Change Forecast'
+      : 'Monthly Cash Flow Forecast';
 
   return (
     <div className="forecast-cockpit">
@@ -243,7 +250,7 @@ export default function CashFlowForecastModule({
           className={viewMode === 'cumulative' ? 'is-active' : ''}
           onClick={() => setViewMode('cumulative')}
         >
-          Cash in Bank
+          {hasCurrentCashBalance ? 'Cash in Bank' : 'Cumulative Change'}
         </button>
         <button
           type="button"
