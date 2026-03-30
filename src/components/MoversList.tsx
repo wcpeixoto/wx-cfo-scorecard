@@ -12,8 +12,8 @@ const SPARKLINE_WIDTH = 72;
 const SPARKLINE_HEIGHT = 24;
 const SPARKLINE_PADDING = 2;
 const MOVER_GROUP_OPTIONS: Array<{ value: MoverGrouping; label: string }> = [
-  { value: 'subcategories', label: 'Subcategories' },
   { value: 'categories', label: 'Categories' },
+  { value: 'subcategories', label: 'Subcategories' },
 ];
 
 function formatCurrency(value: number): string {

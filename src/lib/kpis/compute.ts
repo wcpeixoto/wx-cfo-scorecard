@@ -1086,6 +1086,17 @@ function moverCategoryName(category: string, grouping: MoverGrouping): string {
   return grouping === 'categories' ? parentCategoryName(category) : category;
 }
 
+function isTransferCategoryForDigHere(category: string): boolean {
+  return parentCategoryName(category).toLowerCase() === 'transfer';
+}
+
+function includeExpenseCategoryForDigHere(category: string, cashFlowMode: CashFlowMode): boolean {
+  if (!includeExpenseCategoryForCashFlowMode(category, cashFlowMode)) return false;
+  if (isCapitalDistributionCategory(category)) return false;
+  if (isTransferCategoryForDigHere(category)) return false;
+  return true;
+}
+
 function categoryTotalsByGrouping(
   txns: Txn[],
   cashFlowMode: CashFlowMode,
@@ -1094,7 +1105,7 @@ function categoryTotalsByGrouping(
   const totals = new Map<string, number>();
   txns.forEach((txn) => {
     if (txn.type !== 'expense') return;
-    if (!includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)) return;
+    if (!includeExpenseCategoryForDigHere(txn.category, cashFlowMode)) return;
     const category = moverCategoryName(txn.category, grouping);
     const current = totals.get(category) ?? 0;
     totals.set(category, current + txn.amount);
@@ -1174,7 +1185,7 @@ function buildMovers(
 
     allRelevantTxns.forEach((txn) => {
       if (txn.type !== 'expense') return;
-      if (!includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)) return;
+      if (!includeExpenseCategoryForDigHere(txn.category, cashFlowMode)) return;
       if (!sparklineMonthSet.has(txn.month)) return;
       const category = moverCategoryName(txn.category, grouping);
 
