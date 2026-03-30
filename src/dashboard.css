@@ -986,6 +986,27 @@ body {
   font-size: 0.88rem;
   font-weight: 600;
   color: #314d6f;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.novelty-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid #d8e5f8;
+  background: #eef5ff;
+  color: #315993;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .highlights-main small {
@@ -1633,6 +1654,10 @@ body {
 .movers-list p {
   margin: 0;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .movers-list small {

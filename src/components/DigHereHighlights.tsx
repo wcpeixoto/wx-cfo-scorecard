@@ -59,6 +59,7 @@ export default function DigHereHighlights({
           {visibleItems.map((item) => {
             const isIncrease = item.delta > EPSILON;
             const isDecrease = item.delta < -EPSILON;
+            const isNew = Math.abs(item.previous) <= EPSILON && Math.abs(item.current) > EPSILON;
             const toneClass = isIncrease ? 'is-up' : isDecrease ? 'is-down' : 'is-flat';
             const arrow = isIncrease ? '▲' : isDecrease ? '▼' : '●';
             const deltaText = `${isIncrease ? '+' : ''}${formatCurrency(item.delta)}`;
@@ -66,7 +67,10 @@ export default function DigHereHighlights({
             const rowBody = (
               <>
                 <div className="highlights-main">
-                  <p>{item.category}</p>
+                  <p>
+                    <span>{item.category}</span>
+                    {isNew ? <span className="novelty-badge">New</span> : null}
+                  </p>
                   <small>
                     {formatCurrency(item.current)} vs {formatCurrency(item.previous)}
                   </small>
