@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { SHEET_CSV_FALLBACK_URL, SHEET_CSV_URL, STORAGE_KEYS } from '../config';
 import gracieSportsLogo from '../assets/gracie-sports-logo.svg';
 import type { IconType } from 'react-icons';
@@ -14,6 +15,7 @@ import TrajectoryPanel from '../components/TrajectoryPanel';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
 import { includeExpenseCategoryForCashFlowMode, isCapitalDistributionCategory } from '../lib/cashFlow';
+import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
 import { buildDataSet } from '../lib/data/normalize';
 import { fetchSheetCsv } from '../lib/data/fetchCsv';
 import {
@@ -36,6 +38,7 @@ import type {
   KpiComparisonTimeframe,
   MoverGrouping,
   ScenarioInput,
+  TransactionImportSummary,
   TrendPoint,
 } from '../lib/data/contract';
 
@@ -301,9 +304,15 @@ export default function Dashboard() {
   const [monthPickerDraftStart, setMonthPickerDraftStart] = useState<string>('');
   const [monthPickerDraftEnd, setMonthPickerDraftEnd] = useState<string>('');
   const monthPickerRef = useRef<HTMLDivElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const [dataSet, setDataSet] = useState<DataSet | null>(null);
+  const [importedDataSet, setImportedDataSet] = useState<DataSet | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [lastImportSummary, setLastImportSummary] = useState<TransactionImportSummary | null>(null);
+  const [storedImportedTransactionCount, setStoredImportedTransactionCount] = useState(0);
   const [accountRecords, setAccountRecords] = useState<AccountRecord[]>(getStoredAccountSettings);
   const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(DEFAULT_SCENARIO);
   const [kpiTimeframe, setKpiTimeframe] = useState<KpiComparisonTimeframe>('ttm');
@@ -331,6 +340,22 @@ export default function Dashboard() {
   useEffect(() => {
     void runSync();
   }, [runSync]);
+
+  const loadImportedState = useCallback(async () => {
+    try {
+      const snapshot = await getImportedTransactionsSnapshot();
+      setImportedDataSet(snapshot.dataSet);
+      setLastImportSummary(snapshot.lastImportSummary);
+      setStoredImportedTransactionCount(snapshot.transactionCount);
+    } catch (importStateError) {
+      const message = importStateError instanceof Error ? importStateError.message : 'Could not load imported transactions.';
+      setImportError(message);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadImportedState();
+  }, [loadImportedState]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -363,7 +388,8 @@ export default function Dashboard() {
     return () => window.removeEventListener('popstate', syncStateFromUrl);
   }, []);
 
-  const baseTxns = useMemo(() => dataSet?.txns ?? [], [dataSet?.txns]);
+  const activeDataSet = importedDataSet ?? dataSet;
+  const baseTxns = useMemo(() => activeDataSet?.txns ?? [], [activeDataSet?.txns]);
   const discoveredAccountRecords = useMemo(() => discoverAccountRecords(baseTxns), [baseTxns]);
 
   useEffect(() => {
@@ -1354,6 +1380,45 @@ export default function Dashboard() {
     }
   }
 
+  const handleImportCsvSelection = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+
+      setImportLoading(true);
+      setImportError(null);
+      try {
+        const summary = await importQuickenReportCsv(file);
+        setLastImportSummary(summary);
+        await loadImportedState();
+      } catch (importCsvError) {
+        const message = importCsvError instanceof Error ? importCsvError.message : 'Could not import CSV file.';
+        setImportError(message);
+      } finally {
+        setImportLoading(false);
+      }
+    },
+    [loadImportedState]
+  );
+
+  const handleClearImportedData = useCallback(async () => {
+    setImportLoading(true);
+    setImportError(null);
+    try {
+      await clearImportedTransactions();
+      setImportedDataSet(null);
+      setLastImportSummary(null);
+      setStoredImportedTransactionCount(0);
+      await loadImportedState();
+    } catch (clearError) {
+      const message = clearError instanceof Error ? clearError.message : 'Could not clear imported transactions.';
+      setImportError(message);
+    } finally {
+      setImportLoading(false);
+    }
+  }, [loadImportedState]);
+
   const handleAccountRecordChange = useCallback(
     <K extends keyof Pick<AccountRecord, 'accountName' | 'accountType' | 'startingBalance' | 'includeInCashForecast' | 'active'>>(
       accountId: string,
@@ -1816,8 +1881,112 @@ export default function Dashboard() {
           <div className="stack-grid">
             <article className="card settings-card">
               <div className="card-head">
-                <h3>Data Source Settings</h3>
-                <p className="subtle">Google Sheets CSV endpoint used by this dashboard</p>
+                <h3>Direct CSV Import</h3>
+                <p className="subtle">
+                  Import Quicken-style report CSVs directly into local browser storage. Imported transactions become the active analysis source when present.
+                </p>
+              </div>
+
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="sr-only"
+                onChange={(event) => void handleImportCsvSelection(event)}
+              />
+
+              <div className="settings-actions">
+                <button type="button" onClick={() => importFileInputRef.current?.click()} disabled={importLoading}>
+                  {importLoading ? 'Importing...' : 'Import Quicken CSV'}
+                </button>
+                <button
+                  type="button"
+                  className="ghost-btn"
+                  onClick={() => void handleClearImportedData()}
+                  disabled={importLoading || storedImportedTransactionCount === 0}
+                >
+                  Clear local imported data
+                </button>
+              </div>
+
+              {importError ? <p className="settings-error">{importError}</p> : null}
+
+              <div className="settings-meta">
+                <p>
+                  Active analysis source:{' '}
+                  <strong>{activeDataSet?.sourceLabel ?? activeDataSet?.sourceUrl ?? csvUrl}</strong>
+                </p>
+                <p>
+                  Imported transactions stored: <strong>{storedImportedTransactionCount.toLocaleString()}</strong>
+                </p>
+                <p>
+                  Imported data active:{' '}
+                  <strong>{importedDataSet ? 'Yes, local imported transactions are driving analysis.' : 'No, Google Sheets fallback is active.'}</strong>
+                </p>
+              </div>
+
+              {lastImportSummary ? (
+                <div className="import-summary">
+                  <div className="import-summary-grid">
+                    <div>
+                      <span className="import-summary-label">Source file</span>
+                      <strong>{lastImportSummary.sourceFileName}</strong>
+                    </div>
+                    <div>
+                      <span className="import-summary-label">Imported</span>
+                      <strong>{formatTimestamp(lastImportSummary.importedAtIso)}</strong>
+                    </div>
+                    <div>
+                      <span className="import-summary-label">New imported</span>
+                      <strong>{lastImportSummary.newImported}</strong>
+                    </div>
+                    <div>
+                      <span className="import-summary-label">Exact duplicates skipped</span>
+                      <strong>{lastImportSummary.exactDuplicatesSkipped}</strong>
+                    </div>
+                    <div>
+                      <span className="import-summary-label">Possible duplicates flagged</span>
+                      <strong>{lastImportSummary.possibleDuplicatesFlagged}</strong>
+                    </div>
+                    <div>
+                      <span className="import-summary-label">Parse failures</span>
+                      <strong>{lastImportSummary.parseFailures}</strong>
+                    </div>
+                  </div>
+
+                  {lastImportSummary.possibleDuplicateExamples.length > 0 ? (
+                    <div className="import-summary-section">
+                      <h4>Possible duplicates</h4>
+                      <ul className="import-issue-list">
+                        {lastImportSummary.possibleDuplicateExamples.map((issue) => (
+                          <li key={`dup-${issue.lineNumber}`}>
+                            <strong>Line {issue.lineNumber}.</strong> {issue.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {lastImportSummary.parseFailureExamples.length > 0 ? (
+                    <div className="import-summary-section">
+                      <h4>Parse failures</h4>
+                      <ul className="import-issue-list">
+                        {lastImportSummary.parseFailureExamples.map((issue) => (
+                          <li key={`parse-${issue.lineNumber}`}>
+                            <strong>{issue.lineNumber > 0 ? `Line ${issue.lineNumber}.` : 'Import error.'}</strong> {issue.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </article>
+
+            <article className="card settings-card">
+              <div className="card-head">
+                <h3>Google Sheets Fallback</h3>
+                <p className="subtle">Optional fallback CSV source used when no local imported transactions are present.</p>
               </div>
 
               <label className="settings-field">
@@ -1844,10 +2013,10 @@ export default function Dashboard() {
 
               <div className="settings-meta">
                 <p>
-                  Active source: <code>{dataSet?.sourceUrl ?? csvUrl}</code>
+                  Fallback source: <code>{dataSet?.sourceLabel ?? dataSet?.sourceUrl ?? csvUrl}</code>
                 </p>
                 <p>
-                  Last refresh: <strong>{formatTimestamp(dataSet?.fetchedAtIso ?? null)}</strong>
+                  Last fallback refresh: <strong>{formatTimestamp(dataSet?.fetchedAtIso ?? null)}</strong>
                 </p>
               </div>
             </article>

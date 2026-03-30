@@ -157,5 +157,7 @@ export function buildDataSet(records: CsvRecord[], sourceUrl: string): DataSet {
     txns: normalizeRecords(records),
     fetchedAtIso: new Date().toISOString(),
     sourceUrl,
+    sourceKind: 'sheet',
+    sourceLabel: sourceUrl,
   };
 }
