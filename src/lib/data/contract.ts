@@ -31,10 +31,47 @@ export type AccountRecord = {
   isUserConfigured: boolean;
 };
 
+export type DataSourceKind = 'sheet' | 'imported';
+
 export type DataSet = {
   txns: Txn[];
   fetchedAtIso: string;
   sourceUrl: string;
+  sourceKind?: DataSourceKind;
+  sourceLabel?: string;
+};
+
+export type ImportedTransactionRecord = {
+  fingerprint: string;
+  possibleDuplicateKey: string;
+  importId: string;
+  sourceFileName: string;
+  importedAtIso: string;
+  sourceLineNumber: number;
+  enteredDate?: string;
+  postedDate?: string;
+  transferAccount?: string;
+  txn: Txn;
+};
+
+export type TransactionImportIssue = {
+  kind: 'possible-duplicate' | 'parse-error';
+  lineNumber: number;
+  message: string;
+  rowPreview: string[];
+};
+
+export type TransactionImportSummary = {
+  importId: string;
+  sourceFileName: string;
+  importedAtIso: string;
+  newImported: number;
+  exactDuplicatesSkipped: number;
+  possibleDuplicatesFlagged: number;
+  parseFailures: number;
+  storedTransactionCount: number;
+  possibleDuplicateExamples: TransactionImportIssue[];
+  parseFailureExamples: TransactionImportIssue[];
 };
 
 export type TrendDirection = 'up' | 'down' | 'flat';

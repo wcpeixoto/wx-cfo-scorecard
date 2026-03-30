@@ -1851,6 +1851,12 @@ body {
   color: #274468;
 }
 
+.settings-error {
+  margin: 12px 0 0;
+  color: #b42318;
+  font-size: 0.88rem;
+}
+
 .settings-table-wrap {
   overflow-x: auto;
 }
@@ -1918,6 +1924,65 @@ body {
 .settings-badge.is-auto {
   background: #eef4fb;
   color: #5b728e;
+}
+
+.import-summary {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f7faff;
+  border: 1px solid #d9e5f8;
+}
+
+.import-summary-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.import-summary-grid div {
+  display: grid;
+  gap: 4px;
+}
+
+.import-summary-label {
+  font-size: 0.74rem;
+  color: #667c94;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.import-summary-section {
+  margin-top: 16px;
+}
+
+.import-summary-section h4 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: #274468;
+}
+
+.import-issue-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #425a78;
+  font-size: 0.86rem;
+}
+
+.import-issue-list li + li {
+  margin-top: 6px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .empty-state {
