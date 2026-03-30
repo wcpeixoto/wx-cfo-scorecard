@@ -12,6 +12,7 @@ import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import TrajectoryPanel from '../components/TrajectoryPanel';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
+import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
 import { includeExpenseCategoryForCashFlowMode, isCapitalDistributionCategory } from '../lib/cashFlow';
 import { buildDataSet } from '../lib/data/normalize';
 import { fetchSheetCsv } from '../lib/data/fetchCsv';
@@ -26,6 +27,8 @@ import {
   toMonthLabel,
 } from '../lib/kpis/compute';
 import type {
+  AccountRecord,
+  AccountType,
   CashFlowForecastStatus,
   CashFlowMode,
   DataSet,
@@ -273,6 +276,15 @@ function getStoredCsvUrl(): string {
   }
 }
 
+function getStoredAccountSettings(): AccountRecord[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    return parseStoredAccountRecords(window.localStorage.getItem(STORAGE_KEYS.accountSettings));
+  } catch {
+    return [];
+  }
+}
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabId>('big-picture');
   const [csvUrl, setCsvUrl] = useState(getStoredCsvUrl);
@@ -292,6 +304,7 @@ export default function Dashboard() {
   const [dataSet, setDataSet] = useState<DataSet | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [accountRecords, setAccountRecords] = useState<AccountRecord[]>(getStoredAccountSettings);
   const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(DEFAULT_SCENARIO);
   const [kpiTimeframe, setKpiTimeframe] = useState<KpiComparisonTimeframe>('ttm');
   const [cashFlowMode, setCashFlowMode] = useState<CashFlowMode>('total');
@@ -351,6 +364,25 @@ export default function Dashboard() {
   }, []);
 
   const baseTxns = useMemo(() => dataSet?.txns ?? [], [dataSet?.txns]);
+  const discoveredAccountRecords = useMemo(() => discoverAccountRecords(baseTxns), [baseTxns]);
+
+  useEffect(() => {
+    setAccountRecords((previous) => {
+      const merged = mergeDiscoveredAccountRecords(discoveredAccountRecords, previous);
+      const previousSerialized = JSON.stringify(previous);
+      const mergedSerialized = JSON.stringify(merged);
+      return previousSerialized === mergedSerialized ? previous : merged;
+    });
+  }, [discoveredAccountRecords]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.accountSettings, JSON.stringify(accountRecords));
+    } catch {
+      // Ignore storage failures and continue with in-memory settings.
+    }
+  }, [accountRecords]);
 
   const filteredTxns = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -1322,6 +1354,27 @@ export default function Dashboard() {
     }
   }
 
+  const handleAccountRecordChange = useCallback(
+    <K extends keyof Pick<AccountRecord, 'accountName' | 'accountType' | 'startingBalance' | 'includeInCashForecast' | 'active'>>(
+      accountId: string,
+      field: K,
+      value: AccountRecord[K]
+    ) => {
+      setAccountRecords((previous) =>
+        previous.map((record) =>
+          record.id === accountId
+            ? {
+                ...record,
+                [field]: value,
+                isUserConfigured: true,
+              }
+            : record
+        )
+      );
+    },
+    []
+  );
+
   return (
     <div className="finance-app">
       <header className="app-top-nav">
@@ -1760,43 +1813,146 @@ export default function Dashboard() {
         )}
 
         {activeTab === 'settings' && (
-          <article className="card settings-card">
-            <div className="card-head">
-              <h3>Data Source Settings</h3>
-              <p className="subtle">Google Sheets CSV endpoint used by this dashboard</p>
-            </div>
+          <div className="stack-grid">
+            <article className="card settings-card">
+              <div className="card-head">
+                <h3>Data Source Settings</h3>
+                <p className="subtle">Google Sheets CSV endpoint used by this dashboard</p>
+              </div>
 
-            <label className="settings-field">
-              CSV URL
-              <input
-                type="url"
-                value={draftCsvUrl}
-                onChange={(event) => setDraftCsvUrl(event.target.value)}
-                placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv&gid=0"
-              />
-            </label>
+              <label className="settings-field">
+                CSV URL
+                <input
+                  type="url"
+                  value={draftCsvUrl}
+                  onChange={(event) => setDraftCsvUrl(event.target.value)}
+                  placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv&gid=0"
+                />
+              </label>
 
-            <div className="settings-actions">
-              <button type="button" onClick={handleSaveCsvUrl}>
-                Save source URL
-              </button>
-              <button type="button" onClick={handleResetCsvUrl} className="ghost-btn">
-                Reset to default
-              </button>
-              <button type="button" onClick={() => void runSync()} className="ghost-btn" disabled={loading}>
-                {loading ? 'Syncing...' : 'Sync now'}
-              </button>
-            </div>
+              <div className="settings-actions">
+                <button type="button" onClick={handleSaveCsvUrl}>
+                  Save source URL
+                </button>
+                <button type="button" onClick={handleResetCsvUrl} className="ghost-btn">
+                  Reset to default
+                </button>
+                <button type="button" onClick={() => void runSync()} className="ghost-btn" disabled={loading}>
+                  {loading ? 'Syncing...' : 'Sync now'}
+                </button>
+              </div>
 
-            <div className="settings-meta">
-              <p>
-                Active source: <code>{dataSet?.sourceUrl ?? csvUrl}</code>
-              </p>
-              <p>
-                Last refresh: <strong>{formatTimestamp(dataSet?.fetchedAtIso ?? null)}</strong>
-              </p>
-            </div>
-          </article>
+              <div className="settings-meta">
+                <p>
+                  Active source: <code>{dataSet?.sourceUrl ?? csvUrl}</code>
+                </p>
+                <p>
+                  Last refresh: <strong>{formatTimestamp(dataSet?.fetchedAtIso ?? null)}</strong>
+                </p>
+              </div>
+            </article>
+
+            <article className="card settings-card">
+              <div className="card-head">
+                <h3>Account Setup</h3>
+                <p className="subtle">Auto-discovered from imported CSV data. Your edits become the source of truth for future imports.</p>
+              </div>
+
+              {accountRecords.length === 0 ? (
+                <p className="empty-state">No account names have been discovered from the current data source yet.</p>
+              ) : (
+                <div className="settings-table-wrap">
+                  <table className="account-settings-table">
+                    <thead>
+                      <tr>
+                        <th>Detected Account</th>
+                        <th>Account Name</th>
+                        <th>Type</th>
+                        <th>Starting Balance</th>
+                        <th>In Forecast</th>
+                        <th>Active</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {accountRecords.map((record) => (
+                        <tr key={record.id}>
+                          <td>
+                            <span className="account-source-name">{record.discoveredAccountName}</span>
+                          </td>
+                          <td>
+                            <input
+                              className="settings-table-input"
+                              type="text"
+                              value={record.accountName}
+                              onChange={(event) => handleAccountRecordChange(record.id, 'accountName', event.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <select
+                              className="settings-table-input"
+                              value={record.accountType}
+                              onChange={(event) =>
+                                handleAccountRecordChange(record.id, 'accountType', event.target.value as AccountType)
+                              }
+                            >
+                              <option value="Cash">Cash</option>
+                              <option value="Credit Card">Credit Card</option>
+                              <option value="Loan">Loan</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              className="settings-table-input"
+                              type="number"
+                              step="0.01"
+                              value={record.startingBalance}
+                              onChange={(event) => {
+                                const nextValue = Number.parseFloat(event.target.value);
+                                handleAccountRecordChange(
+                                  record.id,
+                                  'startingBalance',
+                                  Number.isFinite(nextValue) ? nextValue : 0
+                                );
+                              }}
+                            />
+                          </td>
+                          <td>
+                            <label className="settings-checkbox">
+                              <input
+                                type="checkbox"
+                                checked={record.includeInCashForecast}
+                                onChange={(event) =>
+                                  handleAccountRecordChange(record.id, 'includeInCashForecast', event.target.checked)
+                                }
+                              />
+                              <span>{record.includeInCashForecast ? 'Included' : 'Excluded'}</span>
+                            </label>
+                          </td>
+                          <td>
+                            <label className="settings-checkbox">
+                              <input
+                                type="checkbox"
+                                checked={record.active}
+                                onChange={(event) => handleAccountRecordChange(record.id, 'active', event.target.checked)}
+                              />
+                              <span>{record.active ? 'Active' : 'Inactive'}</span>
+                            </label>
+                          </td>
+                          <td>
+                            <span className={record.isUserConfigured ? 'settings-badge is-user' : 'settings-badge is-auto'}>
+                              {record.isUserConfigured ? 'User configured' : 'Auto-discovered'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </article>
+          </div>
         )}
       </section>
 

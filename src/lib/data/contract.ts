@@ -18,6 +18,19 @@ export type Txn = {
 
 export type CsvRecord = Record<string, string>;
 
+export type AccountType = 'Cash' | 'Credit Card' | 'Loan' | 'Other';
+
+export type AccountRecord = {
+  id: string;
+  discoveredAccountName: string;
+  accountName: string;
+  accountType: AccountType;
+  startingBalance: number;
+  includeInCashForecast: boolean;
+  active: boolean;
+  isUserConfigured: boolean;
+};
+
 export type DataSet = {
   txns: Txn[];
   fetchedAtIso: string;
