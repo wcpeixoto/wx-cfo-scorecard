@@ -170,6 +170,7 @@ export type Mover = {
   delta: number;
   deltaPercent: number | null;
   priorityScore: number;
+  sparkline?: number[] | null;
 };
 
 export type OpportunityItem = {

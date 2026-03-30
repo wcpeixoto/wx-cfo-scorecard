@@ -1125,10 +1125,46 @@ export function computePriorityScore(delta: number, deltaPercent: number | null,
 function buildMovers(
   currentMonthTxns: Txn[],
   previousMonthTxns: Txn[],
-  cashFlowMode: CashFlowMode
+  cashFlowMode: CashFlowMode,
+  allRelevantTxns: Txn[] = currentMonthTxns
 ): Mover[] {
   const currentTotals = categoryTotals(currentMonthTxns, cashFlowMode);
   const previousTotals = categoryTotals(previousMonthTxns, cashFlowMode);
+  const currentMonths = [...new Set(currentMonthTxns.map((txn) => txn.month))]
+    .filter((month) => /^\d{4}-\d{2}$/.test(month))
+    .sort(sortMonths);
+  const latestCurrentMonth = currentMonths[currentMonths.length - 1] ?? null;
+  const sparklineWindow = Math.max(6, Math.min(Math.max(currentMonths.length, 1), 12));
+  const sparklineTotalsByCategory = new Map<string, Map<string, number>>();
+
+  if (latestCurrentMonth) {
+    const sparklineMonths = Array.from({ length: sparklineWindow }, (_, index) =>
+      addMonths(latestCurrentMonth, index - (sparklineWindow - 1))
+    );
+    const sparklineMonthSet = new Set(sparklineMonths);
+
+    allRelevantTxns.forEach((txn) => {
+      if (txn.type !== 'expense') return;
+      if (!includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)) return;
+      if (!sparklineMonthSet.has(txn.month)) return;
+
+      if (!sparklineTotalsByCategory.has(txn.category)) {
+        sparklineTotalsByCategory.set(txn.category, new Map<string, number>());
+      }
+
+      const categoryMap = sparklineTotalsByCategory.get(txn.category);
+      if (!categoryMap) return;
+
+      categoryMap.set(txn.month, (categoryMap.get(txn.month) ?? 0) + txn.amount);
+    });
+
+    sparklineTotalsByCategory.forEach((monthMap, category) => {
+      sparklineTotalsByCategory.set(
+        category,
+        new Map(sparklineMonths.map((month) => [month, round2(monthMap.get(month) ?? 0)]))
+      );
+    });
+  }
 
   const categories = new Set<string>([...currentTotals.keys(), ...previousTotals.keys()]);
   const movers: Mover[] = [];
@@ -1146,6 +1182,12 @@ function buildMovers(
       delta,
       deltaPercent,
       priorityScore: computePriorityScore(delta, deltaPercent, previous, current),
+      sparkline: (() => {
+        const sparklineMap = sparklineTotalsByCategory.get(category);
+        if (!sparklineMap) return null;
+        const series = [...sparklineMap.values()];
+        return series.length >= 3 ? series : null;
+      })(),
     });
   });
 
@@ -1247,10 +1289,11 @@ function buildSummary(latest: MonthlyRollup, previous: MonthlyRollup | null, opp
 export function computeDigHereInsights(
   currentTxns: Txn[],
   previousTxns: Txn[],
-  cashFlowMode: CashFlowMode
+  cashFlowMode: CashFlowMode,
+  allRelevantTxns: Txn[] = currentTxns
 ): Pick<DashboardModel, 'movers' | 'topPayees'> {
   return {
-    movers: buildMovers(currentTxns, previousTxns, cashFlowMode),
+    movers: buildMovers(currentTxns, previousTxns, cashFlowMode, allRelevantTxns),
     topPayees: buildTopPayees(currentTxns, cashFlowMode),
   };
 }

@@ -473,8 +473,8 @@ export default function Dashboard() {
   }, [activeDigHereEndMonth, activeDigHereMonth, activeDigHereStartMonth, filteredTxns]);
 
   const digHereInsights = useMemo(
-    () => computeDigHereInsights(digHereCurrentTxns, digHerePreviousTxns, cashFlowMode),
-    [cashFlowMode, digHereCurrentTxns, digHerePreviousTxns]
+    () => computeDigHereInsights(digHereCurrentTxns, digHerePreviousTxns, cashFlowMode, filteredTxns),
+    [cashFlowMode, digHereCurrentTxns, digHerePreviousTxns, filteredTxns]
   );
 
   useEffect(() => {
