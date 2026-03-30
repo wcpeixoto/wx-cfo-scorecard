@@ -5,6 +5,8 @@ type MoversListProps = {
   title?: string;
 };
 
+const EPSILON = 0.00001;
+
 function formatCurrency(value: number): string {
   return value.toLocaleString(undefined, {
     style: 'currency',
@@ -31,21 +33,30 @@ export default function MoversList({ movers, title = 'Dig Here Movers' }: Movers
         <p className="empty-state">Not enough history yet to compute movers.</p>
       ) : (
         <ul className="movers-list">
-          {movers.map((mover) => (
-            <li key={mover.category}>
-              <div>
-                <p>{mover.category}</p>
-                <small>
-                  Prev {formatCurrency(mover.previous)} {'->'} Now {formatCurrency(mover.current)}
-                </small>
-              </div>
-              <div className={`mover-delta ${mover.delta > 0 ? 'is-up' : mover.delta < 0 ? 'is-down' : 'is-flat'}`}>
-                <span>{mover.delta > 0 ? '▲' : mover.delta < 0 ? '▼' : '●'}</span>
-                <strong>{formatCurrency(mover.delta)}</strong>
-                <small>{formatPercent(mover.deltaPercent)}</small>
-              </div>
-            </li>
-          ))}
+          {movers.map((mover) => {
+            const isNew = Math.abs(mover.previous) <= EPSILON && Math.abs(mover.current) > EPSILON;
+
+            return (
+              <li key={mover.category}>
+                <div>
+                  <p>
+                    <span>{mover.category}</span>
+                    {isNew ? <span className="novelty-badge">New</span> : null}
+                  </p>
+                  <small>
+                    Prev {formatCurrency(mover.previous)} {'->'} Now {formatCurrency(mover.current)}
+                  </small>
+                </div>
+                <div
+                  className={`mover-delta ${mover.delta > 0 ? 'is-up' : mover.delta < 0 ? 'is-down' : 'is-flat'}`}
+                >
+                  <span>{mover.delta > 0 ? '▲' : mover.delta < 0 ? '▼' : '●'}</span>
+                  <strong>{formatCurrency(mover.delta)}</strong>
+                  <small>{formatPercent(mover.deltaPercent)}</small>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </article>
