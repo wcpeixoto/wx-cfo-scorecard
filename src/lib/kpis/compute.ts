@@ -1425,7 +1425,7 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
   };
 }
 
-export function projectScenario(model: DashboardModel, input: ScenarioInput): ScenarioPoint[] {
+export function projectScenario(model: DashboardModel, input: ScenarioInput, startingCashBalance = 0): ScenarioPoint[] {
   if (!model.latestMonth || model.monthlyRollups.length === 0) {
     return [];
   }
@@ -1442,7 +1442,7 @@ export function projectScenario(model: DashboardModel, input: ScenarioInput): Sc
   const expenseFactor = 1 - input.expenseReductionPct / 100;
 
   const projections: ScenarioPoint[] = [];
-  let cumulativeNet = 0;
+  let cumulativeNet = Number.isFinite(startingCashBalance) ? round2(startingCashBalance) : 0;
 
   for (let index = 1; index <= input.months; index += 1) {
     const month = addMonths(model.latestMonth, index);
