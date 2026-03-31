@@ -296,6 +296,22 @@ function parseQuickenReportCsv(text: string, sourceFileName: string, importId: s
     candidates.push({ record, rowPreview: row });
   }
 
+  // Disambiguate rows that share identical fingerprints.
+  // Quicken legitimately produces duplicate-looking rows when separate
+  // transactions share the same date, payee, category, amount, and memo.
+  // Append a sequence counter so each row gets a unique fingerprint.
+  const fingerprintCounts = new Map<string, number>();
+  candidates.forEach(({ record }) => {
+    const baseFp = record.fingerprint;
+    const count = (fingerprintCounts.get(baseFp) ?? 0) + 1;
+    fingerprintCounts.set(baseFp, count);
+    if (count > 1) {
+      const uniqueFp = `${baseFp}|#${count}`;
+      record.fingerprint = uniqueFp;
+      record.txn = { ...record.txn, id: uniqueFp };
+    }
+  });
+
   return { candidates, parseErrors };
 }
 
