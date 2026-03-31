@@ -1737,6 +1737,14 @@ export default function Dashboard() {
                     <li key={bullet}>{bullet}</li>
                   ))}
                 </ul>
+
+                {model.uncategorizedWarning ? (
+                  <p className="subtle">
+                    {model.uncategorizedWarning.count} uncategorized row{model.uncategorizedWarning.count === 1 ? '' : 's'} excluded
+                    {' · '}
+                    {formatCurrency(model.uncategorizedWarning.absoluteAmount)} omitted. Fix categories in source data.
+                  </p>
+                ) : null}
               </article>
 
               <article className="card summary-card">

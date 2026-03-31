@@ -490,17 +490,19 @@ export function computeMonthlyRollups(txns: Txn[], cashFlowMode: CashFlowMode = 
     const rollup = monthMap.get(txn.month);
     if (!rollup) return;
 
-    if (isTransferTxn(txn)) {
-      rollup.transactionCount += 1;
-      return;
+    if (shouldExcludeFromBigPicture(txn)) return;
+
+    const revenue = revenueContribution(txn);
+    const expense = expenseContribution(txn, cashFlowMode);
+
+    if (Math.abs(revenue) > EPSILON) {
+      rollup.revenue += revenue;
     }
 
-    if (txn.type === 'income') {
-      rollup.revenue += txn.amount;
-    } else {
-      rollup.expenses += txn.amount;
-      if (isCapitalDistributionCategory(txn.category)) {
-        rollup.capitalDistribution += txn.amount;
+    if (Math.abs(expense) > EPSILON) {
+      rollup.expenses += expense;
+      if (txn.rawAmount < 0 && isCapitalDistributionCategory(txn.category)) {
+        rollup.capitalDistribution += expense;
       }
     }
 
@@ -1072,10 +1074,10 @@ function buildKpis(current: KpiAggregate, previous: KpiAggregate): KpiCard[] {
 function categoryTotals(txns: Txn[], cashFlowMode: CashFlowMode): Map<string, number> {
   const totals = new Map<string, number>();
   txns.forEach((txn) => {
-    if (txn.type !== 'expense') return;
-    if (!includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)) return;
+    const contribution = expenseContribution(txn, cashFlowMode);
+    if (Math.abs(contribution) <= EPSILON) return;
     const current = totals.get(txn.category) ?? 0;
-    totals.set(txn.category, current + txn.amount);
+    totals.set(txn.category, current + contribution);
   });
   return totals;
 }
@@ -1095,8 +1097,64 @@ function isTransferCategory(category: string): boolean {
   return parentCategoryName(category).toLowerCase() === 'transfer';
 }
 
+function isLoanCategory(category: string): boolean {
+  return parentCategoryName(category).toLowerCase() === 'loan';
+}
+
+function isBusinessIncomeCategory(category: string): boolean {
+  return parentCategoryName(category).toLowerCase() === 'business income';
+}
+
+function isUncategorizedCategory(category: string): boolean {
+  const normalized = category.trim().toLowerCase();
+  return normalized.length === 0 || normalized === 'uncategorized';
+}
+
+function isRefundCategory(category: string): boolean {
+  const normalized = category.trim().toLowerCase();
+  return normalized.startsWith('refund') || normalized.includes('allowance');
+}
+
+function accountLooksLikeLoan(account?: string): boolean {
+  return /\bloan\b/i.test(account ?? '');
+}
+
 function isTransferTxn(txn: Txn): boolean {
-  return Boolean(txn.transferAccount?.trim());
+  return Boolean(txn.transferAccount?.trim()) || isTransferCategory(txn.category);
+}
+
+function isFinancingTxn(txn: Txn): boolean {
+  return isLoanCategory(txn.category) || accountLooksLikeLoan(txn.account);
+}
+
+function shouldExcludeFromBigPicture(txn: Txn): boolean {
+  return isTransferTxn(txn) || isFinancingTxn(txn) || isUncategorizedCategory(txn.category);
+}
+
+function revenueContribution(txn: Txn): number {
+  if (shouldExcludeFromBigPicture(txn)) return 0;
+  if (!isBusinessIncomeCategory(txn.category)) return 0;
+  if (isRefundCategory(txn.category)) return 0;
+  return txn.rawAmount > 0 ? txn.amount : 0;
+}
+
+function expenseContribution(txn: Txn, cashFlowMode: CashFlowMode): number {
+  if (shouldExcludeFromBigPicture(txn)) return 0;
+  if (!includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)) return 0;
+  if (isBusinessIncomeCategory(txn.category)) return 0;
+  if (txn.rawAmount < 0) return txn.amount;
+  if (txn.rawAmount > 0) return -txn.amount;
+  return 0;
+}
+
+function buildUncategorizedWarning(txns: Txn[]): DashboardModel['uncategorizedWarning'] {
+  const excluded = txns.filter((txn) => isUncategorizedCategory(txn.category));
+  if (excluded.length === 0) return null;
+  const absoluteAmount = round2(excluded.reduce((sum, txn) => sum + Math.abs(txn.rawAmount), 0));
+  return {
+    count: excluded.length,
+    absoluteAmount,
+  };
 }
 
 function includeExpenseCategoryForDigHere(category: string, cashFlowMode: CashFlowMode): boolean {
@@ -1140,8 +1198,8 @@ function buildTopPayees(latestMonthTxns: Txn[], cashFlowMode: CashFlowMode): Pay
   const map = new Map<string, PayeeTotal>();
 
   latestMonthTxns.forEach((txn) => {
-    if (txn.type !== 'expense') return;
-    if (!includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)) return;
+    const contribution = expenseContribution(txn, cashFlowMode);
+    if (Math.abs(contribution) <= EPSILON) return;
     const payee = txn.payee?.trim() || 'Unknown';
 
     if (!map.has(payee)) {
@@ -1151,7 +1209,7 @@ function buildTopPayees(latestMonthTxns: Txn[], cashFlowMode: CashFlowMode): Pay
     const current = map.get(payee);
     if (!current) return;
 
-    current.amount += txn.amount;
+    current.amount += contribution;
     current.transactionCount += 1;
   });
 
@@ -1255,10 +1313,9 @@ function baselineForCategory(monthlyRollups: MonthlyRollup[], txns: Txn[], categ
   let total = 0;
 
   txns.forEach((txn) => {
-    if (txn.type !== 'expense') return;
     if (txn.category !== category) return;
     if (!monthSet.has(txn.month)) return;
-    total += txn.amount;
+    total += expenseContribution(txn, 'operating');
   });
 
   return total / recentMonths.length;
@@ -1292,9 +1349,9 @@ function buildOpportunities(
   if (candidates.length === 0) {
     const fallbackSavings = round2((latestMonthTxns
       .filter(
-        (txn) => txn.type === 'expense' && includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)
+        (txn) => Math.abs(expenseContribution(txn, cashFlowMode)) > EPSILON
       )
-      .reduce((sum, txn) => sum + txn.amount, 0) * 0.03) || 0);
+      .reduce((sum, txn) => sum + expenseContribution(txn, cashFlowMode), 0) * 0.03) || 0);
 
     return [
       {
@@ -1383,6 +1440,7 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
       opportunityTotal: 0,
       opportunities: [],
       summaryBullets: [],
+      uncategorizedWarning: null,
       digHerePreview: [],
     };
   }
@@ -1399,6 +1457,7 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
 
   const opportunities = buildOpportunities(latestMonthTxns, monthlyRollups, txns, cashFlowMode);
   const opportunityTotal = round2(opportunities.reduce((sum, item) => sum + item.savings, 0));
+  const uncategorizedWarning = buildUncategorizedWarning(txns);
   // Precompute up to 36 projected months so UI horizon controls can expand
   // from 30-day equivalents through 3 years without recalculating the model.
   const cashFlowForecast = buildCashFlowForecastSeries(monthlyRollups, 36);
@@ -1430,6 +1489,7 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
     opportunityTotal,
     opportunities,
     summaryBullets: buildSummary(latest, previous, opportunities, txns.length),
+    uncategorizedWarning,
     digHerePreview: opportunities.slice(0, 4),
   };
 }

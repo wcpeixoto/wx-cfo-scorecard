@@ -233,6 +233,11 @@ export type OpportunityItem = {
   hint: string;
 };
 
+export type ExclusionWarning = {
+  count: number;
+  absoluteAmount: number;
+};
+
 export type DashboardModel = {
   latestMonth: string;
   previousMonth: string | null;
@@ -254,6 +259,7 @@ export type DashboardModel = {
   opportunityTotal: number;
   opportunities: OpportunityItem[];
   summaryBullets: string[];
+  uncategorizedWarning: ExclusionWarning | null;
   digHerePreview: OpportunityItem[];
 };
 
