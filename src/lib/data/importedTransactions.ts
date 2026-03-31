@@ -335,9 +335,11 @@ export async function importQuickenReportCsv(file: File): Promise<TransactionImp
         possibleDuplicateIssues.push({
           kind: 'possible-duplicate',
           lineNumber: record.sourceLineNumber,
-          message: 'Possible duplicate detected with matching date, account, payee, and amount. Not imported automatically.',
+          message: 'Possible duplicate detected with matching date, account, payee, and amount. Imported and flagged for review.',
           rowPreview,
         });
+        acceptedRecords.push({ ...record, possibleDuplicate: true });
+        seenFingerprints.add(record.fingerprint);
         return;
       }
 

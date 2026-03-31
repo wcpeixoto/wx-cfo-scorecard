@@ -51,6 +51,7 @@ export type ImportedTransactionRecord = {
   enteredDate?: string;
   postedDate?: string;
   transferAccount?: string;
+  possibleDuplicate?: boolean;
   txn: Txn;
 };
 
