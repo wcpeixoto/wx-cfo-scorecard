@@ -320,6 +320,7 @@ export default function Dashboard() {
   const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
+  const preserveAccountSettingsOnImportClearRef = useRef(false);
 
   const runSync = useCallback(async () => {
     setLoading(true);
@@ -404,6 +405,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     setAccountRecords((previous) => {
+      if (preserveAccountSettingsOnImportClearRef.current) {
+        preserveAccountSettingsOnImportClearRef.current = false;
+        return previous;
+      }
+
       const merged = mergeDiscoveredAccountRecords(discoveredAccountRecords, previous);
       const previousSerialized = JSON.stringify(previous);
       const mergedSerialized = JSON.stringify(merged);
@@ -1415,19 +1421,24 @@ export default function Dashboard() {
   const handleClearImportedData = useCallback(async () => {
     setImportLoading(true);
     setImportError(null);
+    preserveAccountSettingsOnImportClearRef.current = true;
+
     try {
+      const preservedAccountRecords = accountRecords;
       await clearImportedTransactions();
       setImportedDataSet(null);
       setLastImportSummary(null);
       setStoredImportedTransactionCount(0);
       await loadImportedState();
+      setAccountRecords(preservedAccountRecords);
     } catch (clearError) {
+      preserveAccountSettingsOnImportClearRef.current = false;
       const message = clearError instanceof Error ? clearError.message : 'Could not clear imported transactions.';
       setImportError(message);
     } finally {
       setImportLoading(false);
     }
-  }, [loadImportedState]);
+  }, [accountRecords, loadImportedState]);
 
   const handleAccountRecordChange = useCallback(
     <K extends keyof Pick<AccountRecord, 'accountName' | 'accountType' | 'startingBalance' | 'includeInCashForecast' | 'active'>>(
