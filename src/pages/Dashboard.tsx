@@ -422,6 +422,7 @@ export default function Dashboard() {
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const preserveAccountSettingsOnImportClearRef = useRef(false);
 
   const runSync = useCallback(async () => {
     setLoading(true);
@@ -506,6 +507,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     setAccountRecords((previous) => {
+      if (preserveAccountSettingsOnImportClearRef.current) {
+        preserveAccountSettingsOnImportClearRef.current = false;
+        return previous;
+      }
+
       const merged = mergeDiscoveredAccountRecords(discoveredAccountRecords, previous);
       const previousSerialized = JSON.stringify(previous);
       const mergedSerialized = JSON.stringify(merged);
@@ -1649,19 +1655,24 @@ export default function Dashboard() {
   const handleClearImportedData = useCallback(async () => {
     setImportLoading(true);
     setImportError(null);
+    preserveAccountSettingsOnImportClearRef.current = true;
+
     try {
+      const preservedAccountRecords = accountRecords;
       await clearImportedTransactions();
       setImportedDataSet(null);
       setLastImportSummary(null);
       setStoredImportedTransactionCount(0);
       await loadImportedState();
+      setAccountRecords(preservedAccountRecords);
     } catch (clearError) {
+      preserveAccountSettingsOnImportClearRef.current = false;
       const message = clearError instanceof Error ? clearError.message : 'Could not clear imported transactions.';
       setImportError(message);
     } finally {
       setImportLoading(false);
     }
-  }, [loadImportedState]);
+  }, [accountRecords, loadImportedState]);
 
   const handleAccountRecordChange = useCallback(
     <K extends keyof Pick<AccountRecord, 'accountName' | 'accountType' | 'startingBalance' | 'includeInCashForecast' | 'active'>>(
@@ -1996,6 +2007,14 @@ export default function Dashboard() {
                     <li key={bullet}>{bullet}</li>
                   ))}
                 </ul>
+
+                {model.uncategorizedWarning ? (
+                  <p className="subtle">
+                    {model.uncategorizedWarning.count} uncategorized row{model.uncategorizedWarning.count === 1 ? '' : 's'} excluded
+                    {' · '}
+                    {formatCurrency(model.uncategorizedWarning.absoluteAmount)} omitted. Fix categories in source data.
+                  </p>
+                ) : null}
               </article>
 
               <article className="card summary-card">

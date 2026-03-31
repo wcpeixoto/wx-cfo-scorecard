@@ -276,6 +276,7 @@ function parseQuickenReportCsv(text: string, sourceFileName: string, importId: s
       payee: payee || undefined,
       memo: memo || undefined,
       account: accountName,
+      transferAccount: transferAccount || undefined,
       tags: tags.length > 0 ? tags : undefined,
       rawAmount,
     };

@@ -69,6 +69,7 @@ function toTransaction(record: CsvRecord): Txn | null {
   const account = pickValue(lookup, ['Account', 'Account Name']);
   const payee = pickValue(lookup, ['Payee', 'Description', 'Merchant']);
   const category = pickValue(lookup, ['Category', 'Categories']) || 'Uncategorized';
+  const transferAccount = pickValue(lookup, ['Transfer', 'Transfer Account']);
   const memo = pickValue(lookup, ['Memo/Notes', 'Memo / Notes', 'Memo', 'Notes']);
   const tags = parseTags(pickValue(lookup, ['Tags', 'Tag']));
   const balanceValue = pickValue(lookup, ['Balance', 'Running Balance', 'Current Balance', 'Account Balance']);
@@ -88,6 +89,7 @@ function toTransaction(record: CsvRecord): Txn | null {
     payee: payee || undefined,
     memo: memo || undefined,
     account: account || undefined,
+    transferAccount: transferAccount || undefined,
     tags: tags.length > 0 ? tags : undefined,
     rawAmount,
     balance: parsedBalance ?? undefined,
