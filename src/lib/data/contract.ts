@@ -119,7 +119,8 @@ export type KpiComparisonTimeframe =
   | 'ytd'
   | 'ttm'
   | 'last24Months'
-  | 'last36Months';
+  | 'last36Months'
+  | 'allDates';
 
 export type KpiMetricComparison = {
   current: number;
