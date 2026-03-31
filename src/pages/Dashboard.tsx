@@ -392,6 +392,16 @@ export default function Dashboard() {
   const baseTxns = useMemo(() => activeDataSet?.txns ?? [], [activeDataSet?.txns]);
   const discoveredAccountRecords = useMemo(() => discoverAccountRecords(baseTxns), [baseTxns]);
 
+  const accountBalanceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const txn of baseTxns) {
+      const key = (txn.account ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!key) continue;
+      map.set(key, (map.get(key) ?? 0) + txn.rawAmount);
+    }
+    return map;
+  }, [baseTxns]);
+
   useEffect(() => {
     setAccountRecords((previous) => {
       const merged = mergeDiscoveredAccountRecords(discoveredAccountRecords, previous);
@@ -1945,7 +1955,7 @@ export default function Dashboard() {
                       <strong>{lastImportSummary.exactDuplicatesSkipped}</strong>
                     </div>
                     <div>
-                      <span className="import-summary-label">Possible duplicates flagged</span>
+                      <span className="import-summary-label">Possible duplicates imported</span>
                       <strong>{lastImportSummary.possibleDuplicatesFlagged}</strong>
                     </div>
                     <div>
@@ -2038,6 +2048,7 @@ export default function Dashboard() {
                         <th>Account Name</th>
                         <th>Type</th>
                         <th>Starting Balance</th>
+                        <th>Current Balance</th>
                         <th>In Forecast</th>
                         <th>Active</th>
                         <th>Status</th>
@@ -2086,6 +2097,14 @@ export default function Dashboard() {
                                 );
                               }}
                             />
+                          </td>
+                          <td>
+                            <span className="account-balance-computed">
+                              {formatCurrency(
+                                record.startingBalance +
+                                  (accountBalanceMap.get(record.id) ?? 0)
+                              )}
+                            </span>
                           </td>
                           <td>
                             <label className="settings-checkbox">
