@@ -11,6 +11,7 @@ export type Txn = {
   payee?: string;
   memo?: string;
   account?: string;
+  transferAccount?: string;
   tags?: string[];
   rawAmount: number;
   balance?: number;

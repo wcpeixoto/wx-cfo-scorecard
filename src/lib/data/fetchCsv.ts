@@ -15,6 +15,21 @@ type PositionalColumnMap = {
   tags: number;
 };
 
+function inferTransferAccount(category: string, payee: string): string {
+  const trimmed = category.trim();
+  const separatorIndex = trimmed.indexOf(':');
+  if (separatorIndex === -1) {
+    if (trimmed.toLowerCase() !== 'transfer') return '';
+    if (/\bfee\b/i.test(payee)) return '';
+    return payee.trim();
+  }
+
+  const parent = trimmed.slice(0, separatorIndex).trim().toLowerCase();
+  if (parent !== 'transfer') return '';
+
+  return trimmed.slice(separatorIndex + 1).trim();
+}
+
 function normalizeHeader(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
@@ -89,13 +104,16 @@ function rowsToRecordsFromPositionalMap(rows: string[][]): CsvRecord[] {
     const date = (row[map.date] ?? '').trim();
     const amount = (row[map.amount] ?? '').trim();
     if (!looksLikeDate(date) || !looksLikeAmount(amount)) return;
+    const payee = (row[map.payee] ?? '').trim();
+    const category = (row[map.category] ?? '').trim();
 
     const record: CsvRecord = {
       Date: date,
       Amount: amount,
       Account: (row[map.account] ?? '').trim(),
-      Payee: (row[map.payee] ?? '').trim(),
-      Category: (row[map.category] ?? '').trim(),
+      Payee: payee,
+      Category: category,
+      Transfer: inferTransferAccount(category, payee),
       'Memo/Notes': (row[map.memo] ?? '').trim(),
       Tags: (row[map.tags] ?? '').trim(),
     };

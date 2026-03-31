@@ -490,6 +490,11 @@ export function computeMonthlyRollups(txns: Txn[], cashFlowMode: CashFlowMode = 
     const rollup = monthMap.get(txn.month);
     if (!rollup) return;
 
+    if (isTransferTxn(txn)) {
+      rollup.transactionCount += 1;
+      return;
+    }
+
     if (txn.type === 'income') {
       rollup.revenue += txn.amount;
     } else {
@@ -1086,14 +1091,18 @@ function moverCategoryName(category: string, grouping: MoverGrouping): string {
   return grouping === 'categories' ? parentCategoryName(category) : category;
 }
 
-function isTransferCategoryForDigHere(category: string): boolean {
+function isTransferCategory(category: string): boolean {
   return parentCategoryName(category).toLowerCase() === 'transfer';
+}
+
+function isTransferTxn(txn: Txn): boolean {
+  return Boolean(txn.transferAccount?.trim());
 }
 
 function includeExpenseCategoryForDigHere(category: string, cashFlowMode: CashFlowMode): boolean {
   if (!includeExpenseCategoryForCashFlowMode(category, cashFlowMode)) return false;
   if (isCapitalDistributionCategory(category)) return false;
-  if (isTransferCategoryForDigHere(category)) return false;
+  if (isTransferCategory(category)) return false;
   return true;
 }
 
