@@ -35,7 +35,9 @@ import type {
   CashFlowMode,
   DataSet,
   KpiCard,
+  KpiMetricComparison,
   KpiComparisonTimeframe,
+  KpiTimeframeComparison,
   MoverGrouping,
   ScenarioInput,
   TransactionImportSummary,
@@ -56,9 +58,16 @@ type NavItem = {
   icon: IconType;
 };
 
-type KpiFrameOption = { value: KpiComparisonTimeframe; label: string };
+type BigPictureFrameValue = KpiComparisonTimeframe | 'custom';
+type KpiFrameOption = { value: BigPictureFrameValue; label: string };
 type DigHerePeriodValue = KpiComparisonTimeframe | 'custom';
 type DigHerePeriodOption = { value: DigHerePeriodValue; label: string };
+type BigPictureKpiComparison = KpiTimeframeComparison & {
+  currentStartDate: string | null;
+  currentEndDate: string | null;
+  previousStartDate: string | null;
+  previousEndDate: string | null;
+};
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'big-picture', label: 'Big Picture', icon: FiGrid },
@@ -74,16 +83,23 @@ const DEFAULT_SCENARIO: ScenarioInput = {
   expenseReductionPct: 0,
   months: 12,
 };
-const KPI_FRAME_OPTIONS: KpiFrameOption[] = [
+const BIG_PICTURE_FRAME_OPTIONS: KpiFrameOption[] = [
+  { value: 'thisMonth', label: 'Month' },
+  { value: 'lastMonth', label: 'Last Month' },
+  { value: 'last3Months', label: '3M' },
+  { value: 'ytd', label: 'YTD' },
+  { value: 'ttm', label: '12M' },
+  { value: 'last24Months', label: '24M' },
+  { value: 'last36Months', label: '36M' },
+  { value: 'custom', label: 'Custom' },
+];
+const DIG_HERE_PERIOD_OPTIONS: DigHerePeriodOption[] = [
   { value: 'thisMonth', label: 'Month' },
   { value: 'last3Months', label: '3M' },
   { value: 'ytd', label: 'YTD' },
   { value: 'ttm', label: '12M' },
   { value: 'last24Months', label: '24M' },
   { value: 'last36Months', label: '36M' },
-];
-const DIG_HERE_PERIOD_OPTIONS: DigHerePeriodOption[] = [
-  ...KPI_FRAME_OPTIONS,
   { value: 'custom', label: 'Custom' },
 ];
 const EPSILON = 0.00001;
@@ -140,6 +156,11 @@ function parseMonthToken(value: string | null): string | null {
   return /^\d{4}-\d{2}$/.test(value) ? value : null;
 }
 
+function parseDateToken(value: string | null): string | null {
+  if (!value) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
 function previousMonthToken(month: string): string | null {
   const match = month.match(/^(\d{4})-(\d{2})$/);
   if (!match) return null;
@@ -168,6 +189,53 @@ function addMonthsToToken(month: string, offset: number): string | null {
   const nextYear = date.getUTCFullYear();
   const nextMonth = String(date.getUTCMonth() + 1).padStart(2, '0');
   return `${nextYear}-${nextMonth}`;
+}
+
+function addDaysToToken(date: string, offset: number): string | null {
+  const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number.parseInt(match[1], 10);
+  const monthNumber = Number.parseInt(match[2], 10);
+  const day = Number.parseInt(match[3], 10);
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(monthNumber) ||
+    !Number.isFinite(day) ||
+    monthNumber < 1 ||
+    monthNumber > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return null;
+  }
+
+  const next = new Date(Date.UTC(year, monthNumber - 1, day + offset));
+  const nextYear = next.getUTCFullYear();
+  const nextMonth = String(next.getUTCMonth() + 1).padStart(2, '0');
+  const nextDay = String(next.getUTCDate()).padStart(2, '0');
+  return `${nextYear}-${nextMonth}-${nextDay}`;
+}
+
+function inclusiveDaySpan(startDate: string, endDate: string): number {
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+  return Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+}
+
+function previousEquivalentDateRange(
+  startDate: string | null,
+  endDate: string | null
+): { startDate: string; endDate: string } | null {
+  if (!startDate || !endDate) return null;
+  const span = inclusiveDaySpan(startDate, endDate);
+  if (span <= 0) return null;
+
+  const previousEndDate = addDaysToToken(startDate, -1);
+  const previousStartDate = addDaysToToken(startDate, -span);
+  if (!previousStartDate || !previousEndDate) return null;
+
+  return { startDate: previousStartDate, endDate: previousEndDate };
 }
 
 function inclusiveMonthSpan(startMonth: string, endMonth: string): number {
@@ -260,6 +328,38 @@ function formatTimestamp(iso: string | null): string {
   return date.toLocaleString();
 }
 
+function formatDateLabel(date: string): string {
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return parsed.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function formatDateRangeLabel(startDate: string | null, endDate: string | null): string {
+  if (!startDate || !endDate) return 'Custom range';
+  if (startDate === endDate) return formatDateLabel(startDate);
+  return `${formatDateLabel(startDate)} – ${formatDateLabel(endDate)}`;
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function compareMetric(current: number, previous: number): KpiMetricComparison {
+  const roundedCurrent = round2(current);
+  const roundedPrevious = round2(previous);
+  return {
+    current: roundedCurrent,
+    previous: roundedPrevious,
+    delta: round2(roundedCurrent - roundedPrevious),
+    percentChange: Math.abs(roundedPrevious) <= EPSILON ? null : ((roundedCurrent - roundedPrevious) / Math.abs(roundedPrevious)) * 100,
+  };
+}
+
 function inMonthRange(month: string, startMonth: string | null, endMonth: string | null): boolean {
   if (!startMonth || !endMonth) return false;
   return month >= startMonth && month <= endMonth;
@@ -315,11 +415,13 @@ export default function Dashboard() {
   const [storedImportedTransactionCount, setStoredImportedTransactionCount] = useState(0);
   const [accountRecords, setAccountRecords] = useState<AccountRecord[]>(getStoredAccountSettings);
   const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(DEFAULT_SCENARIO);
-  const [kpiTimeframe, setKpiTimeframe] = useState<KpiComparisonTimeframe>('ttm');
+  const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('thisMonth');
   const [cashFlowMode, setCashFlowMode] = useState<CashFlowMode>('total');
   const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   const runSync = useCallback(async () => {
     setLoading(true);
@@ -440,6 +542,32 @@ export default function Dashboard() {
         .sort((a, b) => b.localeCompare(a)),
     [baseTxns]
   );
+  const availableDates = useMemo(
+    () =>
+      [...new Set(baseTxns.map((txn) => txn.date))]
+        .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+        .sort((a, b) => a.localeCompare(b)),
+    [baseTxns]
+  );
+  const earliestAvailableDate = availableDates[0] ?? '';
+  const latestAvailableDate = availableDates[availableDates.length - 1] ?? '';
+  const latestMonthDateRange = useMemo(() => {
+    const latestMonth = availableMonths[0];
+    if (!latestMonth) return null;
+    const monthDates = availableDates.filter((date) => date.startsWith(`${latestMonth}-`));
+    if (monthDates.length === 0) return null;
+    return {
+      startDate: monthDates[0],
+      endDate: monthDates[monthDates.length - 1],
+    };
+  }, [availableDates, availableMonths]);
+
+  useEffect(() => {
+    if (customStartDate && customEndDate) return;
+    if (!latestMonthDateRange) return;
+    setCustomStartDate((current) => current || latestMonthDateRange.startDate);
+    setCustomEndDate((current) => current || latestMonthDateRange.endDate);
+  }, [customEndDate, customStartDate, latestMonthDateRange]);
   const currentCashBalance = useMemo(() => {
     for (let index = baseTxns.length - 1; index >= 0; index -= 1) {
       const candidate = baseTxns[index].balance;
@@ -464,9 +592,110 @@ export default function Dashboard() {
     [filteredTxns]
   );
 
-  const selectedKpiComparison = model.kpiComparisonByTimeframe[kpiTimeframe];
-  const selectedHeaderComparisonLabel = model.kpiHeaderLabelByTimeframe[kpiTimeframe] ?? 'Comparison unavailable';
-  const selectedKpiFrameLabel = KPI_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? '12M';
+  const customPreviousDateRange = useMemo(
+    () => previousEquivalentDateRange(parseDateToken(customStartDate), parseDateToken(customEndDate)),
+    [customEndDate, customStartDate]
+  );
+  const customCurrentTxns = useMemo(() => {
+    if (kpiTimeframe !== 'custom') return [];
+    const startDate = parseDateToken(customStartDate);
+    const endDate = parseDateToken(customEndDate);
+    if (!startDate || !endDate || startDate > endDate) return [];
+    return filteredTxns.filter((txn) => txn.date >= startDate && txn.date <= endDate);
+  }, [customEndDate, customStartDate, filteredTxns, kpiTimeframe]);
+  const customPreviousTxns = useMemo(() => {
+    if (kpiTimeframe !== 'custom' || !customPreviousDateRange) return [];
+    return filteredTxns.filter(
+      (txn) => txn.date >= customPreviousDateRange.startDate && txn.date <= customPreviousDateRange.endDate
+    );
+  }, [customPreviousDateRange, filteredTxns, kpiTimeframe]);
+  const customCurrentModel = useMemo(
+    () => (kpiTimeframe === 'custom' ? computeDashboardModel(customCurrentTxns, { cashFlowMode }) : null),
+    [cashFlowMode, customCurrentTxns, kpiTimeframe]
+  );
+  const customPreviousModel = useMemo(
+    () => (kpiTimeframe === 'custom' ? computeDashboardModel(customPreviousTxns, { cashFlowMode }) : null),
+    [cashFlowMode, customPreviousTxns, kpiTimeframe]
+  );
+  const selectedKpiComparison = useMemo<BigPictureKpiComparison | null>(() => {
+    if (kpiTimeframe !== 'custom') {
+      const comparison = model.kpiComparisonByTimeframe[kpiTimeframe];
+      return comparison
+        ? {
+            ...comparison,
+            currentStartDate: null,
+            currentEndDate: null,
+            previousStartDate: null,
+            previousEndDate: null,
+          }
+        : null;
+    }
+
+    const startDate = parseDateToken(customStartDate);
+    const endDate = parseDateToken(customEndDate);
+    if (!startDate || !endDate || startDate > endDate) return null;
+
+    const currentSummary = customCurrentModel?.kpiAggregationByTimeframe.allDates;
+    const previousSummary = customPreviousModel?.kpiAggregationByTimeframe.allDates;
+
+    return {
+      timeframe: 'ttm',
+      currentStartMonth: currentSummary?.startMonth ?? startDate.slice(0, 7),
+      currentEndMonth: currentSummary?.endMonth ?? endDate.slice(0, 7),
+      previousStartMonth: previousSummary?.startMonth ?? customPreviousDateRange?.startDate.slice(0, 7) ?? null,
+      previousEndMonth: previousSummary?.endMonth ?? customPreviousDateRange?.endDate.slice(0, 7) ?? null,
+      currentMonthCount: currentSummary?.monthCount ?? 0,
+      previousMonthCount: previousSummary?.monthCount ?? 0,
+      revenue: compareMetric(
+        currentSummary?.revenue ?? 0,
+        previousSummary?.revenue ?? 0
+      ),
+      expenses: compareMetric(
+        currentSummary?.expenses ?? 0,
+        previousSummary?.expenses ?? 0
+      ),
+      netCashFlow: compareMetric(
+        currentSummary?.netCashFlow ?? 0,
+        previousSummary?.netCashFlow ?? 0
+      ),
+      savingsRate: compareMetric(
+        currentSummary?.savingsRate ?? 0,
+        previousSummary?.savingsRate ?? 0
+      ),
+      currentStartDate: startDate,
+      currentEndDate: endDate,
+      previousStartDate: customPreviousDateRange?.startDate ?? null,
+      previousEndDate: customPreviousDateRange?.endDate ?? null,
+    };
+  }, [
+    customCurrentModel,
+    customEndDate,
+    customPreviousDateRange,
+    customPreviousModel,
+    customStartDate,
+    kpiTimeframe,
+    model.kpiComparisonByTimeframe,
+  ]);
+  const selectedHeaderComparisonLabel = useMemo(() => {
+    if (kpiTimeframe !== 'custom') {
+      return model.kpiHeaderLabelByTimeframe[kpiTimeframe] ?? 'Comparison unavailable';
+    }
+
+    const startDate = parseDateToken(customStartDate);
+    const endDate = parseDateToken(customEndDate);
+    if (!startDate || !endDate || startDate > endDate) return 'Choose a valid custom date range';
+
+    const currentRangeLabel = formatDateRangeLabel(startDate, endDate);
+    if (!customPreviousDateRange) {
+      return `${currentRangeLabel} · comparison unavailable`;
+    }
+
+    return `${currentRangeLabel} · vs ${formatDateRangeLabel(
+      customPreviousDateRange.startDate,
+      customPreviousDateRange.endDate
+    )}`;
+  }, [customEndDate, customPreviousDateRange, customStartDate, kpiTimeframe, model.kpiHeaderLabelByTimeframe]);
+  const selectedKpiFrameLabel = BIG_PICTURE_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? '12M';
   const digHerePresetComparisons = useMemo(() => {
     const monthlyRollups = computeMonthlyRollups(baseTxns, cashFlowMode);
     return computeKpiComparisons(monthlyRollups);
@@ -808,10 +1037,15 @@ export default function Dashboard() {
 
   const latestRollup = model.monthlyRollups[model.monthlyRollups.length - 1] ?? null;
   const previousRollup = model.monthlyRollups[model.monthlyRollups.length - 2] ?? null;
+  const selectedBigPictureTitle = useMemo(() => {
+    if (kpiTimeframe === 'custom') return 'Custom Range';
+    if (selectedKpiComparison?.currentEndMonth) return toMonthLabel(selectedKpiComparison.currentEndMonth);
+    return model.latestMonth ? toMonthLabel(model.latestMonth) : 'No Data Yet';
+  }, [kpiTimeframe, model.latestMonth, selectedKpiComparison?.currentEndMonth]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
-    const timeframeTabLabels = KPI_FRAME_OPTIONS.map((option) => option.label);
+    const timeframeTabLabels = BIG_PICTURE_FRAME_OPTIONS.map((option) => option.label);
     const labelsToCheck = [
       ...timeframeTabLabels,
       ...Object.values(model.kpiHeaderLabelByTimeframe),
@@ -1508,9 +1742,7 @@ export default function Dashboard() {
             <h2>
               {activeTab === 'dig-here'
                 ? 'Dig Here'
-                : model.latestMonth
-                  ? toMonthLabel(model.latestMonth)
-                  : 'No Data Yet'}
+                : selectedBigPictureTitle}
             </h2>
             <p>
               {activeTab === 'dig-here' ? digHereHeaderLabel : selectedHeaderComparisonLabel}
@@ -1629,17 +1861,55 @@ export default function Dashboard() {
                 )}
               </div>
             ) : (
-              <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
-                {KPI_FRAME_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={kpiTimeframe === option.value ? 'is-active' : ''}
-                    onClick={() => setKpiTimeframe(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+              <div className="kpi-timeframe-control">
+                <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
+                  {BIG_PICTURE_FRAME_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={kpiTimeframe === option.value ? 'is-active' : ''}
+                      onClick={() => setKpiTimeframe(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {kpiTimeframe === 'custom' && (
+                  <div className="kpi-custom-range" aria-label="Custom Big Picture date range">
+                    <label>
+                      <span>Start</span>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        min={earliestAvailableDate || undefined}
+                        max={latestAvailableDate || undefined}
+                        onChange={(event) => {
+                          const nextStart = event.target.value;
+                          setCustomStartDate(nextStart);
+                          if (customEndDate && nextStart > customEndDate) {
+                            setCustomEndDate(nextStart);
+                          }
+                        }}
+                      />
+                    </label>
+                    <label>
+                      <span>End</span>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        min={customStartDate || earliestAvailableDate || undefined}
+                        max={latestAvailableDate || undefined}
+                        onChange={(event) => {
+                          const nextEnd = event.target.value;
+                          setCustomEndDate(nextEnd);
+                          if (customStartDate && nextEnd < customStartDate) {
+                            setCustomStartDate(nextEnd);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
             )}
           </div>

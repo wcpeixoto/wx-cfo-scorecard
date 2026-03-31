@@ -45,6 +45,7 @@ export const KPI_TIMEFRAMES: KpiTimeframe[] = [
 ];
 export const KPI_COMPARISON_TIMEFRAMES: KpiComparisonTimeframe[] = [
   'thisMonth',
+  'lastMonth',
   'last3Months',
   'ytd',
   'ttm',
@@ -628,6 +629,13 @@ function selectComparisonBlocks(
     };
   }
 
+  if (timeframe === 'lastMonth') {
+    return {
+      current: monthlyRollups.length > 1 ? [monthlyRollups[monthlyRollups.length - 2]] : [],
+      previous: monthlyRollups.length > 2 ? [monthlyRollups[monthlyRollups.length - 3]] : [],
+    };
+  }
+
   if (timeframe === 'last3Months') {
     return {
       current: selectTrailingRollups(monthlyRollups, 3),
@@ -717,6 +725,11 @@ export function computeKpiHeaderLabels(comparisons: KpiComparisonMap): KpiHeader
     const previousRange = formatMonthRangeStable(item.previousStartMonth, item.previousEndMonth);
 
     if (timeframe === 'thisMonth') {
+      result[timeframe] = `${currentRange} · vs ${previousRange}`;
+      return result;
+    }
+
+    if (timeframe === 'lastMonth') {
       result[timeframe] = `${currentRange} · vs ${previousRange}`;
       return result;
     }

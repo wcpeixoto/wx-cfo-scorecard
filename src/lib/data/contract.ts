@@ -113,6 +113,7 @@ export type KpiAggregationMap = Record<KpiTimeframe, KpiAggregate>;
 
 export type KpiComparisonTimeframe =
   | 'thisMonth'
+  | 'lastMonth'
   | 'last3Months'
   | 'ytd'
   | 'ttm'
