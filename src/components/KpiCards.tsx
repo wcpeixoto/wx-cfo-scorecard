@@ -48,7 +48,7 @@ function formatPercentDelta(value: number | null): string {
     return '—';
   }
   const prefix = value > 0 ? '+' : '';
-  return `${prefix}${value.toFixed(1)}%`;
+  return `${prefix}${Math.round(value)}%`;
 }
 
 export default function KpiCards({ cards }: KpiCardsProps) {

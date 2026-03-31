@@ -26,7 +26,7 @@ function formatCurrency(value: number): string {
 function formatDeltaPercent(value: number | null): string {
   if (value === null || Number.isNaN(value)) return '—';
   const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toFixed(1)}%`;
+  return `${sign}${Math.round(value)}%`;
 }
 
 export default function DigHereHighlights({
