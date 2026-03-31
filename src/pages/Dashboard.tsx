@@ -68,6 +68,8 @@ type BigPictureKpiComparison = KpiTimeframeComparison & {
   previousStartDate: string | null;
   previousEndDate: string | null;
 };
+type BigPictureVisibleFrameValue = 'thisMonth' | 'lastMonth' | 'last3Months';
+type BigPictureFilterFrameValue = Exclude<BigPictureFrameValue, BigPictureVisibleFrameValue>;
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'big-picture', label: 'Big Picture', icon: FiGrid },
@@ -84,13 +86,27 @@ const DEFAULT_SCENARIO: ScenarioInput = {
   months: 12,
 };
 const BIG_PICTURE_FRAME_OPTIONS: KpiFrameOption[] = [
-  { value: 'thisMonth', label: 'Month' },
+  { value: 'thisMonth', label: 'This Month' },
   { value: 'lastMonth', label: 'Last Month' },
-  { value: 'last3Months', label: '3M' },
+  { value: 'last3Months', label: 'Last 3 Months' },
   { value: 'ytd', label: 'YTD' },
-  { value: 'ttm', label: '12M' },
-  { value: 'last24Months', label: '24M' },
-  { value: 'last36Months', label: '36M' },
+  { value: 'ttm', label: '12 Months' },
+  { value: 'last24Months', label: '24 Months' },
+  { value: 'last36Months', label: '36 Months' },
+  { value: 'allDates', label: 'All Dates' },
+  { value: 'custom', label: 'Custom' },
+];
+const BIG_PICTURE_VISIBLE_FRAME_OPTIONS: Array<KpiFrameOption & { value: BigPictureVisibleFrameValue }> = [
+  { value: 'thisMonth', label: 'This Month' },
+  { value: 'lastMonth', label: 'Last Month' },
+  { value: 'last3Months', label: 'Last 3 Months' },
+];
+const BIG_PICTURE_FILTER_FRAME_OPTIONS: Array<KpiFrameOption & { value: BigPictureFilterFrameValue }> = [
+  { value: 'ytd', label: 'YTD' },
+  { value: 'ttm', label: '12 Months' },
+  { value: 'last24Months', label: '24 Months' },
+  { value: 'last36Months', label: '36 Months' },
+  { value: 'allDates', label: 'All Dates' },
   { value: 'custom', label: 'Custom' },
 ];
 const DIG_HERE_PERIOD_OPTIONS: DigHerePeriodOption[] = [
@@ -404,6 +420,7 @@ export default function Dashboard() {
   const [monthPickerDraftStart, setMonthPickerDraftStart] = useState<string>('');
   const [monthPickerDraftEnd, setMonthPickerDraftEnd] = useState<string>('');
   const monthPickerRef = useRef<HTMLDivElement>(null);
+  const bigPictureFilterMenuRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const [dataSet, setDataSet] = useState<DataSet | null>(null);
   const [importedDataSet, setImportedDataSet] = useState<DataSet | null>(null);
@@ -422,6 +439,7 @@ export default function Dashboard() {
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const [isBigPictureFilterOpen, setIsBigPictureFilterOpen] = useState(false);
   const preserveAccountSettingsOnImportClearRef = useRef(false);
 
   const runSync = useCallback(async () => {
@@ -1313,6 +1331,29 @@ export default function Dashboard() {
     };
   }, [isMonthPickerOpen]);
 
+  useEffect(() => {
+    if (!isBigPictureFilterOpen) return;
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!bigPictureFilterMenuRef.current?.contains(event.target as Node)) {
+        setIsBigPictureFilterOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsBigPictureFilterOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isBigPictureFilterOpen]);
+
   const writeDashboardUrlState = useCallback(
     (
       next: {
@@ -1874,16 +1915,50 @@ export default function Dashboard() {
             ) : (
               <div className="kpi-timeframe-control">
                 <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
-                  {BIG_PICTURE_FRAME_OPTIONS.map((option) => (
+                  {BIG_PICTURE_VISIBLE_FRAME_OPTIONS.map((option) => (
                     <button
                       key={option.value}
                       type="button"
                       className={kpiTimeframe === option.value ? 'is-active' : ''}
-                      onClick={() => setKpiTimeframe(option.value)}
+                      onClick={() => {
+                        setKpiTimeframe(option.value);
+                        setIsBigPictureFilterOpen(false);
+                      }}
                     >
                       {option.label}
                     </button>
                   ))}
+                  <div className="timeframe-menu" ref={bigPictureFilterMenuRef}>
+                    <button
+                      type="button"
+                      className="timeframe-trigger"
+                      onClick={() => setIsBigPictureFilterOpen((current) => !current)}
+                      aria-haspopup="menu"
+                      aria-expanded={isBigPictureFilterOpen}
+                    >
+                      More ▾
+                    </button>
+                    {isBigPictureFilterOpen && (
+                      <ul className="timeframe-list" role="menu" aria-label="Select Big Picture filter timeframe">
+                        {BIG_PICTURE_FILTER_FRAME_OPTIONS.map((option) => (
+                          <li key={option.value}>
+                            <button
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={kpiTimeframe === option.value}
+                              className={kpiTimeframe === option.value ? 'is-active' : ''}
+                              onClick={() => {
+                                setKpiTimeframe(option.value);
+                                setIsBigPictureFilterOpen(false);
+                              }}
+                            >
+                              {option.label}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
                 {kpiTimeframe === 'custom' && (
                   <div className="kpi-custom-range" aria-label="Custom Big Picture date range">

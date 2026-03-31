@@ -51,6 +51,7 @@ export const KPI_COMPARISON_TIMEFRAMES: KpiComparisonTimeframe[] = [
   'ttm',
   'last24Months',
   'last36Months',
+  'allDates',
 ];
 
 function trendFromDelta(delta: number): TrendDirection {
@@ -671,6 +672,16 @@ function selectComparisonBlocks(
     };
   }
 
+  if (timeframe === 'allDates') {
+    const current = monthlyRollups;
+    const count = current.length;
+    const previous =
+      count > 0 && monthlyRollups.length >= count * 2
+        ? monthlyRollups.slice(monthlyRollups.length - count * 2, monthlyRollups.length - count)
+        : [];
+    return { current, previous };
+  }
+
   const latest = monthlyRollups[monthlyRollups.length - 1];
   const parsedLatest = parseMonthParts(latest.month);
   if (!parsedLatest) {
@@ -756,6 +767,11 @@ export function computeKpiHeaderLabels(comparisons: KpiComparisonMap): KpiHeader
     if (timeframe === 'ttm') {
       const currentEnd = item.currentEndMonth ? monthLabelStable(item.currentEndMonth) : 'n/a';
       result[timeframe] = `Last 12 Months through ${currentEnd} vs prior 12 Months`;
+      return result;
+    }
+
+    if (timeframe === 'allDates') {
+      result[timeframe] = `${currentRange} · vs ${previousRange}`;
       return result;
     }
 
