@@ -8,17 +8,22 @@ function normalizeCategory(category: string): string {
     .trim();
 }
 
+const CAPITAL_DISTRIBUTION_SEGMENTS = new Set([
+  'capital distribution',
+  'owner distributions',
+]);
+
 export function isCapitalDistributionCategory(category: string): boolean {
   const normalized = normalizeCategory(category);
   if (!normalized) return false;
 
-  if (normalized === 'capital distribution') return true;
+  if (CAPITAL_DISTRIBUTION_SEGMENTS.has(normalized)) return true;
 
   return normalized
     .split(':')
     .map((segment) => segment.trim())
     .filter(Boolean)
-    .some((segment) => segment === 'capital distribution');
+    .some((segment) => CAPITAL_DISTRIBUTION_SEGMENTS.has(segment));
 }
 
 export function includeExpenseCategoryForCashFlowMode(
