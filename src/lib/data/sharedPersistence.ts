@@ -63,6 +63,25 @@ function buildHeaders(extra?: HeadersInit): Headers {
   return headers;
 }
 
+async function requestAllRows<T>(path: string): Promise<T[]> {
+  const PAGE_SIZE = 1000;
+  const all: T[] = [];
+  let from = 0;
+
+  for (;;) {
+    const page = await request<T[]>(path, {
+      headers: { Range: `${from}-${from + PAGE_SIZE - 1}` },
+    });
+
+    if (!page || page.length === 0) break;
+    all.push(...page);
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return all;
+}
+
 function withWorkspaceFilter(path: string): string {
   const separator = path.includes('?') ? '&' : '?';
   return `${path}${separator}workspace_id=eq.${encodeURIComponent(WORKSPACE_ID)}`;
@@ -83,7 +102,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     return undefined as T;
   }
 
-  return (await response.json()) as T;
+  const body = await response.text();
+  if (!body.trim()) {
+    return undefined as T;
+  }
+
+  return JSON.parse(body) as T;
 }
 
 function toSharedTransactionRow(record: ImportedTransactionRecord): SharedImportTransactionRow {
@@ -199,7 +223,7 @@ export async function getSharedImportedStoreSnapshot(): Promise<{
   if (!isConfigured()) return null;
 
   const [transactionRows, batchRows] = await Promise.all([
-    request<SharedImportTransactionRow[]>(
+    requestAllRows<SharedImportTransactionRow>(
       withWorkspaceFilter(`${IMPORTED_TRANSACTIONS_TABLE}?select=*&order=imported_at_iso.asc,fingerprint.asc`)
     ),
     request<SharedImportBatchRow[]>(
