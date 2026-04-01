@@ -11,6 +11,7 @@ import KpiCards from '../components/KpiCards';
 import MoversList from '../components/MoversList';
 import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
+import NetCashFlowChart from '../components/NetCashFlowChart';
 import TrajectoryPanel from '../components/TrajectoryPanel';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
@@ -609,11 +610,6 @@ export default function Dashboard() {
   const model = useMemo(
     () => computeDashboardModel(filteredTxns, { cashFlowMode }),
     [filteredTxns, cashFlowMode]
-  );
-
-  const totalModeModel = useMemo(
-    () => computeDashboardModel(filteredTxns, { cashFlowMode: 'total' }),
-    [filteredTxns]
   );
 
   const customPreviousDateRange = useMemo(
@@ -2007,15 +2003,10 @@ export default function Dashboard() {
           <>
             <KpiCards cards={selectedKpiCards} />
             <TrajectoryPanel signals={model.trajectorySignals} />
-            <TrendLineChart
+            <NetCashFlowChart
               data={model.trend}
-              axisDomainData={totalModeModel.trend}
-              metric="net"
-              title="Monthly Net Cash Flow"
-              enableTimeframeControl
-              timeframe={netChartTimeframe}
-              showCashFlowToggle
               cashFlowMode={cashFlowMode}
+              timeframe={netChartTimeframe}
               onCashFlowModeChange={setCashFlowMode}
               onTimeframeChange={setNetChartTimeframe}
               onMonthPointClick={(month) =>
