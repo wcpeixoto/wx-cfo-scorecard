@@ -17,6 +17,11 @@ import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
 import { includeExpenseCategoryForCashFlowMode, isCapitalDistributionCategory } from '../lib/cashFlow';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
+import {
+  getSharedAccountSettings,
+  isSharedPersistenceConfigured,
+  saveSharedAccountSettings,
+} from '../lib/data/sharedPersistence';
 import { buildDataSet } from '../lib/data/normalize';
 import { fetchSheetCsv } from '../lib/data/fetchCsv';
 import {
@@ -406,6 +411,7 @@ function getStoredAccountSettings(): AccountRecord[] {
 }
 
 export default function Dashboard() {
+  const sharedPersistenceEnabled = isSharedPersistenceConfigured();
   const [activeTab, setActiveTab] = useState<TabId>('big-picture');
   const [csvUrl, setCsvUrl] = useState(getStoredCsvUrl);
   const [draftCsvUrl, setDraftCsvUrl] = useState(getStoredCsvUrl);
@@ -442,6 +448,9 @@ export default function Dashboard() {
   const [customEndDate, setCustomEndDate] = useState('');
   const [isBigPictureFilterOpen, setIsBigPictureFilterOpen] = useState(false);
   const preserveAccountSettingsOnImportClearRef = useRef(false);
+  const sharedAccountSettingsSyncArmedRef = useRef(false);
+  const [sharedAccountSettingsReady, setSharedAccountSettingsReady] = useState(!sharedPersistenceEnabled);
+  const [sharedAccountSettingsHasRemoteData, setSharedAccountSettingsHasRemoteData] = useState(false);
 
   const runSync = useCallback(async () => {
     setLoading(true);
@@ -478,6 +487,46 @@ export default function Dashboard() {
   useEffect(() => {
     void loadImportedState();
   }, [loadImportedState]);
+
+  useEffect(() => {
+    if (!sharedPersistenceEnabled) return;
+
+    let cancelled = false;
+
+    const loadSharedSettings = async () => {
+      try {
+        const remoteSettings = await getSharedAccountSettings();
+        if (cancelled) return;
+
+        if (remoteSettings && remoteSettings.length > 0) {
+          setSharedAccountSettingsHasRemoteData(true);
+          setAccountRecords(remoteSettings);
+          if (typeof window !== 'undefined') {
+            try {
+              window.localStorage.setItem(STORAGE_KEYS.accountSettings, JSON.stringify(remoteSettings));
+            } catch {
+              // Ignore local cache write failures.
+            }
+          }
+        } else {
+          setSharedAccountSettingsHasRemoteData(false);
+          setAccountRecords([]);
+        }
+      } catch (sharedSettingsError) {
+        console.warn('Shared account settings unavailable, using browser-local settings.', sharedSettingsError);
+      } finally {
+        if (!cancelled) {
+          setSharedAccountSettingsReady(true);
+        }
+      }
+    };
+
+    void loadSharedSettings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sharedPersistenceEnabled]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -525,6 +574,8 @@ export default function Dashboard() {
   }, [baseTxns]);
 
   useEffect(() => {
+    if (sharedPersistenceEnabled && !sharedAccountSettingsReady) return;
+
     setAccountRecords((previous) => {
       if (preserveAccountSettingsOnImportClearRef.current) {
         preserveAccountSettingsOnImportClearRef.current = false;
@@ -536,7 +587,7 @@ export default function Dashboard() {
       const mergedSerialized = JSON.stringify(merged);
       return previousSerialized === mergedSerialized ? previous : merged;
     });
-  }, [discoveredAccountRecords]);
+  }, [discoveredAccountRecords, sharedAccountSettingsReady, sharedPersistenceEnabled]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -545,7 +596,17 @@ export default function Dashboard() {
     } catch {
       // Ignore storage failures and continue with in-memory settings.
     }
-  }, [accountRecords]);
+    if (sharedPersistenceEnabled && sharedAccountSettingsReady && (sharedAccountSettingsHasRemoteData || sharedAccountSettingsSyncArmedRef.current)) {
+      void saveSharedAccountSettings(accountRecords)
+        .then(() => {
+          sharedAccountSettingsSyncArmedRef.current = false;
+          setSharedAccountSettingsHasRemoteData(true);
+        })
+        .catch((sharedSettingsError) => {
+          console.warn('Could not sync shared account settings.', sharedSettingsError);
+        });
+    }
+  }, [accountRecords, sharedAccountSettingsHasRemoteData, sharedAccountSettingsReady, sharedPersistenceEnabled]);
 
   const filteredTxns = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -1717,6 +1778,9 @@ export default function Dashboard() {
       field: K,
       value: AccountRecord[K]
     ) => {
+      if (sharedPersistenceEnabled) {
+        sharedAccountSettingsSyncArmedRef.current = true;
+      }
       setAccountRecords((previous) =>
         previous.map((record) =>
           record.id === accountId
@@ -1729,8 +1793,32 @@ export default function Dashboard() {
         )
       );
     },
-    []
+    [sharedPersistenceEnabled]
   );
+
+  const importDescription = sharedPersistenceEnabled
+    ? 'Import Quicken-style report CSVs into shared storage. Each shared import replaces the current shared imported dataset and becomes the active analysis source when present.'
+    : 'Import Quicken-style report CSVs directly into browser-local storage. Imported transactions become the active analysis source when present.';
+  const clearImportedDataLabel = sharedPersistenceEnabled ? 'Clear shared imported data' : 'Clear local imported data';
+  const sourcePrecedenceLabel = sharedPersistenceEnabled
+    ? 'Shared imported dataset -> Google Sheets fallback'
+    : 'Browser-local imported dataset -> Google Sheets fallback';
+  const importedSourceStatus = importedDataSet
+    ? lastImportSummary?.storageScope === 'shared'
+      ? 'Yes, shared imported transactions are driving analysis.'
+      : 'Yes, browser-local imported transactions are driving analysis.'
+    : sharedPersistenceEnabled
+      ? 'No shared imported dataset is available, so Google Sheets fallback is active.'
+      : 'No browser-local imported dataset is available, so Google Sheets fallback is active.';
+  const importModeLabel = lastImportSummary?.importMode === 'replace-all' ? 'Replace-all shared dataset' : 'Append to local dataset';
+  const accountSettingsSourceLabel = sharedPersistenceEnabled
+    ? sharedAccountSettingsHasRemoteData
+      ? 'Shared account settings'
+      : 'No shared account settings saved yet; using in-memory/discovered defaults until an edit is synced.'
+    : 'Browser-local account settings';
+  const fallbackSourceDescription = sharedPersistenceEnabled
+    ? 'Fallback CSV source used only when no shared imported dataset is present.'
+    : 'Optional fallback CSV source used when no browser-local imported dataset is present.';
 
   return (
     <div className="finance-app">
@@ -2247,9 +2335,7 @@ export default function Dashboard() {
             <article className="card settings-card">
               <div className="card-head">
                 <h3>Direct CSV Import</h3>
-                <p className="subtle">
-                  Import Quicken-style report CSVs directly into local browser storage. Imported transactions become the active analysis source when present.
-                </p>
+                <p className="subtle">{importDescription}</p>
               </div>
 
               <input
@@ -2270,7 +2356,7 @@ export default function Dashboard() {
                   onClick={() => void handleClearImportedData()}
                   disabled={importLoading || storedImportedTransactionCount === 0}
                 >
-                  Clear local imported data
+                  {clearImportedDataLabel}
                 </button>
               </div>
 
@@ -2281,13 +2367,34 @@ export default function Dashboard() {
                   Active analysis source:{' '}
                   <strong>{activeDataSet?.sourceLabel ?? activeDataSet?.sourceUrl ?? csvUrl}</strong>
                 </p>
+                {lastImportSummary?.latestTxnMonth ? (
+                  <p>
+                    Updated through: <strong>{toMonthLabel(lastImportSummary.latestTxnMonth)}</strong>
+                  </p>
+                ) : null}
                 <p>
                   Imported transactions stored: <strong>{storedImportedTransactionCount.toLocaleString()}</strong>
                 </p>
                 <p>
                   Imported data active:{' '}
-                  <strong>{importedDataSet ? 'Yes, local imported transactions are driving analysis.' : 'No, Google Sheets fallback is active.'}</strong>
+                  <strong>
+                    {importedSourceStatus}
+                  </strong>
                 </p>
+                <p>
+                  Source precedence: <strong>{sourcePrecedenceLabel}</strong>
+                </p>
+                {importedDataSet ? (
+                  <>
+                    <p>
+                      Source storage:{' '}
+                      <strong>{lastImportSummary?.storageScope === 'shared' ? 'Shared imported dataset' : 'Browser-local imported dataset'}</strong>
+                    </p>
+                    <p>
+                      Import mode: <strong>{importModeLabel}</strong>
+                    </p>
+                  </>
+                ) : null}
               </div>
 
               {lastImportSummary ? (
@@ -2351,7 +2458,7 @@ export default function Dashboard() {
             <article className="card settings-card">
               <div className="card-head">
                 <h3>Google Sheets Fallback</h3>
-                <p className="subtle">Optional fallback CSV source used when no local imported transactions are present.</p>
+                <p className="subtle">{fallbackSourceDescription}</p>
               </div>
 
               <label className="settings-field">
@@ -2390,6 +2497,9 @@ export default function Dashboard() {
               <div className="card-head">
                 <h3>Account Setup</h3>
                 <p className="subtle">Auto-discovered from imported CSV data. Your edits become the source of truth for future imports.</p>
+                <p className="subtle">
+                  Settings storage: <strong>{accountSettingsSourceLabel}</strong>
+                </p>
               </div>
 
               {accountRecords.length === 0 ? (
