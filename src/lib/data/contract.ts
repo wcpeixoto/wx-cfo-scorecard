@@ -67,6 +67,9 @@ export type TransactionImportSummary = {
   importId: string;
   sourceFileName: string;
   importedAtIso: string;
+  latestTxnMonth: string | null;
+  storageScope: 'local' | 'shared';
+  importMode: 'append' | 'replace-all';
   newImported: number;
   exactDuplicatesSkipped: number;
   possibleDuplicatesFlagged: number;

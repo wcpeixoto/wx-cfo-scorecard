@@ -1,5 +1,11 @@
 import type { DataSet, ImportedTransactionRecord, TransactionImportIssue, TransactionImportSummary, Txn, TxnType } from './contract';
 import { toISODateOnly } from './normalize';
+import {
+  clearSharedImportedStore,
+  getSharedImportedStoreSnapshot,
+  isSharedPersistenceConfigured,
+  replaceSharedImportedStore,
+} from './sharedPersistence';
 
 const DB_NAME = 'wx-cfo-scorecard';
 const DB_VERSION = 1;
@@ -320,82 +326,102 @@ function sortTransactions(txns: Txn[]): Txn[] {
   return [...txns].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 }
 
-export async function importQuickenReportCsv(file: File): Promise<TransactionImportSummary> {
-  const sourceFileName = file.name || 'Imported CSV';
-  const importId = createImportId();
-  const importedAtIso = new Date().toISOString();
-  const text = await file.text();
-  const { candidates, parseErrors } = parseQuickenReportCsv(text, sourceFileName, importId, importedAtIso);
-
-  const db = await openImportDb();
-  try {
-    const readTx = db.transaction([TRANSACTIONS_STORE, SUMMARIES_STORE], 'readonly');
-    const transactionStore = readTx.objectStore(TRANSACTIONS_STORE);
-    const summaryStore = readTx.objectStore(SUMMARIES_STORE);
-    const existingRecords = (await requestToPromise(transactionStore.getAll())) as ImportedTransactionRecord[];
-    await transactionComplete(readTx);
-
-    const existingFingerprints = new Set(existingRecords.map((record) => record.fingerprint));
-    const seenPossibleKeys = new Set(existingRecords.map((record) => record.possibleDuplicateKey));
-    const seenFingerprints = new Set(existingFingerprints);
-    const acceptedRecords: ImportedTransactionRecord[] = [];
-    const possibleDuplicateIssues: TransactionImportIssue[] = [];
-    let exactDuplicatesSkipped = 0;
-
-    candidates.forEach(({ record, rowPreview }) => {
-      if (seenFingerprints.has(record.fingerprint)) {
-        exactDuplicatesSkipped += 1;
-        return;
-      }
-
-      if (seenPossibleKeys.has(record.possibleDuplicateKey)) {
-        possibleDuplicateIssues.push({
-          kind: 'possible-duplicate',
-          lineNumber: record.sourceLineNumber,
-          message: 'Possible duplicate detected with matching date, account, payee, and amount. Imported and flagged for review.',
-          rowPreview,
-        });
-        acceptedRecords.push({ ...record, possibleDuplicate: true });
-        seenFingerprints.add(record.fingerprint);
-        return;
-      }
-
-      acceptedRecords.push(record);
-      seenFingerprints.add(record.fingerprint);
-      seenPossibleKeys.add(record.possibleDuplicateKey);
-    });
-
-    const storedTransactionCount = existingRecords.length + acceptedRecords.length;
-    const summary: TransactionImportSummary = {
-      importId,
-      sourceFileName,
-      importedAtIso,
-      newImported: acceptedRecords.length,
-      exactDuplicatesSkipped,
-      possibleDuplicatesFlagged: possibleDuplicateIssues.length,
-      parseFailures: parseErrors.length,
-      storedTransactionCount,
-      possibleDuplicateExamples: truncateIssues(possibleDuplicateIssues),
-      parseFailureExamples: truncateIssues(parseErrors),
-    };
-
-    const writeTx = db.transaction([TRANSACTIONS_STORE, SUMMARIES_STORE], 'readwrite');
-    const writeTransactionStore = writeTx.objectStore(TRANSACTIONS_STORE);
-    const writeSummaryStore = writeTx.objectStore(SUMMARIES_STORE);
-    acceptedRecords.forEach((record) => writeTransactionStore.put(record));
-    writeSummaryStore.put(summary);
-    await transactionComplete(writeTx);
-
-    return summary;
-  } finally {
-    db.close();
-  }
+function latestTxnMonth(records: ImportedTransactionRecord[]): string | null {
+  return records.reduce<string | null>((latest, record) => {
+    const month = record.txn.month;
+    if (!month) return latest;
+    if (!latest || month > latest) return month;
+    return latest;
+  }, null);
 }
 
-export async function getImportedTransactionsSnapshot(): Promise<{
-  dataSet: DataSet | null;
-  lastImportSummary: TransactionImportSummary | null;
-  transactionCount: number;
+function buildSummary(
+  importId: string,
+  sourceFileName: string,
+  importedAtIso: string,
+  acceptedRecords: ImportedTransactionRecord[],
+  existingRecords: ImportedTransactionRecord[],
+  possibleDuplicateIssues: TransactionImportIssue[],
+  parseErrors: TransactionImportIssue[],
+  storageScope: 'local' | 'shared',
+  importMode: 'append' | 'replace-all'
+): TransactionImportSummary {
+  return {
+    importId,
+    sourceFileName,
+    importedAtIso,
+    latestTxnMonth: latestTxnMonth(acceptedRecords),
+    storageScope,
+    importMode,
+    newImported: acceptedRecords.length,
+    exactDuplicatesSkipped: 0,
+    possibleDuplicatesFlagged: possibleDuplicateIssues.length,
+    parseFailures: parseErrors.length,
+    storedTransactionCount: existingRecords.length + acceptedRecords.length,
+    possibleDuplicateExamples: truncateIssues(possibleDuplicateIssues),
+    parseFailureExamples: truncateIssues(parseErrors),
+  };
+}
+
+function computeImportOutcome(
+  candidates: ParsedCandidate[],
+  parseErrors: TransactionImportIssue[],
+  existingRecords: ImportedTransactionRecord[],
+  importId: string,
+  sourceFileName: string,
+  importedAtIso: string,
+  storageScope: 'local' | 'shared',
+  importMode: 'append' | 'replace-all'
+): { acceptedRecords: ImportedTransactionRecord[]; summary: TransactionImportSummary } {
+  const existingFingerprints = new Set(existingRecords.map((record) => record.fingerprint));
+  const seenPossibleKeys = new Set(existingRecords.map((record) => record.possibleDuplicateKey));
+  const seenFingerprints = new Set(existingFingerprints);
+  const acceptedRecords: ImportedTransactionRecord[] = [];
+  const possibleDuplicateIssues: TransactionImportIssue[] = [];
+  let exactDuplicatesSkipped = 0;
+
+  candidates.forEach(({ record, rowPreview }) => {
+    if (seenFingerprints.has(record.fingerprint)) {
+      exactDuplicatesSkipped += 1;
+      return;
+    }
+
+    if (seenPossibleKeys.has(record.possibleDuplicateKey)) {
+      possibleDuplicateIssues.push({
+        kind: 'possible-duplicate',
+        lineNumber: record.sourceLineNumber,
+        message: 'Possible duplicate detected with matching date, account, payee, and amount. Imported and flagged for review.',
+        rowPreview,
+      });
+      acceptedRecords.push({ ...record, possibleDuplicate: true });
+      seenFingerprints.add(record.fingerprint);
+      return;
+    }
+
+    acceptedRecords.push(record);
+    seenFingerprints.add(record.fingerprint);
+    seenPossibleKeys.add(record.possibleDuplicateKey);
+  });
+
+  const summary = buildSummary(
+    importId,
+    sourceFileName,
+    importedAtIso,
+    acceptedRecords,
+    existingRecords,
+    possibleDuplicateIssues,
+    parseErrors,
+    storageScope,
+    importMode
+  );
+  summary.exactDuplicatesSkipped = exactDuplicatesSkipped;
+
+  return { acceptedRecords, summary };
+}
+
+async function getLocalImportedStoreSnapshotRaw(): Promise<{
+  records: ImportedTransactionRecord[];
+  summaries: TransactionImportSummary[];
 }> {
   const db = await openImportDb();
   try {
@@ -405,34 +431,133 @@ export async function getImportedTransactionsSnapshot(): Promise<{
     const records = (await requestToPromise(transactionStore.getAll())) as ImportedTransactionRecord[];
     const summaries = (await requestToPromise(summaryStore.getAll())) as TransactionImportSummary[];
     await transactionComplete(tx);
-
-    const lastImportSummary = summaries
-      .slice()
-      .sort((a, b) => b.importedAtIso.localeCompare(a.importedAtIso))[0] ?? null;
-
-    if (records.length === 0) {
-      return { dataSet: null, lastImportSummary, transactionCount: 0 };
-    }
-
-    const txns = sortTransactions(records.map((record) => record.txn));
-    const sourceLabel = lastImportSummary ? `Local import · ${lastImportSummary.sourceFileName}` : 'Local imported transactions';
     return {
-      dataSet: {
-        txns,
-        fetchedAtIso: lastImportSummary?.importedAtIso ?? new Date().toISOString(),
-        sourceUrl: sourceLabel,
-        sourceKind: 'imported',
-        sourceLabel,
-      },
-      lastImportSummary,
-      transactionCount: records.length,
+      records,
+      summaries: summaries.map((summary) => ({
+        ...summary,
+        latestTxnMonth: summary.latestTxnMonth ?? null,
+        storageScope: summary.storageScope ?? 'local',
+        importMode: summary.importMode ?? 'append',
+      })),
     };
   } finally {
     db.close();
   }
 }
 
+async function writeLocalImportedStore(records: ImportedTransactionRecord[], summary: TransactionImportSummary): Promise<void> {
+  const db = await openImportDb();
+  try {
+    const writeTx = db.transaction([TRANSACTIONS_STORE, SUMMARIES_STORE], 'readwrite');
+    const writeTransactionStore = writeTx.objectStore(TRANSACTIONS_STORE);
+    const writeSummaryStore = writeTx.objectStore(SUMMARIES_STORE);
+    records.forEach((record) => writeTransactionStore.put(record));
+    writeSummaryStore.put(summary);
+    await transactionComplete(writeTx);
+  } finally {
+    db.close();
+  }
+}
+
+function buildSnapshotFromStore(
+  records: ImportedTransactionRecord[],
+  summaries: TransactionImportSummary[],
+  storageScope: 'local' | 'shared'
+): {
+  dataSet: DataSet | null;
+  lastImportSummary: TransactionImportSummary | null;
+  transactionCount: number;
+} {
+  const lastImportSummary =
+    summaries
+      .slice()
+      .sort((a, b) => b.importedAtIso.localeCompare(a.importedAtIso))[0] ?? null;
+
+  if (records.length === 0) {
+    return { dataSet: null, lastImportSummary, transactionCount: 0 };
+  }
+
+  const txns = sortTransactions(records.map((record) => record.txn));
+  const sourceLabel =
+    lastImportSummary
+      ? `${storageScope === 'shared' ? 'Shared import' : 'Local import'} · ${lastImportSummary.sourceFileName}${lastImportSummary.importMode === 'replace-all' ? ' · replace-all' : ''}`
+      : storageScope === 'shared'
+        ? 'Shared imported transactions'
+        : 'Local imported transactions';
+
+  return {
+    dataSet: {
+      txns,
+      fetchedAtIso: lastImportSummary?.importedAtIso ?? new Date().toISOString(),
+      sourceUrl: sourceLabel,
+      sourceKind: 'imported',
+      sourceLabel,
+    },
+    lastImportSummary,
+    transactionCount: records.length,
+  };
+}
+
+export async function importQuickenReportCsv(file: File): Promise<TransactionImportSummary> {
+  const sourceFileName = file.name || 'Imported CSV';
+  const importId = createImportId();
+  const importedAtIso = new Date().toISOString();
+  const text = await file.text();
+  const { candidates, parseErrors } = parseQuickenReportCsv(text, sourceFileName, importId, importedAtIso);
+
+  if (isSharedPersistenceConfigured()) {
+    const { acceptedRecords, summary } = computeImportOutcome(
+      candidates,
+      parseErrors,
+      [],
+      importId,
+      sourceFileName,
+      importedAtIso,
+      'shared',
+      'replace-all'
+    );
+    await replaceSharedImportedStore(acceptedRecords, summary);
+    return summary;
+  }
+
+  const localSnapshot = await getLocalImportedStoreSnapshotRaw();
+  const { acceptedRecords, summary } = computeImportOutcome(
+    candidates,
+    parseErrors,
+    localSnapshot.records,
+    importId,
+    sourceFileName,
+    importedAtIso,
+    'local',
+    'append'
+  );
+  await writeLocalImportedStore(acceptedRecords, summary);
+  return summary;
+}
+
+export async function getImportedTransactionsSnapshot(): Promise<{
+  dataSet: DataSet | null;
+  lastImportSummary: TransactionImportSummary | null;
+  transactionCount: number;
+}> {
+  if (isSharedPersistenceConfigured()) {
+    const sharedSnapshot = await getSharedImportedStoreSnapshot();
+    if (sharedSnapshot) {
+      return buildSnapshotFromStore(sharedSnapshot.records, sharedSnapshot.summaries, 'shared');
+    }
+    return { dataSet: null, lastImportSummary: null, transactionCount: 0 };
+  }
+
+  const localSnapshot = await getLocalImportedStoreSnapshotRaw();
+  return buildSnapshotFromStore(localSnapshot.records, localSnapshot.summaries, 'local');
+}
+
 export async function clearImportedTransactions(): Promise<void> {
+  if (isSharedPersistenceConfigured()) {
+    await clearSharedImportedStore();
+    return;
+  }
+
   const db = await openImportDb();
   try {
     const tx = db.transaction([TRANSACTIONS_STORE, SUMMARIES_STORE], 'readwrite');
