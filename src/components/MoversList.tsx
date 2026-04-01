@@ -27,7 +27,7 @@ function formatCurrency(value: number): string {
 function formatPercent(value: number | null): string {
   if (value === null) return 'n/a';
   const prefix = value > 0 ? '+' : '';
-  return `${prefix}${value.toFixed(1)}%`;
+  return `${prefix}${Math.round(value)}%`;
 }
 
 function buildSparklinePath(

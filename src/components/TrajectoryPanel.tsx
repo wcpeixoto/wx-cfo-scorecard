@@ -29,7 +29,7 @@ function toneFor(signal: TrajectorySignal): 'up' | 'down' | 'neutral' {
 function formatPercent(value: number | null): string {
   if (value === null || Number.isNaN(value) || !Number.isFinite(value)) return '—';
   const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toFixed(1)}%`;
+  return `${sign}${Math.round(value)}%`;
 }
 
 function formatRange(startMonth: string | null, endMonth: string | null): string {
