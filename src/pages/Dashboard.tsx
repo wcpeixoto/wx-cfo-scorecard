@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import { SHEET_CSV_FALLBACK_URL, SHEET_CSV_URL, STORAGE_KEYS } from '../config';
 import gracieSportsLogo from '../assets/gracie-sports-logo.svg';
 import type { IconType } from 'react-icons';
-import { FiGrid, FiLayers, FiSearch, FiSettings, FiSliders, FiTrendingUp } from 'react-icons/fi';
+import { FiGrid, FiLayers, FiRefreshCw, FiSearch, FiSettings, FiSliders, FiTrendingUp } from 'react-icons/fi';
 import CashFlowForecastModule from '../components/CashFlowForecastModule';
 import ExpenseDonut from '../components/ExpenseDonut';
 import DigHereHighlights from '../components/DigHereHighlights';
@@ -368,6 +368,24 @@ function formatDateRangeLabel(startDate: string | null, endDate: string | null):
   return `${formatDateLabel(startDate)} – ${formatDateLabel(endDate)}`;
 }
 
+function daysBetweenDateTokens(startDate: string, endDate: string): number | null {
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  return Math.round((end.getTime() - start.getTime()) / 86400000);
+}
+
+function formatRelativeUpdatedLabel(lastUpdatedDate: string | null): string {
+  if (!lastUpdatedDate) return 'Updated recently';
+  const today = toISODateOnly(new Date());
+  if (!today) return `Updated ${formatDateLabel(lastUpdatedDate)}`;
+  const dayDiff = daysBetweenDateTokens(lastUpdatedDate, today);
+  if (dayDiff === null || dayDiff < 0) return `Updated ${formatDateLabel(lastUpdatedDate)}`;
+  if (dayDiff === 0) return 'Updated Today';
+  if (dayDiff === 1) return 'Updated 1 day ago';
+  return `Updated ${dayDiff} days ago`;
+}
+
 function formatMonthRangeLabel(startMonth: string, endMonth: string): string {
   if (startMonth === endMonth) return toMonthLabel(startMonth);
   return `${toMonthLabel(startMonth)} – ${toMonthLabel(endMonth)}`;
@@ -593,7 +611,7 @@ export default function Dashboard() {
     return null;
   }, [activeDataSet?.fetchedAtIso, lastImportSummary?.importedAtIso, latestAvailableTxnDate]);
   const lastUpdatedLabel = useMemo(
-    () => `Last updated: ${lastUpdatedDate ? formatDateLabel(lastUpdatedDate) : 'Unavailable'}`,
+    () => formatRelativeUpdatedLabel(lastUpdatedDate),
     [lastUpdatedDate]
   );
   const discoveredAccountRecords = useMemo(() => discoverAccountRecords(baseTxns), [baseTxns]);
@@ -1944,215 +1962,225 @@ export default function Dashboard() {
 
       <section className="main-zone">
         <header className="top-bar glass-panel">
-          <div>
-            <h2>
-              {activeTab === 'dig-here'
-                ? 'Dig Here'
-                : selectedBigPictureTitle}
-            </h2>
-            <p className="top-bar-context">
-              {activeTab === 'dig-here' ? digHereHeaderLabel : selectedHeaderComparisonLabel}
-            </p>
-            <p className="top-bar-freshness subtle">{lastUpdatedLabel}</p>
-          </div>
+          <div className="top-bar-main">
+            <div className="top-bar-copy">
+              <h2>
+                {activeTab === 'dig-here'
+                  ? 'Dig Here'
+                  : selectedBigPictureTitle}
+              </h2>
+              <p className="top-bar-context">
+                {activeTab === 'dig-here' ? digHereHeaderLabel : selectedHeaderComparisonLabel}
+              </p>
+            </div>
 
-          <div className="top-controls top-controls-timeframe">
-            {activeTab === 'dig-here' ? (
-              <div className="dig-here-period-control" ref={monthPickerRef}>
-                <div className="dig-here-period-toggle" role="group" aria-label="Dig Here period selector">
-                  {DIG_HERE_PERIOD_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={
-                        option.value === 'custom'
-                          ? isMonthPickerOpen
-                            ? 'is-active'
-                            : ''
-                          : selectedDigHerePeriod === option.value
-                            ? 'is-active'
-                            : ''
-                      }
-                      onClick={() => applyDigHerePeriod(option.value)}
-                      aria-expanded={option.value === 'custom' ? isMonthPickerOpen : undefined}
-                      aria-haspopup={option.value === 'custom' ? 'dialog' : undefined}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-                {isMonthPickerOpen && (
-                  <div className="dig-here-month-picker" role="dialog" aria-label="Choose Dig Here month or period">
-                    <div className="dig-here-picker-mode" role="group" aria-label="Focus mode">
+            <div className="top-controls top-controls-timeframe">
+              {activeTab === 'dig-here' ? (
+                <div className="dig-here-period-control" ref={monthPickerRef}>
+                  <div className="dig-here-period-toggle" role="group" aria-label="Dig Here period selector">
+                    {DIG_HERE_PERIOD_OPTIONS.map((option) => (
                       <button
+                        key={option.value}
                         type="button"
-                        className={monthPickerMode === 'month' ? 'is-active' : ''}
-                        onClick={() => setMonthPickerMode('month')}
+                        className={
+                          option.value === 'custom'
+                            ? isMonthPickerOpen
+                              ? 'is-active'
+                              : ''
+                            : selectedDigHerePeriod === option.value
+                              ? 'is-active'
+                              : ''
+                        }
+                        onClick={() => applyDigHerePeriod(option.value)}
+                        aria-expanded={option.value === 'custom' ? isMonthPickerOpen : undefined}
+                        aria-haspopup={option.value === 'custom' ? 'dialog' : undefined}
                       >
-                        Month
+                        {option.label}
                       </button>
-                      <button
-                        type="button"
-                        className={monthPickerMode === 'period' ? 'is-active' : ''}
-                        onClick={() => setMonthPickerMode('period')}
-                      >
-                        Custom period
-                      </button>
-                    </div>
-
-                    {monthPickerMode === 'month' ? (
-                      <label className="dig-here-picker-field">
-                        Month
-                        <select
-                          value={monthPickerDraftMonth}
-                          onChange={(event) => setMonthPickerDraftMonth(event.target.value)}
+                    ))}
+                  </div>
+                  {isMonthPickerOpen && (
+                    <div className="dig-here-month-picker" role="dialog" aria-label="Choose Dig Here month or period">
+                      <div className="dig-here-picker-mode" role="group" aria-label="Focus mode">
+                        <button
+                          type="button"
+                          className={monthPickerMode === 'month' ? 'is-active' : ''}
+                          onClick={() => setMonthPickerMode('month')}
                         >
-                          {availableMonths.map((month) => (
-                            <option key={month} value={month}>
-                              {toMonthLabel(month)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : (
-                      <div className="dig-here-picker-period-grid">
-                        <label className="dig-here-picker-field">
-                          Start
-                          <select
-                            value={monthPickerDraftStart}
-                            onChange={(event) => setMonthPickerDraftStart(event.target.value)}
-                          >
-                            {availableMonths.map((month) => (
-                              <option key={`start-${month}`} value={month}>
-                                {toMonthLabel(month)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="dig-here-picker-field">
-                          End
-                          <select
-                            value={monthPickerDraftEnd}
-                            onChange={(event) => setMonthPickerDraftEnd(event.target.value)}
-                          >
-                            {availableMonths.map((month) => (
-                              <option key={`end-${month}`} value={month}>
-                                {toMonthLabel(month)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                          Month
+                        </button>
+                        <button
+                          type="button"
+                          className={monthPickerMode === 'period' ? 'is-active' : ''}
+                          onClick={() => setMonthPickerMode('period')}
+                        >
+                          Custom period
+                        </button>
                       </div>
-                    )}
 
-                    <div className="dig-here-picker-buttons">
+                      {monthPickerMode === 'month' ? (
+                        <label className="dig-here-picker-field">
+                          Month
+                          <select
+                            value={monthPickerDraftMonth}
+                            onChange={(event) => setMonthPickerDraftMonth(event.target.value)}
+                          >
+                            {availableMonths.map((month) => (
+                              <option key={month} value={month}>
+                                {toMonthLabel(month)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : (
+                        <div className="dig-here-picker-period-grid">
+                          <label className="dig-here-picker-field">
+                            Start
+                            <select
+                              value={monthPickerDraftStart}
+                              onChange={(event) => setMonthPickerDraftStart(event.target.value)}
+                            >
+                              {availableMonths.map((month) => (
+                                <option key={`start-${month}`} value={month}>
+                                  {toMonthLabel(month)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="dig-here-picker-field">
+                            End
+                            <select
+                              value={monthPickerDraftEnd}
+                              onChange={(event) => setMonthPickerDraftEnd(event.target.value)}
+                            >
+                              {availableMonths.map((month) => (
+                                <option key={`end-${month}`} value={month}>
+                                  {toMonthLabel(month)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      )}
+
+                      <div className="dig-here-picker-buttons">
+                        <button
+                          type="button"
+                          className="is-primary"
+                          onClick={monthPickerMode === 'month' ? applyMonthChoice : applyPeriodChoice}
+                        >
+                          Apply
+                        </button>
+                        <button
+                          type="button"
+                          className="is-ghost"
+                          onClick={() => {
+                            resetDigHereFocus();
+                            setIsMonthPickerOpen(false);
+                          }}
+                        >
+                          Reset to default
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="kpi-timeframe-control">
+                  <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
+                    {BIG_PICTURE_VISIBLE_FRAME_OPTIONS.map((option) => (
                       <button
+                        key={option.value}
                         type="button"
-                        className="is-primary"
-                        onClick={monthPickerMode === 'month' ? applyMonthChoice : applyPeriodChoice}
-                      >
-                        Apply
-                      </button>
-                      <button
-                        type="button"
-                        className="is-ghost"
+                        className={kpiTimeframe === option.value ? 'is-active' : ''}
                         onClick={() => {
-                          resetDigHereFocus();
-                          setIsMonthPickerOpen(false);
+                          setKpiTimeframe(option.value);
+                          setIsBigPictureFilterOpen(false);
                         }}
                       >
-                        Reset to default
+                        {option.label}
                       </button>
+                    ))}
+                    <div className="timeframe-menu" ref={bigPictureFilterMenuRef}>
+                      <button
+                        type="button"
+                        className="timeframe-trigger"
+                        onClick={() => setIsBigPictureFilterOpen((current) => !current)}
+                        aria-haspopup="menu"
+                        aria-expanded={isBigPictureFilterOpen}
+                      >
+                        More ▾
+                      </button>
+                      {isBigPictureFilterOpen && (
+                        <ul className="timeframe-list" role="menu" aria-label="Select Big Picture filter timeframe">
+                          {BIG_PICTURE_FILTER_FRAME_OPTIONS.map((option) => (
+                            <li key={option.value}>
+                              <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={kpiTimeframe === option.value}
+                                className={kpiTimeframe === option.value ? 'is-active' : ''}
+                                onClick={() => {
+                                  setKpiTimeframe(option.value);
+                                  setIsBigPictureFilterOpen(false);
+                                }}
+                              >
+                                {option.label}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="kpi-timeframe-control">
-                <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
-                  {BIG_PICTURE_VISIBLE_FRAME_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={kpiTimeframe === option.value ? 'is-active' : ''}
-                      onClick={() => {
-                        setKpiTimeframe(option.value);
-                        setIsBigPictureFilterOpen(false);
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                  <div className="timeframe-menu" ref={bigPictureFilterMenuRef}>
-                    <button
-                      type="button"
-                      className="timeframe-trigger"
-                      onClick={() => setIsBigPictureFilterOpen((current) => !current)}
-                      aria-haspopup="menu"
-                      aria-expanded={isBigPictureFilterOpen}
-                    >
-                      More ▾
-                    </button>
-                    {isBigPictureFilterOpen && (
-                      <ul className="timeframe-list" role="menu" aria-label="Select Big Picture filter timeframe">
-                        {BIG_PICTURE_FILTER_FRAME_OPTIONS.map((option) => (
-                          <li key={option.value}>
-                            <button
-                              type="button"
-                              role="menuitemradio"
-                              aria-checked={kpiTimeframe === option.value}
-                              className={kpiTimeframe === option.value ? 'is-active' : ''}
-                              onClick={() => {
-                                setKpiTimeframe(option.value);
-                                setIsBigPictureFilterOpen(false);
-                              }}
-                            >
-                              {option.label}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                  {kpiTimeframe === 'custom' && (
+                    <div className="kpi-custom-range" aria-label="Custom Big Picture date range">
+                      <label>
+                        <span>Start</span>
+                        <input
+                          type="date"
+                          value={customStartDate}
+                          min={earliestAvailableDate || undefined}
+                          max={latestAvailableDate || undefined}
+                          onChange={(event) => {
+                            const nextStart = event.target.value;
+                            setCustomStartDate(nextStart);
+                            if (customEndDate && nextStart > customEndDate) {
+                              setCustomEndDate(nextStart);
+                            }
+                          }}
+                        />
+                      </label>
+                      <label>
+                        <span>End</span>
+                        <input
+                          type="date"
+                          value={customEndDate}
+                          min={customStartDate || earliestAvailableDate || undefined}
+                          max={latestAvailableDate || undefined}
+                          onChange={(event) => {
+                            const nextEnd = event.target.value;
+                            setCustomEndDate(nextEnd);
+                            if (customStartDate && nextEnd < customStartDate) {
+                              setCustomStartDate(nextEnd);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  )}
                 </div>
-                {kpiTimeframe === 'custom' && (
-                  <div className="kpi-custom-range" aria-label="Custom Big Picture date range">
-                    <label>
-                      <span>Start</span>
-                      <input
-                        type="date"
-                        value={customStartDate}
-                        min={earliestAvailableDate || undefined}
-                        max={latestAvailableDate || undefined}
-                        onChange={(event) => {
-                          const nextStart = event.target.value;
-                          setCustomStartDate(nextStart);
-                          if (customEndDate && nextStart > customEndDate) {
-                            setCustomEndDate(nextStart);
-                          }
-                        }}
-                      />
-                    </label>
-                    <label>
-                      <span>End</span>
-                      <input
-                        type="date"
-                        value={customEndDate}
-                        min={customStartDate || earliestAvailableDate || undefined}
-                        max={latestAvailableDate || undefined}
-                        onChange={(event) => {
-                          const nextEnd = event.target.value;
-                          setCustomEndDate(nextEnd);
-                          if (customStartDate && nextEnd < customStartDate) {
-                            setCustomStartDate(nextEnd);
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+              <button
+                type="button"
+                className="top-bar-freshness subtle clickable"
+                onClick={() => navigateToTab('settings')}
+                aria-label={`${lastUpdatedLabel}. Open Settings.`}
+              >
+                <FiRefreshCw className="top-bar-freshness-icon" aria-hidden="true" />
+                <span>{lastUpdatedLabel}</span>
+              </button>
+            </div>
           </div>
         </header>
 
