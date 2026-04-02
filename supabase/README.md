@@ -25,6 +25,7 @@ Shared tables:
 
 - One logical workspace per `workspace_id`
 - Shared imported CSV data is `replace-all`
+- Shared replace-all imports are executed through a transactional RPC
 - Source precedence is:
   - shared imported dataset when configured and present
   - Google Sheets fallback otherwise
@@ -47,9 +48,9 @@ Shared tables:
    - another explicit auth gate
 
 4. Replace-all write safety
-   - Shared imports currently use clear-then-write REST calls from the client.
-   - That is deterministic, but not transactional.
-   - Production rollout should move the replace-all operation into a single RPC or server-side transaction.
+   - Shared imports now run through the database RPC `public.replace_shared_imported_store(...)`.
+   - That RPC performs delete + rewrite inside one database transaction.
+   - If the RPC fails, the previous shared dataset remains intact.
 
 ## Required local/staging setup
 

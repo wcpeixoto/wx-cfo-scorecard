@@ -63,6 +63,88 @@ create table if not exists public.shared_account_settings (
 create index if not exists shared_account_settings_workspace_account_name_idx
   on public.shared_account_settings (workspace_id, account_name);
 
+create or replace function public.replace_shared_imported_store(
+  p_workspace_id text,
+  p_records jsonb,
+  p_summary jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+set statement_timeout = '120s'
+as $$
+begin
+  delete from public.shared_imported_transactions
+  where workspace_id = p_workspace_id;
+
+  delete from public.shared_import_batches
+  where workspace_id = p_workspace_id;
+
+  insert into public.shared_imported_transactions (
+    workspace_id,
+    fingerprint,
+    possible_duplicate_key,
+    import_id,
+    source_file_name,
+    imported_at_iso,
+    source_line_number,
+    entered_date,
+    posted_date,
+    transfer_account,
+    possible_duplicate,
+    txn
+  )
+  select
+    p_workspace_id,
+    elem->>'fingerprint',
+    elem->>'possible_duplicate_key',
+    elem->>'import_id',
+    elem->>'source_file_name',
+    (elem->>'imported_at_iso')::timestamptz,
+    (elem->>'source_line_number')::integer,
+    (elem->>'entered_date')::date,
+    (elem->>'posted_date')::date,
+    elem->>'transfer_account',
+    coalesce((elem->>'possible_duplicate')::boolean, false),
+    elem->'txn'
+  from jsonb_array_elements(coalesce(p_records, '[]'::jsonb)) as elem;
+
+  insert into public.shared_import_batches (
+    workspace_id,
+    import_id,
+    source_file_name,
+    imported_at_iso,
+    latest_txn_month,
+    storage_scope,
+    import_mode,
+    new_imported,
+    exact_duplicates_skipped,
+    possible_duplicates_flagged,
+    parse_failures,
+    stored_transaction_count,
+    possible_duplicate_examples,
+    parse_failure_examples
+  )
+  values (
+    p_workspace_id,
+    p_summary->>'import_id',
+    p_summary->>'source_file_name',
+    (p_summary->>'imported_at_iso')::timestamptz,
+    p_summary->>'latest_txn_month',
+    'shared',
+    'replace-all',
+    (p_summary->>'new_imported')::integer,
+    (p_summary->>'exact_duplicates_skipped')::integer,
+    (p_summary->>'possible_duplicates_flagged')::integer,
+    (p_summary->>'parse_failures')::integer,
+    (p_summary->>'stored_transaction_count')::integer,
+    coalesce(p_summary->'possible_duplicate_examples', '[]'::jsonb),
+    coalesce(p_summary->'parse_failure_examples', '[]'::jsonb)
+  );
+end;
+$$;
+
 -- Recommended next step before production use:
 -- alter table public.shared_imported_transactions enable row level security;
 -- alter table public.shared_import_batches enable row level security;

@@ -11,6 +11,9 @@ alter table public.shared_imported_transactions enable row level security;
 alter table public.shared_import_batches enable row level security;
 alter table public.shared_account_settings enable row level security;
 
+revoke all on function public.replace_shared_imported_store(text, jsonb, jsonb) from public;
+grant execute on function public.replace_shared_imported_store(text, jsonb, jsonb) to anon;
+
 drop policy if exists "first_test_read_shared_imported_transactions" on public.shared_imported_transactions;
 drop policy if exists "first_test_write_shared_imported_transactions" on public.shared_imported_transactions;
 drop policy if exists "first_test_read_shared_import_batches" on public.shared_import_batches;
