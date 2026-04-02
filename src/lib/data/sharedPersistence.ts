@@ -243,26 +243,17 @@ export async function replaceSharedImportedStore(
 ): Promise<void> {
   if (!isConfigured()) return;
 
-  await clearSharedImportedStore();
-
-  if (records.length > 0) {
-    await request<unknown>(IMPORTED_TRANSACTIONS_TABLE, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify(records.map(toSharedTransactionRow)),
-    });
-  }
-
-  await request<unknown>(IMPORT_BATCHES_TABLE, {
+  await request<unknown>('rpc/replace_shared_imported_store', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
     },
-    body: JSON.stringify([toSharedBatchRow(summary)]),
+    body: JSON.stringify({
+      p_workspace_id: WORKSPACE_ID,
+      p_records: records.map(toSharedTransactionRow),
+      p_summary: toSharedBatchRow(summary),
+    }),
   });
 }
 
