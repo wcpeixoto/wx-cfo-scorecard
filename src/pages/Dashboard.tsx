@@ -22,7 +22,7 @@ import {
   isSharedPersistenceConfigured,
   saveSharedAccountSettings,
 } from '../lib/data/sharedPersistence';
-import { buildDataSet } from '../lib/data/normalize';
+import { buildDataSet, toISODateOnly } from '../lib/data/normalize';
 import { fetchSheetCsv } from '../lib/data/fetchCsv';
 import {
   buildPrePhase4DebugReport,
@@ -48,6 +48,7 @@ import type {
   ScenarioInput,
   TransactionImportSummary,
   TrendPoint,
+  Txn,
 } from '../lib/data/contract';
 
 type TabId =
@@ -367,6 +368,23 @@ function formatDateRangeLabel(startDate: string | null, endDate: string | null):
   return `${formatDateLabel(startDate)} – ${formatDateLabel(endDate)}`;
 }
 
+function formatMonthRangeLabel(startMonth: string, endMonth: string): string {
+  if (startMonth === endMonth) return toMonthLabel(startMonth);
+  return `${toMonthLabel(startMonth)} – ${toMonthLabel(endMonth)}`;
+}
+
+function getCurrentCalendarMonthToken(): string {
+  const currentDate = toISODateOnly(new Date()) ?? new Date().toISOString().slice(0, 10);
+  return currentDate.slice(0, 7);
+}
+
+function getLatestTxnDate(txns: Txn[]): string | null {
+  return txns.reduce<string | null>((latest, txn) => {
+    if (!latest || txn.date > latest) return txn.date;
+    return latest;
+  }, null);
+}
+
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -561,6 +579,23 @@ export default function Dashboard() {
 
   const activeDataSet = importedDataSet ?? dataSet;
   const baseTxns = useMemo(() => activeDataSet?.txns ?? [], [activeDataSet?.txns]);
+  const currentCalendarMonth = useMemo(() => getCurrentCalendarMonthToken(), []);
+  const previousCalendarMonth = useMemo(() => previousMonthToken(currentCalendarMonth), [currentCalendarMonth]);
+  const twoMonthsAgo = useMemo(
+    () => (previousCalendarMonth ? previousMonthToken(previousCalendarMonth) : null),
+    [previousCalendarMonth]
+  );
+  const latestAvailableTxnDate = useMemo(() => getLatestTxnDate(baseTxns), [baseTxns]);
+  const lastUpdatedDate = useMemo(() => {
+    if (latestAvailableTxnDate) return latestAvailableTxnDate;
+    if (lastImportSummary?.importedAtIso) return toISODateOnly(lastImportSummary.importedAtIso);
+    if (activeDataSet?.fetchedAtIso) return toISODateOnly(activeDataSet.fetchedAtIso);
+    return null;
+  }, [activeDataSet?.fetchedAtIso, lastImportSummary?.importedAtIso, latestAvailableTxnDate]);
+  const lastUpdatedLabel = useMemo(
+    () => `Last updated: ${lastUpdatedDate ? formatDateLabel(lastUpdatedDate) : 'Unavailable'}`,
+    [lastUpdatedDate]
+  );
   const discoveredAccountRecords = useMemo(() => discoverAccountRecords(baseTxns), [baseTxns]);
 
   const accountBalanceMap = useMemo(() => {
@@ -669,8 +704,8 @@ export default function Dashboard() {
   );
 
   const model = useMemo(
-    () => computeDashboardModel(filteredTxns, { cashFlowMode }),
-    [filteredTxns, cashFlowMode]
+    () => computeDashboardModel(filteredTxns, { cashFlowMode, thisMonthAnchor: currentCalendarMonth }),
+    [currentCalendarMonth, filteredTxns, cashFlowMode]
   );
 
   const customPreviousDateRange = useMemo(
@@ -691,12 +726,18 @@ export default function Dashboard() {
     );
   }, [customPreviousDateRange, filteredTxns, kpiTimeframe]);
   const customCurrentModel = useMemo(
-    () => (kpiTimeframe === 'custom' ? computeDashboardModel(customCurrentTxns, { cashFlowMode }) : null),
-    [cashFlowMode, customCurrentTxns, kpiTimeframe]
+    () =>
+      kpiTimeframe === 'custom'
+        ? computeDashboardModel(customCurrentTxns, { cashFlowMode, thisMonthAnchor: currentCalendarMonth })
+        : null,
+    [cashFlowMode, currentCalendarMonth, customCurrentTxns, kpiTimeframe]
   );
   const customPreviousModel = useMemo(
-    () => (kpiTimeframe === 'custom' ? computeDashboardModel(customPreviousTxns, { cashFlowMode }) : null),
-    [cashFlowMode, customPreviousTxns, kpiTimeframe]
+    () =>
+      kpiTimeframe === 'custom'
+        ? computeDashboardModel(customPreviousTxns, { cashFlowMode, thisMonthAnchor: currentCalendarMonth })
+        : null,
+    [cashFlowMode, currentCalendarMonth, customPreviousTxns, kpiTimeframe]
   );
   const selectedKpiComparison = useMemo<BigPictureKpiComparison | null>(() => {
     if (kpiTimeframe !== 'custom') {
@@ -759,6 +800,14 @@ export default function Dashboard() {
   ]);
   const selectedHeaderComparisonLabel = useMemo(() => {
     if (kpiTimeframe !== 'custom') {
+      if (kpiTimeframe === 'thisMonth' && previousCalendarMonth) {
+        return `${toMonthLabel(currentCalendarMonth)} · vs ${toMonthLabel(previousCalendarMonth)}`;
+      }
+
+      if (kpiTimeframe === 'lastMonth' && previousCalendarMonth && twoMonthsAgo) {
+        return `${toMonthLabel(previousCalendarMonth)} · vs ${toMonthLabel(twoMonthsAgo)}`;
+      }
+
       return model.kpiHeaderLabelByTimeframe[kpiTimeframe] ?? 'Comparison unavailable';
     }
 
@@ -775,12 +824,21 @@ export default function Dashboard() {
       customPreviousDateRange.startDate,
       customPreviousDateRange.endDate
     )}`;
-  }, [customEndDate, customPreviousDateRange, customStartDate, kpiTimeframe, model.kpiHeaderLabelByTimeframe]);
+  }, [
+    currentCalendarMonth,
+    customEndDate,
+    customPreviousDateRange,
+    customStartDate,
+    kpiTimeframe,
+    model.kpiHeaderLabelByTimeframe,
+    previousCalendarMonth,
+    twoMonthsAgo,
+  ]);
   const selectedKpiFrameLabel = BIG_PICTURE_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? '12M';
   const digHerePresetComparisons = useMemo(() => {
     const monthlyRollups = computeMonthlyRollups(baseTxns, cashFlowMode);
-    return computeKpiComparisons(monthlyRollups);
-  }, [baseTxns, cashFlowMode]);
+    return computeKpiComparisons(monthlyRollups, undefined, currentCalendarMonth);
+  }, [baseTxns, cashFlowMode, currentCalendarMonth]);
 
   const defaultDigHereRange = useMemo(() => {
     const ttm = digHerePresetComparisons.ttm;
@@ -1118,11 +1176,23 @@ export default function Dashboard() {
 
   const latestRollup = model.monthlyRollups[model.monthlyRollups.length - 1] ?? null;
   const previousRollup = model.monthlyRollups[model.monthlyRollups.length - 2] ?? null;
+  const currentCalendarRollup = useMemo(
+    () => model.monthlyRollups.find((rollup) => rollup.month === currentCalendarMonth) ?? null,
+    [currentCalendarMonth, model.monthlyRollups]
+  );
+  const previousCalendarRollup = useMemo(
+    () =>
+      previousCalendarMonth
+        ? model.monthlyRollups.find((rollup) => rollup.month === previousCalendarMonth) ?? null
+        : null,
+    [model.monthlyRollups, previousCalendarMonth]
+  );
   const selectedBigPictureTitle = useMemo(() => {
     if (kpiTimeframe === 'custom') return 'Custom Range';
-    if (selectedKpiComparison?.currentEndMonth) return toMonthLabel(selectedKpiComparison.currentEndMonth);
-    return model.latestMonth ? toMonthLabel(model.latestMonth) : 'No Data Yet';
-  }, [kpiTimeframe, model.latestMonth, selectedKpiComparison?.currentEndMonth]);
+    if (kpiTimeframe === 'thisMonth') return toMonthLabel(currentCalendarMonth);
+    if (kpiTimeframe === 'lastMonth' && previousCalendarMonth) return toMonthLabel(previousCalendarMonth);
+    return BIG_PICTURE_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? 'Big Picture';
+  }, [currentCalendarMonth, kpiTimeframe, previousCalendarMonth]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -1880,9 +1950,10 @@ export default function Dashboard() {
                 ? 'Dig Here'
                 : selectedBigPictureTitle}
             </h2>
-            <p>
+            <p className="top-bar-context">
               {activeTab === 'dig-here' ? digHereHeaderLabel : selectedHeaderComparisonLabel}
             </p>
+            <p className="top-bar-freshness subtle">{lastUpdatedLabel}</p>
           </div>
 
           <div className="top-controls top-controls-timeframe">
@@ -2612,17 +2683,17 @@ export default function Dashboard() {
       <aside className="right-panel">
         <section className="right-hero">
           <p className="eyebrow">Current Net</p>
-          <h3>{latestRollup ? formatCurrency(latestRollup.netCashFlow) : '$0'}</h3>
+          <h3>{currentCalendarRollup ? formatCurrency(currentCalendarRollup.netCashFlow) : '$0'}</h3>
           <p>
-            {latestRollup
-              ? `for ${toMonthLabel(latestRollup.month)} (${latestRollup.transactionCount.toLocaleString()} transactions)`
+            {currentCalendarRollup
+              ? `for ${toMonthLabel(currentCalendarRollup.month)} (${currentCalendarRollup.transactionCount.toLocaleString()} transactions)`
               : 'Waiting for data'}
           </p>
 
           <div className="delta-chip">
-            <span>{(latestRollup?.netCashFlow ?? 0) >= (previousRollup?.netCashFlow ?? 0) ? '▲' : '▼'}</span>
+            <span>{(currentCalendarRollup?.netCashFlow ?? 0) >= (previousCalendarRollup?.netCashFlow ?? 0) ? '▲' : '▼'}</span>
             <span>
-              vs previous {previousRollup ? formatCurrency(previousRollup.netCashFlow) : 'n/a'}
+              vs previous {previousCalendarRollup ? formatCurrency(previousCalendarRollup.netCashFlow) : 'n/a'}
             </span>
           </div>
         </section>
@@ -2631,13 +2702,13 @@ export default function Dashboard() {
           <h4>Quick Health</h4>
           <div className="mini-metrics">
             <p>
-              Revenue <strong>{formatCurrency(latestRollup?.revenue ?? 0)}</strong>
+              Revenue <strong>{formatCurrency(currentCalendarRollup?.revenue ?? 0)}</strong>
             </p>
             <p>
-              Expense <strong>{formatCurrency(latestRollup?.expenses ?? 0)}</strong>
+              Expense <strong>{formatCurrency(currentCalendarRollup?.expenses ?? 0)}</strong>
             </p>
             <p>
-              Savings Rate <strong>{(latestRollup?.savingsRate ?? 0).toFixed(1)}%</strong>
+              Savings Rate <strong>{(currentCalendarRollup?.savingsRate ?? 0).toFixed(1)}%</strong>
             </p>
             <p>
               Opportunity <strong>{formatCurrency(model.opportunityTotal)}</strong>

@@ -326,6 +326,12 @@ body {
   font-size: 0.9rem;
 }
 
+.top-bar-freshness {
+  margin-top: 6px;
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+}
+
 .top-controls {
   width: auto;
   display: grid;
