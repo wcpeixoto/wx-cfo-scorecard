@@ -65,7 +65,7 @@ function computeLinearTrend(values: number[]): number[] {
 
 export default function NetCashFlowChart({
   data,
-  cashFlowMode = 'total',
+  cashFlowMode = 'operating',
   timeframe: controlledTimeframe,
   onCashFlowModeChange,
   onTimeframeChange,
@@ -135,10 +135,13 @@ export default function NetCashFlowChart({
     fill: {
       type: ['gradient', 'solid'],
       gradient: {
-        shadeIntensity: 1,
-        opacityFrom: 0.35,
-        opacityTo: 0.05,
-        stops: [0, 90, 100],
+        type: 'vertical',
+        shade: 'light',
+        shadeIntensity: 0,
+        inverseColors: false,
+        opacityFrom: 0.24,
+        opacityTo: 0.02,
+        stops: [0, 78, 100],
       },
       opacity: [1, 0],
     },
@@ -209,17 +212,17 @@ export default function NetCashFlowChart({
           <div className="cashflow-toggle">
             <button
               type="button"
-              className={cashFlowMode === 'total' ? 'is-active' : ''}
-              onClick={() => onCashFlowModeChange?.('total')}
-            >
-              Total
-            </button>
-            <button
-              type="button"
               className={cashFlowMode === 'operating' ? 'is-active' : ''}
               onClick={() => onCashFlowModeChange?.('operating')}
             >
               Operating
+            </button>
+            <button
+              type="button"
+              className={cashFlowMode === 'total' ? 'is-active' : ''}
+              onClick={() => onCashFlowModeChange?.('total')}
+            >
+              Total
             </button>
           </div>
           <div className="cashflow-help">

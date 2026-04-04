@@ -476,7 +476,7 @@ export default function Dashboard() {
   const [accountRecords, setAccountRecords] = useState<AccountRecord[]>(getStoredAccountSettings);
   const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(DEFAULT_SCENARIO);
   const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('thisMonth');
-  const [cashFlowMode, setCashFlowMode] = useState<CashFlowMode>('total');
+  const [cashFlowMode, setCashFlowMode] = useState<CashFlowMode>('operating');
   const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
@@ -581,7 +581,7 @@ export default function Dashboard() {
       const validRange = startMonth && endMonth && startMonth <= endMonth;
 
       setActiveTab(tab ?? 'big-picture');
-      setCashFlowMode(cashFlow ?? 'total');
+      setCashFlowMode(cashFlow ?? 'operating');
       setQuery(nextQuery ?? '');
       setDigHereFocusMonth(validRange ? null : month);
       setDigHereStartMonth(validRange ? startMonth : null);
