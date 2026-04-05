@@ -535,6 +535,23 @@ export function computeMonthlyRollups(txns: Txn[], cashFlowMode: CashFlowMode = 
     });
 }
 
+/**
+ * Build a rollup for a single month using only transactions up to (and including)
+ * cutoffDate. Used to produce an apples-to-apples prior-year comparison when the
+ * current month is still in progress.
+ */
+function computePartialMonthRollup(
+  txns: Txn[],
+  month: string,
+  cutoffDate: string,
+  cashFlowMode: CashFlowMode
+): MonthlyRollup | null {
+  const filtered = txns.filter((txn) => txn.month === month && txn.date <= cutoffDate);
+  if (filtered.length === 0) return null;
+  const rollups = computeMonthlyRollups(filtered, cashFlowMode);
+  return rollups.find((r) => r.month === month) ?? null;
+}
+
 type RollupSummary = Omit<KpiAggregate, 'timeframe'>;
 
 function summarizeRollups(rollups: MonthlyRollup[]): RollupSummary {
@@ -821,7 +838,8 @@ function selectYoYComparisonBlocks(
   monthlyRollups: MonthlyRollup[],
   timeframe: KpiComparisonTimeframe,
   anchorMonth?: string,
-  thisMonthAnchor?: string
+  thisMonthAnchor?: string,
+  thisMonthPriorYearRollup?: MonthlyRollup | null
 ): { current: MonthlyRollup[]; previous: MonthlyRollup[] } {
   if (monthlyRollups.length === 0) {
     return { current: [], previous: [] };
@@ -835,9 +853,14 @@ function selectYoYComparisonBlocks(
   }
 
   if (timeframe === 'thisMonth') {
+    // Use a day-truncated prior-year rollup when available so we compare
+    // e.g. Apr 1–3, 2026 against Apr 1–3, 2025, not all of Apr 2025.
+    const previousRollups = thisMonthPriorYearRollup
+      ? [thisMonthPriorYearRollup]
+      : selectRollupsInRange(monthlyRollups, addMonths(resolvedAnchor, -12), addMonths(resolvedAnchor, -12));
     return {
       current: selectRollupsInRange(monthlyRollups, resolvedAnchor, resolvedAnchor),
-      previous: selectRollupsInRange(monthlyRollups, addMonths(resolvedAnchor, -12), addMonths(resolvedAnchor, -12)),
+      previous: previousRollups,
     };
   }
 
@@ -861,9 +884,14 @@ function selectYoYComparisonBlocks(
   return selectComparisonBlocks(monthlyRollups, timeframe, anchorMonth, thisMonthAnchor);
 }
 
-export function computeKpiYoYComparisons(monthlyRollups: MonthlyRollup[], anchorMonth?: string, thisMonthAnchor?: string): KpiComparisonMap {
+export function computeKpiYoYComparisons(
+  monthlyRollups: MonthlyRollup[],
+  anchorMonth?: string,
+  thisMonthAnchor?: string,
+  thisMonthPriorYearRollup?: MonthlyRollup | null
+): KpiComparisonMap {
   return KPI_COMPARISON_TIMEFRAMES.reduce<KpiComparisonMap>((result, timeframe) => {
-    const blocks = selectYoYComparisonBlocks(monthlyRollups, timeframe, anchorMonth, thisMonthAnchor);
+    const blocks = selectYoYComparisonBlocks(monthlyRollups, timeframe, anchorMonth, thisMonthAnchor, thisMonthPriorYearRollup);
     const currentSummary = summarizeRollups(blocks.current);
     const previousSummary = summarizeRollups(blocks.previous);
     result[timeframe] = buildTimeframeComparison(timeframe, currentSummary, previousSummary);
@@ -1602,9 +1630,25 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
   const previousContextMonth = addMonths(contextMonth, -1);
   const contextCurrentTxns = txns.filter((txn) => txn.month === contextMonth);
   const contextPreviousTxns = txns.filter((txn) => txn.month === previousContextMonth);
+  // For "This Month" YoY comparison, truncate the prior-year same month to the
+  // same day-of-month as the last imported transaction, so we compare identical
+  // elapsed fractions of the month (e.g. Apr 1–3 vs Apr 1–3) rather than a
+  // partial current month against a full prior-year month.
+  const currentAnchorMonth = thisMonthAnchor ?? anchorMonth ?? latest.month;
+  const latestDateInCurrentMonth = txns
+    .filter((txn) => txn.month === currentAnchorMonth)
+    .reduce<string | null>((max, txn) => (!max || txn.date > max ? txn.date : max), null);
+  let thisMonthPriorYearRollup: MonthlyRollup | null = null;
+  if (latestDateInCurrentMonth) {
+    const priorYearMonth = addMonths(currentAnchorMonth, -12);
+    const day = latestDateInCurrentMonth.slice(8); // "DD" from "YYYY-MM-DD"
+    const cutoffDate = `${priorYearMonth}-${day}`;
+    thisMonthPriorYearRollup = computePartialMonthRollup(txns, priorYearMonth, cutoffDate, cashFlowMode);
+  }
+
   const kpiAggregationByTimeframe = computeKpiAggregations(monthlyRollups, anchorMonth, thisMonthAnchor);
   const kpiComparisonByTimeframe = computeKpiComparisons(monthlyRollups, anchorMonth, thisMonthAnchor);
-  const kpiYoYComparisonByTimeframe = computeKpiYoYComparisons(monthlyRollups, anchorMonth, thisMonthAnchor);
+  const kpiYoYComparisonByTimeframe = computeKpiYoYComparisons(monthlyRollups, anchorMonth, thisMonthAnchor, thisMonthPriorYearRollup);
   const kpiHeaderLabelByTimeframe = computeKpiHeaderLabels(kpiComparisonByTimeframe);
   const kpiYoYHeaderLabelByTimeframe = computeKpiYoYHeaderLabels(kpiYoYComparisonByTimeframe);
   const trajectorySignals = computeTrajectorySignals(kpiComparisonByTimeframe);
