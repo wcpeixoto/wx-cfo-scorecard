@@ -27,8 +27,13 @@ import type {
   Txn,
 } from '../data/contract';
 import {
-  includeExpenseCategoryForCashFlowMode,
+  expenseContribution,
+  includeExpenseForDigHere,
   isCapitalDistributionCategory,
+  isUncategorizedCategory,
+  parentCategoryName,
+  revenueContribution,
+  shouldExcludeFromProfitability,
 } from '../cashFlow';
 
 const EPSILON = 0.00001;
@@ -492,7 +497,7 @@ export function computeMonthlyRollups(txns: Txn[], cashFlowMode: CashFlowMode = 
     const rollup = monthMap.get(txn.month);
     if (!rollup) return;
 
-    if (shouldExcludeFromBigPicture(txn)) return;
+    if (shouldExcludeFromProfitability(txn)) return;
 
     const revenue = revenueContribution(txn);
     const expense = expenseContribution(txn, cashFlowMode);
@@ -1240,69 +1245,8 @@ function categoryTotals(txns: Txn[], cashFlowMode: CashFlowMode): Map<string, nu
   return totals;
 }
 
-function parentCategoryName(category: string): string {
-  const separatorIndex = category.indexOf(':');
-  if (separatorIndex === -1) return category.trim();
-  const parent = category.slice(0, separatorIndex).trim();
-  return parent || category.trim();
-}
-
 function moverCategoryName(category: string, grouping: MoverGrouping): string {
   return grouping === 'categories' ? parentCategoryName(category) : category;
-}
-
-function isTransferCategory(category: string): boolean {
-  return parentCategoryName(category).toLowerCase() === 'transfer';
-}
-
-function isLoanCategory(category: string): boolean {
-  return parentCategoryName(category).toLowerCase() === 'loan';
-}
-
-function isBusinessIncomeCategory(category: string): boolean {
-  return parentCategoryName(category).toLowerCase() === 'business income';
-}
-
-function isUncategorizedCategory(category: string): boolean {
-  const normalized = category.trim().toLowerCase();
-  return normalized.length === 0 || normalized === 'uncategorized';
-}
-
-function isRefundCategory(category: string): boolean {
-  const normalized = category.trim().toLowerCase();
-  return normalized.startsWith('refund') || normalized.includes('allowance');
-}
-
-function accountLooksLikeLoan(account?: string): boolean {
-  return /\bloan\b/i.test(account ?? '');
-}
-
-function isTransferTxn(txn: Txn): boolean {
-  return Boolean(txn.transferAccount?.trim()) || isTransferCategory(txn.category);
-}
-
-function isFinancingTxn(txn: Txn): boolean {
-  return isLoanCategory(txn.category) || accountLooksLikeLoan(txn.account);
-}
-
-function shouldExcludeFromBigPicture(txn: Txn): boolean {
-  return isTransferTxn(txn) || isFinancingTxn(txn) || isUncategorizedCategory(txn.category);
-}
-
-function revenueContribution(txn: Txn): number {
-  if (shouldExcludeFromBigPicture(txn)) return 0;
-  if (!isBusinessIncomeCategory(txn.category)) return 0;
-  if (isRefundCategory(txn.category)) return 0;
-  return txn.rawAmount > 0 ? txn.amount : 0;
-}
-
-function expenseContribution(txn: Txn, cashFlowMode: CashFlowMode): number {
-  if (shouldExcludeFromBigPicture(txn)) return 0;
-  if (!includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)) return 0;
-  if (isBusinessIncomeCategory(txn.category)) return 0;
-  if (txn.rawAmount < 0) return txn.amount;
-  if (txn.rawAmount > 0) return -txn.amount;
-  return 0;
 }
 
 function buildUncategorizedWarning(txns: Txn[]): DashboardModel['uncategorizedWarning'] {
@@ -1315,13 +1259,6 @@ function buildUncategorizedWarning(txns: Txn[]): DashboardModel['uncategorizedWa
   };
 }
 
-function includeExpenseCategoryForDigHere(category: string, cashFlowMode: CashFlowMode): boolean {
-  if (!includeExpenseCategoryForCashFlowMode(category, cashFlowMode)) return false;
-  if (isCapitalDistributionCategory(category)) return false;
-  if (isTransferCategory(category)) return false;
-  return true;
-}
-
 function categoryTotalsByGrouping(
   txns: Txn[],
   cashFlowMode: CashFlowMode,
@@ -1330,7 +1267,7 @@ function categoryTotalsByGrouping(
   const totals = new Map<string, number>();
   txns.forEach((txn) => {
     if (txn.type !== 'expense') return;
-    if (!includeExpenseCategoryForDigHere(txn.category, cashFlowMode)) return;
+    if (!includeExpenseForDigHere(txn.category, cashFlowMode)) return;
     const category = moverCategoryName(txn.category, grouping);
     const current = totals.get(category) ?? 0;
     totals.set(category, current + txn.amount);
@@ -1425,7 +1362,7 @@ function buildMovers(
 
     allRelevantTxns.forEach((txn) => {
       if (txn.type !== 'expense') return;
-      if (!includeExpenseCategoryForDigHere(txn.category, cashFlowMode)) return;
+      if (!includeExpenseForDigHere(txn.category, cashFlowMode)) return;
       if (!sparklineMonthSet.has(txn.month)) return;
       const category = moverCategoryName(txn.category, grouping);
 

@@ -64,7 +64,7 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
       },
     },
     states: {
-      hover: { filter: { type: 'lighten', value: 0.05 } },
+      hover: { filter: { type: 'lighten' } },
       active: { filter: { type: 'none' } },
     },
   };

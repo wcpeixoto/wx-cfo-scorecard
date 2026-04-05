@@ -17,7 +17,7 @@ import NetCashFlowChart from '../components/NetCashFlowChart';
 import TrajectoryPanel from '../components/TrajectoryPanel';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
-import { includeExpenseCategoryForCashFlowMode, isCapitalDistributionCategory } from '../lib/cashFlow';
+import { includeExpenseForDigHere, isCapitalDistributionCategory } from '../lib/cashFlow';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
 import {
   getSharedAccountSettings,
@@ -451,6 +451,7 @@ function getStoredAccountSettings(): AccountRecord[] {
 
 export default function Dashboard() {
   const sharedPersistenceEnabled = isSharedPersistenceConfigured();
+  const profitabilityCashFlowMode: CashFlowMode = 'operating';
   const [activeTab, setActiveTab] = useState<TabId>('big-picture');
   const [csvUrl, setCsvUrl] = useState(getStoredCsvUrl);
   const [draftCsvUrl, setDraftCsvUrl] = useState(getStoredCsvUrl);
@@ -479,7 +480,7 @@ export default function Dashboard() {
   const [accountRecords, setAccountRecords] = useState<AccountRecord[]>(getStoredAccountSettings);
   const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(DEFAULT_SCENARIO);
   const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('lastMonth');
-  const [cashFlowMode, setCashFlowMode] = useState<CashFlowMode>('operating');
+  const [netCashFlowChartMode, setNetCashFlowChartMode] = useState<CashFlowMode>('operating');
   const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
@@ -584,7 +585,7 @@ export default function Dashboard() {
       const validRange = startMonth && endMonth && startMonth <= endMonth;
 
       setActiveTab(tab ?? 'big-picture');
-      setCashFlowMode(cashFlow ?? 'operating');
+      setNetCashFlowChartMode(cashFlow ?? 'operating');
       setQuery(nextQuery ?? '');
       setDigHereFocusMonth(validRange ? null : month);
       setDigHereStartMonth(validRange ? startMonth : null);
@@ -725,8 +726,20 @@ export default function Dashboard() {
   );
 
   const model = useMemo(
-    () => computeDashboardModel(filteredTxns, { cashFlowMode, thisMonthAnchor: currentCalendarMonth }),
-    [currentCalendarMonth, filteredTxns, cashFlowMode]
+    () =>
+      computeDashboardModel(filteredTxns, {
+        cashFlowMode: profitabilityCashFlowMode,
+        thisMonthAnchor: currentCalendarMonth,
+      }),
+    [currentCalendarMonth, filteredTxns, profitabilityCashFlowMode]
+  );
+  const netCashFlowChartModel = useMemo(
+    () =>
+      computeDashboardModel(filteredTxns, {
+        cashFlowMode: netCashFlowChartMode,
+        thisMonthAnchor: currentCalendarMonth,
+      }),
+    [currentCalendarMonth, filteredTxns, netCashFlowChartMode]
   );
 
   const customPreviousDateRange = useMemo(
@@ -749,16 +762,22 @@ export default function Dashboard() {
   const customCurrentModel = useMemo(
     () =>
       kpiTimeframe === 'custom'
-        ? computeDashboardModel(customCurrentTxns, { cashFlowMode, thisMonthAnchor: currentCalendarMonth })
+        ? computeDashboardModel(customCurrentTxns, {
+            cashFlowMode: profitabilityCashFlowMode,
+            thisMonthAnchor: currentCalendarMonth,
+          })
         : null,
-    [cashFlowMode, currentCalendarMonth, customCurrentTxns, kpiTimeframe]
+    [currentCalendarMonth, customCurrentTxns, kpiTimeframe, profitabilityCashFlowMode]
   );
   const customPreviousModel = useMemo(
     () =>
       kpiTimeframe === 'custom'
-        ? computeDashboardModel(customPreviousTxns, { cashFlowMode, thisMonthAnchor: currentCalendarMonth })
+        ? computeDashboardModel(customPreviousTxns, {
+            cashFlowMode: profitabilityCashFlowMode,
+            thisMonthAnchor: currentCalendarMonth,
+          })
         : null,
-    [cashFlowMode, currentCalendarMonth, customPreviousTxns, kpiTimeframe]
+    [currentCalendarMonth, customPreviousTxns, kpiTimeframe, profitabilityCashFlowMode]
   );
   const selectedKpiComparison = useMemo<BigPictureKpiComparison | null>(() => {
     if (kpiTimeframe !== 'custom') {
@@ -846,9 +865,9 @@ export default function Dashboard() {
   ]);
   const selectedKpiFrameLabel = BIG_PICTURE_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? '12M';
   const digHerePresetComparisons = useMemo(() => {
-    const monthlyRollups = computeMonthlyRollups(baseTxns, cashFlowMode);
+    const monthlyRollups = computeMonthlyRollups(baseTxns, profitabilityCashFlowMode);
     return computeKpiComparisons(monthlyRollups, undefined, currentCalendarMonth);
-  }, [baseTxns, cashFlowMode, currentCalendarMonth]);
+  }, [baseTxns, currentCalendarMonth, profitabilityCashFlowMode]);
 
   const defaultDigHereRange = useMemo(() => {
     const ttm = digHerePresetComparisons.ttm;
@@ -929,11 +948,11 @@ export default function Dashboard() {
       computeDigHereInsights(
         digHereCurrentTxns,
         digHerePreviousTxns,
-        cashFlowMode,
+        profitabilityCashFlowMode,
         filteredTxns,
         digHereMoverGrouping
       ),
-    [cashFlowMode, digHereCurrentTxns, digHereMoverGrouping, digHerePreviousTxns, filteredTxns]
+    [digHereCurrentTxns, digHereMoverGrouping, digHerePreviousTxns, filteredTxns, profitabilityCashFlowMode]
   );
 
   useEffect(() => {
@@ -1003,18 +1022,18 @@ export default function Dashboard() {
       }
     };
 
-    const oppositeCashFlowMode: CashFlowMode = cashFlowMode === 'operating' ? 'total' : 'operating';
+    const oppositeCashFlowMode: CashFlowMode = netCashFlowChartMode === 'operating' ? 'total' : 'operating';
     const edgeCaseRows = [
-      runEdgeCase('Short history (1 month)', filteredTxns.slice(-1), cashFlowMode),
-      runEdgeCase('Short history (2 months)', filteredTxns.slice(-2), cashFlowMode),
-      runEdgeCase('All dates window', filteredTxns, cashFlowMode),
+      runEdgeCase('Short history (1 month)', filteredTxns.slice(-1), profitabilityCashFlowMode),
+      runEdgeCase('Short history (2 months)', filteredTxns.slice(-2), profitabilityCashFlowMode),
+      runEdgeCase('All dates window', filteredTxns, profitabilityCashFlowMode),
       {
         case: 'Rapid timeframe switch simulation',
         status: 'ok',
         simulatedTimeframes: TREND_TIMEFRAMES.map((item) => (item === 'all' ? 'all' : `${item}m`)).join(', '),
       },
-      runEdgeCase('Search filter applied (live state)', filteredTxns, cashFlowMode),
-      runEdgeCase(`Cash Flow toggled (${oppositeCashFlowMode})`, filteredTxns, oppositeCashFlowMode),
+      runEdgeCase('Search filter applied (live state)', filteredTxns, profitabilityCashFlowMode),
+      runEdgeCase(`Chart Cash Flow toggled (${oppositeCashFlowMode})`, filteredTxns, oppositeCashFlowMode),
     ];
 
     const matchedCapitalDistribution = filteredTxns.filter(
@@ -1110,7 +1129,8 @@ export default function Dashboard() {
       failureReasons.forEach((reason) => console.warn(`- ${reason}`));
     }
     console.info('Context', {
-      cashFlowMode,
+      profitabilityCashFlowMode,
+      netCashFlowChartMode,
       searchQuery: query,
       rowCount: filteredTxns.length,
       latestMonthFromRollups: debug.latestMonthFromRollups || 'n/a',
@@ -1140,7 +1160,16 @@ export default function Dashboard() {
       matchedExpenseTotal,
     });
     console.groupEnd();
-  }, [cashFlowMode, filteredTxns, model.cashFlowForecastModelNotes, model.cashFlowForecastSeries, model.monthlyRollups, model.trend, query]);
+  }, [
+    filteredTxns,
+    model.cashFlowForecastModelNotes,
+    model.cashFlowForecastSeries,
+    model.monthlyRollups,
+    model.trend,
+    netCashFlowChartMode,
+    profitabilityCashFlowMode,
+    query,
+  ]);
 
   useEffect(() => {
     setIsMobileNavOpen(false);
@@ -1316,15 +1345,12 @@ export default function Dashboard() {
     if (!selectedKpiComparison) return [];
     if (!selectedKpiComparison.currentEndMonth || !selectedKpiComparison.currentStartMonth) return [];
 
-    const includeCategory = (category: string) =>
-      includeExpenseCategoryForCashFlowMode(category, cashFlowMode);
-
     const currentTotals = new Map<string, number>();
     const previousTotals = new Map<string, number>();
 
     filteredTxns.forEach((txn) => {
       if (txn.type !== 'expense') return;
-      if (!includeCategory(txn.category)) return;
+      if (!includeExpenseForDigHere(txn.category, profitabilityCashFlowMode)) return;
 
       if (
         inMonthRange(
@@ -1374,7 +1400,7 @@ export default function Dashboard() {
         return b.priorityScore - a.priorityScore;
       })
       .slice(0, 5);
-  }, [cashFlowMode, filteredTxns, selectedKpiComparison]);
+  }, [filteredTxns, profitabilityCashFlowMode, selectedKpiComparison]);
 
   const selectedKpiCards = useMemo<KpiCard[]>(() => {
     if (!selectedKpiComparison) return model.kpiCards;
@@ -1408,11 +1434,11 @@ export default function Dashboard() {
     const startMonth = selectedKpiComparison?.currentStartMonth;
     const endMonth = selectedKpiComparison?.currentEndMonth;
     if (!startMonth || !endMonth) {
-      return computeExpenseSlices([], cashFlowMode);
+      return computeExpenseSlices([], profitabilityCashFlowMode);
     }
     const periodTxns = filteredTxns.filter((txn) => txn.month >= startMonth && txn.month <= endMonth);
-    return computeExpenseSlices(periodTxns, cashFlowMode);
-  }, [selectedKpiComparison, filteredTxns, cashFlowMode]);
+    return computeExpenseSlices(periodTxns, profitabilityCashFlowMode);
+  }, [selectedKpiComparison, filteredTxns, profitabilityCashFlowMode]);
 
   const kpiVsLabel = useMemo<string>(() => {
     const labels: Record<BigPictureFrameValue, string> = {
@@ -1601,7 +1627,7 @@ export default function Dashboard() {
 
       writeDashboardUrlState({
         tab: nextTab,
-        cashFlow: cashFlowMode,
+        cashFlow: netCashFlowChartMode,
         queryText: query,
         month: null,
         startMonth: null,
@@ -1611,7 +1637,7 @@ export default function Dashboard() {
       });
     },
     [
-      cashFlowMode,
+      netCashFlowChartMode,
       digHereEndMonth,
       digHereFocusContext,
       digHereFocusMonth,
@@ -1644,7 +1670,7 @@ export default function Dashboard() {
       writeDashboardUrlState(
         {
           tab: activeTab,
-          cashFlow: cashFlowMode,
+          cashFlow: netCashFlowChartMode,
           queryText: query,
           month: digHereFocusMonth,
           startMonth: digHereStartMonth,
@@ -1664,7 +1690,7 @@ export default function Dashboard() {
 
       writeDashboardUrlState({
         tab: 'dig-here',
-        cashFlow: cashFlowMode,
+        cashFlow: netCashFlowChartMode,
         queryText: nextQuery,
         month: focusMonth,
         startMonth,
@@ -1675,7 +1701,7 @@ export default function Dashboard() {
     },
     [
       activeTab,
-      cashFlowMode,
+      netCashFlowChartMode,
       digHereFocusContext,
       digHereEndMonth,
       digHereFocusMonth,
@@ -1695,14 +1721,14 @@ export default function Dashboard() {
     setDigHereFocusContext(null);
     writeDashboardUrlState({
       tab: 'dig-here',
-      cashFlow: cashFlowMode,
+      cashFlow: netCashFlowChartMode,
       month: null,
       startMonth: null,
       endMonth: null,
       focusContext: null,
       moverGrouping: digHereMoverGrouping,
     });
-  }, [cashFlowMode, digHereMoverGrouping, writeDashboardUrlState]);
+  }, [digHereMoverGrouping, netCashFlowChartMode, writeDashboardUrlState]);
 
   const applyDigHerePeriod = useCallback(
     (period: DigHerePeriodValue) => {
@@ -1771,7 +1797,7 @@ export default function Dashboard() {
       writeDashboardUrlState(
         {
           tab: 'dig-here',
-          cashFlow: cashFlowMode,
+          cashFlow: netCashFlowChartMode,
           queryText: query,
           month: digHereFocusMonth,
           startMonth: digHereStartMonth,
@@ -1783,7 +1809,7 @@ export default function Dashboard() {
       );
     },
     [
-      cashFlowMode,
+      netCashFlowChartMode,
       digHereEndMonth,
       digHereFocusContext,
       digHereFocusMonth,
@@ -1798,7 +1824,7 @@ export default function Dashboard() {
     setQuery('');
     writeDashboardUrlState({
       tab: activeTab,
-      cashFlow: cashFlowMode,
+      cashFlow: netCashFlowChartMode,
       queryText: '',
       month: digHereFocusMonth,
       startMonth: digHereStartMonth,
@@ -1821,7 +1847,7 @@ export default function Dashboard() {
     setQuery('');
     writeDashboardUrlState({
       tab: activeTab,
-      cashFlow: cashFlowMode,
+      cashFlow: netCashFlowChartMode,
       queryText: '',
       month: digHereFocusMonth,
       startMonth: digHereStartMonth,
@@ -2213,10 +2239,10 @@ export default function Dashboard() {
             <p className="data-trust-note">Excludes transfers &amp; financing · operating cash flow only</p>
             <TrajectoryPanel signals={model.trajectorySignals} />
             <NetCashFlowChart
-              data={model.trend}
-              cashFlowMode={cashFlowMode}
+              data={netCashFlowChartModel.trend}
+              cashFlowMode={netCashFlowChartMode}
               timeframe={netChartTimeframe}
-              onCashFlowModeChange={setCashFlowMode}
+              onCashFlowModeChange={setNetCashFlowChartMode}
               onTimeframeChange={setNetChartTimeframe}
               onMonthPointClick={(month) =>
                 navigateToDigHere({

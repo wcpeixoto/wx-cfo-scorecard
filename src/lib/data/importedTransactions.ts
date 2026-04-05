@@ -1,5 +1,6 @@
-import type { DataSet, ImportedTransactionRecord, TransactionImportIssue, TransactionImportSummary, Txn, TxnType } from './contract';
+import type { DataSet, ImportedTransactionRecord, TransactionImportIssue, TransactionImportSummary, Txn } from './contract';
 import { toISODateOnly } from './normalize';
+import { classifyType } from '../cashFlow';
 import {
   clearSharedImportedStore,
   getSharedImportedStoreSnapshot,
@@ -35,10 +36,6 @@ function parseTags(raw: string): string[] {
     .split(/[;,]/)
     .map((value) => value.trim())
     .filter(Boolean);
-}
-
-function classifyType(rawAmount: number): TxnType {
-  return rawAmount >= 0 ? 'income' : 'expense';
 }
 
 function buildFingerprint(parts: Array<string | number | undefined>): string {

@@ -1,4 +1,5 @@
-import type { CsvRecord, DataSet, Txn, TxnType } from './contract';
+import type { CsvRecord, DataSet, Txn } from './contract';
+import { classifyType } from '../cashFlow';
 
 function normalizeKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -47,10 +48,6 @@ function parseTags(raw: string): string[] {
     .split(/[;,]/)
     .map((entry) => entry.trim())
     .filter(Boolean);
-}
-
-function classifyType(rawAmount: number): TxnType {
-  return rawAmount >= 0 ? 'income' : 'expense';
 }
 
 function toTransaction(record: CsvRecord): Txn | null {
