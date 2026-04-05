@@ -1536,7 +1536,11 @@ export default function Dashboard() {
       const url = new URL(window.location.href);
       url.searchParams.set('tab', next.tab);
       url.searchParams.delete('view');
-      url.searchParams.set('cf', next.cashFlow);
+      if (next.cashFlow !== 'operating') {
+        url.searchParams.set('cf', next.cashFlow);
+      } else {
+        url.searchParams.delete('cf');
+      }
 
       if (next.queryText?.trim()) {
         url.searchParams.set('q', next.queryText.trim());
