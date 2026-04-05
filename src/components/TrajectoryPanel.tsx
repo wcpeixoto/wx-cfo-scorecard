@@ -8,9 +8,9 @@ type TrajectoryPanelProps = {
 const SIGNAL_ORDER: TrajectorySignalId[] = ['monthlyTrend', 'shortTermTrend', 'longTermTrend'];
 
 function labelForSignal(id: TrajectorySignalId): string {
-  if (id === 'monthlyTrend') return 'Monthly Trend';
-  if (id === 'shortTermTrend') return 'Short-Term Trend';
-  return 'Long-Term Trend';
+  if (id === 'monthlyTrend') return 'Last Month (YoY)';
+  if (id === 'shortTermTrend') return 'Momentum (Last 3 Months)';
+  return 'Annual Performance';
 }
 
 function timeframeForSignal(id: TrajectorySignalId): TrajectorySignal['timeframe'] {
@@ -36,6 +36,17 @@ function formatRange(startMonth: string | null, endMonth: string | null): string
   if (!startMonth || !endMonth) return 'Insufficient history';
   if (startMonth === endMonth) return toMonthLabel(startMonth);
   return `${toMonthLabel(startMonth)} – ${toMonthLabel(endMonth)}`;
+}
+
+function comparisonTextForSignal(signal: TrajectorySignal): string {
+  if (!signal.hasSufficientHistory) return formatRange(signal.currentStartMonth, signal.currentEndMonth);
+
+  if (signal.id === 'shortTermTrend') return 'Last 3 Months vs Prior 3 Months';
+  if (signal.id === 'longTermTrend') return 'Last 12 Months vs Prior 12 Months';
+
+  const currentRange = formatRange(signal.currentStartMonth, signal.currentEndMonth);
+  const previousRange = formatRange(signal.previousStartMonth, signal.previousEndMonth);
+  return `${currentRange} vs ${previousRange}`;
 }
 
 export default function TrajectoryPanel({ signals }: TrajectoryPanelProps) {
@@ -75,9 +86,7 @@ export default function TrajectoryPanel({ signals }: TrajectoryPanelProps) {
         {orderedSignals.map((signal) => {
           const tone = toneFor(signal);
           const arrow = tone === 'up' ? '▲' : tone === 'down' ? '▼' : '●';
-          const currentRange = formatRange(signal.currentStartMonth, signal.currentEndMonth);
-          const previousRange = formatRange(signal.previousStartMonth, signal.previousEndMonth);
-          const comparisonText = signal.hasSufficientHistory ? `${currentRange} vs ${previousRange}` : currentRange;
+          const comparisonText = comparisonTextForSignal(signal);
 
           const isLongTerm = signal.id === 'longTermTrend';
           const itemClass = [

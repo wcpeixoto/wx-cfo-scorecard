@@ -916,9 +916,9 @@ type TrajectorySignalConfig = {
 };
 
 const TRAJECTORY_SIGNALS: TrajectorySignalConfig[] = [
-  { id: 'monthlyTrend', label: 'Monthly Trend', timeframe: 'lastMonth' },
-  { id: 'shortTermTrend', label: 'Short-Term Trend', timeframe: 'last3Months' },
-  { id: 'longTermTrend', label: 'Long-Term Trend', timeframe: 'ttm' },
+  { id: 'monthlyTrend', label: 'Last Month (YoY)', timeframe: 'lastMonth' },
+  { id: 'shortTermTrend', label: 'Momentum (Last 3 Months)', timeframe: 'last3Months' },
+  { id: 'longTermTrend', label: 'Annual Performance', timeframe: 'ttm' },
 ];
 
 export function computeTrajectorySignals(comparisons: KpiComparisonMap): TrajectorySignal[] {
@@ -1687,12 +1687,16 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
     kpiYoYHeaderLabelByTimeframe,
     trajectorySignals,
     kpiCards: buildKpis(kpiAggregationByTimeframe.thisMonth, kpiAggregationByTimeframe.lastMonth),
-    trend: monthlyRollups.map<TrendPoint>((rollup) => ({
-      month: rollup.month,
-      income: rollup.revenue,
-      expense: rollup.expenses,
-      net: rollup.netCashFlow,
-    })),
+    // Exclude the current (incomplete) calendar month from the chart so the
+    // last data point is always a fully closed month.
+    trend: monthlyRollups
+      .filter((rollup) => rollup.month <= prevCalendarMonth)
+      .map<TrendPoint>((rollup) => ({
+        month: rollup.month,
+        income: rollup.revenue,
+        expense: rollup.expenses,
+        net: rollup.netCashFlow,
+      })),
     cashFlowForecastSeries: cashFlowForecast.series,
     cashFlowForecastModelNotes: cashFlowForecast.modelNotes,
     suggestedRevenueMargin: suggestedMargins.suggestedRevenueMargin,
