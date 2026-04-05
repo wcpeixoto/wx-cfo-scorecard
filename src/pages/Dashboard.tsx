@@ -466,7 +466,6 @@ export default function Dashboard() {
   const [monthPickerDraftEnd, setMonthPickerDraftEnd] = useState<string>('');
   const monthPickerRef = useRef<HTMLDivElement>(null);
   const bigPictureFilterMenuRef = useRef<HTMLDivElement>(null);
-  const bigPictureTitleRef = useRef<HTMLButtonElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const [dataSet, setDataSet] = useState<DataSet | null>(null);
   const [importedDataSet, setImportedDataSet] = useState<DataSet | null>(null);
@@ -1499,8 +1498,7 @@ export default function Dashboard() {
 
     const handleOutsideClick = (event: MouseEvent) => {
       const inMenu = bigPictureFilterMenuRef.current?.contains(event.target as Node);
-      const inTitle = bigPictureTitleRef.current?.contains(event.target as Node);
-      if (!inMenu && !inTitle) {
+      if (!inMenu) {
         setIsBigPictureFilterOpen(false);
       }
     };
@@ -1985,18 +1983,7 @@ export default function Dashboard() {
           <div className="top-bar-main">
             <div className="top-bar-copy">
               <h2>
-                {activeTab === 'dig-here' ? 'Dig Here' : (
-                  <button
-                    ref={bigPictureTitleRef}
-                    type="button"
-                    className="top-bar-title-btn"
-                    onClick={() => setIsBigPictureFilterOpen((c) => !c)}
-                    aria-haspopup="menu"
-                    aria-expanded={isBigPictureFilterOpen}
-                  >
-                    {selectedBigPictureTitle}
-                  </button>
-                )}
+                {activeTab === 'dig-here' ? 'Dig Here' : selectedBigPictureTitle}
               </h2>
               <p className="top-bar-context">
                 {activeTab === 'dig-here' ? digHereHeaderLabel : selectedHeaderComparisonLabel}
@@ -2279,6 +2266,10 @@ export default function Dashboard() {
                 slices={kpiExpenseBreakdown.slices}
                 total={kpiExpenseBreakdown.total}
                 subtitle={selectedKpiFrameLabel}
+                onSubtitleClick={() => {
+                  setIsBigPictureFilterOpen((c) => !c);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
               />
             </div>
 

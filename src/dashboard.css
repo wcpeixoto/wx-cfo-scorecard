@@ -332,25 +332,19 @@ body {
   font-size: clamp(1.25rem, 2.2vw, 1.95rem);
 }
 
-.top-bar-title-btn {
+.card-period-btn {
   all: unset;
   cursor: pointer;
   font: inherit;
   color: inherit;
   letter-spacing: inherit;
+  opacity: 0.7;
 }
 
-.top-bar-title-btn::after {
-  content: ' ▾';
-  font-size: 0.6em;
-  opacity: 0.5;
-  vertical-align: middle;
-  position: relative;
-  top: -0.1em;
-}
-
-.top-bar-title-btn:hover {
-  opacity: 0.75;
+.card-period-btn:hover {
+  opacity: 1;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .top-bar-context {
