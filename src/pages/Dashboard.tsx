@@ -9,6 +9,7 @@ import ExpenseDonut from '../components/ExpenseDonut';
 import DigHereHighlights from '../components/DigHereHighlights';
 import KpiCards from '../components/KpiCards';
 import MoversList from '../components/MoversList';
+import TopCategoriesCard from '../components/TopCategoriesCard';
 import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
@@ -28,6 +29,7 @@ import {
   buildPrePhase4DebugReport,
   computeDashboardModel,
   computeDigHereInsights,
+  computeExpenseSlices,
   computeKpiComparisons,
   computePriorityScore,
   computeMonthlyRollups,
@@ -464,6 +466,7 @@ export default function Dashboard() {
   const [monthPickerDraftEnd, setMonthPickerDraftEnd] = useState<string>('');
   const monthPickerRef = useRef<HTMLDivElement>(null);
   const bigPictureFilterMenuRef = useRef<HTMLDivElement>(null);
+  const bigPictureTitleRef = useRef<HTMLButtonElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const [dataSet, setDataSet] = useState<DataSet | null>(null);
   const [importedDataSet, setImportedDataSet] = useState<DataSet | null>(null);
@@ -475,7 +478,7 @@ export default function Dashboard() {
   const [storedImportedTransactionCount, setStoredImportedTransactionCount] = useState(0);
   const [accountRecords, setAccountRecords] = useState<AccountRecord[]>(getStoredAccountSettings);
   const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(DEFAULT_SCENARIO);
-  const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('thisMonth');
+  const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('lastMonth');
   const [cashFlowMode, setCashFlowMode] = useState<CashFlowMode>('operating');
   const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -759,7 +762,7 @@ export default function Dashboard() {
   );
   const selectedKpiComparison = useMemo<BigPictureKpiComparison | null>(() => {
     if (kpiTimeframe !== 'custom') {
-      const comparison = model.kpiComparisonByTimeframe[kpiTimeframe];
+      const comparison = model.kpiYoYComparisonByTimeframe[kpiTimeframe];
       return comparison
         ? {
             ...comparison,
@@ -814,19 +817,11 @@ export default function Dashboard() {
     customPreviousModel,
     customStartDate,
     kpiTimeframe,
-    model.kpiComparisonByTimeframe,
+    model.kpiYoYComparisonByTimeframe,
   ]);
   const selectedHeaderComparisonLabel = useMemo(() => {
     if (kpiTimeframe !== 'custom') {
-      if (kpiTimeframe === 'thisMonth' && previousCalendarMonth) {
-        return `${toMonthLabel(currentCalendarMonth)} · vs ${toMonthLabel(previousCalendarMonth)}`;
-      }
-
-      if (kpiTimeframe === 'lastMonth' && previousCalendarMonth && twoMonthsAgo) {
-        return `${toMonthLabel(previousCalendarMonth)} · vs ${toMonthLabel(twoMonthsAgo)}`;
-      }
-
-      return model.kpiHeaderLabelByTimeframe[kpiTimeframe] ?? 'Comparison unavailable';
+      return model.kpiYoYHeaderLabelByTimeframe[kpiTimeframe] ?? 'Comparison unavailable';
     }
 
     const startDate = parseDateToken(customStartDate);
@@ -843,14 +838,11 @@ export default function Dashboard() {
       customPreviousDateRange.endDate
     )}`;
   }, [
-    currentCalendarMonth,
     customEndDate,
     customPreviousDateRange,
     customStartDate,
     kpiTimeframe,
-    model.kpiHeaderLabelByTimeframe,
-    previousCalendarMonth,
-    twoMonthsAgo,
+    model.kpiYoYHeaderLabelByTimeframe,
   ]);
   const selectedKpiFrameLabel = BIG_PICTURE_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? '12M';
   const digHerePresetComparisons = useMemo(() => {
@@ -1412,6 +1404,32 @@ export default function Dashboard() {
     ];
   }, [selectedKpiComparison, model.kpiCards]);
 
+  const kpiExpenseBreakdown = useMemo(() => {
+    const startMonth = selectedKpiComparison?.currentStartMonth;
+    const endMonth = selectedKpiComparison?.currentEndMonth;
+    if (!startMonth || !endMonth) {
+      return computeExpenseSlices([], cashFlowMode);
+    }
+    const periodTxns = filteredTxns.filter((txn) => txn.month >= startMonth && txn.month <= endMonth);
+    return computeExpenseSlices(periodTxns, cashFlowMode);
+  }, [selectedKpiComparison, filteredTxns, cashFlowMode]);
+
+  const kpiVsLabel = useMemo<string>(() => {
+    const labels: Record<BigPictureFrameValue, string> = {
+      thisMonth:    'vs same month last year',
+      lastMonth:    'vs same month last year',
+      last3Months:  'vs same 3 months last year',
+      ytd:          'vs prior YTD',
+      ttm:          'vs prior 12 months',
+      last24Months: 'vs prior 24 months',
+      last36Months: 'vs prior 36 months',
+      allDates:     'vs prior period',
+      custom:       'vs prior period',
+    };
+    return labels[kpiTimeframe];
+  }, [kpiTimeframe]);
+
+
   const sustainability = useMemo(
     () => [
       {
@@ -1480,7 +1498,9 @@ export default function Dashboard() {
     if (!isBigPictureFilterOpen) return;
 
     const handleOutsideClick = (event: MouseEvent) => {
-      if (!bigPictureFilterMenuRef.current?.contains(event.target as Node)) {
+      const inMenu = bigPictureFilterMenuRef.current?.contains(event.target as Node);
+      const inTitle = bigPictureTitleRef.current?.contains(event.target as Node);
+      if (!inMenu && !inTitle) {
         setIsBigPictureFilterOpen(false);
       }
     };
@@ -1965,9 +1985,18 @@ export default function Dashboard() {
           <div className="top-bar-main">
             <div className="top-bar-copy">
               <h2>
-                {activeTab === 'dig-here'
-                  ? 'Dig Here'
-                  : selectedBigPictureTitle}
+                {activeTab === 'dig-here' ? 'Dig Here' : (
+                  <button
+                    ref={bigPictureTitleRef}
+                    type="button"
+                    className="top-bar-title-btn"
+                    onClick={() => setIsBigPictureFilterOpen((c) => !c)}
+                    aria-haspopup="menu"
+                    aria-expanded={isBigPictureFilterOpen}
+                  >
+                    {selectedBigPictureTitle}
+                  </button>
+                )}
               </h2>
               <p className="top-bar-context">
                 {activeTab === 'dig-here' ? digHereHeaderLabel : selectedHeaderComparisonLabel}
@@ -2188,7 +2217,8 @@ export default function Dashboard() {
 
         {activeTab === 'big-picture' && (
           <>
-            <KpiCards cards={selectedKpiCards} />
+            <KpiCards cards={selectedKpiCards} vsLabel={kpiVsLabel} />
+            <p className="data-trust-note">Excludes transfers &amp; financing · operating cash flow only</p>
             <TrajectoryPanel signals={model.trajectorySignals} />
             <NetCashFlowChart
               data={model.trend}
@@ -2245,7 +2275,11 @@ export default function Dashboard() {
                 </ul>
               </article>
 
-              <TopPayeesTable payees={model.topPayees} />
+              <TopCategoriesCard
+                slices={kpiExpenseBreakdown.slices}
+                total={kpiExpenseBreakdown.total}
+                subtitle={selectedKpiFrameLabel}
+              />
             </div>
 
             <div className="two-col-grid">
@@ -2319,7 +2353,7 @@ export default function Dashboard() {
             <div className="tab-grid">
               <MoversList
                 movers={digHereInsights.movers}
-                title="Dig Here Actions"
+                title="Where to Look"
                 grouping={digHereMoverGrouping}
                 onGroupingChange={handleDigHereMoverGroupingChange}
               />

@@ -2,6 +2,7 @@ import type { KpiCard } from '../lib/data/contract';
 
 type KpiCardsProps = {
   cards: KpiCard[];
+  vsLabel?: string;
 };
 
 const EPSILON = 0.00001;
@@ -51,7 +52,7 @@ function formatPercentDelta(value: number | null): string {
   return `${prefix}${Math.round(value)}%`;
 }
 
-export default function KpiCards({ cards }: KpiCardsProps) {
+export default function KpiCards({ cards, vsLabel = 'vs prior period' }: KpiCardsProps) {
   return (
     <section className="kpi-grid" aria-label="Key metrics">
       {cards.map((card) => {
@@ -69,16 +70,16 @@ export default function KpiCards({ cards }: KpiCardsProps) {
         return (
           <article className="kpi-card" key={card.id}>
             <p className="kpi-label">{card.label}</p>
-            <div className="kpi-main-row">
-              <p className="kpi-value">{formatValue(card.value, card.format)}</p>
-              <p className={`kpi-change ${trendClass}`}>
+            <p className="kpi-value">{formatValue(card.value, card.format)}</p>
+            <div className="kpi-footer">
+              <span className={`kpi-badge ${trendClass}`}>
                 <span aria-hidden="true" className="kpi-change-arrow">
                   {trendClass === 'is-up' ? '▲' : trendClass === 'is-down' ? '▼' : '●'}
                 </span>
                 <span className="kpi-change-percent">{percentDelta}</span>
-              </p>
+              </span>
+              <span className="kpi-vs-label">{vsLabel}</span>
             </div>
-            <p className={`kpi-delta-row ${trendClass}`}>{absoluteDelta}</p>
           </article>
         );
       })}

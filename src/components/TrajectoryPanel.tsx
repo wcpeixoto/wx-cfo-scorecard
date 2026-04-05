@@ -79,8 +79,15 @@ export default function TrajectoryPanel({ signals }: TrajectoryPanelProps) {
           const previousRange = formatRange(signal.previousStartMonth, signal.previousEndMonth);
           const comparisonText = signal.hasSufficientHistory ? `${currentRange} vs ${previousRange}` : currentRange;
 
+          const isLongTerm = signal.id === 'longTermTrend';
+          const itemClass = [
+            'trajectory-item',
+            isLongTerm ? 'is-long-term' : '',
+            isLongTerm && tone === 'down' ? 'is-long-term-down' : '',
+          ].filter(Boolean).join(' ');
+
           return (
-            <article key={signal.id} className="trajectory-item">
+            <article key={signal.id} className={itemClass}>
               <div className="trajectory-head">
                 <p className="trajectory-label">{signal.label}</p>
                 <span className={`trajectory-light is-${tone}`} aria-hidden="true" />

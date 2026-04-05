@@ -75,7 +75,7 @@ export default function MoversList({
       <div className="card-head movers-card-head">
         <div>
           <h3>{title}</h3>
-          <p className="subtle">Largest category shifts vs prior period</p>
+          <p className="subtle">Categories with the biggest change vs prior period</p>
         </div>
         <div className="movers-group-toggle" role="group" aria-label="Mover grouping selector">
           {MOVER_GROUP_OPTIONS.map((option) => (

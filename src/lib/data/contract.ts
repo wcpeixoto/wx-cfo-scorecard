@@ -249,7 +249,9 @@ export type DashboardModel = {
   monthlyRollups: MonthlyRollup[];
   kpiAggregationByTimeframe: KpiAggregationMap;
   kpiComparisonByTimeframe: KpiComparisonMap;
+  kpiYoYComparisonByTimeframe: KpiComparisonMap;
   kpiHeaderLabelByTimeframe: KpiHeaderLabelMap;
+  kpiYoYHeaderLabelByTimeframe: KpiHeaderLabelMap;
   trajectorySignals: TrajectorySignal[];
   kpiCards: KpiCard[];
   trend: TrendPoint[];

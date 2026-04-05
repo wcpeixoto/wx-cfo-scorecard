@@ -48,6 +48,28 @@ function formatCurrency(value: number): string {
   return `${sign}$${Math.round(abs).toLocaleString()}`;
 }
 
+function xAxisLabelStep(count: number): number {
+  if (count >= 24) return 3;
+  if (count >= 12) return 2;
+  return 1;
+}
+
+// Returns nice axis bounds that guarantee 0 falls on a tick boundary
+function computeNiceAxisBounds(dataMin: number, dataMax: number) {
+  const lo = Math.min(dataMin, 0);
+  const hi = Math.max(dataMax, 0);
+  const maxAbs = Math.max(Math.abs(lo), Math.abs(hi)) || 1000;
+  const roughInterval = maxAbs / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(roughInterval)));
+  const interval = [1, 2, 2.5, 5, 10].map((c) => c * mag).find((c) => roughInterval <= c) ?? mag * 10;
+  const axisMin = lo < 0 ? -Math.ceil(-lo / interval) * interval : 0;
+  const axisMax = hi > 0 ? Math.ceil(hi / interval) * interval : interval;
+  const tickAmount = Math.round((axisMax - axisMin) / interval);
+  const span = axisMax - axisMin;
+  const zeroOffset = span === 0 ? 50 : Math.round((axisMax / span) * 100);
+  return { axisMin, axisMax, tickAmount, zeroOffset };
+}
+
 function computeLinearTrend(values: number[]): number[] {
   const n = values.length;
   if (n < 2) return values.slice();
@@ -102,6 +124,19 @@ export default function NetCashFlowChart({
   const values = useMemo(() => scopedData.map((d) => d.net), [scopedData]);
   const months = useMemo(() => scopedData.map((d) => d.month), [scopedData]);
   const trendValues = useMemo(() => computeLinearTrend(values), [values]);
+  const labelStep = useMemo(() => xAxisLabelStep(categories.length), [categories.length]);
+
+  const hasPositive = useMemo(() => values.some((v) => v > 0), [values]);
+  const hasNegative = useMemo(() => values.some((v) => v < 0), [values]);
+
+  // Compute nice axis bounds with 0 guaranteed as a tick boundary
+  const { yAxisMin, yAxisMax, yAxisTickAmount, zeroOffset } = useMemo(() => {
+    if (values.length === 0) return { yAxisMin: -1000, yAxisMax: 1000, yAxisTickAmount: 4, zeroOffset: 50 };
+    const dataMin = Math.min(...values);
+    const dataMax = Math.max(...values);
+    const { axisMin, axisMax, tickAmount, zeroOffset } = computeNiceAxisBounds(dataMin, dataMax);
+    return { yAxisMin: axisMin, yAxisMax: axisMax, yAxisTickAmount: tickAmount, zeroOffset };
+  }, [values]);
 
   const rangeLabel = useMemo(() => {
     if (scopedData.length === 0) return '';
@@ -114,7 +149,30 @@ export default function NetCashFlowChart({
     ? 'Operating mode excludes capital distribution.'
     : 'Total mode includes capital distribution.';
 
-  const options = useMemo<ApexOptions>(() => ({
+  const options = useMemo<ApexOptions>(() => {
+    // Build dual-color gradient stops: blue above zero, red below zero
+    const z = zeroOffset;
+    const colorStops = hasPositive && hasNegative
+      ? [
+          [
+            { offset: 0, color: '#465fff', opacity: 0.28 },
+            { offset: Math.max(0, z - 2), color: '#465fff', opacity: 0.02 },
+            { offset: Math.min(100, z + 2), color: '#ef4444', opacity: 0.02 },
+            { offset: 100, color: '#ef4444', opacity: 0.28 },
+          ],
+          [], // trend series — no gradient fill
+        ]
+      : hasNegative
+      ? [
+          [{ offset: 0, color: '#ef4444', opacity: 0.02 }, { offset: 100, color: '#ef4444', opacity: 0.28 }],
+          [],
+        ]
+      : [
+          [{ offset: 0, color: '#465fff', opacity: 0.28 }, { offset: 100, color: '#465fff', opacity: 0.02 }],
+          [],
+        ];
+
+    return ({
     chart: {
       type: 'area',
       height: 310,
@@ -134,50 +192,79 @@ export default function NetCashFlowChart({
     colors: ['#465fff', '#94a3b8'],
     fill: {
       type: ['gradient', 'solid'],
+      opacity: [1, 0],
       gradient: {
         type: 'vertical',
-        shade: 'light',
-        shadeIntensity: 0,
-        inverseColors: false,
-        opacityFrom: 0.24,
-        opacityTo: 0.02,
-        stops: [0, 78, 100],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        colorStops: colorStops as any,
       },
-      opacity: [1, 0],
     },
     stroke: {
-      width: [2.5, 1.5],
+      width: [2.25, 1.25],
       curve: ['smooth', 'straight'],
       dashArray: [0, 5],
+      lineCap: 'round',
     },
     dataLabels: { enabled: false },
     markers: {
       size: 0,
       hover: { sizeOffset: 5 },
     },
+    annotations: {
+      yaxis: [
+        {
+          y: 0,
+          borderColor: '#9ca3af',
+          borderWidth: 0.75,
+          strokeDashArray: 0,
+          label: { text: '' },
+        },
+      ],
+    },
     xaxis: {
       categories,
       axisBorder: { show: false },
       axisTicks: { show: false },
       labels: {
+        hideOverlappingLabels: false,
+        trim: false,
+        offsetY: 2,
+        formatter: (value: string, _timestamp?: number, opts?: { dataPointIndex?: number }) => {
+          const index = opts?.dataPointIndex ?? categories.indexOf(value);
+          if (index < 0) return value;
+          if (index === 0 || index === categories.length - 1) return value;
+          return index % labelStep === 0 ? value : '';
+        },
         style: {
-          fontSize: '11px',
+          fontSize: '12px',
+          fontWeight: '500',
           colors: '#6b7280',
         },
       },
     },
     yaxis: {
+      min: yAxisMin,
+      max: yAxisMax,
+      tickAmount: yAxisTickAmount,
       labels: {
         formatter: formatCurrency,
+        offsetX: -4,
         style: {
-          fontSize: '11px',
+          fontSize: '12px',
+          fontWeight: '500',
           colors: '#6b7280',
         },
       },
     },
     grid: {
-      borderColor: '#e5e7eb',
-      strokeDashArray: 3,
+      borderColor: '#E4E7EC',
+      strokeDashArray: 4,
+      padding: {
+        left: 6,
+        right: 10,
+        top: 6,
+        bottom: 0,
+      },
       xaxis: { lines: { show: false } },
       yaxis: { lines: { show: true } },
     },
@@ -190,11 +277,13 @@ export default function NetCashFlowChart({
         const formatted = `${sign}$${abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         const accentColor = val < 0 ? '#ef4444' : '#465fff';
         const seriesName = cashFlowMode === 'total' ? 'Total' : 'Operating';
-        return `<div style="padding:8px 12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.1);font-family:inherit"><div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:${accentColor};flex-shrink:0;display:inline-block"></span><span style="font-size:12px;color:#6b7280">${seriesName}:</span><span style="font-size:12px;font-weight:600;color:${accentColor}">${formatted}</span></div></div>`;
+        const monthLabel = categories[dataPointIndex] ?? '';
+        return `<div style="padding:10px 12px;background:#fff;border:1px solid #e4e7ec;border-radius:10px;box-shadow:0 10px 24px rgba(16,24,40,0.08);font-family:inherit;min-width:148px"><div style="font-size:11px;font-weight:600;color:#101828;margin-bottom:6px">${monthLabel}</div><div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:999px;background:${accentColor};flex-shrink:0;display:inline-block"></span><span style="font-size:11px;color:#667085">${seriesName}</span><span style="margin-left:auto;font-size:12px;font-weight:700;color:${accentColor}">${formatted}</span></div></div>`;
       },
     },
     legend: { show: false },
-  }), [categories, months, onMonthPointClick, cashFlowMode]);
+  });
+  }, [categories, months, onMonthPointClick, cashFlowMode, labelStep, hasPositive, hasNegative, zeroOffset, yAxisMin, yAxisMax, yAxisTickAmount]);
 
   const series = useMemo(() => [
     { name: cashFlowMode === 'total' ? 'Total' : 'Operating', data: values, type: 'area' },

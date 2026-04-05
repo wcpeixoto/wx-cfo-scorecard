@@ -812,6 +812,75 @@ export function computeKpiHeaderLabels(comparisons: KpiComparisonMap): KpiHeader
   }, {} as KpiHeaderLabelMap);
 }
 
+/**
+ * Year-over-Year comparison blocks for KPI cards.
+ * thisMonth, lastMonth, last3Months compare against the same period 12 months prior.
+ * All other timeframes delegate to the standard sequential logic.
+ */
+function selectYoYComparisonBlocks(
+  monthlyRollups: MonthlyRollup[],
+  timeframe: KpiComparisonTimeframe,
+  anchorMonth?: string,
+  thisMonthAnchor?: string
+): { current: MonthlyRollup[]; previous: MonthlyRollup[] } {
+  if (monthlyRollups.length === 0) {
+    return { current: [], previous: [] };
+  }
+
+  const effectiveAnchorStr =
+    timeframe === 'thisMonth' || timeframe === 'lastMonth' ? (thisMonthAnchor ?? anchorMonth) : anchorMonth;
+  const resolvedAnchor = resolveAnchorMonth(monthlyRollups, effectiveAnchorStr);
+  if (!resolvedAnchor) {
+    return { current: [], previous: [] };
+  }
+
+  if (timeframe === 'thisMonth') {
+    return {
+      current: selectRollupsInRange(monthlyRollups, resolvedAnchor, resolvedAnchor),
+      previous: selectRollupsInRange(monthlyRollups, addMonths(resolvedAnchor, -12), addMonths(resolvedAnchor, -12)),
+    };
+  }
+
+  if (timeframe === 'lastMonth') {
+    const lastMonth = addMonths(resolvedAnchor, -1);
+    return {
+      current: selectRollupsInRange(monthlyRollups, lastMonth, lastMonth),
+      previous: selectRollupsInRange(monthlyRollups, addMonths(lastMonth, -12), addMonths(lastMonth, -12)),
+    };
+  }
+
+  if (timeframe === 'last3Months') {
+    return {
+      current: selectRollupsInRange(monthlyRollups, addMonths(resolvedAnchor, -2), resolvedAnchor),
+      previous: selectRollupsInRange(monthlyRollups, addMonths(resolvedAnchor, -14), addMonths(resolvedAnchor, -12)),
+    };
+  }
+
+  // All other timeframes are already strategic (YoY-equivalent or longer):
+  // ytd, ttm, last24Months, last36Months, allDates — delegate to standard logic.
+  return selectComparisonBlocks(monthlyRollups, timeframe, anchorMonth, thisMonthAnchor);
+}
+
+export function computeKpiYoYComparisons(monthlyRollups: MonthlyRollup[], anchorMonth?: string, thisMonthAnchor?: string): KpiComparisonMap {
+  return KPI_COMPARISON_TIMEFRAMES.reduce<KpiComparisonMap>((result, timeframe) => {
+    const blocks = selectYoYComparisonBlocks(monthlyRollups, timeframe, anchorMonth, thisMonthAnchor);
+    const currentSummary = summarizeRollups(blocks.current);
+    const previousSummary = summarizeRollups(blocks.previous);
+    result[timeframe] = buildTimeframeComparison(timeframe, currentSummary, previousSummary);
+    return result;
+  }, {} as KpiComparisonMap);
+}
+
+export function computeKpiYoYHeaderLabels(comparisons: KpiComparisonMap): KpiHeaderLabelMap {
+  return KPI_COMPARISON_TIMEFRAMES.reduce<KpiHeaderLabelMap>((result, timeframe) => {
+    const item = comparisons[timeframe];
+    const currentRange = formatMonthRangeStable(item.currentStartMonth, item.currentEndMonth);
+    const previousRange = formatMonthRangeStable(item.previousStartMonth, item.previousEndMonth);
+    result[timeframe] = `${currentRange} · vs ${previousRange}`;
+    return result;
+  }, {} as KpiHeaderLabelMap);
+}
+
 type TrajectorySignalConfig = {
   id: TrajectorySignalId;
   label: string;
@@ -1241,18 +1310,33 @@ function categoryTotalsByGrouping(
   return totals;
 }
 
-function buildExpenseSlices(latestMonthTxns: Txn[], cashFlowMode: CashFlowMode): ExpenseSlice[] {
-  const totals = categoryTotals(latestMonthTxns, cashFlowMode);
-  const entries = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+export function computeExpenseSlices(txns: Txn[], cashFlowMode: CashFlowMode): { slices: ExpenseSlice[]; total: number } {
+  const subTotals = categoryTotals(txns, cashFlowMode);
+  const parentTotals = new Map<string, number>();
+  subTotals.forEach((value, category) => {
+    // Always exclude owner distributions / capital distributions from the expense breakdown
+    if (isCapitalDistributionCategory(category)) return;
+    const parent = parentCategoryName(category);
+    parentTotals.set(parent, (parentTotals.get(parent) ?? 0) + value);
+  });
+  // Compute share relative to ALL categories so percentages are accurate even when truncated to top N
+  const totalExpense = [...parentTotals.values()].reduce((sum, v) => sum + v, 0);
+  const entries = [...parentTotals.entries()].sort((a, b) => b[1] - a[1]);
   const top = entries.slice(0, 7);
-  const totalExpense = top.reduce((sum, entry) => sum + entry[1], 0);
 
-  return top.map(([name, value], index) => ({
-    name,
-    value: round2(value),
-    share: totalExpense > EPSILON ? value / totalExpense : 0,
-    color: EXPENSE_COLORS[index % EXPENSE_COLORS.length],
-  }));
+  return {
+    slices: top.map(([name, value], index) => ({
+      name,
+      value: round2(value),
+      share: totalExpense > EPSILON ? value / totalExpense : 0,
+      color: EXPENSE_COLORS[index % EXPENSE_COLORS.length],
+    })),
+    total: round2(totalExpense),
+  };
+}
+
+function buildExpenseSlices(txns: Txn[], cashFlowMode: CashFlowMode): ExpenseSlice[] {
+  return computeExpenseSlices(txns, cashFlowMode).slices;
 }
 
 function buildTopPayees(latestMonthTxns: Txn[], cashFlowMode: CashFlowMode): PayeeTotal[] {
@@ -1476,7 +1560,9 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
   if (monthlyRollups.length === 0) {
     const emptyAggregations = computeKpiAggregations([], anchorMonth, thisMonthAnchor);
     const emptyComparisons = computeKpiComparisons([], anchorMonth, thisMonthAnchor);
+    const emptyYoYComparisons = computeKpiYoYComparisons([], anchorMonth, thisMonthAnchor);
     const emptyHeaderLabels = computeKpiHeaderLabels(emptyComparisons);
+    const emptyYoYHeaderLabels = computeKpiYoYHeaderLabels(emptyYoYComparisons);
     const emptyTrajectory = computeTrajectorySignals(emptyComparisons);
     return {
       latestMonth: '',
@@ -1484,7 +1570,9 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
       monthlyRollups: [],
       kpiAggregationByTimeframe: emptyAggregations,
       kpiComparisonByTimeframe: emptyComparisons,
+      kpiYoYComparisonByTimeframe: emptyYoYComparisons,
       kpiHeaderLabelByTimeframe: emptyHeaderLabels,
+      kpiYoYHeaderLabelByTimeframe: emptyYoYHeaderLabels,
       trajectorySignals: emptyTrajectory,
       kpiCards: [],
       trend: [],
@@ -1516,7 +1604,9 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
   const contextPreviousTxns = txns.filter((txn) => txn.month === previousContextMonth);
   const kpiAggregationByTimeframe = computeKpiAggregations(monthlyRollups, anchorMonth, thisMonthAnchor);
   const kpiComparisonByTimeframe = computeKpiComparisons(monthlyRollups, anchorMonth, thisMonthAnchor);
+  const kpiYoYComparisonByTimeframe = computeKpiYoYComparisons(monthlyRollups, anchorMonth, thisMonthAnchor);
   const kpiHeaderLabelByTimeframe = computeKpiHeaderLabels(kpiComparisonByTimeframe);
+  const kpiYoYHeaderLabelByTimeframe = computeKpiYoYHeaderLabels(kpiYoYComparisonByTimeframe);
   const trajectorySignals = computeTrajectorySignals(kpiComparisonByTimeframe);
 
   const latestMonthTxns = txns.filter((txn) => txn.month === latest.month);
@@ -1536,7 +1626,9 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
     monthlyRollups,
     kpiAggregationByTimeframe,
     kpiComparisonByTimeframe,
+    kpiYoYComparisonByTimeframe,
     kpiHeaderLabelByTimeframe,
+    kpiYoYHeaderLabelByTimeframe,
     trajectorySignals,
     kpiCards: buildKpis(kpiAggregationByTimeframe.thisMonth, kpiAggregationByTimeframe.lastMonth),
     trend: monthlyRollups.map<TrendPoint>((rollup) => ({
