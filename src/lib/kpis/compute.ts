@@ -916,7 +916,7 @@ type TrajectorySignalConfig = {
 };
 
 const TRAJECTORY_SIGNALS: TrajectorySignalConfig[] = [
-  { id: 'monthlyTrend', label: 'Monthly Trend', timeframe: 'thisMonth' },
+  { id: 'monthlyTrend', label: 'Monthly Trend', timeframe: 'lastMonth' },
   { id: 'shortTermTrend', label: 'Short-Term Trend', timeframe: 'last3Months' },
   { id: 'longTermTrend', label: 'Long-Term Trend', timeframe: 'ttm' },
 ];
@@ -1651,7 +1651,19 @@ export function computeDashboardModel(txns: Txn[], options?: { cashFlowMode?: Ca
   const kpiYoYComparisonByTimeframe = computeKpiYoYComparisons(monthlyRollups, anchorMonth, thisMonthAnchor, thisMonthPriorYearRollup);
   const kpiHeaderLabelByTimeframe = computeKpiHeaderLabels(kpiComparisonByTimeframe);
   const kpiYoYHeaderLabelByTimeframe = computeKpiYoYHeaderLabels(kpiYoYComparisonByTimeframe);
-  const trajectorySignals = computeTrajectorySignals(kpiComparisonByTimeframe);
+
+  // Trajectory uses the last *complete* month as the anchor so no signal ever
+  // includes an in-progress month:
+  //  • Monthly Trend  = last complete month vs same month last year  (YoY)
+  //  • Short-Term     = last 3 complete months vs prior 3 months     (momentum)
+  //  • Long-Term      = TTM ending at last complete month vs prior TTM
+  const prevCalendarMonth = thisMonthAnchor ? addMonths(thisMonthAnchor, -1) : (anchorMonth ?? latest.month);
+  const prevAnchoredComparisons = computeKpiComparisons(monthlyRollups, prevCalendarMonth, prevCalendarMonth);
+  const trajectoryComparisonMap: KpiComparisonMap = {
+    ...prevAnchoredComparisons,
+    lastMonth: kpiYoYComparisonByTimeframe.lastMonth, // YoY: Mar 2026 vs Mar 2025
+  };
+  const trajectorySignals = computeTrajectorySignals(trajectoryComparisonMap);
 
   const latestMonthTxns = txns.filter((txn) => txn.month === latest.month);
   const previousMonthTxns = previous ? txns.filter((txn) => txn.month === previous.month) : [];
