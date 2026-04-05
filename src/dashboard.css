@@ -332,19 +332,71 @@ body {
   font-size: clamp(1.25rem, 2.2vw, 1.95rem);
 }
 
-.card-period-btn {
+/* ── Per-card period dropdown ───────────────────────────────────────────── */
+.period-dropdown {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.period-dropdown-trigger {
   all: unset;
   cursor: pointer;
-  font: inherit;
-  color: inherit;
-  letter-spacing: inherit;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.period-dropdown-trigger:hover {
+  color: var(--text-primary);
+}
+
+.period-dropdown-caret {
+  font-size: 0.65em;
   opacity: 0.7;
 }
 
-.card-period-btn:hover {
-  opacity: 1;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+.period-dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 200;
+  background: #fff;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  padding: 4px;
+  margin: 0;
+  list-style: none;
+  min-width: 130px;
+  white-space: nowrap;
+}
+
+.period-dropdown-menu li {
+  margin: 0;
+}
+
+.period-dropdown-menu button {
+  all: unset;
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  border-radius: 5px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.period-dropdown-menu button:hover {
+  background: #f2f4f7;
+}
+
+.period-dropdown-menu button.is-active {
+  color: var(--primary, #4f6fdd);
+  font-weight: 600;
 }
 
 .top-bar-context {

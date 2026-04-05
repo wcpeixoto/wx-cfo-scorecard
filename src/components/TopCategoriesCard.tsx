@@ -1,11 +1,11 @@
+import type { ReactNode } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import type { ExpenseSlice } from '../lib/data/contract';
 
 type TopCategoriesCardProps = {
   slices: ExpenseSlice[];
   total: number;
-  subtitle?: string;
-  onSubtitleClick?: () => void;
+  periodControl?: ReactNode;
 };
 
 function formatCurrency(value: number): string {
@@ -16,28 +16,15 @@ function formatCurrency(value: number): string {
   });
 }
 
-export default function TopCategoriesCard({
-  slices,
-  total,
-  subtitle = 'Expense breakdown this month',
-  onSubtitleClick,
-}: TopCategoriesCardProps) {
+export default function TopCategoriesCard({ slices, total, periodControl }: TopCategoriesCardProps) {
   const top = slices.slice(0, 6);
-
-  const subtitleNode = onSubtitleClick ? (
-    <button type="button" className="card-period-btn subtle" onClick={onSubtitleClick}>
-      {subtitle} ▾
-    </button>
-  ) : (
-    <p className="subtle">{subtitle}</p>
-  );
 
   if (top.length === 0) {
     return (
       <article className="card top-categories-card">
         <div className="card-head">
           <h3>Top Expense Categories</h3>
-          {subtitleNode}
+          {periodControl}
         </div>
         <p className="empty-state">No expense data yet.</p>
       </article>
@@ -89,7 +76,7 @@ export default function TopCategoriesCard({
           <h3>Top Expense Categories</h3>
           <p className="top-categories-total">Total: {formatCurrency(total)}</p>
         </div>
-        {subtitleNode}
+        {periodControl}
       </div>
 
       <div className="top-categories-layout">

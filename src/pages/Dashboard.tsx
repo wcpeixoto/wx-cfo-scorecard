@@ -10,6 +10,7 @@ import DigHereHighlights from '../components/DigHereHighlights';
 import KpiCards from '../components/KpiCards';
 import MoversList from '../components/MoversList';
 import TopCategoriesCard from '../components/TopCategoriesCard';
+import PeriodDropdown from '../components/PeriodDropdown';
 import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
@@ -2265,11 +2266,13 @@ export default function Dashboard() {
               <TopCategoriesCard
                 slices={kpiExpenseBreakdown.slices}
                 total={kpiExpenseBreakdown.total}
-                subtitle={selectedKpiFrameLabel}
-                onSubtitleClick={() => {
-                  setIsBigPictureFilterOpen((c) => !c);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
+                periodControl={
+                  <PeriodDropdown
+                    value={kpiTimeframe}
+                    options={BIG_PICTURE_FRAME_OPTIONS}
+                    onChange={(v) => setKpiTimeframe(v as BigPictureFrameValue)}
+                  />
+                }
               />
             </div>
 
