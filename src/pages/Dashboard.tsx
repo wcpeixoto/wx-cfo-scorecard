@@ -730,17 +730,19 @@ export default function Dashboard() {
     () =>
       computeDashboardModel(filteredTxns, {
         cashFlowMode: profitabilityCashFlowMode,
+        anchorMonth: previousCalendarMonth ?? undefined,
         thisMonthAnchor: currentCalendarMonth,
       }),
-    [currentCalendarMonth, filteredTxns, profitabilityCashFlowMode]
+    [currentCalendarMonth, filteredTxns, previousCalendarMonth, profitabilityCashFlowMode]
   );
   const netCashFlowChartModel = useMemo(
     () =>
       computeDashboardModel(filteredTxns, {
         cashFlowMode: netCashFlowChartMode,
+        anchorMonth: previousCalendarMonth ?? undefined,
         thisMonthAnchor: currentCalendarMonth,
       }),
-    [currentCalendarMonth, filteredTxns, netCashFlowChartMode]
+    [currentCalendarMonth, filteredTxns, netCashFlowChartMode, previousCalendarMonth]
   );
 
   const customPreviousDateRange = useMemo(
@@ -765,20 +767,22 @@ export default function Dashboard() {
       kpiTimeframe === 'custom'
         ? computeDashboardModel(customCurrentTxns, {
             cashFlowMode: profitabilityCashFlowMode,
+            anchorMonth: previousCalendarMonth ?? undefined,
             thisMonthAnchor: currentCalendarMonth,
           })
         : null,
-    [currentCalendarMonth, customCurrentTxns, kpiTimeframe, profitabilityCashFlowMode]
+    [currentCalendarMonth, customCurrentTxns, kpiTimeframe, previousCalendarMonth, profitabilityCashFlowMode]
   );
   const customPreviousModel = useMemo(
     () =>
       kpiTimeframe === 'custom'
         ? computeDashboardModel(customPreviousTxns, {
             cashFlowMode: profitabilityCashFlowMode,
+            anchorMonth: previousCalendarMonth ?? undefined,
             thisMonthAnchor: currentCalendarMonth,
           })
         : null,
-    [currentCalendarMonth, customPreviousTxns, kpiTimeframe, profitabilityCashFlowMode]
+    [currentCalendarMonth, customPreviousTxns, kpiTimeframe, previousCalendarMonth, profitabilityCashFlowMode]
   );
   const selectedKpiComparison = useMemo<BigPictureKpiComparison | null>(() => {
     if (kpiTimeframe !== 'custom') {
@@ -867,8 +871,8 @@ export default function Dashboard() {
   const selectedKpiFrameLabel = BIG_PICTURE_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? '12M';
   const digHerePresetComparisons = useMemo(() => {
     const monthlyRollups = computeMonthlyRollups(baseTxns, profitabilityCashFlowMode);
-    return computeKpiComparisons(monthlyRollups, undefined, currentCalendarMonth);
-  }, [baseTxns, currentCalendarMonth, profitabilityCashFlowMode]);
+    return computeKpiComparisons(monthlyRollups, previousCalendarMonth ?? undefined, currentCalendarMonth);
+  }, [baseTxns, currentCalendarMonth, previousCalendarMonth, profitabilityCashFlowMode]);
 
   const defaultDigHereRange = useMemo(() => {
     const ttm = digHerePresetComparisons.ttm;
