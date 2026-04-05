@@ -395,6 +395,12 @@ function formatMonthRangeLabel(startMonth: string, endMonth: string): string {
   return `${toMonthLabel(startMonth)} – ${toMonthLabel(endMonth)}`;
 }
 
+function summarizeAccountNames(records: AccountRecord[], limit = 3): string {
+  const names = records.map((record) => record.accountName || record.discoveredAccountName).filter(Boolean);
+  if (names.length <= limit) return names.join(', ');
+  return `${names.slice(0, limit).join(', ')} +${names.length - limit} more`;
+}
+
 function getCurrentCalendarMonthToken(): string {
   const currentDate = toISODateOnly(new Date()) ?? new Date().toISOString().slice(0, 10);
   return currentDate.slice(0, 7);
@@ -725,9 +731,62 @@ export default function Dashboard() {
   // True when at least one included account has a non-zero starting balance, meaning
   // the absolute cash position is meaningful (not just cumulative net change from 0).
   const hasCurrentCashBalance = useMemo(
-    () => accountRecords.some((r) => r.includeInCashForecast && r.active && r.startingBalance !== 0),
+    () => accountRecords.some((r) => r.includeInCashForecast && r.active && Math.abs(r.startingBalance) > EPSILON),
     [accountRecords]
   );
+  const forecastWindowStartLabel = useMemo(
+    () => (earliestAvailableDate ? formatDateLabel(earliestAvailableDate) : 'the start of the loaded data window'),
+    [earliestAvailableDate]
+  );
+  const forecastWindowLabel = useMemo(() => {
+    if (!earliestAvailableDate || !latestAvailableDate) return 'the loaded data window';
+    return formatDateRangeLabel(earliestAvailableDate, latestAvailableDate);
+  }, [earliestAvailableDate, latestAvailableDate]);
+  const includedForecastAccounts = useMemo(
+    () => accountRecords.filter((record) => record.active && record.includeInCashForecast),
+    [accountRecords]
+  );
+  const includedForecastAccountsMissingStartingBalance = useMemo(
+    () => includedForecastAccounts.filter((record) => Math.abs(record.startingBalance) <= EPSILON),
+    [includedForecastAccounts]
+  );
+  const includedNonCashForecastAccounts = useMemo(
+    () => includedForecastAccounts.filter((record) => record.accountType !== 'Cash'),
+    [includedForecastAccounts]
+  );
+  const includedCashAccountCount = useMemo(
+    () => includedForecastAccounts.filter((record) => record.accountType === 'Cash').length,
+    [includedForecastAccounts]
+  );
+  const forecastFoundationWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    if (includedForecastAccounts.length === 0) {
+      warnings.push('No active accounts are currently included in forecast, so cash forecasting has no account foundation yet.');
+      return warnings;
+    }
+    if (!hasCurrentCashBalance) {
+      warnings.push(
+        `Included forecast accounts all have a $0 starting balance, so forecast can only show cumulative change instead of absolute cash in bank.`
+      );
+    }
+    if (includedForecastAccountsMissingStartingBalance.length > 0) {
+      warnings.push(
+        `${summarizeAccountNames(includedForecastAccountsMissingStartingBalance)} still need a starting balance as of ${forecastWindowStartLabel}.`
+      );
+    }
+    if (includedNonCashForecastAccounts.length > 0) {
+      warnings.push(
+        `${summarizeAccountNames(includedNonCashForecastAccounts)} are included in forecast even though their account type is not Cash. Double-check that they should contribute to cash balance.`
+      );
+    }
+    return warnings;
+  }, [
+    forecastWindowStartLabel,
+    hasCurrentCashBalance,
+    includedForecastAccounts,
+    includedForecastAccountsMissingStartingBalance,
+    includedNonCashForecastAccounts,
+  ]);
 
   const model = useMemo(
     () =>
@@ -2682,6 +2741,43 @@ export default function Dashboard() {
                 </p>
               </div>
 
+              <div className="account-setup-summary">
+                <p className="account-setup-summary-title">Forecast cash foundation</p>
+                <p className="account-setup-summary-copy">
+                  Only <strong>Active</strong> accounts marked <strong>In Forecast</strong> contribute to current cash balance and the forecast starting point.
+                </p>
+                <div className="account-setup-summary-grid">
+                  <div>
+                    <span className="account-setup-summary-label">Loaded data window</span>
+                    <strong>{forecastWindowLabel}</strong>
+                  </div>
+                  <div>
+                    <span className="account-setup-summary-label">Included accounts</span>
+                    <strong>{includedForecastAccounts.length.toLocaleString()} total · {includedCashAccountCount.toLocaleString()} cash</strong>
+                  </div>
+                  <div>
+                    <span className="account-setup-summary-label">Current cash basis</span>
+                    <strong>{formatCurrency(currentCashBalance)}</strong>
+                  </div>
+                </div>
+                <ul className="account-setup-summary-notes">
+                  <li><strong>Starting Balance</strong> should be the account balance on <strong>{forecastWindowStartLabel}</strong>.</li>
+                  <li><strong>Current Balance</strong> is calculated as Starting Balance + loaded net transactions for that account.</li>
+                  <li>The forecast uses that computed current balance as its starting point.</li>
+                </ul>
+              </div>
+
+              {forecastFoundationWarnings.length > 0 ? (
+                <div className="account-setup-warnings" role="status" aria-live="polite">
+                  <p className="account-setup-warning-title">Check before trusting forecast output</p>
+                  <ul>
+                    {forecastFoundationWarnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
               {accountRecords.length === 0 ? (
                 <p className="empty-state">No account names have been discovered from the current data source yet.</p>
               ) : (
@@ -2692,8 +2788,8 @@ export default function Dashboard() {
                         <th>Detected Account</th>
                         <th>Account Name</th>
                         <th>Type</th>
-                        <th>Starting Balance</th>
-                        <th>Current Balance</th>
+                        <th>Starting Balance at Window Start</th>
+                        <th>Current Balance (computed)</th>
                         <th>In Forecast</th>
                         <th>Active</th>
                         <th>Status</th>
@@ -2728,28 +2824,41 @@ export default function Dashboard() {
                             </select>
                           </td>
                           <td>
-                            <input
-                              className="settings-table-input"
-                              type="number"
-                              step="0.01"
-                              value={record.startingBalance}
-                              onChange={(event) => {
-                                const nextValue = Number.parseFloat(event.target.value);
-                                handleAccountRecordChange(
-                                  record.id,
-                                  'startingBalance',
-                                  Number.isFinite(nextValue) ? nextValue : 0
-                                );
-                              }}
-                            />
+                            <div className="account-balance-input-cell">
+                              <input
+                                className="settings-table-input"
+                                type="number"
+                                step="0.01"
+                                value={record.startingBalance}
+                                aria-label={`${record.accountName} starting balance at window start`}
+                                onChange={(event) => {
+                                  const nextValue = Number.parseFloat(event.target.value);
+                                  handleAccountRecordChange(
+                                    record.id,
+                                    'startingBalance',
+                                    Number.isFinite(nextValue) ? nextValue : 0
+                                  );
+                                }}
+                              />
+                              <span className="account-input-hint">
+                                {Math.abs(record.startingBalance) <= EPSILON && record.includeInCashForecast && record.active
+                                  ? `Needed for forecast basis as of ${forecastWindowStartLabel}`
+                                  : `Balance on ${forecastWindowStartLabel}`}
+                              </span>
+                            </div>
                           </td>
                           <td>
-                            <span className="account-balance-computed">
-                              {formatCurrency(
-                                record.startingBalance +
-                                  (accountBalanceMap.get(record.id) ?? 0)
-                              )}
-                            </span>
+                            <div className="account-balance-cell">
+                              <span className="account-balance-computed">
+                                {formatCurrency(
+                                  record.startingBalance +
+                                    (accountBalanceMap.get(record.id) ?? 0)
+                                )}
+                              </span>
+                              <span className="account-balance-note">
+                                {record.active && record.includeInCashForecast ? 'Feeds forecast' : 'Not used in forecast'}
+                              </span>
+                            </div>
                           </td>
                           <td>
                             <label className="settings-checkbox">
