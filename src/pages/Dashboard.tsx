@@ -18,6 +18,7 @@ import TrajectoryPanel from '../components/TrajectoryPanel';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
 import { includeExpenseForDigHere, isCapitalDistributionCategory } from '../lib/cashFlow';
+import { runDataSanityChecks } from '../lib/dataSanity';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
 import {
   getSharedAccountSettings,
@@ -1159,6 +1160,21 @@ export default function Dashboard() {
       matchedRows: matchedCapitalDistribution.length,
       matchedExpenseTotal,
     });
+
+    const sanity = runDataSanityChecks(filteredTxns, model.monthlyRollups, profitabilityCashFlowMode);
+    const sanityLog = sanity.verdict === 'OK' ? console.info : console.error;
+    sanityLog(`[Data Sanity] ${sanity.verdict} — ${sanity.passCount} passed, ${sanity.failCount} failed`);
+    console.table(sanity.checks.map((c) => ({
+      id: c.id,
+      severity: c.severity,
+      passed: c.passed ? '✓' : '✗',
+      message: c.message,
+    })));
+    if (sanity.checks.some((c) => !c.passed && c.detail)) {
+      sanity.checks.filter((c) => !c.passed && c.detail).forEach((c) => {
+        console.warn(`[Data Sanity] ${c.id}:\n${c.detail}`);
+      });
+    }
     console.groupEnd();
   }, [
     filteredTxns,
