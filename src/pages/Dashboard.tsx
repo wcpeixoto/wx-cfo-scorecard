@@ -712,18 +712,21 @@ export default function Dashboard() {
     setCustomStartDate((current) => current || latestMonthDateRange.startDate);
     setCustomEndDate((current) => current || latestMonthDateRange.endDate);
   }, [customEndDate, customStartDate, latestMonthDateRange]);
+  // Sum startingBalance + cumulative net change for every account included in the cash forecast.
+  // This is the same formula already shown in Settings → Current Balance column.
   const currentCashBalance = useMemo(() => {
-    for (let index = baseTxns.length - 1; index >= 0; index -= 1) {
-      const candidate = baseTxns[index].balance;
-      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-        return candidate;
-      }
-    }
-    return 0;
-  }, [baseTxns]);
+    const includedRecords = accountRecords.filter((r) => r.includeInCashForecast && r.active);
+    if (includedRecords.length === 0) return 0;
+    return includedRecords.reduce(
+      (sum, record) => sum + record.startingBalance + (accountBalanceMap.get(record.id) ?? 0),
+      0
+    );
+  }, [accountRecords, accountBalanceMap]);
+  // True when at least one included account has a non-zero starting balance, meaning
+  // the absolute cash position is meaningful (not just cumulative net change from 0).
   const hasCurrentCashBalance = useMemo(
-    () => baseTxns.some((txn) => typeof txn.balance === 'number' && Number.isFinite(txn.balance)),
-    [baseTxns]
+    () => accountRecords.some((r) => r.includeInCashForecast && r.active && r.startingBalance !== 0),
+    [accountRecords]
   );
 
   const model = useMemo(
