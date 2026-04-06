@@ -603,20 +603,31 @@ function selectRollupsInRange(monthlyRollups: MonthlyRollup[], startMonth: strin
 export function computeRunwayMetric(
   monthlyRollups: MonthlyRollup[],
   currentCashBalance: number,
-  anchorMonth?: string
+  anchorMonth?: string,
+  reserveContextMonth?: string
 ): RunwayMetric {
   const normalizedCurrentCashBalance = round2(Number.isFinite(currentCashBalance) ? currentCashBalance : 0);
   const resolvedAnchor = resolveAnchorMonth(monthlyRollups, anchorMonth);
+  const reserveSnapshot = computeOperatingReserveSnapshot(
+    monthlyRollups,
+    normalizedCurrentCashBalance,
+    reserveContextMonth ?? anchorMonth ?? resolvedAnchor ?? undefined
+  );
 
   if (normalizedCurrentCashBalance <= EPSILON) {
     return {
       status: 'no-runway',
       months: null,
+      netRunwayMonths: null,
+      grossRunwayMonths: null,
       burnBasisMonths: 0,
+      netBurn: 0,
+      grossBurn: 0,
       averageMonthlyBurn: 0,
       currentCashBalance: normalizedCurrentCashBalance,
       burnStartMonth: null,
       burnEndMonth: null,
+      ...reserveSnapshot,
     };
   }
 
@@ -624,54 +635,108 @@ export function computeRunwayMetric(
     return {
       status: 'insufficient-history',
       months: null,
+      netRunwayMonths: null,
+      grossRunwayMonths: null,
       burnBasisMonths: 0,
+      netBurn: 0,
+      grossBurn: 0,
       averageMonthlyBurn: 0,
       currentCashBalance: normalizedCurrentCashBalance,
       burnStartMonth: null,
       burnEndMonth: null,
+      ...reserveSnapshot,
     };
   }
 
-  const burnWindow = selectRollupsInRange(monthlyRollups, addMonths(resolvedAnchor, -2), resolvedAnchor);
-  const averageNetCashFlow =
-    burnWindow.reduce((sum, rollup) => sum + rollup.netCashFlow, 0) / Math.max(burnWindow.length, 1);
+  const burnWindow = selectRollupsInRange(monthlyRollups, addMonths(resolvedAnchor, -11), resolvedAnchor);
 
-  if (burnWindow.length < 3) {
+  if (burnWindow.length === 0) {
     return {
       status: 'insufficient-history',
       months: null,
-      burnBasisMonths: burnWindow.length,
+      netRunwayMonths: null,
+      grossRunwayMonths: null,
+      burnBasisMonths: 0,
+      netBurn: 0,
+      grossBurn: 0,
       averageMonthlyBurn: 0,
       currentCashBalance: normalizedCurrentCashBalance,
-      burnStartMonth: burnWindow[0]?.month ?? null,
-      burnEndMonth: burnWindow[burnWindow.length - 1]?.month ?? null,
+      burnStartMonth: null,
+      burnEndMonth: null,
+      ...reserveSnapshot,
     };
   }
+
+  const averageNetCashFlow =
+    burnWindow.reduce((sum, rollup) => sum + rollup.netCashFlow, 0) / Math.max(burnWindow.length, 1);
+  const averageMonthlyExpenses =
+    burnWindow.reduce((sum, rollup) => sum + rollup.expenses, 0) / Math.max(burnWindow.length, 1);
+  const grossBurn = round2(Math.max(averageMonthlyExpenses, 0));
+  const grossRunwayMonths =
+    grossBurn <= EPSILON ? null : round2(normalizedCurrentCashBalance / grossBurn);
 
   if (averageNetCashFlow >= -EPSILON) {
     return {
       status: 'self-funded',
       months: null,
+      netRunwayMonths: null,
+      grossRunwayMonths,
       burnBasisMonths: burnWindow.length,
+      netBurn: 0,
+      grossBurn,
       averageMonthlyBurn: 0,
       currentCashBalance: normalizedCurrentCashBalance,
       burnStartMonth: burnWindow[0]?.month ?? null,
       burnEndMonth: burnWindow[burnWindow.length - 1]?.month ?? null,
+      ...reserveSnapshot,
     };
   }
 
   const averageMonthlyBurn = round2(Math.abs(averageNetCashFlow));
-  const months = averageMonthlyBurn <= EPSILON ? null : round2(normalizedCurrentCashBalance / averageMonthlyBurn);
+  const netRunwayMonths = averageMonthlyBurn <= EPSILON ? null : round2(normalizedCurrentCashBalance / averageMonthlyBurn);
 
   return {
-    status: months === null ? 'self-funded' : 'ok',
-    months,
+    status: netRunwayMonths === null ? 'self-funded' : 'ok',
+    months: netRunwayMonths,
+    netRunwayMonths,
+    grossRunwayMonths,
     burnBasisMonths: burnWindow.length,
+    netBurn: averageMonthlyBurn,
+    grossBurn,
     averageMonthlyBurn,
     currentCashBalance: normalizedCurrentCashBalance,
     burnStartMonth: burnWindow[0]?.month ?? null,
     burnEndMonth: burnWindow[burnWindow.length - 1]?.month ?? null,
+    ...reserveSnapshot,
   };
+}
+
+function computeOperatingReserveSnapshot(
+  monthlyRollups: MonthlyRollup[],
+  currentCashBalance: number,
+  contextMonth?: string
+): Pick<RunwayMetric, 'reserveTarget' | 'percentFunded'> {
+  const resolvedContextMonth = contextMonth ?? resolveAnchorMonth(monthlyRollups) ?? null;
+  const parsedContext = resolvedContextMonth ? parseMonthParts(resolvedContextMonth) : null;
+  if (!parsedContext) {
+    return { reserveTarget: 0, percentFunded: null };
+  }
+
+  const recalibrationStartMonth =
+    parsedContext.month <= 6 ? `${parsedContext.year}-01` : `${parsedContext.year}-07`;
+  const priorCompleteRollups = monthlyRollups.filter((rollup) => rollup.month < recalibrationStartMonth);
+  const reserveBasisWindow = selectTrailingRollups(priorCompleteRollups, 3);
+
+  if (reserveBasisWindow.length === 0) {
+    return { reserveTarget: 0, percentFunded: null };
+  }
+
+  const averageMonthlyExpenses =
+    reserveBasisWindow.reduce((sum, rollup) => sum + rollup.expenses, 0) / reserveBasisWindow.length;
+  const reserveTarget = round2(Math.max(averageMonthlyExpenses, 0));
+  const percentFunded = reserveTarget > EPSILON ? round2(currentCashBalance / reserveTarget) : null;
+
+  return { reserveTarget, percentFunded };
 }
 
 function resolveAnchorMonth(monthlyRollups: MonthlyRollup[], anchorMonth?: string): string | null {
@@ -1637,7 +1702,7 @@ export function computeDashboardModel(
       summaryBullets: [],
       uncategorizedWarning: null,
       digHerePreview: [],
-      runway: computeRunwayMetric([], currentCashBalance, anchorMonth),
+      runway: computeRunwayMetric([], currentCashBalance, anchorMonth, thisMonthAnchor),
     };
   }
 
@@ -1689,7 +1754,12 @@ export function computeDashboardModel(
   const opportunityTotal = round2(opportunities.reduce((sum, item) => sum + item.savings, 0));
   const uncategorizedWarning = buildUncategorizedWarning(txns);
   const runwayAnchorMonth = anchorMonth ?? (thisMonthAnchor ? addMonths(thisMonthAnchor, -1) : latest.month);
-  const runway = computeRunwayMetric(monthlyRollups, currentCashBalance, runwayAnchorMonth);
+  const runway = computeRunwayMetric(
+    monthlyRollups,
+    currentCashBalance,
+    runwayAnchorMonth,
+    thisMonthAnchor ?? anchorMonth ?? latest.month
+  );
   // Precompute up to 36 projected months so UI horizon controls can expand
   // from 30-day equivalents through 3 years without recalculating the model.
   const cashFlowForecast = buildCashFlowForecastSeries(monthlyRollups, 36);

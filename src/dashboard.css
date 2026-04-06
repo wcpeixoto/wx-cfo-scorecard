@@ -12,6 +12,7 @@
   --accent: #4f78ff;
   --accent-soft: #dce5ff;
   --positive: #1f9d68;
+  --warning: #d97706;
   --negative: #d25b70;
   --line: #d8e2f0;
   --shadow-soft: 0 18px 40px rgba(24, 49, 89, 0.08);
@@ -1224,6 +1225,255 @@ body {
 .highlights-card {
   padding-top: 14px;
   padding-bottom: 14px;
+}
+
+.runway-highlights-grid {
+  align-items: start;
+}
+
+/* ── Operating Reserve card ── */
+
+.reserve-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-self: start;
+  min-height: auto;
+  padding: 20px 24px;
+}
+
+.reserve-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+}
+
+.reserve-header-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.reserve-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.reserve-badge.is-caution {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
+}
+
+.reserve-badge.is-positive {
+  background: color-mix(in srgb, var(--positive) 14%, transparent);
+  color: var(--positive);
+  border: 1px solid color-mix(in srgb, var(--positive) 30%, transparent);
+}
+
+.reserve-badge.is-neutral {
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+  border: 1px solid var(--line);
+}
+
+.reserve-header h3 {
+  margin: 0;
+  font-size: 1.04rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.15;
+}
+
+.reserve-subtitle {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  color: var(--text-secondary);
+}
+
+/* ── Semicircular gauge ── */
+
+.reserve-gauge-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.reserve-gauge-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.reserve-gauge-arc {
+  stroke: var(--warning);
+}
+
+.reserve-gauge-arc.is-positive {
+  stroke: var(--positive);
+}
+
+.reserve-gauge-arc.is-caution {
+  stroke: var(--warning);
+}
+
+.reserve-gauge-arc.is-low {
+  stroke: var(--negative);
+}
+
+.reserve-gauge-arc.is-neutral {
+  stroke: var(--text-secondary);
+}
+
+.reserve-gauge-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, 5%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.reserve-gauge-value {
+  font-size: clamp(2rem, 3.2vw, 2.6rem);
+  line-height: 0.95;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.reserve-gauge-label {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  line-height: 1.15;
+}
+
+.reserve-gauge-end-label {
+  font-size: 11px;
+  fill: var(--text-secondary);
+}
+
+.reserve-floor {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: -2px;
+}
+
+.reserve-floor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.reserve-floor-current,
+.reserve-floor-target {
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.reserve-floor-current {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.reserve-floor-target {
+  color: var(--text-secondary);
+}
+
+.reserve-floor-bar,
+.reserve-stat-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+
+.reserve-floor-fill,
+.reserve-stat-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.32s ease;
+}
+
+.reserve-floor-fill.is-positive,
+.reserve-stat-bar-fill.is-positive {
+  background: var(--positive);
+}
+
+.reserve-floor-fill.is-caution,
+.reserve-stat-bar-fill.is-caution {
+  background: var(--warning);
+}
+
+.reserve-floor-fill.is-low,
+.reserve-stat-bar-fill.is-low {
+  background: var(--negative);
+}
+
+.reserve-floor-fill.is-neutral,
+.reserve-stat-bar-fill.is-neutral {
+  background: var(--text-secondary);
+}
+
+/* ── Stat rows ── */
+
+.reserve-stat-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reserve-stat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reserve-stat-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.reserve-stat-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.reserve-stat-value {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.reserve-stat-bar-fill.is-gap {
+  background: var(--line);
+}
+
+.reserve-structural {
+  margin: 0;
+  padding-top: 2px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
 }
 
 .highlights-title-btn {

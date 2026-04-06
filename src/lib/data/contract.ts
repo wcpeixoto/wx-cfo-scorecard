@@ -248,11 +248,19 @@ export type RunwayStatus = 'ok' | 'self-funded' | 'no-runway' | 'insufficient-hi
 export type RunwayMetric = {
   status: RunwayStatus;
   months: number | null;
+  netRunwayMonths: number | null;
+  grossRunwayMonths: number | null;
   burnBasisMonths: number;
+  netBurn: number;
+  grossBurn: number;
   averageMonthlyBurn: number;
   currentCashBalance: number;
   burnStartMonth: string | null;
   burnEndMonth: string | null;
+  /** Fixed operating reserve target currently in force from semiannual recalibration. */
+  reserveTarget: number;
+  /** currentCashBalance / reserveTarget as a 0–1+ ratio (null when target is unavailable). */
+  percentFunded: number | null;
 };
 
 export type DashboardModel = {

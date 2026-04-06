@@ -402,15 +402,21 @@ function summarizeAccountNames(records: AccountRecord[], limit = 3): string {
   return `${names.slice(0, limit).join(', ')} +${names.length - limit} more`;
 }
 
-function getReservePercentDisplay(runway: DashboardModel['runway']): number {
-  if (runway.percentFunded === null) return 0;
-  return Math.round(runway.percentFunded * 100);
+function getReservePercentDisplay(currentCashBalance: number, reserveTarget: number): number | null {
+  if (reserveTarget <= EPSILON) return null;
+  return Math.round((currentCashBalance / reserveTarget) * 100);
 }
 
-function reserveToneClassName(percent: number): string {
+function reserveToneClassName(percent: number | null): string {
+  if (percent === null) return 'is-neutral';
   if (percent >= 100) return 'is-positive';
-  if (percent >= 50) return 'is-caution';
-  return 'is-low';
+  return 'is-caution';
+}
+
+function getReserveBadgeState(percent: number | null): { label: string; toneClassName: string } {
+  if (percent === null) return { label: 'Unavailable', toneClassName: 'is-neutral' };
+  if (percent >= 100) return { label: 'At/above floor', toneClassName: 'is-positive' };
+  return { label: 'Below floor', toneClassName: 'is-caution' };
 }
 
 function formatCompactCurrency(value: number): string {
@@ -420,30 +426,41 @@ function formatCompactCurrency(value: number): string {
   return `$${Math.round(value)}`;
 }
 
-function formatCoverageGapWeeks(runway: DashboardModel['runway']): string {
-  if (runway.reserveTarget <= 0 || runway.grossBurn <= 0) return '—';
-  const gap = Math.max(runway.reserveTarget - runway.currentCashBalance, 0);
-  if (gap <= 0) return 'Fully funded';
-  const weeklyBurn = runway.grossBurn / 4.33;
+function formatCoverageGapWeeks(currentCashBalance: number, reserveTarget: number): string {
+  if (reserveTarget <= EPSILON) return '—';
+  const gap = Math.max(reserveTarget - currentCashBalance, 0);
+  if (gap <= EPSILON) return '0 weeks';
+  const monthlyReserveRequirement = reserveTarget / 3;
+  if (monthlyReserveRequirement <= EPSILON) return '—';
+  const weeklyBurn = monthlyReserveRequirement / 4.33;
   const weeks = Math.round(gap / weeklyBurn);
   return `~${weeks} week${weeks === 1 ? '' : 's'}`;
 }
 
-function ReserveGauge({ percent, toneClass, currentCash, reserveTarget }: {
-  percent: number;
+function formatReservePercentLabel(percent: number | null): string {
+  if (percent === null) return '—';
+  return `${percent}%`;
+}
+
+function formatReserveFloorLabel(reserveTarget: number): string {
+  if (reserveTarget <= EPSILON) return 'floor —';
+  return `floor ${formatCurrency(reserveTarget)}`;
+}
+
+function ReserveGauge({ percentLabel, fillPercent, toneClass, reserveTarget }: {
+  percentLabel: string;
+  fillPercent: number;
   toneClass: string;
-  currentCash: number;
   reserveTarget: number;
 }) {
-  const size = 180;
+  const size = 280;
   const cx = size / 2;
-  const cy = size / 2 + 10;
-  const radius = 70;
-  const strokeWidth = 12;
-  // Arc from 180° (left) to 0° (right) — semicircle open at bottom
+  const cy = size / 2;
+  const radius = 115;
+  const strokeWidth = 18;
   const startAngle = Math.PI;
   const endAngle = 0;
-  const clampedPercent = Math.min(Math.max(percent, 0), 100);
+  const clampedPercent = Math.min(Math.max(fillPercent, 0), 100);
   const fillAngle = startAngle - (clampedPercent / 100) * Math.PI;
 
   function polarToXY(angle: number): { x: number; y: number } {
@@ -458,20 +475,23 @@ function ReserveGauge({ percent, toneClass, currentCash, reserveTarget }: {
   const trackPath = `M ${trackStart.x} ${trackStart.y} A ${radius} ${radius} 0 1 1 ${trackEnd.x} ${trackEnd.y}`;
   const fillPath = `M ${trackStart.x} ${trackStart.y} A ${radius} ${radius} 0 ${largeArc} 1 ${fillEnd.x} ${fillEnd.y}`;
 
+  const labelY = cy + strokeWidth / 2 + 16;
+  const maxLabel = reserveTarget > EPSILON ? formatCompactCurrency(reserveTarget) : '—';
+
   return (
     <div className="reserve-gauge-wrap">
-      <svg viewBox={`0 0 ${size} ${cy + 8}`} className="reserve-gauge-svg" aria-hidden="true">
-        <path d={trackPath} fill="none" stroke="var(--bg-tertiary, #e5e7eb)" strokeWidth={strokeWidth} strokeLinecap="round" />
+      <svg viewBox={`0 0 ${size} ${labelY + 4}`} className="reserve-gauge-svg" aria-hidden="true">
+        <path d={trackPath} fill="none" stroke="var(--bg-muted)" strokeWidth={strokeWidth} strokeLinecap="round" />
         {clampedPercent > 0 && (
           <path d={fillPath} fill="none" className={`reserve-gauge-arc ${toneClass}`} strokeWidth={strokeWidth} strokeLinecap="round" />
         )}
+        <text x={trackStart.x} y={labelY} textAnchor="start" className="reserve-gauge-end-label">$0</text>
+        <text x={trackEnd.x} y={labelY} textAnchor="end" className="reserve-gauge-end-label">{maxLabel}</text>
       </svg>
       <div className="reserve-gauge-center">
-        <span className={`reserve-gauge-value ${toneClass}`}>{percent}%</span>
+        <span className="reserve-gauge-value">{percentLabel}</span>
         <span className="reserve-gauge-label">of reserve funded</span>
       </div>
-      <span className="reserve-gauge-min">$0</span>
-      <span className="reserve-gauge-max">{formatCompactCurrency(reserveTarget)}</span>
     </div>
   );
 }
@@ -1646,8 +1666,23 @@ export default function Dashboard() {
     [latestRollup?.netCashFlow, selectedKpiCards, model.monthlyRollups.length]
   );
 
-  const reservePercent = useMemo(() => getReservePercentDisplay(model.runway), [model.runway]);
+  const reservePercent = useMemo(
+    () => getReservePercentDisplay(currentCashBalance, model.runway.reserveTarget),
+    [currentCashBalance, model.runway.reserveTarget]
+  );
+  const reserveFillPercent = useMemo(
+    () => (reservePercent === null ? 0 : Math.min(Math.max(reservePercent, 0), 100)),
+    [reservePercent]
+  );
+  const reserveGapPercent = useMemo(() => {
+    if (model.runway.reserveTarget <= EPSILON) return 0;
+    return Math.min(
+      Math.max(((model.runway.reserveTarget - currentCashBalance) / model.runway.reserveTarget) * 100, 0),
+      100
+    );
+  }, [currentCashBalance, model.runway.reserveTarget]);
   const reserveTone = useMemo(() => reserveToneClassName(reservePercent), [reservePercent]);
+  const reserveBadge = useMemo(() => getReserveBadgeState(reservePercent), [reservePercent]);
 
   useEffect(() => {
     if (!isMonthPickerOpen) return;
@@ -2450,39 +2485,57 @@ export default function Dashboard() {
 
               <article className="card reserve-card">
                 <div className="reserve-header">
-                  <h3>Operating Reserve</h3>
-                  <span className="reserve-subtitle">3-month avg expenses</span>
+                  <div className="reserve-header-copy">
+                    <h3>Operating Reserve</h3>
+                    <span className="reserve-subtitle">3-month avg expenses</span>
+                  </div>
+                  <span className={`reserve-badge ${reserveBadge.toneClassName}`}>{reserveBadge.label}</span>
                 </div>
 
                 <ReserveGauge
-                  percent={reservePercent}
+                  percentLabel={formatReservePercentLabel(reservePercent)}
+                  fillPercent={reserveFillPercent}
                   toneClass={reserveTone}
-                  currentCash={model.runway.currentCashBalance}
                   reserveTarget={model.runway.reserveTarget}
                 />
+
+                <div className="reserve-floor">
+                  <div className="reserve-floor-head">
+                    <span className="reserve-floor-current">{formatCompactCurrency(currentCashBalance)} current</span>
+                    <span className="reserve-floor-target">{formatReserveFloorLabel(model.runway.reserveTarget)}</span>
+                  </div>
+                  <div className="reserve-floor-bar" aria-hidden="true">
+                    <div
+                      className={`reserve-floor-fill ${reserveTone}`}
+                      style={{ width: `${reserveFillPercent}%` }}
+                    />
+                  </div>
+                </div>
 
                 <div className="reserve-stat-rows">
                   <div className="reserve-stat-row">
                     <div className="reserve-stat-head">
                       <span className="reserve-stat-label">Cash on hand</span>
-                      <span className="reserve-stat-value">{formatCurrency(model.runway.currentCashBalance)}</span>
+                      <span className="reserve-stat-value">{formatCurrency(currentCashBalance)}</span>
                     </div>
                     <div className="reserve-stat-bar">
                       <div
                         className={`reserve-stat-bar-fill ${reserveTone}`}
-                        style={{ width: `${Math.min(reservePercent, 100)}%` }}
+                        style={{ width: `${reserveFillPercent}%` }}
                       />
                     </div>
                   </div>
                   <div className="reserve-stat-row">
                     <div className="reserve-stat-head">
                       <span className="reserve-stat-label">Coverage gap</span>
-                      <span className="reserve-stat-value">{formatCoverageGapWeeks(model.runway)}</span>
+                      <span className="reserve-stat-value">
+                        {formatCoverageGapWeeks(currentCashBalance, model.runway.reserveTarget)}
+                      </span>
                     </div>
                     <div className="reserve-stat-bar">
                       <div
                         className="reserve-stat-bar-fill is-gap"
-                        style={{ width: `${Math.min(Math.max(100 - reservePercent, 0), 100)}%` }}
+                        style={{ width: `${reserveGapPercent}%` }}
                       />
                     </div>
                   </div>
