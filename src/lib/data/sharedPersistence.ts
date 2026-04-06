@@ -287,21 +287,32 @@ export async function getSharedAccountSettings(): Promise<AccountRecord[] | null
 export async function saveSharedAccountSettings(records: AccountRecord[]): Promise<void> {
   if (!isConfigured()) return;
 
-  await request<unknown>(withWorkspaceFilter(`${ACCOUNT_SETTINGS_TABLE}?id=neq.__none__`), {
-    method: 'DELETE',
-    headers: {
-      Prefer: 'return=minimal',
-    },
-  });
+  if (records.length === 0) {
+    // Only delete when explicitly clearing — never as part of a save-then-insert.
+    await request<unknown>(withWorkspaceFilter(`${ACCOUNT_SETTINGS_TABLE}?id=neq.__none__`), {
+      method: 'DELETE',
+      headers: { Prefer: 'return=minimal' },
+    });
+    return;
+  }
 
-  if (records.length === 0) return;
-
-  await request<unknown>(ACCOUNT_SETTINGS_TABLE, {
+  // Upsert: atomic per-row, avoids the DELETE+INSERT gap where remote can be left empty.
+  await request<unknown>(`${ACCOUNT_SETTINGS_TABLE}?on_conflict=workspace_id,id`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
+      Prefer: 'return=minimal,resolution=merge-duplicates',
     },
     body: JSON.stringify(records.map(toSharedAccountSettingRow)),
   });
+
+  // Remove stale rows that are no longer in the local record set.
+  const currentIds = records.map((r) => `"${r.id}"`).join(',');
+  await request<unknown>(
+    withWorkspaceFilter(`${ACCOUNT_SETTINGS_TABLE}?id=not.in.(${currentIds})`),
+    {
+      method: 'DELETE',
+      headers: { Prefer: 'return=minimal' },
+    }
+  );
 }
