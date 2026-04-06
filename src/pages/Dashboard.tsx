@@ -794,8 +794,9 @@ export default function Dashboard() {
         cashFlowMode: profitabilityCashFlowMode,
         anchorMonth: previousCalendarMonth ?? undefined,
         thisMonthAnchor: currentCalendarMonth,
+        currentCashBalance,
       }),
-    [currentCalendarMonth, filteredTxns, previousCalendarMonth, profitabilityCashFlowMode]
+    [currentCalendarMonth, currentCashBalance, filteredTxns, previousCalendarMonth, profitabilityCashFlowMode]
   );
   const netCashFlowChartModel = useMemo(
     () =>
@@ -803,8 +804,9 @@ export default function Dashboard() {
         cashFlowMode: netCashFlowChartMode,
         anchorMonth: previousCalendarMonth ?? undefined,
         thisMonthAnchor: currentCalendarMonth,
+        currentCashBalance,
       }),
-    [currentCalendarMonth, filteredTxns, netCashFlowChartMode, previousCalendarMonth]
+    [currentCalendarMonth, currentCashBalance, filteredTxns, netCashFlowChartMode, previousCalendarMonth]
   );
 
   const customPreviousDateRange = useMemo(
@@ -831,9 +833,10 @@ export default function Dashboard() {
             cashFlowMode: profitabilityCashFlowMode,
             anchorMonth: previousCalendarMonth ?? undefined,
             thisMonthAnchor: currentCalendarMonth,
+            currentCashBalance,
           })
         : null,
-    [currentCalendarMonth, customCurrentTxns, kpiTimeframe, previousCalendarMonth, profitabilityCashFlowMode]
+    [currentCalendarMonth, currentCashBalance, customCurrentTxns, kpiTimeframe, previousCalendarMonth, profitabilityCashFlowMode]
   );
   const customPreviousModel = useMemo(
     () =>
@@ -842,9 +845,10 @@ export default function Dashboard() {
             cashFlowMode: profitabilityCashFlowMode,
             anchorMonth: previousCalendarMonth ?? undefined,
             thisMonthAnchor: currentCalendarMonth,
+            currentCashBalance,
           })
         : null,
-    [currentCalendarMonth, customPreviousTxns, kpiTimeframe, previousCalendarMonth, profitabilityCashFlowMode]
+    [currentCalendarMonth, currentCashBalance, customPreviousTxns, kpiTimeframe, previousCalendarMonth, profitabilityCashFlowMode]
   );
   const selectedKpiComparison = useMemo<BigPictureKpiComparison | null>(() => {
     if (kpiTimeframe !== 'custom') {
@@ -1069,7 +1073,10 @@ export default function Dashboard() {
 
     const runEdgeCase = (label: string, txnsForCase: typeof filteredTxns, caseCashFlowMode: CashFlowMode) => {
       try {
-        const caseModel = computeDashboardModel(txnsForCase, { cashFlowMode: caseCashFlowMode });
+        const caseModel = computeDashboardModel(txnsForCase, {
+          cashFlowMode: caseCashFlowMode,
+          currentCashBalance,
+        });
         const caseDebug = buildPrePhase4DebugReport(caseModel.monthlyRollups, txnsForCase);
         return {
           case: label,

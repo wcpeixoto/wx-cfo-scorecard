@@ -243,6 +243,18 @@ export type ExclusionWarning = {
   absoluteAmount: number;
 };
 
+export type RunwayStatus = 'ok' | 'self-funded' | 'no-runway' | 'insufficient-history';
+
+export type RunwayMetric = {
+  status: RunwayStatus;
+  months: number | null;
+  burnBasisMonths: number;
+  averageMonthlyBurn: number;
+  currentCashBalance: number;
+  burnStartMonth: string | null;
+  burnEndMonth: string | null;
+};
+
 export type DashboardModel = {
   latestMonth: string;
   previousMonth: string | null;
@@ -268,6 +280,7 @@ export type DashboardModel = {
   summaryBullets: string[];
   uncategorizedWarning: ExclusionWarning | null;
   digHerePreview: OpportunityItem[];
+  runway: RunwayMetric;
 };
 
 export type ScenarioInput = {
