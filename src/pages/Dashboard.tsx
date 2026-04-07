@@ -30,6 +30,7 @@ import { fetchSheetCsv } from '../lib/data/fetchCsv';
 import {
   buildPrePhase4DebugReport,
   computeDashboardModel,
+  computeForecastDecisionSignals,
   computeDigHereInsights,
   computeExpenseSlices,
   computeKpiComparisons,
@@ -426,15 +427,16 @@ function formatCompactCurrency(value: number): string {
   return `$${Math.round(value)}`;
 }
 
-function formatCoverageGapWeeks(currentCashBalance: number, reserveTarget: number): string {
-  if (reserveTarget <= EPSILON) return '—';
-  const gap = Math.max(reserveTarget - currentCashBalance, 0);
-  if (gap <= EPSILON) return '0 weeks';
-  const monthlyReserveRequirement = reserveTarget / 3;
-  if (monthlyReserveRequirement <= EPSILON) return '—';
-  const weeklyBurn = monthlyReserveRequirement / 4.33;
-  const weeks = Math.round(gap / weeklyBurn);
-  return `~${weeks} week${weeks === 1 ? '' : 's'}`;
+function computeCoverageWeeks(currentCashBalance: number, reserveTarget: number): number {
+  if (reserveTarget <= EPSILON || currentCashBalance <= 0) return 0;
+  const weeklyBurn = reserveTarget / 4.33;
+  if (weeklyBurn <= EPSILON) return 0;
+  return Math.round(currentCashBalance / weeklyBurn);
+}
+
+function formatCoverageWeeks(weeks: number): string {
+  if (weeks <= 0) return '0 weeks';
+  return `${weeks} week${weeks === 1 ? '' : 's'}`;
 }
 
 function formatReservePercentLabel(percent: number | null): string {
@@ -1383,6 +1385,10 @@ export default function Dashboard() {
     () => scenarioProjection.slice(0, forecastRangeMonths),
     [forecastRangeMonths, scenarioProjection]
   );
+  const forecastDecisionSignals = useMemo(
+    () => computeForecastDecisionSignals(scenarioProjection),
+    [scenarioProjection]
+  );
   const cashFlowForecastTrend = useMemo<TrendPoint[]>(
     () =>
       visibleScenarioProjection.map((point) => ({
@@ -1674,15 +1680,12 @@ export default function Dashboard() {
     () => (reservePercent === null ? 0 : Math.min(Math.max(reservePercent, 0), 100)),
     [reservePercent]
   );
-  const reserveGapPercent = useMemo(() => {
-    if (model.runway.reserveTarget <= EPSILON) return 0;
-    return Math.min(
-      Math.max(((model.runway.reserveTarget - currentCashBalance) / model.runway.reserveTarget) * 100, 0),
-      100
-    );
-  }, [currentCashBalance, model.runway.reserveTarget]);
   const reserveTone = useMemo(() => reserveToneClassName(reservePercent), [reservePercent]);
   const reserveBadge = useMemo(() => getReserveBadgeState(reservePercent), [reservePercent]);
+  const coverageWeeks = useMemo(
+    () => computeCoverageWeeks(currentCashBalance, model.runway.reserveTarget),
+    [currentCashBalance, model.runway.reserveTarget]
+  );
 
   useEffect(() => {
     if (!isMonthPickerOpen) return;
@@ -2499,51 +2502,29 @@ export default function Dashboard() {
                   reserveTarget={model.runway.reserveTarget}
                 />
 
-                <div className="reserve-floor">
-                  <div className="reserve-floor-head">
-                    <span className="reserve-floor-current">{formatCompactCurrency(currentCashBalance)} current</span>
-                    <span className="reserve-floor-target">{formatReserveFloorLabel(model.runway.reserveTarget)}</span>
+                <div className="reserve-coverage">
+                  <div className="reserve-coverage-head">
+                    <span className="reserve-coverage-label">Coverage</span>
+                    <span className="reserve-coverage-value">{formatCoverageWeeks(coverageWeeks)}</span>
                   </div>
-                  <div className="reserve-floor-bar" aria-hidden="true">
+                  <div className="reserve-coverage-track" aria-hidden="true">
                     <div
-                      className={`reserve-floor-fill ${reserveTone}`}
-                      style={{ width: `${reserveFillPercent}%` }}
+                      className={`reserve-coverage-fill ${reserveTone}`}
+                      style={{ width: `${Math.min((coverageWeeks / 4) * 100, 100)}%` }}
                     />
                   </div>
                 </div>
 
-                <div className="reserve-stat-rows">
-                  <div className="reserve-stat-row">
-                    <div className="reserve-stat-head">
-                      <span className="reserve-stat-label">Cash on hand</span>
-                      <span className="reserve-stat-value">{formatCurrency(currentCashBalance)}</span>
-                    </div>
-                    <div className="reserve-stat-bar">
-                      <div
-                        className={`reserve-stat-bar-fill ${reserveTone}`}
-                        style={{ width: `${reserveFillPercent}%` }}
-                      />
-                    </div>
+                <div className="reserve-stat-cards">
+                  <div className="reserve-stat-card">
+                    <span className="reserve-stat-card-label">Cash on hand</span>
+                    <span className="reserve-stat-card-value">{formatCurrency(currentCashBalance)}</span>
                   </div>
-                  <div className="reserve-stat-row">
-                    <div className="reserve-stat-head">
-                      <span className="reserve-stat-label">Coverage gap</span>
-                      <span className="reserve-stat-value">
-                        {formatCoverageGapWeeks(currentCashBalance, model.runway.reserveTarget)}
-                      </span>
-                    </div>
-                    <div className="reserve-stat-bar">
-                      <div
-                        className="reserve-stat-bar-fill is-gap"
-                        style={{ width: `${reserveGapPercent}%` }}
-                      />
-                    </div>
+                  <div className="reserve-stat-card">
+                    <span className="reserve-stat-card-label">Reserve floor</span>
+                    <span className="reserve-stat-card-value">{model.runway.reserveTarget > EPSILON ? formatCurrency(model.runway.reserveTarget) : '—'}</span>
                   </div>
                 </div>
-
-                <p className="reserve-structural">
-                  Recurring payments cover 34% of expenses · 90–92% retention · Low structural risk
-                </p>
               </article>
             </div>
 
@@ -2703,6 +2684,7 @@ export default function Dashboard() {
             <CashFlowForecastModule
               data={cashFlowForecastTrend}
               pointStatusByMonth={cashFlowForecastStatusByMonth}
+              decisionSignals={forecastDecisionSignals}
               currentCashBalance={currentCashBalance}
               hasCurrentCashBalance={hasCurrentCashBalance}
               forecastRangeMonths={forecastRangeMonths}

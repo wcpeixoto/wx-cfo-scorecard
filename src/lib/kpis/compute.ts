@@ -4,6 +4,7 @@ import type {
   CashFlowMode,
   DashboardModel,
   ExpenseSlice,
+  ForecastDecisionSignals,
   KpiAggregate,
   KpiAggregationMap,
   KpiComparisonMap,
@@ -722,9 +723,7 @@ function computeOperatingReserveSnapshot(
     return { reserveTarget: 0, percentFunded: null };
   }
 
-  const recalibrationStartMonth =
-    parsedContext.month <= 6 ? `${parsedContext.year}-01` : `${parsedContext.year}-07`;
-  const priorCompleteRollups = monthlyRollups.filter((rollup) => rollup.month < recalibrationStartMonth);
+  const priorCompleteRollups = monthlyRollups.filter((rollup) => rollup.month < resolvedContextMonth!);
   const reserveBasisWindow = selectTrailingRollups(priorCompleteRollups, 3);
 
   if (reserveBasisWindow.length === 0) {
@@ -1839,6 +1838,38 @@ export function projectScenario(model: DashboardModel, input: ScenarioInput, sta
   }
 
   return projections;
+}
+
+export function computeForecastDecisionSignals(points: ScenarioPoint[]): ForecastDecisionSignals {
+  if (points.length === 0) {
+    return {
+      breakEvenMonth: null,
+      cashTroughMonth: null,
+      cashTroughBalance: null,
+    };
+  }
+
+  let breakEvenMonth: string | null = null;
+  for (let index = 0; index < points.length; index += 1) {
+    const candidate = points[index];
+    if (candidate.projectedNet < -EPSILON) continue;
+    const remainsNonNegative = points.slice(index).every((point) => point.projectedNet >= -EPSILON);
+    if (remainsNonNegative) {
+      breakEvenMonth = candidate.month;
+      break;
+    }
+  }
+
+  const troughPoint = points.reduce<ScenarioPoint | null>((lowest, point) => {
+    if (!lowest) return point;
+    return point.cumulativeNet < lowest.cumulativeNet ? point : lowest;
+  }, null);
+
+  return {
+    breakEvenMonth,
+    cashTroughMonth: troughPoint?.month ?? null,
+    cashTroughBalance: troughPoint ? round2(troughPoint.cumulativeNet) : null,
+  };
 }
 
 export function toMonthLabel(month: string): string {

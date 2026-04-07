@@ -304,3 +304,9 @@ export type ScenarioPoint = {
   projectedNet: number;
   cumulativeNet: number;
 };
+
+export type ForecastDecisionSignals = {
+  breakEvenMonth: string | null;
+  cashTroughMonth: string | null;
+  cashTroughBalance: number | null;
+};

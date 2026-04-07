@@ -990,6 +990,50 @@ body {
   margin: 0;
 }
 
+.forecast-decision-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.forecast-decision-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-panel);
+}
+
+.forecast-decision-head {
+  display: grid;
+  gap: 2px;
+}
+
+.forecast-decision-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.forecast-decision-meta {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  line-height: 1.25;
+}
+
+.forecast-decision-value {
+  font-size: 1.05rem;
+  line-height: 1.15;
+  color: var(--text-primary);
+}
+
+.forecast-decision-subvalue {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.2;
+}
+
 .forecast-slider-dual-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1259,7 +1303,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 5px 12px;
+  padding: 6px 12px 5px;
   border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 600;
@@ -1368,112 +1412,86 @@ body {
   fill: var(--text-secondary);
 }
 
-.reserve-floor {
+/* ── Coverage weeks bar ── */
+
+.reserve-coverage {
   display: flex;
   flex-direction: column;
   gap: 5px;
   margin-top: -2px;
 }
 
-.reserve-floor-head {
+.reserve-coverage-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
 
-.reserve-floor-current,
-.reserve-floor-target {
-  font-size: 0.82rem;
-  line-height: 1.2;
+.reserve-coverage-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }
 
-.reserve-floor-current {
+.reserve-coverage-value {
+  font-size: 0.84rem;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.reserve-floor-target {
-  color: var(--text-secondary);
-}
-
-.reserve-floor-bar,
-.reserve-stat-bar {
+.reserve-coverage-track {
   height: 6px;
   border-radius: 999px;
   background: var(--bg-muted);
   overflow: hidden;
 }
 
-.reserve-floor-fill,
-.reserve-stat-bar-fill {
+.reserve-coverage-fill {
   height: 100%;
   border-radius: 999px;
   transition: width 0.32s ease;
 }
 
-.reserve-floor-fill.is-positive,
-.reserve-stat-bar-fill.is-positive {
+.reserve-coverage-fill.is-positive {
   background: var(--positive);
 }
 
-.reserve-floor-fill.is-caution,
-.reserve-stat-bar-fill.is-caution {
+.reserve-coverage-fill.is-caution {
   background: var(--warning);
 }
 
-.reserve-floor-fill.is-low,
-.reserve-stat-bar-fill.is-low {
-  background: var(--negative);
-}
-
-.reserve-floor-fill.is-neutral,
-.reserve-stat-bar-fill.is-neutral {
+.reserve-coverage-fill.is-neutral {
   background: var(--text-secondary);
 }
 
-/* ── Stat rows ── */
+/* ── Stat cards ── */
 
-.reserve-stat-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.reserve-stat-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.reserve-stat-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.reserve-stat-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
-.reserve-stat-label {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+.reserve-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  background: var(--bg-muted);
+  border-radius: 8px;
 }
 
-.reserve-stat-value {
-  font-size: 0.84rem;
+.reserve-stat-card-label {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  line-height: 1.2;
+}
+
+.reserve-stat-card-value {
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-primary);
-}
-
-.reserve-stat-bar-fill.is-gap {
-  background: var(--line);
-}
-
-.reserve-structural {
-  margin: 0;
-  padding-top: 2px;
-  font-size: 0.75rem;
-  line-height: 1.4;
-  color: var(--text-secondary);
+  line-height: 1.2;
 }
 
 .highlights-title-btn {
@@ -2860,6 +2878,10 @@ body {
   }
 
   .forecast-slider-dual-row {
+    grid-template-columns: 1fr;
+  }
+
+  .forecast-decision-grid {
     grid-template-columns: 1fr;
   }
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import TrendLineChart from './TrendLineChart';
-import type { CashFlowForecastStatus, TrendPoint } from '../lib/data/contract';
+import type { CashFlowForecastStatus, ForecastDecisionSignals, TrendPoint } from '../lib/data/contract';
 import { toMonthLabel } from '../lib/kpis/compute';
 
 type SelectOption = { value: string; label: string };
@@ -8,6 +8,7 @@ type SelectOption = { value: string; label: string };
 type CashFlowForecastModuleProps = {
   data: TrendPoint[];
   pointStatusByMonth: Partial<Record<string, CashFlowForecastStatus>>;
+  decisionSignals: ForecastDecisionSignals;
   currentCashBalance: number;
   hasCurrentCashBalance: boolean;
   forecastRangeMonths: number;
@@ -133,6 +134,13 @@ function formatSignedPercent(value: number): string {
   return `${rounded}%`;
 }
 
+function formatCurrencyCompact(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  return `$${Math.round(value)}`;
+}
+
 function ForecastSliderControl({ label, value, min, max, step, onChange }: ForecastSliderControlProps) {
   const safeSpan = Math.max(max - min, 1);
   const sliderPercent = ((value - min) / safeSpan) * 100;
@@ -186,6 +194,7 @@ function ForecastSliderControl({ label, value, min, max, step, onChange }: Forec
 export default function CashFlowForecastModule({
   data,
   pointStatusByMonth,
+  decisionSignals,
   currentCashBalance,
   hasCurrentCashBalance,
   forecastRangeMonths,
@@ -241,6 +250,10 @@ export default function CashFlowForecastModule({
         ? 'Cash Balance Forecast'
         : 'Cumulative Cash Change Forecast'
       : 'Monthly Cash Flow Forecast';
+  const breakEvenLabel = decisionSignals.breakEvenMonth ? toMonthLabel(decisionSignals.breakEvenMonth) : 'Not visible yet';
+  const troughMonthLabel = decisionSignals.cashTroughMonth ? toMonthLabel(decisionSignals.cashTroughMonth) : 'Not available';
+  const troughBalanceLabel =
+    decisionSignals.cashTroughBalance === null ? 'Forecast unavailable' : formatCurrencyCompact(decisionSignals.cashTroughBalance);
 
   return (
     <div className="forecast-cockpit">
@@ -275,6 +288,25 @@ export default function CashFlowForecastModule({
           forecastRangeOptions={forecastRangeOptions}
           onForecastRangeChange={onForecastRangeChange}
         />
+
+        <div className="forecast-decision-grid" aria-label="Forecast decision signals">
+          <article className="forecast-decision-card">
+            <div className="forecast-decision-head">
+              <span className="forecast-decision-label">Break-even Month</span>
+              <span className="forecast-decision-meta">Durable non-negative cash flow</span>
+            </div>
+            <strong className="forecast-decision-value">{breakEvenLabel}</strong>
+          </article>
+
+          <article className="forecast-decision-card">
+            <div className="forecast-decision-head">
+              <span className="forecast-decision-label">Cash Trough Month</span>
+              <span className="forecast-decision-meta">Lowest projected cash balance</span>
+            </div>
+            <strong className="forecast-decision-value">{troughMonthLabel}</strong>
+            <span className="forecast-decision-subvalue">{troughBalanceLabel}</span>
+          </article>
+        </div>
 
         <div className="forecast-slider-dual-row" aria-label="What-if controls">
           <ForecastSliderControl
