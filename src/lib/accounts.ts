@@ -124,6 +124,7 @@ export function mergeDiscoveredAccountRecords(discovered: AccountRecord[], exist
       id: existingRecord.id,
       active: existingRecord.active,
       startingBalance: existingRecord.startingBalance,
+      includeInCashForecast: existingRecord.includeInCashForecast,
       isUserConfigured: existingRecord.isUserConfigured,
     });
   });
