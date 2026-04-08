@@ -3117,3 +3117,102 @@ body {
   }
 
 }
+
+/* ── Forecast Events Section ─────────────────────────────────── */
+
+.forecast-events-section {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.forecast-events-header {
+  margin-bottom: 0.5rem;
+}
+
+.forecast-events-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.forecast-events-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.forecast-event-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  flex-wrap: wrap;
+}
+
+.forecast-event-month {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  min-width: 4.5rem;
+  flex-shrink: 0;
+}
+
+.forecast-event-title {
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+.forecast-event-impacts {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.forecast-event-impact {
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.forecast-event-impact--in {
+  color: var(--positive);
+}
+
+.forecast-event-impact--out {
+  color: var(--negative, var(--warning));
+}
+
+.forecast-event-status {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.forecast-event-status.is-caution {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
+}
+
+.forecast-event-status.is-positive {
+  background: color-mix(in srgb, var(--positive) 14%, transparent);
+  color: var(--positive);
+  border: 1px solid color-mix(in srgb, var(--positive) 30%, transparent);
+}
+
+.forecast-event-status.is-neutral {
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+  border: 1px solid var(--line);
+}

@@ -45,6 +45,7 @@ import type {
   CashFlowMode,
   DataSet,
   DashboardModel,
+  ForecastEvent,
   ForecastScenarioKey,
   KpiCard,
   KpiMetricComparison,
@@ -172,6 +173,42 @@ const FORECAST_RANGE_OPTIONS: ForecastRangeOption[] = [
   { value: '1y', label: 'Next 1 Year', months: 12 },
   { value: '2y', label: 'Next 2 Years', months: 24 },
   { value: '3y', label: 'Next 3 Years', months: 36 },
+];
+
+const DEFAULT_FORECAST_EVENTS: ForecastEvent[] = [
+  {
+    id: 'evt-summer-churn-2026-08',
+    month: '2026-08',
+    type: 'churn_risk',
+    title: 'Summer churn pressure',
+    status: 'tentative',
+    impactMode: 'fixed_amount',
+    cashInImpact: 6000,
+    cashOutImpact: 0,
+    enabled: true,
+  },
+  {
+    id: 'evt-black-friday-2026-11',
+    month: '2026-11',
+    type: 'promotion',
+    title: 'Black Friday promo',
+    status: 'planned',
+    impactMode: 'fixed_amount',
+    cashInImpact: 12000,
+    cashOutImpact: 1500,
+    enabled: true,
+  },
+  {
+    id: 'evt-tax-payment-2027-01',
+    month: '2027-01',
+    type: 'tax_payment',
+    title: 'Annual tax payment',
+    status: 'committed',
+    impactMode: 'fixed_amount',
+    cashInImpact: 0,
+    cashOutImpact: 7000,
+    enabled: true,
+  },
 ];
 
 type DigHereHighlight = {
@@ -601,6 +638,7 @@ export default function Dashboard() {
   const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
+  const [forecastEvents, setForecastEvents] = useState<ForecastEvent[]>(DEFAULT_FORECAST_EVENTS);
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [isBigPictureFilterOpen, setIsBigPictureFilterOpen] = useState(false);
@@ -1435,9 +1473,10 @@ export default function Dashboard() {
           ...scenarioInput,
           months: Math.max(scenarioInput.months, forecastRangeMonths),
         },
-        forecastCurrentCashBalance
+        forecastCurrentCashBalance,
+        forecastEvents
       ),
-    [forecastCurrentCashBalance, forecastRangeMonths, model, scenarioInput]
+    [forecastCurrentCashBalance, forecastEvents, forecastRangeMonths, model, scenarioInput]
   );
   const scenarioProjection = useMemo(() => forecastProjection.points, [forecastProjection.points]);
   const forecastSeasonality = useMemo(() => forecastProjection.seasonality, [forecastProjection.seasonality]);
@@ -2735,6 +2774,7 @@ export default function Dashboard() {
               onExpenseChange={(nextValue) => updateCustomScenario({ expenseChangePct: nextValue })}
               onReceivableDaysChange={(nextValue) => updateCustomScenario({ receivableDays: nextValue })}
               onPayableDaysChange={(nextValue) => updateCustomScenario({ payableDays: nextValue })}
+              forecastEvents={forecastEvents}
             />
 
             <article className="card table-card">

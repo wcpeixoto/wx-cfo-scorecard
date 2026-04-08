@@ -23,6 +23,7 @@ import type {
   OpportunityItem,
   PayeeTotal,
   RunwayMetric,
+  ForecastEvent,
   ScenarioInput,
   ScenarioPoint,
   TrajectorySignal,
@@ -2225,7 +2226,7 @@ function buildForecastDivergenceWarning(
   };
 }
 
-export function projectScenario(model: DashboardModel, input: ScenarioInput, startingCashBalance = 0): ForecastProjectionResult {
+export function projectScenario(model: DashboardModel, input: ScenarioInput, startingCashBalance = 0, events: ForecastEvent[] = []): ForecastProjectionResult {
   const emptySeasonality = createSeasonalityMeta(getForecastSeasonalityTier(0), [], []);
   if (model.forecastCashRollups.length === 0) {
     return { points: [], seasonality: emptySeasonality };
@@ -2299,8 +2300,15 @@ export function projectScenario(model: DashboardModel, input: ScenarioInput, sta
       );
     }
 
-    const cashIn = round2(operatingCashIn * (1 - receivableCarryShare) + receivableCarryAmount);
-    const cashOut = round2(operatingCashOut * (1 - payableCarryShare) + payableCarryAmount);
+    const rawCashIn = round2(operatingCashIn * (1 - receivableCarryShare) + receivableCarryAmount);
+    const rawCashOut = round2(operatingCashOut * (1 - payableCarryShare) + payableCarryAmount);
+
+    // Apply event adjustments
+    const monthEvents = events.filter(e => e.enabled && e.month === month);
+    const eventCashIn = monthEvents.reduce((sum, e) => sum + e.cashInImpact, 0);
+    const eventCashOut = monthEvents.reduce((sum, e) => sum + e.cashOutImpact, 0);
+    const cashIn = round2(rawCashIn + eventCashIn);
+    const cashOut = round2(rawCashOut + eventCashOut);
     const netCashFlow = round2(cashIn - cashOut);
     endingCashBalance = round2(endingCashBalance + netCashFlow);
 

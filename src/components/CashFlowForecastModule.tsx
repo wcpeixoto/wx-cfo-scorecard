@@ -3,6 +3,7 @@ import TrendLineChart from './TrendLineChart';
 import type {
   CashFlowForecastStatus,
   ForecastDecisionSignals,
+  ForecastEvent,
   ForecastScenarioKey,
   ForecastSeasonalityMeta,
   TrendPoint,
@@ -32,6 +33,7 @@ type CashFlowForecastModuleProps = {
   onExpenseChange: (nextValue: number) => void;
   onReceivableDaysChange: (nextValue: number) => void;
   onPayableDaysChange: (nextValue: number) => void;
+  forecastEvents?: ForecastEvent[];
 };
 
 type ForecastViewMode = 'monthly' | 'cumulative';
@@ -244,6 +246,7 @@ export default function CashFlowForecastModule({
   onExpenseChange,
   onReceivableDaysChange,
   onPayableDaysChange,
+  forecastEvents = [],
 }: CashFlowForecastModuleProps) {
   const [viewMode, setViewMode] = useState<ForecastViewMode>('cumulative');
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -498,6 +501,47 @@ export default function CashFlowForecastModule({
             </div>
           ) : null}
         </div>
+
+        {forecastEvents.length > 0 && (
+          <div className="forecast-events-section">
+            <div className="forecast-events-header">
+              <span className="forecast-events-title">Known Events</span>
+            </div>
+            <ul className="forecast-events-list">
+              {[...forecastEvents]
+                .sort((a, b) => a.month.localeCompare(b.month))
+                .map((event) => (
+                  <li key={event.id} className="forecast-event-row">
+                    <span className="forecast-event-month">{toMonthLabel(event.month)}</span>
+                    <span className="forecast-event-title">{event.title}</span>
+                    <span className="forecast-event-impacts">
+                      {event.cashInImpact > 0 && (
+                        <span className="forecast-event-impact forecast-event-impact--in">
+                          +{formatCurrencyCompact(event.cashInImpact)}
+                        </span>
+                      )}
+                      {event.cashOutImpact > 0 && (
+                        <span className="forecast-event-impact forecast-event-impact--out">
+                          -{formatCurrencyCompact(event.cashOutImpact)}
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      className={`forecast-event-status ${
+                        event.status === 'tentative'
+                          ? 'is-caution'
+                          : event.status === 'committed'
+                          ? 'is-positive'
+                          : 'is-neutral'
+                      }`}
+                    >
+                      {event.status}
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
       </section>
     </div>
   );

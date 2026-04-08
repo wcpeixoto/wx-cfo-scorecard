@@ -353,3 +353,36 @@ export type ForecastDecisionSignals = {
   reserveBreachEvaluated: boolean;
   negativeCashMonth: string | null;
 };
+
+export type ForecastEventType =
+  | "renewal"
+  | "promotion"
+  | "seasonal_override"
+  | "one_time_revenue"
+  | "one_time_expense"
+  | "churn_risk"
+  | "staffing_change"
+  | "rent_change"
+  | "tax_payment"
+  | "debt_payment"
+  | "other";
+
+export type ForecastEventStatus =
+  | "planned"
+  | "tentative"
+  | "committed";
+
+export type ForecastEventImpactMode = "fixed_amount";
+
+export type ForecastEvent = {
+  id: string;
+  month: string; // YYYY-MM
+  type: ForecastEventType;
+  title: string;
+  note?: string;
+  status: ForecastEventStatus;
+  impactMode: ForecastEventImpactMode;
+  cashInImpact: number;   // positive dollars
+  cashOutImpact: number;  // positive dollars
+  enabled: boolean;
+};
