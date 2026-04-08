@@ -364,37 +364,12 @@ export default function CashFlowForecastModule({
         </div>
       </div>
 
-      <div className="forecast-view-toggle" role="group" aria-label="Forecast chart mode">
-        <button
-          type="button"
-          className={viewMode === 'cumulative' ? 'is-active' : ''}
-          onClick={() => setViewMode('cumulative')}
-        >
-          {hasCurrentCashBalance ? 'Cash in Bank' : 'Cumulative Change'}
-        </button>
-        <button
-          type="button"
-          className={viewMode === 'monthly' ? 'is-active' : ''}
-          onClick={() => setViewMode('monthly')}
-        >
-          Monthly Change
-        </button>
-      </div>
-
       <section className="card forecast-chart-shell">
-        <div className="forecast-mode-row">
-          <div className="forecast-mode-copy">
-            <span className={`forecast-mode-pill is-${seasonality.mode}`}>{seasonalityModeLabel}</span>
-            <span className="forecast-mode-note">{seasonalitySupportLabel}</span>
-          </div>
-          {seasonalityConfidenceLabel ? (
-            <span className={`forecast-mode-badge is-${seasonality.confidence}`}>{seasonalityConfidenceLabel}</span>
-          ) : null}
-        </div>
+        {/* TODO: render warning pill here when confidence is degraded */}
 
         {visibleSeasonalityWarning ? (
           <div className="forecast-warning-callout" role="status" aria-live="polite">
-            {visibleSeasonalityWarning.message}
+            Heads up — this forecast follows seasonal patterns from prior years. If this year feels unusually different, use the sliders below to adjust.
           </div>
         ) : null}
 
@@ -411,16 +386,16 @@ export default function CashFlowForecastModule({
         <div className="forecast-decision-grid" aria-label="Forecast decision signals">
           <article className="forecast-decision-card">
             <div className="forecast-decision-head">
-              <span className="forecast-decision-label">Break-even Month</span>
-              <span className="forecast-decision-meta">Durable non-negative cash flow</span>
+              <span className="forecast-decision-label">Cash Stays Positive From</span>
+              <span className="forecast-decision-meta">First month with sustained positive cash</span>
             </div>
             <strong className="forecast-decision-value">{breakEvenLabel}</strong>
           </article>
 
           <article className="forecast-decision-card">
             <div className="forecast-decision-head">
-              <span className="forecast-decision-label">Cash Trough Month</span>
-              <span className="forecast-decision-meta">Lowest projected cash balance</span>
+              <span className="forecast-decision-label">Lowest Cash Point</span>
+              <span className="forecast-decision-meta">The month your cash balance hits its floor</span>
             </div>
             <strong className="forecast-decision-value">{troughMonthLabel}</strong>
             <span className="forecast-decision-subvalue">{troughBalanceLabel}</span>
@@ -428,16 +403,16 @@ export default function CashFlowForecastModule({
 
           <article className="forecast-decision-card">
             <div className="forecast-decision-head">
-              <span className="forecast-decision-label">Reserve Floor Breach</span>
-              <span className="forecast-decision-meta">First month below current reserve floor</span>
+              <span className="forecast-decision-label">Safety Buffer Warning</span>
+              <span className="forecast-decision-meta">First month cash dips below your minimum reserve</span>
             </div>
             <strong className="forecast-decision-value">{reserveBreachLabel}</strong>
           </article>
 
           <article className="forecast-decision-card">
             <div className="forecast-decision-head">
-              <span className="forecast-decision-label">Negative Cash Month</span>
-              <span className="forecast-decision-meta">First month projected cash turns negative</span>
+              <span className="forecast-decision-label">Cash Goes Negative</span>
+              <span className="forecast-decision-meta">First month projected balance turns negative</span>
             </div>
             <strong className="forecast-decision-value">{negativeCashLabel}</strong>
           </article>
@@ -502,11 +477,13 @@ export default function CashFlowForecastModule({
           ) : null}
         </div>
 
-        {forecastEvents.length > 0 && (
-          <div className="forecast-events-section">
-            <div className="forecast-events-header">
-              <span className="forecast-events-title">Known Events</span>
-            </div>
+        <div className="forecast-events-section">
+          <div className="forecast-events-header">
+            <span className="forecast-events-title">Known Events</span>
+          </div>
+          {forecastEvents.length === 0 ? (
+            <p className="forecast-events-empty">No events added yet.</p>
+          ) : (
             <ul className="forecast-events-list">
               {[...forecastEvents]
                 .sort((a, b) => a.month.localeCompare(b.month))
@@ -531,8 +508,8 @@ export default function CashFlowForecastModule({
                         event.status === 'tentative'
                           ? 'is-caution'
                           : event.status === 'committed'
-                          ? 'is-positive'
-                          : 'is-neutral'
+                            ? 'is-positive'
+                            : 'is-neutral'
                       }`}
                     >
                       {event.status}
@@ -540,8 +517,8 @@ export default function CashFlowForecastModule({
                   </li>
                 ))}
             </ul>
-          </div>
-        )}
+          )}
+        </div>
       </section>
     </div>
   );

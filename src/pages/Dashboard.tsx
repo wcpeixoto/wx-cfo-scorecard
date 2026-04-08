@@ -175,41 +175,7 @@ const FORECAST_RANGE_OPTIONS: ForecastRangeOption[] = [
   { value: '3y', label: 'Next 3 Years', months: 36 },
 ];
 
-const DEFAULT_FORECAST_EVENTS: ForecastEvent[] = [
-  {
-    id: 'evt-summer-churn-2026-08',
-    month: '2026-08',
-    type: 'churn_risk',
-    title: 'Summer churn pressure',
-    status: 'tentative',
-    impactMode: 'fixed_amount',
-    cashInImpact: 6000,
-    cashOutImpact: 0,
-    enabled: true,
-  },
-  {
-    id: 'evt-black-friday-2026-11',
-    month: '2026-11',
-    type: 'promotion',
-    title: 'Black Friday promo',
-    status: 'planned',
-    impactMode: 'fixed_amount',
-    cashInImpact: 12000,
-    cashOutImpact: 1500,
-    enabled: true,
-  },
-  {
-    id: 'evt-tax-payment-2027-01',
-    month: '2027-01',
-    type: 'tax_payment',
-    title: 'Annual tax payment',
-    status: 'committed',
-    impactMode: 'fixed_amount',
-    cashInImpact: 0,
-    cashOutImpact: 7000,
-    enabled: true,
-  },
-];
+const DEFAULT_FORECAST_EVENTS: ForecastEvent[] = [];
 
 type DigHereHighlight = {
   category: string;
@@ -2266,7 +2232,7 @@ export default function Dashboard() {
       </header>
 
       <section className="main-zone">
-        <header className="top-bar glass-panel">
+        {activeTab !== 'what-if' && <header className="top-bar glass-panel">
           <div className="top-bar-main">
             <div className="top-bar-copy">
               <h2>
@@ -2485,7 +2451,7 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
-        </header>
+        </header>}
 
         {!hasImportedData && (
           <article className="card settings-card">
