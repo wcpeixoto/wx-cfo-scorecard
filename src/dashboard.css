@@ -4,18 +4,17 @@
   --top-nav-inner-pad-x: 14px;
   --layout-gap: 16px;
   --right-panel-w: 320px;
-  --bg-main: #eef2f8;
-  --bg-panel: #f8fbff;
-  --bg-muted: #edf2fa;
-  --text-primary: #122034;
-  --text-secondary: #5f6f83;
-  --accent: #4f78ff;
-  --accent-soft: #dce5ff;
-  --positive: #1f9d68;
-  --warning: #d97706;
-  --negative: #d25b70;
-  --line: #d8e2f0;
-  --shadow-soft: 0 18px 40px rgba(24, 49, 89, 0.08);
+  --bg-main: #F9FAFB;
+  --bg-panel: #FFFFFF;
+  --bg-muted: #F2F4F7;
+  --text-primary: #101828;
+  --text-secondary: #667085;
+  --accent: #465FFF;
+  --accent-soft: #ECF3FF;
+  --positive: #12B76A;
+  --warning: #F79009;
+  --negative: #F04438;
+  --line: #E4E7EC;
   --shadow-card: 0 8px 20px rgba(18, 37, 71, 0.07);
 }
 
@@ -31,12 +30,9 @@ body,
 }
 
 body {
-  font-family: 'Avenir Next', 'Poppins', 'Nunito Sans', 'Trebuchet MS', sans-serif;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   color: var(--text-primary);
-  background:
-    radial-gradient(circle at 8% 0%, rgba(161, 195, 255, 0.32), transparent 33%),
-    radial-gradient(circle at 95% 92%, rgba(137, 183, 255, 0.18), transparent 28%),
-    var(--bg-main);
+  background: #F9FAFB;
 }
 
 .finance-app {
@@ -52,11 +48,10 @@ body {
 }
 
 .glass-panel {
-  background: rgba(249, 252, 255, 0.85);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(216, 227, 244, 0.9);
-  box-shadow: var(--shadow-soft);
-  border-radius: 24px;
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+  box-shadow: none;
 }
 
 .left-nav {
@@ -76,9 +71,10 @@ body {
   width: 100%;
   min-height: var(--top-nav-h);
   z-index: 80;
-  background: linear-gradient(180deg, #f6f8fc 0%, #f1f5fb 100%);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 16px;
+  background: #FFFFFF;
+  border: none;
+  border-bottom: 1px solid #E4E7EC;
+  border-radius: 0;
   box-shadow: none;
   isolation: isolate;
 }
@@ -967,21 +963,21 @@ body {
   width: fit-content;
   flex-wrap: wrap;
   gap: 4px;
-  border: 1px solid var(--line);
+  border: none;
   border-radius: 12px;
-  padding: 3px;
-  background: var(--bg-muted);
+  padding: 4px;
+  background: #F2F4F7;
 }
 
 .forecast-view-toggle button,
 .forecast-scenario-toggle button {
   border: none;
-  border-radius: 9px;
+  border-radius: 10px;
   background: transparent;
-  color: var(--text-secondary);
+  color: #667085;
   font: inherit;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 500;
   min-height: 32px;
   padding: 0 10px;
   cursor: pointer;
@@ -989,9 +985,10 @@ body {
 
 .forecast-view-toggle button.is-active,
 .forecast-scenario-toggle button.is-active {
-  background: #fff;
-  color: var(--text-primary);
-  box-shadow: 0 2px 10px rgba(24, 49, 89, 0.1);
+  background: #FFFFFF;
+  color: #465FFF;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
 }
 
 .forecast-inline-select {
@@ -1131,10 +1128,11 @@ body {
 .forecast-decision-card {
   display: grid;
   gap: 6px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
+  padding: 20px;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+  background: #FFFFFF;
+  box-shadow: none;
 }
 
 .forecast-decision-head {
