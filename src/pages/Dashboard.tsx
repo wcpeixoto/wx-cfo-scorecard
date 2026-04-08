@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { SHEET_CSV_FALLBACK_URL, SHEET_CSV_URL, STORAGE_KEYS } from '../config';
+import { STORAGE_KEYS } from '../config';
 import gracieSportsLogo from '../assets/gracie-sports-logo.svg';
 import type { IconType } from 'react-icons';
 import { FiGrid, FiLayers, FiRefreshCw, FiSearch, FiSettings, FiSliders, FiTrendingUp } from 'react-icons/fi';
@@ -25,8 +25,7 @@ import {
   isSharedPersistenceConfigured,
   saveSharedAccountSettings,
 } from '../lib/data/sharedPersistence';
-import { buildDataSet, toISODateOnly } from '../lib/data/normalize';
-import { fetchSheetCsv } from '../lib/data/fetchCsv';
+import { toISODateOnly } from '../lib/data/normalize';
 import {
   buildPrePhase4DebugReport,
   computeDashboardModel,
@@ -46,6 +45,7 @@ import type {
   CashFlowMode,
   DataSet,
   DashboardModel,
+  ForecastScenarioKey,
   KpiCard,
   KpiMetricComparison,
   KpiComparisonTimeframe,
@@ -94,9 +94,35 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const DEFAULT_SCENARIO: ScenarioInput = {
+  scenarioKey: 'base',
   revenueGrowthPct: 0,
-  expenseReductionPct: 0,
+  expenseChangePct: 0,
+  receivableDays: 3,
+  payableDays: 3,
   months: 12,
+};
+const DEFAULT_CUSTOM_SCENARIO: ScenarioInput = {
+  ...DEFAULT_SCENARIO,
+  scenarioKey: 'custom',
+};
+const FORECAST_SCENARIO_PRESETS: Record<Exclude<ForecastScenarioKey, 'custom'>, ScenarioInput> = {
+  base: DEFAULT_SCENARIO,
+  best: {
+    scenarioKey: 'best',
+    revenueGrowthPct: 4,
+    expenseChangePct: -3,
+    receivableDays: 3,
+    payableDays: 3,
+    months: 12,
+  },
+  worst: {
+    scenarioKey: 'worst',
+    revenueGrowthPct: -5,
+    expenseChangePct: 4,
+    receivableDays: 3,
+    payableDays: 3,
+    months: 12,
+  },
 };
 const BIG_PICTURE_FRAME_OPTIONS: KpiFrameOption[] = [
   { value: 'thisMonth', label: 'This Month' },
@@ -535,15 +561,6 @@ function toDeltaPercent(current: number, previous: number): number | null {
   return ((current - previous) / Math.abs(previous)) * 100;
 }
 
-function getStoredCsvUrl(): string {
-  if (typeof window === 'undefined') return SHEET_CSV_URL;
-  try {
-    return window.localStorage.getItem(STORAGE_KEYS.csvUrl) ?? SHEET_CSV_URL;
-  } catch {
-    return SHEET_CSV_URL;
-  }
-}
-
 function getStoredAccountSettings(): AccountRecord[] {
   if (typeof window === 'undefined') return [];
   try {
@@ -557,8 +574,6 @@ export default function Dashboard() {
   const sharedPersistenceEnabled = isSharedPersistenceConfigured();
   const profitabilityCashFlowMode: CashFlowMode = 'operating';
   const [activeTab, setActiveTab] = useState<TabId>('big-picture');
-  const [csvUrl, setCsvUrl] = useState(getStoredCsvUrl);
-  const [draftCsvUrl, setDraftCsvUrl] = useState(getStoredCsvUrl);
   const [query, setQuery] = useState('');
   const [netChartTimeframe, setNetChartTimeframe] = useState<TrendTimeframeOption>(12);
   const [digHereFocusMonth, setDigHereFocusMonth] = useState<string | null>(null);
@@ -573,16 +588,14 @@ export default function Dashboard() {
   const monthPickerRef = useRef<HTMLDivElement>(null);
   const bigPictureFilterMenuRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
-  const [dataSet, setDataSet] = useState<DataSet | null>(null);
   const [importedDataSet, setImportedDataSet] = useState<DataSet | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [lastImportSummary, setLastImportSummary] = useState<TransactionImportSummary | null>(null);
   const [storedImportedTransactionCount, setStoredImportedTransactionCount] = useState(0);
   const [accountRecords, setAccountRecords] = useState<AccountRecord[]>(getStoredAccountSettings);
-  const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(DEFAULT_SCENARIO);
+  const [selectedScenarioKey, setSelectedScenarioKey] = useState<ForecastScenarioKey>('base');
+  const [customScenarioInput, setCustomScenarioInput] = useState<ScenarioInput>(DEFAULT_CUSTOM_SCENARIO);
   const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('lastMonth');
   const [netCashFlowChartMode, setNetCashFlowChartMode] = useState<CashFlowMode>('operating');
   const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
@@ -595,26 +608,25 @@ export default function Dashboard() {
   const sharedAccountSettingsSyncArmedRef = useRef(false);
   const [sharedAccountSettingsReady, setSharedAccountSettingsReady] = useState(!sharedPersistenceEnabled);
   const [sharedAccountSettingsHasRemoteData, setSharedAccountSettingsHasRemoteData] = useState(false);
+  const scenarioInput = useMemo(
+    () => (selectedScenarioKey === 'custom' ? customScenarioInput : FORECAST_SCENARIO_PRESETS[selectedScenarioKey]),
+    [customScenarioInput, selectedScenarioKey]
+  );
 
-  const runSync = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { records, sourceUrl } = await fetchSheetCsv(csvUrl, SHEET_CSV_FALLBACK_URL);
-      const normalized = buildDataSet(records, sourceUrl);
-      setDataSet(normalized);
-    } catch (syncError) {
-      const message = syncError instanceof Error ? syncError.message : 'Could not sync CSV data.';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [csvUrl]);
-
-  useEffect(() => {
-    void runSync();
-  }, [runSync]);
+  const updateCustomScenario = useCallback(
+    (patch: Partial<ScenarioInput>) => {
+      const baseScenario =
+        selectedScenarioKey === 'custom' ? customScenarioInput : { ...FORECAST_SCENARIO_PRESETS[selectedScenarioKey], scenarioKey: 'custom' as const };
+      const nextCustomScenario: ScenarioInput = {
+        ...baseScenario,
+        ...patch,
+        scenarioKey: 'custom',
+      };
+      setCustomScenarioInput(nextCustomScenario);
+      setSelectedScenarioKey('custom');
+    },
+    [customScenarioInput, selectedScenarioKey]
+  );
 
   const loadImportedState = useCallback(async () => {
     try {
@@ -704,8 +716,9 @@ export default function Dashboard() {
     return () => window.removeEventListener('popstate', syncStateFromUrl);
   }, []);
 
-  const activeDataSet = importedDataSet ?? dataSet;
+  const activeDataSet = importedDataSet;
   const baseTxns = useMemo(() => activeDataSet?.txns ?? [], [activeDataSet?.txns]);
+  const hasImportedData = Boolean(importedDataSet && importedDataSet.txns.length > 0);
   const currentCalendarMonth = useMemo(() => getCurrentCalendarMonthToken(), []);
   const previousCalendarMonth = useMemo(() => previousMonthToken(currentCalendarMonth), [currentCalendarMonth]);
   const twoMonthsAgo = useMemo(
@@ -829,6 +842,14 @@ export default function Dashboard() {
       0
     );
   }, [accountRecords, accountBalanceMap]);
+  const activeCashAccountRecords = useMemo(
+    () => accountRecords.filter((record) => record.active && record.accountType === 'Cash'),
+    [accountRecords]
+  );
+  const includedCashForecastAccounts = useMemo(
+    () => activeCashAccountRecords.filter((record) => record.includeInCashForecast),
+    [activeCashAccountRecords]
+  );
   // True when at least one included account has a non-zero starting balance, meaning
   // the absolute cash position is meaningful (not just cumulative net change from 0).
   const hasCurrentCashBalance = useMemo(
@@ -855,24 +876,56 @@ export default function Dashboard() {
     () => includedForecastAccounts.filter((record) => record.accountType !== 'Cash'),
     [includedForecastAccounts]
   );
+  const forecastCashAnchorAccounts = useMemo(() => {
+    if (includedNonCashForecastAccounts.length > 0 || includedCashForecastAccounts.length === 0) {
+      return activeCashAccountRecords;
+    }
+    return includedCashForecastAccounts;
+  }, [activeCashAccountRecords, includedCashForecastAccounts, includedNonCashForecastAccounts]);
+  const forecastCashAnchorAccountIds = useMemo(
+    () => new Set(forecastCashAnchorAccounts.map((record) => record.id)),
+    [forecastCashAnchorAccounts]
+  );
+  const forecastCashAnchorUsesFallback = useMemo(
+    () => includedNonCashForecastAccounts.length > 0 || includedCashForecastAccounts.length === 0,
+    [includedCashForecastAccounts.length, includedNonCashForecastAccounts.length]
+  );
+  const forecastCurrentCashBalance = useMemo(() => {
+    if (forecastCashAnchorAccounts.length === 0) return 0;
+    return forecastCashAnchorAccounts.reduce(
+      (sum, record) => sum + record.startingBalance + (accountBalanceMap.get(record.id) ?? 0),
+      0
+    );
+  }, [accountBalanceMap, forecastCashAnchorAccounts]);
+  const forecastCashAnchorAccountsMissingStartingBalance = useMemo(
+    () => forecastCashAnchorAccounts.filter((record) => Math.abs(record.startingBalance) <= EPSILON),
+    [forecastCashAnchorAccounts]
+  );
+  const hasForecastCurrentCashBalance = useMemo(
+    () => forecastCashAnchorAccounts.some((record) => Math.abs(record.startingBalance) > EPSILON),
+    [forecastCashAnchorAccounts]
+  );
   const includedCashAccountCount = useMemo(
     () => includedForecastAccounts.filter((record) => record.accountType === 'Cash').length,
     [includedForecastAccounts]
   );
   const forecastFoundationWarnings = useMemo(() => {
     const warnings: string[] = [];
-    if (includedForecastAccounts.length === 0) {
-      warnings.push('No active accounts are currently included in forecast, so cash forecasting has no account foundation yet.');
+    if (forecastCashAnchorAccounts.length === 0) {
+      warnings.push('No active Cash accounts are available for the forecast starting balance yet.');
       return warnings;
     }
-    if (!hasCurrentCashBalance) {
+    if (includedForecastAccounts.length === 0) {
+      warnings.push('No accounts are currently marked In Forecast, so the forecast is falling back to active Cash accounts only.');
+    }
+    if (!hasForecastCurrentCashBalance) {
       warnings.push(
-        `Included forecast accounts all have a $0 starting balance, so forecast can only show cumulative change instead of absolute cash in bank.`
+        `Forecast cash anchor accounts all have a $0 starting balance, so forecast can only show cumulative change instead of absolute cash in bank.`
       );
     }
-    if (includedForecastAccountsMissingStartingBalance.length > 0) {
+    if (forecastCashAnchorAccountsMissingStartingBalance.length > 0) {
       warnings.push(
-        `${summarizeAccountNames(includedForecastAccountsMissingStartingBalance)} still need a starting balance as of ${forecastWindowStartLabel}.`
+        `${summarizeAccountNames(forecastCashAnchorAccountsMissingStartingBalance)} still need a starting balance as of ${forecastWindowStartLabel}.`
       );
     }
     if (includedNonCashForecastAccounts.length > 0) {
@@ -880,12 +933,17 @@ export default function Dashboard() {
         `${summarizeAccountNames(includedNonCashForecastAccounts)} are included in forecast even though their account type is not Cash. Double-check that they should contribute to cash balance.`
       );
     }
+    if (forecastCashAnchorUsesFallback && forecastCashAnchorAccounts.length > 0) {
+      warnings.push('Forecast engine uses active Cash accounts only for its starting cash anchor; non-cash forecast accounts are ignored.');
+    }
     return warnings;
   }, [
+    forecastCashAnchorAccounts.length,
+    forecastCashAnchorAccountsMissingStartingBalance,
+    forecastCashAnchorUsesFallback,
     forecastWindowStartLabel,
-    hasCurrentCashBalance,
+    hasForecastCurrentCashBalance,
     includedForecastAccounts,
-    includedForecastAccountsMissingStartingBalance,
     includedNonCashForecastAccounts,
   ]);
 
@@ -1369,7 +1427,7 @@ export default function Dashboard() {
     () => FORECAST_RANGE_OPTIONS.find((option) => option.value === forecastRange)?.months ?? 3,
     [forecastRange]
   );
-  const scenarioProjection = useMemo(
+  const forecastProjection = useMemo(
     () =>
       projectScenario(
         model,
@@ -1377,25 +1435,27 @@ export default function Dashboard() {
           ...scenarioInput,
           months: Math.max(scenarioInput.months, forecastRangeMonths),
         },
-        currentCashBalance
+        forecastCurrentCashBalance
       ),
-    [currentCashBalance, forecastRangeMonths, model, scenarioInput]
+    [forecastCurrentCashBalance, forecastRangeMonths, model, scenarioInput]
   );
+  const scenarioProjection = useMemo(() => forecastProjection.points, [forecastProjection.points]);
+  const forecastSeasonality = useMemo(() => forecastProjection.seasonality, [forecastProjection.seasonality]);
   const visibleScenarioProjection = useMemo(
     () => scenarioProjection.slice(0, forecastRangeMonths),
     [forecastRangeMonths, scenarioProjection]
   );
   const forecastDecisionSignals = useMemo(
-    () => computeForecastDecisionSignals(scenarioProjection),
-    [scenarioProjection]
+    () => computeForecastDecisionSignals(scenarioProjection, model.runway.reserveTarget),
+    [model.runway.reserveTarget, scenarioProjection]
   );
   const cashFlowForecastTrend = useMemo<TrendPoint[]>(
     () =>
       visibleScenarioProjection.map((point) => ({
         month: point.month,
-        income: point.projectedIncome,
-        expense: point.projectedExpense,
-        net: point.projectedNet,
+        income: point.cashIn,
+        expense: point.cashOut,
+        net: point.netCashFlow,
       })),
     [visibleScenarioProjection]
   );
@@ -2028,52 +2088,6 @@ export default function Dashboard() {
     ]
   );
 
-  function handleSaveCsvUrl() {
-    const nextUrl = draftCsvUrl.trim();
-    setQuery('');
-    writeDashboardUrlState({
-      tab: activeTab,
-      cashFlow: netCashFlowChartMode,
-      queryText: '',
-      month: digHereFocusMonth,
-      startMonth: digHereStartMonth,
-      endMonth: digHereEndMonth,
-      focusContext: digHereFocusContext,
-      moverGrouping: digHereMoverGrouping,
-    }, 'replace');
-    setCsvUrl(nextUrl);
-    if (typeof window !== 'undefined') {
-      try {
-        window.localStorage.setItem(STORAGE_KEYS.csvUrl, nextUrl);
-      } catch {
-        // Ignore storage failures and continue with in-memory URL.
-      }
-    }
-  }
-
-  function handleResetCsvUrl() {
-    setDraftCsvUrl(SHEET_CSV_URL);
-    setQuery('');
-    writeDashboardUrlState({
-      tab: activeTab,
-      cashFlow: netCashFlowChartMode,
-      queryText: '',
-      month: digHereFocusMonth,
-      startMonth: digHereStartMonth,
-      endMonth: digHereEndMonth,
-      focusContext: digHereFocusContext,
-      moverGrouping: digHereMoverGrouping,
-    }, 'replace');
-    setCsvUrl(SHEET_CSV_URL);
-    if (typeof window !== 'undefined') {
-      try {
-        window.localStorage.setItem(STORAGE_KEYS.csvUrl, SHEET_CSV_URL);
-      } catch {
-        // Ignore storage failures and continue with in-memory URL.
-      }
-    }
-  }
-
   const handleImportCsvSelection = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -2143,29 +2157,23 @@ export default function Dashboard() {
   );
 
   const importDescription = sharedPersistenceEnabled
-    ? 'Import Quicken-style report CSVs into shared storage. Each shared import replaces the current shared imported dataset and becomes the active analysis source when present.'
-    : 'Import Quicken-style report CSVs directly into browser-local storage. Imported transactions become the active analysis source when present.';
+    ? 'Import Quicken-style report CSVs into shared storage. Each shared import replaces the current shared dataset and becomes the only active analysis source.'
+    : 'Import Quicken-style report CSVs directly into browser-local storage. Imported transactions are the only active analysis source.';
   const clearImportedDataLabel = sharedPersistenceEnabled ? 'Clear shared imported data' : 'Clear local imported data';
-  const sourcePrecedenceLabel = sharedPersistenceEnabled
-    ? 'Shared imported dataset -> Google Sheets fallback'
-    : 'Browser-local imported dataset -> Google Sheets fallback';
+  const sourcePrecedenceLabel = sharedPersistenceEnabled ? 'Shared imported dataset only' : 'Browser-local imported dataset only';
   const importedSourceStatus = importedDataSet
     ? lastImportSummary?.storageScope === 'shared'
       ? 'Yes, shared imported transactions are driving analysis.'
       : 'Yes, browser-local imported transactions are driving analysis.'
     : sharedPersistenceEnabled
-      ? 'No shared imported dataset is available, so Google Sheets fallback is active.'
-      : 'No browser-local imported dataset is available, so Google Sheets fallback is active.';
+      ? 'No shared imported dataset is available. Import a Quicken CSV to begin.'
+      : 'No browser-local imported dataset is available. Import a Quicken CSV to begin.';
   const importModeLabel = lastImportSummary?.importMode === 'replace-all' ? 'Replace-all shared dataset' : 'Append to local dataset';
   const accountSettingsSourceLabel = sharedPersistenceEnabled
     ? sharedAccountSettingsHasRemoteData
       ? 'Shared account settings'
       : 'No shared account settings saved yet; using in-memory/discovered defaults until an edit is synced.'
     : 'Browser-local account settings';
-  const fallbackSourceDescription = sharedPersistenceEnabled
-    ? 'Fallback CSV source used only when no shared imported dataset is present.'
-    : 'Optional fallback CSV source used when no browser-local imported dataset is present.';
-
   return (
     <div className="finance-app">
       <header className="app-top-nav">
@@ -2440,9 +2448,31 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {error && <p className="error-banner">{error}</p>}
+        {!hasImportedData && (
+          <article className="card settings-card">
+            <div className="card-head">
+              <h3>Imported Transactions Required</h3>
+              <p className="subtle">
+                Imported Quicken transactions are now the only runtime source of truth. Google Sheets fallback has been removed.
+              </p>
+            </div>
+            <p className="empty-state">
+              No imported transactions are available in {sharedPersistenceEnabled ? 'shared' : 'browser-local'} storage. Import a Quicken CSV to begin analysis.
+            </p>
+            <div className="settings-actions">
+              <button type="button" onClick={() => importFileInputRef.current?.click()} disabled={importLoading}>
+                {importLoading ? 'Importing...' : 'Import Quicken CSV'}
+              </button>
+              {activeTab !== 'settings' ? (
+                <button type="button" className="ghost-btn" onClick={() => navigateToTab('settings')}>
+                  Open Settings
+                </button>
+              ) : null}
+            </div>
+          </article>
+        )}
 
-        {activeTab === 'big-picture' && (
+        {hasImportedData && activeTab === 'big-picture' && (
           <>
             <KpiCards cards={selectedKpiCards} vsLabel={kpiVsLabel} />
             <p className="data-trust-note">Excludes transfers &amp; financing · operating cash flow only</p>
@@ -2598,7 +2628,7 @@ export default function Dashboard() {
           </>
         )}
 
-        {activeTab === 'money-left' && (
+        {hasImportedData && activeTab === 'money-left' && (
           <div className="tab-grid">
             <article className="card">
               <div className="card-head">
@@ -2624,7 +2654,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {activeTab === 'dig-here' && (
+        {hasImportedData && activeTab === 'dig-here' && (
           <div className="stack-grid">
             <div className="tab-grid">
               <MoversList
@@ -2641,7 +2671,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {activeTab === 'trends' && (
+        {hasImportedData && activeTab === 'trends' && (
           <div className="stack-grid">
             <TrendLineChart data={model.trend} metric="income" title="Revenue Trend" />
             <TrendLineChart data={model.trend} metric="expense" title="Expense Trend" />
@@ -2679,14 +2709,15 @@ export default function Dashboard() {
           </div>
         )}
 
-        {activeTab === 'what-if' && (
+        {hasImportedData && activeTab === 'what-if' && (
           <div className="stack-grid">
             <CashFlowForecastModule
               data={cashFlowForecastTrend}
               pointStatusByMonth={cashFlowForecastStatusByMonth}
               decisionSignals={forecastDecisionSignals}
-              currentCashBalance={currentCashBalance}
-              hasCurrentCashBalance={hasCurrentCashBalance}
+              seasonality={forecastSeasonality}
+              currentCashBalance={forecastCurrentCashBalance}
+              hasCurrentCashBalance={hasForecastCurrentCashBalance}
               forecastRangeMonths={forecastRangeMonths}
               forecastRangeValue={forecastRange}
               forecastRangeOptions={FORECAST_RANGE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
@@ -2694,20 +2725,16 @@ export default function Dashboard() {
                 const parsed = parseForecastRangeValue(nextValue);
                 if (parsed) setForecastRange(parsed);
               }}
+              scenarioKey={selectedScenarioKey}
+              onScenarioChange={(scenarioKey) => setSelectedScenarioKey(scenarioKey)}
               revenueGrowthPct={scenarioInput.revenueGrowthPct}
-              expenseReductionPct={scenarioInput.expenseReductionPct}
-              onRevenueGrowthChange={(nextValue) =>
-                setScenarioInput((prev) => ({
-                  ...prev,
-                  revenueGrowthPct: nextValue,
-                }))
-              }
-              onExpenseReductionChange={(nextValue) =>
-                setScenarioInput((prev) => ({
-                  ...prev,
-                  expenseReductionPct: nextValue,
-                }))
-              }
+              expenseChangePct={scenarioInput.expenseChangePct}
+              receivableDays={scenarioInput.receivableDays}
+              payableDays={scenarioInput.payableDays}
+              onRevenueGrowthChange={(nextValue) => updateCustomScenario({ revenueGrowthPct: nextValue })}
+              onExpenseChange={(nextValue) => updateCustomScenario({ expenseChangePct: nextValue })}
+              onReceivableDaysChange={(nextValue) => updateCustomScenario({ receivableDays: nextValue })}
+              onPayableDaysChange={(nextValue) => updateCustomScenario({ payableDays: nextValue })}
             />
 
             <article className="card table-card">
@@ -2718,20 +2745,20 @@ export default function Dashboard() {
                 <thead>
                   <tr>
                     <th>Month</th>
-                    <th>Projected Income</th>
-                    <th>Projected Expense</th>
-                    <th>Projected Net</th>
-                    <th>{hasCurrentCashBalance ? 'Projected Cash Balance' : 'Cumulative Net Change'}</th>
+                    <th>Projected Cash In</th>
+                    <th>Projected Cash Out</th>
+                    <th>Projected Net Cash</th>
+                    <th>{hasForecastCurrentCashBalance ? 'Projected Cash Balance' : 'Cumulative Net Change'}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {visibleScenarioProjection.map((row) => (
                     <tr key={row.month}>
                       <td>{toMonthLabel(row.month)}</td>
-                      <td>{formatCurrency(row.projectedIncome)}</td>
-                      <td>{formatCurrency(row.projectedExpense)}</td>
-                      <td className={row.projectedNet < 0 ? 'is-negative' : undefined}>{formatCurrency(row.projectedNet)}</td>
-                      <td className={row.cumulativeNet < 0 ? 'is-negative' : undefined}>{formatCurrency(row.cumulativeNet)}</td>
+                      <td>{formatCurrency(row.cashIn)}</td>
+                      <td>{formatCurrency(row.cashOut)}</td>
+                      <td className={row.netCashFlow < 0 ? 'is-negative' : undefined}>{formatCurrency(row.netCashFlow)}</td>
+                      <td className={row.endingCashBalance < 0 ? 'is-negative' : undefined}>{formatCurrency(row.endingCashBalance)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -2775,7 +2802,7 @@ export default function Dashboard() {
               <div className="settings-meta">
                 <p>
                   Active analysis source:{' '}
-                  <strong>{activeDataSet?.sourceLabel ?? activeDataSet?.sourceUrl ?? csvUrl}</strong>
+                  <strong>{activeDataSet?.sourceLabel ?? 'No imported dataset loaded'}</strong>
                 </p>
                 {lastImportSummary?.latestTxnMonth ? (
                   <p>
@@ -2867,44 +2894,6 @@ export default function Dashboard() {
 
             <article className="card settings-card">
               <div className="card-head">
-                <h3>Google Sheets Fallback</h3>
-                <p className="subtle">{fallbackSourceDescription}</p>
-              </div>
-
-              <label className="settings-field">
-                CSV URL
-                <input
-                  type="url"
-                  value={draftCsvUrl}
-                  onChange={(event) => setDraftCsvUrl(event.target.value)}
-                  placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv&gid=0"
-                />
-              </label>
-
-              <div className="settings-actions">
-                <button type="button" onClick={handleSaveCsvUrl}>
-                  Save source URL
-                </button>
-                <button type="button" onClick={handleResetCsvUrl} className="ghost-btn">
-                  Reset to default
-                </button>
-                <button type="button" onClick={() => void runSync()} className="ghost-btn" disabled={loading}>
-                  {loading ? 'Syncing...' : 'Sync now'}
-                </button>
-              </div>
-
-              <div className="settings-meta">
-                <p>
-                  Fallback source: <code>{dataSet?.sourceLabel ?? dataSet?.sourceUrl ?? csvUrl}</code>
-                </p>
-                <p>
-                  Last fallback refresh: <strong>{formatTimestamp(dataSet?.fetchedAtIso ?? null)}</strong>
-                </p>
-              </div>
-            </article>
-
-            <article className="card settings-card">
-              <div className="card-head">
                 <h3>Account Setup</h3>
                 <p className="subtle">Auto-discovered from imported CSV data. Your edits become the source of truth for future imports.</p>
                 <p className="subtle">
@@ -2915,7 +2904,7 @@ export default function Dashboard() {
               <div className="account-setup-summary">
                 <p className="account-setup-summary-title">Forecast cash foundation</p>
                 <p className="account-setup-summary-copy">
-                  Only <strong>Active</strong> accounts marked <strong>In Forecast</strong> contribute to current cash balance and the forecast starting point.
+                  Forecast starting cash uses <strong>active Cash accounts only</strong>. Non-cash accounts are ignored in the forecast anchor even if they are marked <strong>In Forecast</strong>.
                 </p>
                 <div className="account-setup-summary-grid">
                   <div>
@@ -2928,13 +2917,13 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <span className="account-setup-summary-label">Current cash basis</span>
-                    <strong>{formatCurrency(currentCashBalance)}</strong>
+                    <strong>{formatCurrency(forecastCurrentCashBalance)}</strong>
                   </div>
                 </div>
                 <ul className="account-setup-summary-notes">
                   <li><strong>Starting Balance</strong> should be the account balance on <strong>{forecastWindowStartLabel}</strong>.</li>
                   <li><strong>Current Balance</strong> is calculated as Starting Balance + loaded net transactions for that account.</li>
-                  <li>The forecast uses that computed current balance as its starting point.</li>
+                  <li>The forecast uses the computed balance from cash accounts as its starting point.</li>
                 </ul>
               </div>
 
@@ -3012,7 +3001,7 @@ export default function Dashboard() {
                                 }}
                               />
                               <span className="account-input-hint">
-                                {Math.abs(record.startingBalance) <= EPSILON && record.includeInCashForecast && record.active
+                                {Math.abs(record.startingBalance) <= EPSILON && forecastCashAnchorAccountIds.has(record.id)
                                   ? `Needed for forecast basis as of ${forecastWindowStartLabel}`
                                   : `Balance on ${forecastWindowStartLabel}`}
                               </span>
@@ -3027,7 +3016,11 @@ export default function Dashboard() {
                                 )}
                               </span>
                               <span className="account-balance-note">
-                                {record.active && record.includeInCashForecast ? 'Feeds forecast' : 'Not used in forecast'}
+                                {forecastCashAnchorAccountIds.has(record.id)
+                                  ? 'Feeds forecast cash'
+                                  : record.active && record.includeInCashForecast && record.accountType !== 'Cash'
+                                    ? 'Ignored for cash anchor'
+                                    : 'Not used in forecast'}
                               </span>
                             </div>
                           </td>
