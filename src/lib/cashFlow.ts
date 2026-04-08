@@ -83,13 +83,68 @@ export function isUncategorizedCategory(category: string): boolean {
 
 export function isRefundCategory(category: string): boolean {
   const normalized = category.trim().toLowerCase();
-  return normalized.startsWith('refund') || normalized.includes('allowance');
+  return normalized.includes('refund') || normalized.includes('allowance');
 }
 
 // ─── Account-level classifiers ──────────────────────────────────────────────
 
 export function accountLooksLikeLoan(account?: string): boolean {
   return /\bloan\b/i.test(account ?? '');
+}
+
+function normalizeLabel(value?: string): string {
+  return (value ?? '').trim().toLowerCase();
+}
+
+function accountLooksLikeCash(account?: string): boolean {
+  const normalized = normalizeLabel(account);
+  if (!normalized) return false;
+  return (
+    normalized.includes('checking') ||
+    normalized.includes('savings') ||
+    normalized.includes('bank') ||
+    normalized === 'cash'
+  );
+}
+
+function accountLooksLikeCreditCard(account?: string): boolean {
+  const normalized = normalizeLabel(account);
+  if (!normalized) return false;
+  return (
+    normalized.includes('credit') ||
+    normalized.includes('card') ||
+    normalized.includes('amex') ||
+    normalized.includes('visa') ||
+    normalized.includes('mastercard') ||
+    normalized.includes('discover') ||
+    normalized.startsWith('cc ')
+  );
+}
+
+function accountLooksLikeLiability(account?: string): boolean {
+  const normalized = normalizeLabel(account);
+  if (!normalized) return false;
+  return (
+    accountLooksLikeCreditCard(normalized) ||
+    accountLooksLikeLoan(normalized) ||
+    normalized.includes('debt') ||
+    normalized.includes('mortgage') ||
+    normalized.includes('line of credit') ||
+    normalized.includes('loc')
+  );
+}
+
+function labelLooksLikeLiabilitySettlement(value?: string): boolean {
+  const normalized = normalizeLabel(value);
+  if (!normalized) return false;
+  return (
+    normalized.includes('credit card payment') ||
+    normalized.includes('credit card closing') ||
+    normalized.includes('loan payment') ||
+    normalized.includes('autopay payment') ||
+    normalized.includes('mobile payment') ||
+    normalized.includes('thank you')
+  );
 }
 
 // ─── Transaction-level classifiers ──────────────────────────────────────────
@@ -147,6 +202,52 @@ export function expenseContribution(txn: Txn, cashFlowMode: CashFlowMode): numbe
   if (shouldExcludeFromProfitability(txn)) return 0;
   if (!includeExpenseCategoryForCashFlowMode(txn.category, cashFlowMode)) return 0;
   if (isBusinessIncomeCategory(txn.category)) return 0;
+  if (txn.rawAmount < 0) return txn.amount;
+  if (txn.rawAmount > 0) return -txn.amount;
+  return 0;
+}
+
+/** Returns true when a transaction should not feed the forecast cash engine.
+ *  Forecasting is operating cash only, before owner decisions. */
+export function shouldExcludeFromForecastCash(txn: Txn): boolean {
+  return isFinancingTxn(txn) || isUncategorizedCategory(txn.category) || isCapitalDistributionCategory(txn.category);
+}
+
+function isTrueInternalCashTransfer(txn: Txn): boolean {
+  if (!isTransferTxn(txn)) return false;
+  return accountLooksLikeCash(txn.account) && accountLooksLikeCash(txn.transferAccount);
+}
+
+function isLiabilitySettlementTransfer(txn: Txn): boolean {
+  if (!isTransferTxn(txn)) return false;
+  return (
+    labelLooksLikeLiabilitySettlement(txn.category) ||
+    labelLooksLikeLiabilitySettlement(txn.payee) ||
+    labelLooksLikeLiabilitySettlement(txn.transferAccount) ||
+    accountLooksLikeLiability(txn.account) ||
+    accountLooksLikeLiability(txn.transferAccount)
+  );
+}
+
+/** Forecast cash-in uses operating cash receipts only.
+ *  Transfers, financing, owner activity, and misc positive credits are excluded. */
+export function forecastCashInContribution(txn: Txn): number {
+  if (shouldExcludeFromForecastCash(txn)) return 0;
+  if (isTransferTxn(txn)) return 0;
+  if (!isBusinessIncomeCategory(txn.category)) return 0;
+  if (isRefundCategory(txn.category)) return 0;
+  return txn.rawAmount > 0 ? txn.amount : 0;
+}
+
+/** Forecast cash-out uses operating cash disbursements.
+ *  Refunds are treated as cash out, and positive expense credits reduce outflow.
+ *  Transfer-coded cash movement is excluded entirely from operating cash. */
+export function forecastCashOutContribution(txn: Txn): number {
+  if (shouldExcludeFromForecastCash(txn)) return 0;
+  if (isTransferTxn(txn)) return 0;
+  if (isBusinessIncomeCategory(txn.category)) {
+    return txn.rawAmount < 0 ? txn.amount : 0;
+  }
   if (txn.rawAmount < 0) return txn.amount;
   if (txn.rawAmount > 0) return -txn.amount;
   return 0;
