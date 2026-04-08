@@ -1,6 +1,12 @@
 import { useMemo, useState } from 'react';
 import TrendLineChart from './TrendLineChart';
-import type { CashFlowForecastStatus, ForecastDecisionSignals, TrendPoint } from '../lib/data/contract';
+import type {
+  CashFlowForecastStatus,
+  ForecastDecisionSignals,
+  ForecastScenarioKey,
+  ForecastSeasonalityMeta,
+  TrendPoint,
+} from '../lib/data/contract';
 import { toMonthLabel } from '../lib/kpis/compute';
 
 type SelectOption = { value: string; label: string };
@@ -9,16 +15,23 @@ type CashFlowForecastModuleProps = {
   data: TrendPoint[];
   pointStatusByMonth: Partial<Record<string, CashFlowForecastStatus>>;
   decisionSignals: ForecastDecisionSignals;
+  seasonality: ForecastSeasonalityMeta;
   currentCashBalance: number;
   hasCurrentCashBalance: boolean;
   forecastRangeMonths: number;
   forecastRangeValue: string;
   forecastRangeOptions: SelectOption[];
   onForecastRangeChange: (nextValue: string) => void;
+  scenarioKey: ForecastScenarioKey;
+  onScenarioChange: (nextValue: ForecastScenarioKey) => void;
   revenueGrowthPct: number;
-  expenseReductionPct: number;
+  expenseChangePct: number;
+  receivableDays: number;
+  payableDays: number;
   onRevenueGrowthChange: (nextValue: number) => void;
-  onExpenseReductionChange: (nextValue: number) => void;
+  onExpenseChange: (nextValue: number) => void;
+  onReceivableDaysChange: (nextValue: number) => void;
+  onPayableDaysChange: (nextValue: number) => void;
 };
 
 type ForecastViewMode = 'monthly' | 'cumulative';
@@ -29,6 +42,9 @@ type ForecastSliderControlProps = {
   max: number;
   step: number;
   onChange: (nextValue: number) => void;
+  formatValue?: (value: number) => string;
+  tickValues?: number[];
+  formatTickValue?: (value: number) => string;
 };
 
 function formatDateKey(date: Date): string {
@@ -134,6 +150,10 @@ function formatSignedPercent(value: number): string {
   return `${rounded}%`;
 }
 
+function formatDays(value: number): string {
+  return `${Math.round(value)}d`;
+}
+
 function formatCurrencyCompact(value: number): string {
   const abs = Math.abs(value);
   if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -141,11 +161,23 @@ function formatCurrencyCompact(value: number): string {
   return `$${Math.round(value)}`;
 }
 
-function ForecastSliderControl({ label, value, min, max, step, onChange }: ForecastSliderControlProps) {
+function ForecastSliderControl({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  formatValue = formatSignedPercent,
+  tickValues,
+  formatTickValue = formatValue,
+}: ForecastSliderControlProps) {
   const safeSpan = Math.max(max - min, 1);
   const sliderPercent = ((value - min) / safeSpan) * 100;
   const valueTransform = sliderPercent < 8 ? 'translateX(0%)' : sliderPercent > 92 ? 'translateX(-100%)' : 'translateX(-50%)';
-  const tickValues = [min, -25, 0, 25, max].filter((tick, index, list) => tick >= min && tick <= max && list.indexOf(tick) === index);
+  const sliderTicks = (tickValues ?? [min, (min + max) / 2, max]).filter(
+    (tick, index, list) => tick >= min && tick <= max && list.indexOf(tick) === index
+  );
 
   return (
     <label className="forecast-slider-control">
@@ -158,10 +190,10 @@ function ForecastSliderControl({ label, value, min, max, step, onChange }: Forec
             transform: valueTransform,
           }}
         >
-          {formatSignedPercent(value)}
+          {formatValue(value)}
         </span>
         <div className="forecast-slider-ticks" aria-hidden="true">
-          {tickValues.map((tick) => {
+          {sliderTicks.map((tick) => {
             const tickPercent = ((tick - min) / safeSpan) * 100;
             const isZero = Math.abs(tick) < 0.001;
             return (
@@ -182,9 +214,9 @@ function ForecastSliderControl({ label, value, min, max, step, onChange }: Forec
           onChange={(event) => onChange(Number.parseFloat(event.target.value))}
         />
         <div className="forecast-slider-tick-label-row" aria-hidden="true">
-          <span>{formatSignedPercent(min)}</span>
-          <span>{formatSignedPercent(0)}</span>
-          <span>{formatSignedPercent(max)}</span>
+          {sliderTicks.map((tick) => (
+            <span key={`${label}-tick-label-${tick}`}>{formatTickValue(tick)}</span>
+          ))}
         </div>
       </div>
     </label>
@@ -195,19 +227,26 @@ export default function CashFlowForecastModule({
   data,
   pointStatusByMonth,
   decisionSignals,
+  seasonality,
   currentCashBalance,
   hasCurrentCashBalance,
   forecastRangeMonths,
   forecastRangeValue,
   forecastRangeOptions,
   onForecastRangeChange,
+  scenarioKey,
+  onScenarioChange,
   revenueGrowthPct,
-  expenseReductionPct,
+  expenseChangePct,
+  receivableDays,
+  payableDays,
   onRevenueGrowthChange,
-  onExpenseReductionChange,
+  onExpenseChange,
+  onReceivableDaysChange,
+  onPayableDaysChange,
 }: CashFlowForecastModuleProps) {
   const [viewMode, setViewMode] = useState<ForecastViewMode>('cumulative');
-  const expenseChangePct = -expenseReductionPct;
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const granularity: 'month' | 'week' = forecastRangeMonths < 6 ? 'week' : 'month';
   const startingCashBalance = Number.isFinite(currentCashBalance) ? currentCashBalance : 0;
 
@@ -254,9 +293,74 @@ export default function CashFlowForecastModule({
   const troughMonthLabel = decisionSignals.cashTroughMonth ? toMonthLabel(decisionSignals.cashTroughMonth) : 'Not available';
   const troughBalanceLabel =
     decisionSignals.cashTroughBalance === null ? 'Forecast unavailable' : formatCurrencyCompact(decisionSignals.cashTroughBalance);
+  const reserveBreachLabel = !decisionSignals.reserveBreachEvaluated
+    ? 'Not available'
+    : decisionSignals.reserveBreachMonth
+      ? toMonthLabel(decisionSignals.reserveBreachMonth)
+      : 'Not breached';
+  const negativeCashLabel =
+    data.length === 0 ? 'Not available' : decisionSignals.negativeCashMonth ? toMonthLabel(decisionSignals.negativeCashMonth) : 'Stays above zero';
+  const visibleSeasonalityWarning = useMemo(() => {
+    if (!seasonality.warning) return null;
+    return data.some((point) => point.month === seasonality.warning?.month) ? seasonality.warning : null;
+  }, [data, seasonality.warning]);
+  const seasonalityModeLabel = seasonality.mode === 'seasonal' ? 'Seasonal mode' : 'Fallback mode';
+  const seasonalitySupportLabel =
+    seasonality.mode === 'seasonal'
+      ? `Using ${seasonality.completeYearsUsed.length} complete year${seasonality.completeYearsUsed.length === 1 ? '' : 's'}`
+      : 'Using recent baseline only';
+  const seasonalityConfidenceLabel =
+    seasonality.confidence === 'low'
+      ? 'Low confidence — limited seasonal history'
+      : seasonality.confidence === 'strong'
+        ? 'Strong confidence'
+        : null;
+  const scenarioOptions: Array<{ key: ForecastScenarioKey; label: string }> = [
+    { key: 'base', label: 'Base Case' },
+    { key: 'best', label: 'Best Case' },
+    { key: 'worst', label: 'Worst Case' },
+    { key: 'custom', label: 'Custom Case' },
+  ];
 
   return (
     <div className="forecast-cockpit">
+      <div className="forecast-toolbar">
+        <div className="forecast-scenario-toggle" role="group" aria-label="Forecast scenario">
+          {scenarioOptions.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              className={scenarioKey === option.key ? 'is-active' : ''}
+              onClick={() => onScenarioChange(option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="forecast-toolbar-actions">
+          <label className="forecast-inline-select">
+            <span>Forecast horizon</span>
+            <select value={forecastRangeValue} onChange={(event) => onForecastRangeChange(event.target.value)}>
+              {forecastRangeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <button
+            type="button"
+            className={`forecast-advanced-toggle${advancedOpen ? ' is-active' : ''}`}
+            onClick={() => setAdvancedOpen((previous) => !previous)}
+            aria-expanded={advancedOpen}
+          >
+            Advanced
+          </button>
+        </div>
+      </div>
+
       <div className="forecast-view-toggle" role="group" aria-label="Forecast chart mode">
         <button
           type="button"
@@ -275,6 +379,22 @@ export default function CashFlowForecastModule({
       </div>
 
       <section className="card forecast-chart-shell">
+        <div className="forecast-mode-row">
+          <div className="forecast-mode-copy">
+            <span className={`forecast-mode-pill is-${seasonality.mode}`}>{seasonalityModeLabel}</span>
+            <span className="forecast-mode-note">{seasonalitySupportLabel}</span>
+          </div>
+          {seasonalityConfidenceLabel ? (
+            <span className={`forecast-mode-badge is-${seasonality.confidence}`}>{seasonalityConfidenceLabel}</span>
+          ) : null}
+        </div>
+
+        {visibleSeasonalityWarning ? (
+          <div className="forecast-warning-callout" role="status" aria-live="polite">
+            {visibleSeasonalityWarning.message}
+          </div>
+        ) : null}
+
         <TrendLineChart
           data={displaySeries}
           metric="net"
@@ -283,10 +403,6 @@ export default function CashFlowForecastModule({
           pointStatusByMonth={displayPointStatusByMonth}
           showRevenueExpenseInTooltip={viewMode === 'monthly'}
           rangeLabelOverride={monthlyRangeLabel}
-          forecastRangeLabel="Forecast range"
-          forecastRangeValue={forecastRangeValue}
-          forecastRangeOptions={forecastRangeOptions}
-          onForecastRangeChange={onForecastRangeChange}
         />
 
         <div className="forecast-decision-grid" aria-label="Forecast decision signals">
@@ -306,29 +422,81 @@ export default function CashFlowForecastModule({
             <strong className="forecast-decision-value">{troughMonthLabel}</strong>
             <span className="forecast-decision-subvalue">{troughBalanceLabel}</span>
           </article>
+
+          <article className="forecast-decision-card">
+            <div className="forecast-decision-head">
+              <span className="forecast-decision-label">Reserve Floor Breach</span>
+              <span className="forecast-decision-meta">First month below current reserve floor</span>
+            </div>
+            <strong className="forecast-decision-value">{reserveBreachLabel}</strong>
+          </article>
+
+          <article className="forecast-decision-card">
+            <div className="forecast-decision-head">
+              <span className="forecast-decision-label">Negative Cash Month</span>
+              <span className="forecast-decision-meta">First month projected cash turns negative</span>
+            </div>
+            <strong className="forecast-decision-value">{negativeCashLabel}</strong>
+          </article>
         </div>
 
-        <div className="forecast-slider-dual-row" aria-label="What-if controls">
-          <ForecastSliderControl
-            label="Revenue Change"
-            min={-50}
-            max={50}
-            step={1}
-            value={revenueGrowthPct}
-            onChange={onRevenueGrowthChange}
-          />
+        <div className="forecast-control-stack" aria-label="What-if controls">
+          <div className="forecast-slider-grid forecast-slider-grid--main">
+            <ForecastSliderControl
+              label="Revenue Growth"
+              min={-12}
+              max={12}
+              step={1}
+              value={revenueGrowthPct}
+              onChange={onRevenueGrowthChange}
+              tickValues={[-12, 0, 12]}
+            />
 
-          <ForecastSliderControl
-            label="Expense Change"
-            min={-50}
-            max={50}
-            step={1}
-            value={expenseChangePct}
-            onChange={(nextExpenseChange) => {
-              // Scenario state stores expense reduction; invert sign so formula is equivalent to (1 + expenseChangePct).
-              onExpenseReductionChange(-nextExpenseChange);
-            }}
-          />
+            <ForecastSliderControl
+              label="Expense Change"
+              min={-12}
+              max={12}
+              step={1}
+              value={expenseChangePct}
+              onChange={onExpenseChange}
+              tickValues={[-12, 0, 12]}
+            />
+          </div>
+
+          {advancedOpen ? (
+            <div className="forecast-advanced-panel" aria-label="Advanced forecast settings">
+              <div className="forecast-advanced-head">
+                <span className="forecast-advanced-title">Advanced timing</span>
+                <span className="forecast-advanced-copy">Defaults stay at 3 days unless you need a manual override.</span>
+              </div>
+
+              <div className="forecast-slider-grid forecast-slider-grid--advanced">
+                <ForecastSliderControl
+                  label="Receivables Timing"
+                  min={0}
+                  max={30}
+                  step={1}
+                  value={receivableDays}
+                  onChange={onReceivableDaysChange}
+                  formatValue={formatDays}
+                  formatTickValue={formatDays}
+                  tickValues={[0, 15, 30]}
+                />
+
+                <ForecastSliderControl
+                  label="Payables Timing"
+                  min={0}
+                  max={30}
+                  step={1}
+                  value={payableDays}
+                  onChange={onPayableDaysChange}
+                  formatValue={formatDays}
+                  formatTickValue={formatDays}
+                  tickValues={[0, 15, 30]}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
     </div>

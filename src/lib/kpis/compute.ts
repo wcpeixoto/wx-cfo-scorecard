@@ -4,7 +4,10 @@ import type {
   CashFlowMode,
   DashboardModel,
   ExpenseSlice,
+  ForecastCashRollup,
   ForecastDecisionSignals,
+  ForecastProjectionResult,
+  ForecastSeasonalityMeta,
   KpiAggregate,
   KpiAggregationMap,
   KpiComparisonMap,
@@ -30,6 +33,8 @@ import type {
 } from '../data/contract';
 import {
   expenseContribution,
+  forecastCashInContribution,
+  forecastCashOutContribution,
   includeExpenseForDigHere,
   isCapitalDistributionCategory,
   isUncategorizedCategory,
@@ -77,9 +82,23 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 function average(values: number[]): number {
   if (values.length === 0) return 0;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+  return sorted[middle];
 }
 
 function averageMonthOverMonthDelta(values: number[]): number {
@@ -540,6 +559,52 @@ export function computeMonthlyRollups(txns: Txn[], cashFlowMode: CashFlowMode = 
         transactionCount: rollup.transactionCount,
       };
     });
+}
+
+export function computeForecastCashRollups(txns: Txn[]): ForecastCashRollup[] {
+  const monthMap = new Map<string, ForecastCashRollup>();
+
+  txns.forEach((txn) => {
+    if (!monthMap.has(txn.month)) {
+      monthMap.set(txn.month, {
+        month: txn.month,
+        cashIn: 0,
+        cashOut: 0,
+        netCashFlow: 0,
+        transactionCount: 0,
+      });
+    }
+
+    const rollup = monthMap.get(txn.month);
+    if (!rollup) return;
+
+    const cashIn = forecastCashInContribution(txn);
+    const cashOut = forecastCashOutContribution(txn);
+
+    if (Math.abs(cashIn) > EPSILON) {
+      rollup.cashIn += cashIn;
+    }
+
+    if (Math.abs(cashOut) > EPSILON) {
+      rollup.cashOut += cashOut;
+    }
+
+    if (Math.abs(cashIn) > EPSILON || Math.abs(cashOut) > EPSILON) {
+      rollup.transactionCount += 1;
+    }
+
+    rollup.netCashFlow = rollup.cashIn - rollup.cashOut;
+  });
+
+  return [...monthMap.values()]
+    .sort((a, b) => sortMonths(a.month, b.month))
+    .map((rollup) => ({
+      month: rollup.month,
+      cashIn: round2(rollup.cashIn),
+      cashOut: round2(rollup.cashOut),
+      netCashFlow: round2(rollup.netCashFlow),
+      transactionCount: rollup.transactionCount,
+    }));
 }
 
 /**
@@ -1664,6 +1729,14 @@ export function computeDashboardModel(
   const thisMonthAnchor = options?.thisMonthAnchor;
   const currentCashBalance = options?.currentCashBalance ?? 0;
   const monthlyRollups = computeMonthlyRollups(txns, cashFlowMode);
+  // Exclude the current (incomplete) calendar month so the forecast baseline
+  // is always derived from fully-closed months.  Without this filter the
+  // partial month drags down both the 3-month average and the latest-month
+  // seed, making early projected months materially lower than reality.
+  const lastCompleteMonth = thisMonthAnchor ? addMonths(thisMonthAnchor, -1) : undefined;
+  const forecastCashRollups = computeForecastCashRollups(txns).filter(
+    (rollup) => !lastCompleteMonth || rollup.month <= lastCompleteMonth
+  );
 
   if (monthlyRollups.length === 0) {
     const emptyAggregations = computeKpiAggregations([], anchorMonth, thisMonthAnchor);
@@ -1676,6 +1749,7 @@ export function computeDashboardModel(
       latestMonth: '',
       previousMonth: null,
       monthlyRollups: [],
+      forecastCashRollups: [],
       kpiAggregationByTimeframe: emptyAggregations,
       kpiComparisonByTimeframe: emptyComparisons,
       kpiYoYComparisonByTimeframe: emptyYoYComparisons,
@@ -1768,6 +1842,7 @@ export function computeDashboardModel(
     latestMonth: latest.month,
     previousMonth: previous?.month ?? null,
     monthlyRollups,
+    forecastCashRollups,
     kpiAggregationByTimeframe,
     kpiComparisonByTimeframe,
     kpiYoYComparisonByTimeframe,
@@ -1802,58 +1877,475 @@ export function computeDashboardModel(
   };
 }
 
-export function projectScenario(model: DashboardModel, input: ScenarioInput, startingCashBalance = 0): ScenarioPoint[] {
-  if (!model.latestMonth || model.monthlyRollups.length === 0) {
-    return [];
+type ForecastBaseline = {
+  baselineCashIn: number;
+  baselineCashOut: number;
+  latestCashIn: number;
+  latestCashOut: number;
+  fixedCashOutBase: number;
+  variableCashOutBase: number;
+  cashInMomentumPct: number;
+  cashOutMomentumPct: number;
+};
+
+type ForecastSeasonalityTier = {
+  mode: ForecastSeasonalityMeta['mode'];
+  confidence: ForecastSeasonalityMeta['confidence'];
+  weighting: number[];
+  capMin: number;
+  capMax: number;
+  divergenceThresholdPct: number;
+};
+
+type SeasonalIndicesBuild = {
+  meta: ForecastSeasonalityMeta;
+  cashInByMonth: number[] | null;
+  cashOutByMonth: number[] | null;
+};
+
+function averageCompleteYearMonthlyValue(
+  completeYears: number[],
+  rollupsByYear: Map<number, Map<number, ForecastCashRollup>>,
+  pickValue: (rollup: ForecastCashRollup) => number
+): number | null {
+  if (completeYears.length < 2) return null;
+
+  const annualMonthlyAverages = completeYears
+    .map((year) => {
+      const yearMonths = rollupsByYear.get(year);
+      if (!yearMonths || yearMonths.size !== 12) return null;
+      const values = Array.from({ length: 12 }, (_, monthIndex) => pickValue(yearMonths.get(monthIndex + 1) as ForecastCashRollup));
+      return average(values);
+    })
+    .filter((value): value is number => value !== null && Number.isFinite(value));
+
+  if (annualMonthlyAverages.length < 2) return null;
+  return round2(Math.max(average(annualMonthlyAverages), 0));
+}
+
+function deriveForecastBaseline(
+  forecastCashRollups: ForecastCashRollup[],
+  seasonalityBuild?: SeasonalIndicesBuild,
+  rollupsByYear?: Map<number, Map<number, ForecastCashRollup>>
+): ForecastBaseline | null {
+  if (forecastCashRollups.length === 0) return null;
+
+  const recentMonths = forecastCashRollups.slice(-Math.min(6, forecastCashRollups.length));
+  const priorMonths = forecastCashRollups.length > 3 ? forecastCashRollups.slice(-6, -3) : [];
+  const latestMonth = forecastCashRollups[forecastCashRollups.length - 1];
+  const recentCashInValues = recentMonths.map((month) => month.cashIn);
+  const trailingCashIn = round2(Math.max(average(recentCashInValues), 0));
+  const trailingCashInMedian = Math.max(median(recentCashInValues), 0);
+  const trailingCashInTrimFloor = trailingCashInMedian * 0.6;
+  const trimmedTrailingCashIn = round2(
+    Math.max(
+      average(
+        recentCashInValues.map((value) => (value < trailingCashInTrimFloor ? trailingCashInMedian : value))
+      ),
+      0
+    )
+  );
+  const trailingCashOut = round2(Math.max(average(recentMonths.map((month) => month.cashOut)), 0));
+  const completeYearsUsed = seasonalityBuild?.meta.completeYearsUsed ?? [];
+  const historicalCashIn =
+    rollupsByYear && completeYearsUsed.length > 0
+      ? averageCompleteYearMonthlyValue(completeYearsUsed, rollupsByYear, (rollup) => rollup.cashIn)
+      : null;
+  const historicalCashOut =
+    rollupsByYear && completeYearsUsed.length > 0
+      ? averageCompleteYearMonthlyValue(completeYearsUsed, rollupsByYear, (rollup) => rollup.cashOut)
+      : null;
+  const baselineCashIn = round2(
+    Math.max(historicalCashIn === null ? trimmedTrailingCashIn : trimmedTrailingCashIn * 0.3 + historicalCashIn * 0.7, 0)
+  );
+  const baselineCashOut = round2(
+    Math.max(historicalCashOut === null ? trailingCashOut : trailingCashOut * 0.6 + historicalCashOut * 0.4, 0)
+  );
+  const priorCashIn = round2(Math.max(average(priorMonths.map((month) => month.cashIn)), 0));
+  const priorCashOut = round2(Math.max(average(priorMonths.map((month) => month.cashOut)), 0));
+  const fixedCashOutBase = round2(baselineCashOut * 0.68);
+  const variableCashOutBase = round2(Math.max(baselineCashOut - fixedCashOutBase, 0));
+  const cashInMomentumPct =
+    priorCashIn > EPSILON ? clamp((baselineCashIn - priorCashIn) / priorCashIn, -0.12, 0.12) : 0;
+  const cashOutMomentumPct =
+    priorCashOut > EPSILON ? clamp((baselineCashOut - priorCashOut) / priorCashOut, -0.12, 0.12) : 0;
+
+  return {
+    baselineCashIn,
+    baselineCashOut,
+    latestCashIn: round2(Math.max(latestMonth?.cashIn ?? baselineCashIn, 0)),
+    latestCashOut: round2(Math.max(latestMonth?.cashOut ?? baselineCashOut, 0)),
+    fixedCashOutBase,
+    variableCashOutBase,
+    cashInMomentumPct,
+    cashOutMomentumPct,
+  };
+}
+
+function normalizeWeights(weights: number[]): number[] {
+  if (weights.length === 0) return [];
+  const total = weights.reduce((sum, value) => sum + value, 0);
+  if (Math.abs(total) <= EPSILON) {
+    return weights.map(() => 1 / weights.length);
+  }
+  return weights.map((value) => value / total);
+}
+
+function weightedAverage(values: number[], weights: number[]): number {
+  if (values.length === 0 || weights.length === 0 || values.length !== weights.length) return 0;
+  const normalizedWeights = normalizeWeights(weights);
+  return values.reduce((sum, value, index) => sum + value * normalizedWeights[index], 0);
+}
+
+function getForecastSeasonalityTier(completeYearCount: number): ForecastSeasonalityTier {
+  if (completeYearCount < 2) {
+    return {
+      mode: 'fallback',
+      confidence: 'none',
+      weighting: [],
+      capMin: 0,
+      capMax: 0,
+      divergenceThresholdPct: 0,
+    };
   }
 
-  const baselineMonths = model.monthlyRollups.slice(-3);
-  const baselineRevenue =
-    baselineMonths.reduce((sum, month) => sum + month.revenue, 0) /
-    Math.max(baselineMonths.length, 1);
-  const baselineExpense =
-    baselineMonths.reduce((sum, month) => sum + month.expenses, 0) /
-    Math.max(baselineMonths.length, 1);
+  if (completeYearCount === 2) {
+    return {
+      mode: 'seasonal',
+      confidence: 'low',
+      weighting: [0.5, 0.5],
+      capMin: 0.4,
+      capMax: 2.2,
+      divergenceThresholdPct: 20,
+    };
+  }
 
-  const growthFactor = 1 + input.revenueGrowthPct / 100;
-  const expenseFactor = 1 - input.expenseReductionPct / 100;
+  if (completeYearCount === 3) {
+    return {
+      mode: 'seasonal',
+      confidence: 'standard',
+      weighting: [0.5, 0.3, 0.2],
+      capMin: 0.5,
+      capMax: 2,
+      divergenceThresholdPct: 25,
+    };
+  }
+
+  return {
+    mode: 'seasonal',
+    confidence: 'strong',
+    weighting: [0.4, 0.3, 0.2, 0.1],
+    capMin: 0.5,
+    capMax: 2,
+    divergenceThresholdPct: 25,
+  };
+}
+
+function createSeasonalityMeta(
+  tier: ForecastSeasonalityTier,
+  completeYearsUsed: number[],
+  partialYearsExcluded: number[],
+  warning: ForecastSeasonalityMeta['warning'] = null
+): ForecastSeasonalityMeta {
+  return {
+    mode: tier.mode,
+    confidence: tier.confidence,
+    completeYearsUsed,
+    partialYearsExcluded,
+    weighting: tier.weighting,
+    capMin: tier.capMin,
+    capMax: tier.capMax,
+    divergenceThresholdPct: tier.divergenceThresholdPct,
+    warning,
+  };
+}
+
+function collectForecastYears(forecastCashRollups: ForecastCashRollup[]): {
+  completeYears: number[];
+  partialYears: number[];
+  rollupsByYear: Map<number, Map<number, ForecastCashRollup>>;
+} {
+  const rollupsByYear = new Map<number, Map<number, ForecastCashRollup>>();
+
+  forecastCashRollups.forEach((rollup) => {
+    const parsed = parseMonthParts(rollup.month);
+    if (!parsed) return;
+    const yearMap = rollupsByYear.get(parsed.year) ?? new Map<number, ForecastCashRollup>();
+    yearMap.set(parsed.month, rollup);
+    rollupsByYear.set(parsed.year, yearMap);
+  });
+
+  const completeYears: number[] = [];
+  const partialYears: number[] = [];
+  [...rollupsByYear.keys()]
+    .sort((a, b) => a - b)
+    .forEach((year) => {
+      const months = [...(rollupsByYear.get(year)?.keys() ?? [])].sort((a, b) => a - b);
+      const isCompleteYear = months.length === 12 && months.every((month, index) => month === index + 1);
+      if (isCompleteYear) {
+        completeYears.push(year);
+      } else {
+        partialYears.push(year);
+      }
+    });
+
+  return { completeYears, partialYears, rollupsByYear };
+}
+
+function buildSeasonalIndexByMonth(
+  years: number[],
+  weights: number[],
+  rollupsByYear: Map<number, Map<number, ForecastCashRollup>>,
+  pickValue: (rollup: ForecastCashRollup) => number,
+  capMin: number,
+  capMax: number
+): number[] | null {
+  const usableYears = years
+    .map((year, index) => {
+      const months = rollupsByYear.get(year);
+      if (!months) return null;
+      const values = Array.from({ length: 12 }, (_, monthIndex) => pickValue(months.get(monthIndex + 1) as ForecastCashRollup));
+      const averageValue = average(values);
+      if (averageValue <= EPSILON) return null;
+      return { year, weight: weights[index], averageValue, months };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+  if (usableYears.length < 2) return null;
+
+  const usableWeights = normalizeWeights(usableYears.map((entry) => entry.weight));
+  const indices = new Array(13).fill(1);
+
+  for (let monthNumber = 1; monthNumber <= 12; monthNumber += 1) {
+    const ratios = usableYears.map((entry) => {
+      const rollup = entry.months.get(monthNumber);
+      const value = rollup ? pickValue(rollup) : 0;
+      return entry.averageValue > EPSILON ? value / entry.averageValue : 1;
+    });
+    const medianRatio = median(ratios);
+    const lowerBound = medianRatio * 0.7;
+    const upperBound = medianRatio * 1.3;
+    const winsorized = ratios.map((ratio) => clamp(ratio, lowerBound, upperBound));
+    indices[monthNumber] = round2(clamp(weightedAverage(winsorized, usableWeights), capMin, capMax));
+  }
+
+  return indices;
+}
+
+function buildForecastSeasonality(forecastCashRollups: ForecastCashRollup[]): SeasonalIndicesBuild {
+  const { completeYears, partialYears, rollupsByYear } = collectForecastYears(forecastCashRollups);
+  const tier = getForecastSeasonalityTier(completeYears.length);
+
+  if (tier.mode === 'fallback') {
+    return {
+      meta: createSeasonalityMeta(tier, [], partialYears),
+      cashInByMonth: null,
+      cashOutByMonth: null,
+    };
+  }
+
+  const completeYearsUsed = completeYears.slice(-tier.weighting.length).reverse();
+  const cashInByMonth = buildSeasonalIndexByMonth(
+    completeYearsUsed,
+    tier.weighting,
+    rollupsByYear,
+    (rollup) => rollup.cashIn,
+    tier.capMin,
+    tier.capMax
+  );
+  const cashOutByMonth = buildSeasonalIndexByMonth(
+    completeYearsUsed,
+    tier.weighting,
+    rollupsByYear,
+    (rollup) => rollup.cashOut,
+    tier.capMin,
+    tier.capMax
+  );
+
+  if (!cashInByMonth || !cashOutByMonth) {
+    const fallbackTier = getForecastSeasonalityTier(0);
+    return {
+      meta: createSeasonalityMeta(fallbackTier, [], partialYears),
+      cashInByMonth: null,
+      cashOutByMonth: null,
+    };
+  }
+
+  return {
+    meta: createSeasonalityMeta(tier, completeYearsUsed, partialYears),
+    cashInByMonth,
+    cashOutByMonth,
+  };
+}
+
+function carryShareFromDays(days: number): number {
+  if (!Number.isFinite(days)) return 0;
+  return clamp(days / 30, 0, 0.95);
+}
+
+function buildForecastDivergenceWarning(
+  month: string,
+  cashInDiverged: boolean,
+  cashOutDiverged: boolean,
+  cashInDirection: 'above' | 'below',
+  cashOutDirection: 'above' | 'below'
+): ForecastSeasonalityMeta['warning'] {
+  if (!cashInDiverged && !cashOutDiverged) return null;
+
+  if (cashInDiverged && cashOutDiverged) {
+    const direction = cashInDirection === cashOutDirection ? cashInDirection : 'mixed';
+    return {
+      month,
+      metric: 'both',
+      direction,
+      message: 'This seasonal forecast diverges materially from recent performance. Confirm seasonality is expected.',
+    };
+  }
+
+  if (cashInDiverged) {
+    return {
+      month,
+      metric: 'cash-in',
+      direction: cashInDirection,
+      message:
+        cashInDirection === 'below'
+          ? 'This seasonal forecast is materially below recent cash-in performance. Confirm seasonality is expected.'
+          : 'This seasonal forecast diverges materially from recent performance. Confirm seasonality is expected.',
+    };
+  }
+
+  return {
+    month,
+    metric: 'cash-out',
+    direction: cashOutDirection,
+    message:
+      cashOutDirection === 'above'
+        ? 'This seasonal forecast is materially above recent cash-out performance. Confirm seasonality is expected.'
+        : 'This seasonal forecast diverges materially from recent performance. Confirm seasonality is expected.',
+  };
+}
+
+export function projectScenario(model: DashboardModel, input: ScenarioInput, startingCashBalance = 0): ForecastProjectionResult {
+  const emptySeasonality = createSeasonalityMeta(getForecastSeasonalityTier(0), [], []);
+  if (model.forecastCashRollups.length === 0) {
+    return { points: [], seasonality: emptySeasonality };
+  }
+
+  const seasonalityBuild = buildForecastSeasonality(model.forecastCashRollups);
+  const { rollupsByYear } = collectForecastYears(model.forecastCashRollups);
+  const baseline = deriveForecastBaseline(model.forecastCashRollups, seasonalityBuild, rollupsByYear);
+  if (!baseline) return { points: [], seasonality: emptySeasonality };
+
+  const latestForecastMonth = model.forecastCashRollups[model.forecastCashRollups.length - 1]?.month;
+  if (!latestForecastMonth) return { points: [], seasonality: emptySeasonality };
+
+  const seasonalityActive =
+    seasonalityBuild.meta.mode === 'seasonal' && seasonalityBuild.cashInByMonth !== null && seasonalityBuild.cashOutByMonth !== null;
+  const cashInTarget = baseline.baselineCashIn * (1 + clamp(input.revenueGrowthPct / 100, -0.6, 0.6));
+  const expenseChangeRatio = clamp(input.expenseChangePct / 100, -0.5, 0.5);
+  const receivableCarryShare = carryShareFromDays(input.receivableDays);
+  const payableCarryShare = carryShareFromDays(input.payableDays);
 
   const projections: ScenarioPoint[] = [];
-  let cumulativeNet = Number.isFinite(startingCashBalance) ? round2(startingCashBalance) : 0;
+  let seasonalityWarning: ForecastSeasonalityMeta['warning'] = null;
+  let endingCashBalance = Number.isFinite(startingCashBalance) ? round2(startingCashBalance) : 0;
+  let priorOperatingCashIn = baseline.latestCashIn > EPSILON ? baseline.latestCashIn : baseline.baselineCashIn;
+  let priorOperatingCashOut = baseline.latestCashOut > EPSILON ? baseline.latestCashOut : baseline.baselineCashOut;
+  let receivableCarryAmount = round2(priorOperatingCashIn * receivableCarryShare);
+  let payableCarryAmount = round2(priorOperatingCashOut * payableCarryShare);
 
   for (let index = 1; index <= input.months; index += 1) {
-    const month = addMonths(model.latestMonth, index);
-    const projectedIncome = round2(baselineRevenue * growthFactor ** index);
-    const projectedExpense = round2(baselineExpense * expenseFactor ** index);
-    const projectedNet = round2(projectedIncome - projectedExpense);
-    cumulativeNet = round2(cumulativeNet + projectedNet);
+    const month = addMonths(latestForecastMonth, index);
+    const monthNumber = parseMonthParts(month)?.month ?? 1;
+    let operatingCashIn = 0;
+    let operatingCashOut = 0;
+
+    if (seasonalityActive) {
+      const seasonalCashInIndex = seasonalityBuild.cashInByMonth?.[monthNumber] ?? 1;
+      const seasonalCashOutIndex = seasonalityBuild.cashOutByMonth?.[monthNumber] ?? 1;
+      operatingCashIn = round2(Math.max(baseline.baselineCashIn * seasonalCashInIndex * (1 + clamp(input.revenueGrowthPct / 100, -0.6, 0.6)), 0));
+      operatingCashOut = round2(Math.max(baseline.baselineCashOut * seasonalCashOutIndex * (1 + expenseChangeRatio), 0));
+
+      if (!seasonalityWarning) {
+        const cashInDivergencePct =
+          baseline.baselineCashIn > EPSILON ? (Math.abs(operatingCashIn - baseline.baselineCashIn) / baseline.baselineCashIn) * 100 : 0;
+        const cashOutDivergencePct =
+          baseline.baselineCashOut > EPSILON ? (Math.abs(operatingCashOut - baseline.baselineCashOut) / baseline.baselineCashOut) * 100 : 0;
+        const threshold = seasonalityBuild.meta.divergenceThresholdPct;
+        const cashInDiverged = threshold > EPSILON && cashInDivergencePct > threshold;
+        const cashOutDiverged = threshold > EPSILON && cashOutDivergencePct > threshold;
+        seasonalityWarning = buildForecastDivergenceWarning(
+          month,
+          cashInDiverged,
+          cashOutDiverged,
+          operatingCashIn >= baseline.baselineCashIn ? 'above' : 'below',
+          operatingCashOut >= baseline.baselineCashOut ? 'above' : 'below'
+        );
+      }
+    } else {
+      const momentumDecay = Math.max(0, 1 - (index - 1) * 0.18);
+      const cashInMomentumAdjustment = priorOperatingCashIn * baseline.cashInMomentumPct * momentumDecay * 0.45;
+      const cashInTargetPull = (cashInTarget - priorOperatingCashIn) * 0.35;
+      operatingCashIn = round2(Math.max(priorOperatingCashIn + cashInMomentumAdjustment + cashInTargetPull, 0));
+      const cashInScale = baseline.baselineCashIn > EPSILON ? operatingCashIn / baseline.baselineCashIn : 1;
+      const targetFixedCashOut = baseline.fixedCashOutBase * (1 + expenseChangeRatio * 0.55);
+      const targetVariableCashOut =
+        baseline.variableCashOutBase * Math.max(cashInScale, 0) * (1 + expenseChangeRatio * 0.45);
+      const targetCashOut = targetFixedCashOut + targetVariableCashOut;
+      const cashOutMomentumAdjustment = priorOperatingCashOut * baseline.cashOutMomentumPct * momentumDecay * 0.35;
+      const cashOutTargetPull = (targetCashOut - priorOperatingCashOut) * 0.38;
+      operatingCashOut = round2(
+        Math.max(priorOperatingCashOut + cashOutMomentumAdjustment + cashOutTargetPull, baseline.fixedCashOutBase * 0.5)
+      );
+    }
+
+    const cashIn = round2(operatingCashIn * (1 - receivableCarryShare) + receivableCarryAmount);
+    const cashOut = round2(operatingCashOut * (1 - payableCarryShare) + payableCarryAmount);
+    const netCashFlow = round2(cashIn - cashOut);
+    endingCashBalance = round2(endingCashBalance + netCashFlow);
 
     projections.push({
       month,
-      projectedIncome,
-      projectedExpense,
-      projectedNet,
-      cumulativeNet,
+      operatingCashIn,
+      operatingCashOut,
+      cashIn,
+      cashOut,
+      netCashFlow,
+      endingCashBalance,
     });
+
+    priorOperatingCashIn = operatingCashIn;
+    priorOperatingCashOut = operatingCashOut;
+    receivableCarryAmount = round2(operatingCashIn * receivableCarryShare);
+    payableCarryAmount = round2(operatingCashOut * payableCarryShare);
   }
 
-  return projections;
+  return {
+    points: projections,
+    seasonality: {
+      ...seasonalityBuild.meta,
+      warning: seasonalityActive ? seasonalityWarning : null,
+    },
+  };
 }
 
-export function computeForecastDecisionSignals(points: ScenarioPoint[]): ForecastDecisionSignals {
+export function computeForecastDecisionSignals(points: ScenarioPoint[], reserveTarget = 0): ForecastDecisionSignals {
   if (points.length === 0) {
     return {
       breakEvenMonth: null,
       cashTroughMonth: null,
       cashTroughBalance: null,
+      reserveBreachMonth: null,
+      reserveBreachEvaluated: false,
+      negativeCashMonth: null,
     };
   }
 
   let breakEvenMonth: string | null = null;
   for (let index = 0; index < points.length; index += 1) {
     const candidate = points[index];
-    if (candidate.projectedNet < -EPSILON) continue;
-    const remainsNonNegative = points.slice(index).every((point) => point.projectedNet >= -EPSILON);
+    if (candidate.netCashFlow < -EPSILON) continue;
+    const remainsNonNegative = points.slice(index).every((point) => point.netCashFlow >= -EPSILON);
     if (remainsNonNegative) {
       breakEvenMonth = candidate.month;
       break;
@@ -1862,13 +2354,21 @@ export function computeForecastDecisionSignals(points: ScenarioPoint[]): Forecas
 
   const troughPoint = points.reduce<ScenarioPoint | null>((lowest, point) => {
     if (!lowest) return point;
-    return point.cumulativeNet < lowest.cumulativeNet ? point : lowest;
+    return point.endingCashBalance < lowest.endingCashBalance ? point : lowest;
   }, null);
+  const reserveBreachMonth =
+    reserveTarget > EPSILON
+      ? points.find((point) => point.endingCashBalance < reserveTarget - EPSILON)?.month ?? null
+      : null;
+  const negativeCashMonth = points.find((point) => point.endingCashBalance < -EPSILON)?.month ?? null;
 
   return {
     breakEvenMonth,
     cashTroughMonth: troughPoint?.month ?? null,
-    cashTroughBalance: troughPoint ? round2(troughPoint.cumulativeNet) : null,
+    cashTroughBalance: troughPoint ? round2(troughPoint.endingCashBalance) : null,
+    reserveBreachMonth,
+    reserveBreachEvaluated: reserveTarget > EPSILON,
+    negativeCashMonth,
   };
 }
 

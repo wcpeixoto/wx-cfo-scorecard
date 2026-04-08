@@ -263,10 +263,19 @@ export type RunwayMetric = {
   percentFunded: number | null;
 };
 
+export type ForecastCashRollup = {
+  month: string;
+  cashIn: number;
+  cashOut: number;
+  netCashFlow: number;
+  transactionCount: number;
+};
+
 export type DashboardModel = {
   latestMonth: string;
   previousMonth: string | null;
   monthlyRollups: MonthlyRollup[];
+  forecastCashRollups: ForecastCashRollup[];
   kpiAggregationByTimeframe: KpiAggregationMap;
   kpiComparisonByTimeframe: KpiComparisonMap;
   kpiYoYComparisonByTimeframe: KpiComparisonMap;
@@ -291,22 +300,56 @@ export type DashboardModel = {
   runway: RunwayMetric;
 };
 
+export type ForecastScenarioKey = 'base' | 'best' | 'worst' | 'custom';
+
 export type ScenarioInput = {
+  scenarioKey: ForecastScenarioKey;
   revenueGrowthPct: number;
-  expenseReductionPct: number;
+  expenseChangePct: number;
+  receivableDays: number;
+  payableDays: number;
   months: number;
 };
 
 export type ScenarioPoint = {
   month: string;
-  projectedIncome: number;
-  projectedExpense: number;
-  projectedNet: number;
-  cumulativeNet: number;
+  operatingCashIn: number;
+  operatingCashOut: number;
+  cashIn: number;
+  cashOut: number;
+  netCashFlow: number;
+  endingCashBalance: number;
+};
+
+export type ForecastDivergenceWarning = {
+  month: string;
+  metric: 'cash-in' | 'cash-out' | 'both';
+  direction: 'above' | 'below' | 'mixed';
+  message: string;
+};
+
+export type ForecastSeasonalityMeta = {
+  mode: 'fallback' | 'seasonal';
+  confidence: 'none' | 'low' | 'standard' | 'strong';
+  completeYearsUsed: number[];
+  partialYearsExcluded: number[];
+  weighting: number[];
+  capMin: number;
+  capMax: number;
+  divergenceThresholdPct: number;
+  warning: ForecastDivergenceWarning | null;
+};
+
+export type ForecastProjectionResult = {
+  points: ScenarioPoint[];
+  seasonality: ForecastSeasonalityMeta;
 };
 
 export type ForecastDecisionSignals = {
   breakEvenMonth: string | null;
   cashTroughMonth: string | null;
   cashTroughBalance: number | null;
+  reserveBreachMonth: string | null;
+  reserveBreachEvaluated: boolean;
+  negativeCashMonth: string | null;
 };
