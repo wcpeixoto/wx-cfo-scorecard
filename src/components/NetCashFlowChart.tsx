@@ -66,7 +66,7 @@ function computeNiceAxisBounds(dataMin: number, dataMax: number) {
   const axisMax = hi > 0 ? Math.ceil(hi / interval) * interval : interval;
   const tickAmount = Math.round((axisMax - axisMin) / interval);
   const span = axisMax - axisMin;
-  const zeroOffset = span === 0 ? 50 : Math.round((axisMax / span) * 100);
+  const zeroOffset = span === 0 ? 50 : (axisMax / span) * 100;
   return { axisMin, axisMax, tickAmount, zeroOffset };
 }
 
@@ -156,17 +156,17 @@ export default function NetCashFlowChart({
       ? [
           [
             { offset: 0, color: '#465fff', opacity: 0.28 },
-            { offset: Math.max(0, z - 2), color: '#465fff', opacity: 0.02 },
-            { offset: Math.min(100, z + 2), color: '#ef4444', opacity: 0.02 },
+            { offset: z, color: '#465fff', opacity: 0 },
+            { offset: z, color: '#ef4444', opacity: 0 },
             { offset: 100, color: '#ef4444', opacity: 0.28 },
           ],
         ]
       : hasNegative
       ? [
-          [{ offset: 0, color: '#ef4444', opacity: 0.02 }, { offset: 100, color: '#ef4444', opacity: 0.28 }],
+          [{ offset: 0, color: '#ef4444', opacity: 0 }, { offset: 100, color: '#ef4444', opacity: 0.28 }],
         ]
       : [
-          [{ offset: 0, color: '#465fff', opacity: 0.28 }, { offset: 100, color: '#465fff', opacity: 0.02 }],
+          [{ offset: 0, color: '#465fff', opacity: 0.28 }, { offset: 100, color: '#465fff', opacity: 0 }],
         ];
 
     return ({
