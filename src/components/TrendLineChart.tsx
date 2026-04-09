@@ -44,6 +44,8 @@ type TrendLineChartProps = {
   hideDots?: boolean;
   hideTrend?: boolean;
   hideAxisLines?: boolean;
+  showOnlyProjectedTicks?: boolean;
+  showMonthlyXLabels?: boolean;
 };
 
 type PlotPoint = {
@@ -288,6 +290,68 @@ function formatShortMonthLabel(month: string): string {
   return `${shortMonths[parsed.month - 1]} ${yy}`;
 }
 
+// Returns a map of point index → month label for the first point in each calendar month.
+// point.month may be "YYYY-MM" or a date key like "2026-04-07"; we extract YYYY-MM from either.
+function monthLabelStep(forecastMonthCount: number): number {
+  if (forecastMonthCount <= 6) return 1;
+  if (forecastMonthCount <= 12) return 2;
+  if (forecastMonthCount <= 24) return 3;
+  return 6;
+}
+
+// Returns a map of point index → month label.
+// Anchor month (first) → label at its first point.
+// Forecast months → label at last point of every Nth month per step table.
+// Last forecast month is always labeled regardless of step.
+// Accepts point.month as "YYYY-MM" or "YYYY-MM-DD".
+function buildMonthlyLabelMap(points: PlotPoint[]): Map<number, string> {
+  const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // Pass 1: collect first and last point index per calendar month, in order
+  const firstIndexByMonth = new Map<string, number>();
+  const lastIndexByMonth = new Map<string, number>();
+  for (let i = 0; i < points.length; i++) {
+    const match = points[i].month.match(/^(\d{4})-(\d{2})/);
+    if (!match) continue;
+    const yearMonth = `${match[1]}-${match[2]}`;
+    if (!firstIndexByMonth.has(yearMonth)) firstIndexByMonth.set(yearMonth, i);
+    lastIndexByMonth.set(yearMonth, i);
+  }
+
+  const anchorMatch = points[0]?.month.match(/^(\d{4})-(\d{2})/);
+  const anchorMonth = anchorMatch ? `${anchorMatch[1]}-${anchorMatch[2]}` : null;
+
+  // Forecast months = all months except the anchor, in chronological order
+  const forecastMonths = [...lastIndexByMonth.keys()].filter((m) => m !== anchorMonth);
+  const step = monthLabelStep(forecastMonths.length);
+  const lastForecastMonth = forecastMonths[forecastMonths.length - 1] ?? null;
+
+  const makeLabel = (yearMonth: string): string => {
+    const [yearStr, monthStr] = yearMonth.split('-');
+    const monthIdx = Number.parseInt(monthStr, 10) - 1;
+    const yy = String(Number.parseInt(yearStr, 10)).slice(-2);
+    return `${shortMonths[monthIdx]} ${yy}`;
+  };
+
+  const result = new Map<number, string>();
+
+  // Anchor month: label at first point
+  if (anchorMonth) {
+    const idx = firstIndexByMonth.get(anchorMonth);
+    if (idx !== undefined) result.set(idx, makeLabel(anchorMonth));
+  }
+
+  // Forecast months: label every Nth, always label the last
+  forecastMonths.forEach((yearMonth, position) => {
+    const isLast = yearMonth === lastForecastMonth;
+    if (position % step !== step - 1 && !isLast) return;
+    const idx = lastIndexByMonth.get(yearMonth);
+    if (idx !== undefined) result.set(idx, makeLabel(yearMonth));
+  });
+
+  return result;
+}
+
 function buildYearlyJanuaryIndices(points: PlotPoint[]): number[] {
   const indices = new Set<number>();
   if (points.length === 0) return [];
@@ -494,6 +558,8 @@ export default function TrendLineChart({
   hideDots = false,
   hideTrend = false,
   hideAxisLines = false,
+  showOnlyProjectedTicks = false,
+  showMonthlyXLabels = false,
 }: TrendLineChartProps) {
   const [internalTimeframe, setInternalTimeframe] = useState<TimeframeOption>(12);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1058,15 +1124,30 @@ export default function TrendLineChart({
           </g>
         )}
 
-        {xTickIndices.map((index) => {
-          const point = points[index];
-          if (!point) return null;
-          return (
-            <text key={`${point.label}-${index}`} x={point.x} y={HEIGHT - 10} textAnchor="middle" className="axis-label">
-              {point.axisLabel}
-            </text>
-          );
-        })}
+        {showMonthlyXLabels
+          ? (() => {
+              const monthLabelMap = buildMonthlyLabelMap(points);
+              return Array.from(monthLabelMap.entries()).map(([index, label]) => {
+                const point = points[index];
+                if (!point) return null;
+                return (
+                  <text key={`month-${index}`} x={point.x} y={HEIGHT - 10} textAnchor="middle" className="axis-label">
+                    {label}
+                  </text>
+                );
+              });
+            })()
+          : xTickIndices
+              .filter((index) => !showOnlyProjectedTicks || points[index]?.status === 'projected')
+              .map((index) => {
+                const point = points[index];
+                if (!point) return null;
+                return (
+                  <text key={`${point.label}-${index}`} x={point.x} y={HEIGHT - 10} textAnchor="middle" className="axis-label">
+                    {point.axisLabel}
+                  </text>
+                );
+              })}
 
         {yTicks.map((tick) => {
           const y = PADDING_TOP + ((axisMax - tick) / Math.max(axisMax - axisMin, 1)) * innerHeight;

@@ -452,6 +452,8 @@ export default function CashFlowForecastModule({
           hideDots
           hideTrend
           hideAxisLines
+          showOnlyProjectedTicks
+          showMonthlyXLabels
         />
 
         <div className="forecast-control-stack" aria-label="What-if controls">
