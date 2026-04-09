@@ -186,6 +186,9 @@ export default function NetCashFlowChart({
         },
       },
     },
+    plotOptions: {
+      area: { fillTo: 'origin' },
+    },
     colors: ['#465fff'],
     fill: {
       type: 'gradient',
