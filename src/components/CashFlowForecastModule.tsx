@@ -240,16 +240,11 @@ export default function CashFlowForecastModule({
   onScenarioChange,
   revenueGrowthPct,
   expenseChangePct,
-  receivableDays,
-  payableDays,
   onRevenueGrowthChange,
   onExpenseChange,
-  onReceivableDaysChange,
-  onPayableDaysChange,
   forecastEvents = [],
 }: CashFlowForecastModuleProps) {
   const [viewMode, setViewMode] = useState<ForecastViewMode>('cumulative');
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const granularity: 'month' | 'week' = forecastRangeMonths < 6 ? 'week' : 'month';
   const startingCashBalance = Number.isFinite(currentCashBalance) ? currentCashBalance : 0;
 
@@ -340,28 +335,6 @@ export default function CashFlowForecastModule({
             </button>
           ))}
         </div>
-
-        <div className="forecast-toolbar-actions">
-          <label className="forecast-inline-select">
-            <span>Forecast horizon</span>
-            <select value={forecastRangeValue} onChange={(event) => onForecastRangeChange(event.target.value)}>
-              {forecastRangeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <button
-            type="button"
-            className={`forecast-advanced-toggle${advancedOpen ? ' is-active' : ''}`}
-            onClick={() => setAdvancedOpen((previous) => !previous)}
-            aria-expanded={advancedOpen}
-          >
-            Advanced
-          </button>
-        </div>
       </div>
 
       <section className="card forecast-chart-shell">
@@ -373,15 +346,19 @@ export default function CashFlowForecastModule({
           </div>
         ) : null}
 
-        <TrendLineChart
-          data={displaySeries}
-          metric="net"
-          title={chartTitle}
-          tooltipVariant="forecast"
-          pointStatusByMonth={displayPointStatusByMonth}
-          showRevenueExpenseInTooltip={viewMode === 'monthly'}
-          rangeLabelOverride={monthlyRangeLabel}
-        />
+        <div className="forecast-chart-header">
+          <h2 className="forecast-chart-title">{chartTitle}</h2>
+          <label className="forecast-inline-select">
+            <span>Forecast horizon</span>
+            <select value={forecastRangeValue} onChange={(event) => onForecastRangeChange(event.target.value)}>
+              {forecastRangeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
         <div className="forecast-decision-grid" aria-label="Forecast decision signals">
           <article className="forecast-decision-card">
@@ -418,6 +395,16 @@ export default function CashFlowForecastModule({
           </article>
         </div>
 
+        <TrendLineChart
+          data={displaySeries}
+          metric="net"
+          title={chartTitle}
+          tooltipVariant="forecast"
+          pointStatusByMonth={displayPointStatusByMonth}
+          showRevenueExpenseInTooltip={viewMode === 'monthly'}
+          rangeLabelOverride={monthlyRangeLabel}
+        />
+
         <div className="forecast-control-stack" aria-label="What-if controls">
           <div className="forecast-slider-grid forecast-slider-grid--main">
             <ForecastSliderControl
@@ -440,41 +427,6 @@ export default function CashFlowForecastModule({
               tickValues={[-12, 0, 12]}
             />
           </div>
-
-          {advancedOpen ? (
-            <div className="forecast-advanced-panel" aria-label="Advanced forecast settings">
-              <div className="forecast-advanced-head">
-                <span className="forecast-advanced-title">Advanced timing</span>
-                <span className="forecast-advanced-copy">Defaults stay at 3 days unless you need a manual override.</span>
-              </div>
-
-              <div className="forecast-slider-grid forecast-slider-grid--advanced">
-                <ForecastSliderControl
-                  label="Receivables Timing"
-                  min={0}
-                  max={30}
-                  step={1}
-                  value={receivableDays}
-                  onChange={onReceivableDaysChange}
-                  formatValue={formatDays}
-                  formatTickValue={formatDays}
-                  tickValues={[0, 15, 30]}
-                />
-
-                <ForecastSliderControl
-                  label="Payables Timing"
-                  min={0}
-                  max={30}
-                  step={1}
-                  value={payableDays}
-                  onChange={onPayableDaysChange}
-                  formatValue={formatDays}
-                  formatTickValue={formatDays}
-                  tickValues={[0, 15, 30]}
-                />
-              </div>
-            </div>
-          ) : null}
         </div>
 
         <div className="forecast-events-section">
