@@ -1132,7 +1132,7 @@ body {
 .forecast-decision-card {
   display: grid;
   gap: 6px;
-  padding: 20px;
+  padding: 24px;
   border: 1px solid #E4E7EC;
   border-radius: 16px;
   background: #FFFFFF;
@@ -1163,46 +1163,23 @@ body {
   color: #101828;
 }
 
-.forecast-decision-subvalue {
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  line-height: 1.2;
+.forecast-decision-value.is-safe {
+  color: #12B76A;
 }
 
-.forecast-decision-message {
+.forecast-decision-value.is-warning {
+  color: #F79009;
+}
+
+.forecast-decision-value.is-critical {
+  color: #F04438;
+}
+
+.forecast-decision-detail {
   font-size: 16px;
   font-weight: 400;
-  color: var(--text-primary);
+  color: #101828;
   line-height: 1.4;
-}
-
-.forecast-status-badge {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.forecast-status-badge--safe {
-  background: color-mix(in srgb, var(--positive) 14%, transparent);
-  color: var(--positive);
-  border: 1px solid color-mix(in srgb, var(--positive) 30%, transparent);
-}
-
-.forecast-status-badge--warning {
-  background: color-mix(in srgb, var(--warning) 14%, transparent);
-  color: var(--warning);
-  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
-}
-
-.forecast-status-badge--critical {
-  background: color-mix(in srgb, var(--negative) 14%, transparent);
-  color: var(--negative);
-  border: 1px solid color-mix(in srgb, var(--negative) 30%, transparent);
 }
 
 .forecast-control-stack {

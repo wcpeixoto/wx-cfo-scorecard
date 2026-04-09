@@ -303,30 +303,14 @@ export default function CashFlowForecastModule({
         ? 'Cash Balance Forecast'
         : 'Cumulative Cash Change Forecast'
       : 'Monthly Cash Flow Forecast';
-  const troughMonthLabel = decisionSignals.cashTroughMonth ? toMonthLabel(decisionSignals.cashTroughMonth) : 'Not available';
-  const troughBalanceLabel =
-    decisionSignals.cashTroughBalance === null ? '—' : formatCurrencyCompact(decisionSignals.cashTroughBalance);
+  const reserveBreached = !!decisionSignals.reserveBreachMonth;
+  const hasNegativeCash = !!decisionSignals.negativeCashMonth;
+  const cashRiskState: 'safe' | 'warning' | 'critical' = hasNegativeCash ? 'critical' : reserveBreached ? 'warning' : 'safe';
 
-  const riskVariant: 'safe' | 'warning' | 'critical' =
-    decisionSignals.negativeCashMonth ? 'critical' :
-    decisionSignals.reserveBreachMonth ? 'warning' : 'safe';
-  const riskStatusLabel = riskVariant === 'critical' ? 'Critical' : riskVariant === 'warning' ? 'Warning' : 'Safe';
-  const riskMessage =
-    riskVariant === 'critical' ? 'Cash goes negative' :
-    riskVariant === 'warning' ? 'Cash may drop below safe levels' :
-    'No cash shortfall expected';
-  const riskDetail =
-    riskVariant === 'critical'
-      ? `Projected deficit in ${toMonthLabel(decisionSignals.negativeCashMonth!)}`
-      : riskVariant === 'warning'
-        ? `Below reserve in ${toMonthLabel(decisionSignals.reserveBreachMonth!)}`
-        : 'Balance stays above zero across forecast';
-
-  const bufferStatusLabel = riskVariant === 'critical' ? 'Unsafe' : riskVariant === 'warning' ? 'Tight' : 'Healthy';
-  const bufferDetail =
-    riskVariant === 'critical' ? 'No cash cushion' :
-    riskVariant === 'warning' ? 'Below minimum reserve' :
-    'Above minimum reserve';
+  const negativeCashMonthLabel = decisionSignals.negativeCashMonth ? toMonthLabel(decisionSignals.negativeCashMonth) : null;
+  const reserveBreachMonthLabel = decisionSignals.reserveBreachMonth ? toMonthLabel(decisionSignals.reserveBreachMonth) : null;
+  const cashTroughMonthLabel = decisionSignals.cashTroughMonth ? toMonthLabel(decisionSignals.cashTroughMonth) : '—';
+  const cashTroughBalanceLabel = decisionSignals.cashTroughBalance === null ? '—' : formatCurrencyCompact(decisionSignals.cashTroughBalance);
   const visibleSeasonalityWarning = useMemo(() => {
     if (!seasonality.warning) return null;
     return data.some((point) => point.month === seasonality.warning?.month) ? seasonality.warning : null;
@@ -356,21 +340,35 @@ export default function CashFlowForecastModule({
 
         <article className="forecast-decision-card">
           <span className="forecast-decision-label">Cash Risk</span>
-          <span className={`forecast-status-badge forecast-status-badge--${riskVariant}`}>{riskStatusLabel}</span>
-          <span className="forecast-decision-message">{riskMessage}</span>
-          <span className="forecast-decision-meta">{riskDetail}</span>
+          <strong className={`forecast-decision-value is-${cashRiskState}`}>
+            {cashRiskState === 'critical' ? 'Critical' : cashRiskState === 'warning' ? 'Warning' : 'Safe'}
+          </strong>
+          <span className="forecast-decision-detail">
+            {cashRiskState === 'critical' ? 'Cash goes negative' : cashRiskState === 'warning' ? 'Cash may drop below safe levels' : 'No cash shortfall expected'}
+          </span>
+          <span className="forecast-decision-meta">
+            {cashRiskState === 'critical' && negativeCashMonthLabel ? `Projected deficit in ${negativeCashMonthLabel}` : cashRiskState === 'warning' && reserveBreachMonthLabel ? `Below reserve in ${reserveBreachMonthLabel}` : 'Balance stays above zero across forecast'}
+          </span>
         </article>
 
         <article className="forecast-decision-card">
           <span className="forecast-decision-label">Lowest Cash Point</span>
-          <strong className="forecast-decision-value">{troughBalanceLabel}</strong>
-          <span className="forecast-decision-meta">{troughMonthLabel}</span>
+          <strong className="forecast-decision-value">{cashTroughBalanceLabel}</strong>
+          <span className="forecast-decision-detail">Projected cash trough</span>
+          <span className="forecast-decision-meta">{cashTroughMonthLabel}</span>
         </article>
 
         <article className="forecast-decision-card">
           <span className="forecast-decision-label">Safety Buffer</span>
-          <span className={`forecast-status-badge forecast-status-badge--${riskVariant}`}>{bufferStatusLabel}</span>
-          <span className="forecast-decision-meta">{bufferDetail}</span>
+          <strong className={`forecast-decision-value is-${cashRiskState}`}>
+            {cashRiskState === 'critical' ? 'Unsafe' : cashRiskState === 'warning' ? 'Tight' : 'Healthy'}
+          </strong>
+          <span className="forecast-decision-detail">
+            {cashRiskState === 'critical' ? 'No cash cushion' : cashRiskState === 'warning' ? 'Below minimum reserve' : 'Above minimum reserve'}
+          </span>
+          <span className="forecast-decision-meta">
+            {cashRiskState === 'safe' ? 'Reserve threshold not breached' : reserveBreachMonthLabel ? `Breach projected in ${reserveBreachMonthLabel}` : 'Reserve threshold at risk'}
+          </span>
         </article>
 
       </div>
