@@ -2718,10 +2718,31 @@ export default function Dashboard() {
           <header className="top-bar glass-panel">
             <div className="top-bar-main">
               <div className="top-bar-copy">
-                <h2>Cash Balance Forecast</h2>
+                <h2>Cash Flow Forecast</h2>
                 <p className="top-bar-context">
                   Expected inflows, outflows, and projected balance
                 </p>
+              </div>
+              <div className="top-controls">
+                <div className="forecast-scenario-toggle" role="group" aria-label="Forecast scenario">
+                  {(
+                    [
+                      { key: 'base' as ForecastScenarioKey, label: 'Base Case' },
+                      { key: 'best' as ForecastScenarioKey, label: 'Best Case' },
+                      { key: 'worst' as ForecastScenarioKey, label: 'Worst Case' },
+                      { key: 'custom' as ForecastScenarioKey, label: 'Custom Case' },
+                    ] as const
+                  ).map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      className={selectedScenarioKey === option.key ? 'is-active' : ''}
+                      onClick={() => setSelectedScenarioKey(option.key)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </header>

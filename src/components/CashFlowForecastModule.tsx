@@ -322,19 +322,40 @@ export default function CashFlowForecastModule({
 
   return (
     <div className="forecast-cockpit">
-      <div className="forecast-toolbar">
-        <div className="forecast-scenario-toggle" role="group" aria-label="Forecast scenario">
-          {scenarioOptions.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              className={scenarioKey === option.key ? 'is-active' : ''}
-              onClick={() => onScenarioChange(option.key)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+
+      <div className="kpi-grid" aria-label="Forecast decision signals">
+        <article className="kpi-card">
+          <div className="forecast-decision-head">
+            <span className="forecast-decision-label">Cash Stays Positive From</span>
+            <span className="forecast-decision-meta">First month with sustained positive cash</span>
+          </div>
+          <strong className="forecast-decision-value">{breakEvenLabel}</strong>
+        </article>
+
+        <article className="kpi-card">
+          <div className="forecast-decision-head">
+            <span className="forecast-decision-label">Lowest Cash Point</span>
+            <span className="forecast-decision-meta">The month your cash balance hits its floor</span>
+          </div>
+          <strong className="forecast-decision-value">{troughMonthLabel}</strong>
+          <span className="forecast-decision-subvalue">{troughBalanceLabel}</span>
+        </article>
+
+        <article className="kpi-card">
+          <div className="forecast-decision-head">
+            <span className="forecast-decision-label">Safety Buffer Warning</span>
+            <span className="forecast-decision-meta">First month cash dips below your minimum reserve</span>
+          </div>
+          <strong className="forecast-decision-value">{reserveBreachLabel}</strong>
+        </article>
+
+        <article className="kpi-card">
+          <div className="forecast-decision-head">
+            <span className="forecast-decision-label">Cash Goes Negative</span>
+            <span className="forecast-decision-meta">First month projected balance turns negative</span>
+          </div>
+          <strong className="forecast-decision-value">{negativeCashLabel}</strong>
+        </article>
       </div>
 
       <section className="card forecast-chart-shell">
@@ -346,66 +367,22 @@ export default function CashFlowForecastModule({
           </div>
         ) : null}
 
-        <div className="forecast-chart-header">
-          <h2 className="forecast-chart-title">Projected Cash Balance</h2>
-          <label className="forecast-inline-select">
-            <span>Forecast horizon</span>
-            <select value={forecastRangeValue} onChange={(event) => onForecastRangeChange(event.target.value)}>
-              {forecastRangeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="forecast-decision-grid" aria-label="Forecast decision signals">
-          <article className="forecast-decision-card">
-            <div className="forecast-decision-head">
-              <span className="forecast-decision-label">Cash Stays Positive From</span>
-              <span className="forecast-decision-meta">First month with sustained positive cash</span>
-            </div>
-            <strong className="forecast-decision-value">{breakEvenLabel}</strong>
-          </article>
-
-          <article className="forecast-decision-card">
-            <div className="forecast-decision-head">
-              <span className="forecast-decision-label">Lowest Cash Point</span>
-              <span className="forecast-decision-meta">The month your cash balance hits its floor</span>
-            </div>
-            <strong className="forecast-decision-value">{troughMonthLabel}</strong>
-            <span className="forecast-decision-subvalue">{troughBalanceLabel}</span>
-          </article>
-
-          <article className="forecast-decision-card">
-            <div className="forecast-decision-head">
-              <span className="forecast-decision-label">Safety Buffer Warning</span>
-              <span className="forecast-decision-meta">First month cash dips below your minimum reserve</span>
-            </div>
-            <strong className="forecast-decision-value">{reserveBreachLabel}</strong>
-          </article>
-
-          <article className="forecast-decision-card">
-            <div className="forecast-decision-head">
-              <span className="forecast-decision-label">Cash Goes Negative</span>
-              <span className="forecast-decision-meta">First month projected balance turns negative</span>
-            </div>
-            <strong className="forecast-decision-value">{negativeCashLabel}</strong>
-          </article>
-        </div>
-
         <TrendLineChart
           data={displaySeries}
           metric="net"
-          title={chartTitle}
+          title="Projected Cash Balance"
           tooltipVariant="forecast"
           pointStatusByMonth={displayPointStatusByMonth}
           showRevenueExpenseInTooltip={viewMode === 'monthly'}
           rangeLabelOverride={monthlyRangeLabel}
+          forecastRangeLabel="Forecast horizon"
+          forecastRangeValue={forecastRangeValue}
+          forecastRangeOptions={forecastRangeOptions}
+          onForecastRangeChange={onForecastRangeChange}
         />
 
         <div className="forecast-control-stack" aria-label="What-if controls">
+          <p className="forecast-control-label">Adjust Forecast Assumptions</p>
           <div className="forecast-slider-grid forecast-slider-grid--main">
             <ForecastSliderControl
               label="Revenue Growth"
