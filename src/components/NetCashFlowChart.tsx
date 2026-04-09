@@ -160,16 +160,13 @@ export default function NetCashFlowChart({
             { offset: Math.min(100, z + 2), color: '#ef4444', opacity: 0.02 },
             { offset: 100, color: '#ef4444', opacity: 0.28 },
           ],
-          [], // trend series — no gradient fill
         ]
       : hasNegative
       ? [
           [{ offset: 0, color: '#ef4444', opacity: 0.02 }, { offset: 100, color: '#ef4444', opacity: 0.28 }],
-          [],
         ]
       : [
           [{ offset: 0, color: '#465fff', opacity: 0.28 }, { offset: 100, color: '#465fff', opacity: 0.02 }],
-          [],
         ];
 
     return ({
@@ -189,10 +186,10 @@ export default function NetCashFlowChart({
         },
       },
     },
-    colors: ['#465fff', '#94a3b8'],
+    colors: ['#465fff'],
     fill: {
-      type: ['gradient', 'solid'],
-      opacity: [1, 0],
+      type: 'gradient',
+      opacity: 1,
       gradient: {
         type: 'vertical',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -200,9 +197,8 @@ export default function NetCashFlowChart({
       },
     },
     stroke: {
-      width: [2.25, 1.25],
-      curve: ['smooth', 'straight'],
-      dashArray: [0, 5],
+      width: 2.25,
+      curve: 'smooth',
       lineCap: 'round',
     },
     dataLabels: { enabled: false },
@@ -225,6 +221,7 @@ export default function NetCashFlowChart({
       categories,
       axisBorder: { show: false },
       axisTicks: { show: false },
+      tooltip: { enabled: false },
       labels: {
         hideOverlappingLabels: false,
         trim: false,
@@ -287,8 +284,7 @@ export default function NetCashFlowChart({
 
   const series = useMemo(() => [
     { name: cashFlowMode === 'total' ? 'Total' : 'Operating', data: values, type: 'area' },
-    { name: 'Trend', data: trendValues, type: 'line' },
-  ], [cashFlowMode, values, trendValues]);
+  ], [cashFlowMode, values]);
 
   return (
     <article className="card chart-card">
