@@ -785,6 +785,10 @@ export default function TrendLineChart({
         <div className="chart-head-left">
           <h3 className="chart-head-title">{title}</h3>
           {subtitle && <p className="subtle chart-head-subtitle">{subtitle}</p>}
+          <div className="chart-head-meta">
+            <p className="subtle chart-range-label">{rangeLabel}</p>
+            {hasTrend && trendNoteLabel && <p className="subtle trend-note">{trendNoteLabel}</p>}
+          </div>
         </div>
         {showCashFlowControl && (
           <div className="chart-head-middle" role="group" aria-label="Cash Flow mode selector">
@@ -863,7 +867,7 @@ export default function TrendLineChart({
               </div>
               {showForecastRangeControl && (
                 <label className="chart-select-control">
-                  <span>{forecastRangeLabel}</span>
+                  {forecastRangeLabel && <span>{forecastRangeLabel}</span>}
                   <select value={forecastRangeValue} onChange={(event) => onForecastRangeChange?.(event.target.value)}>
                     {forecastRangeOptions?.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -909,10 +913,6 @@ export default function TrendLineChart({
               )}
             </div>
           )}
-          <div className="chart-head-meta">
-            <p className="subtle chart-range-label">{rangeLabel}</p>
-            {hasTrend && trendNoteLabel && <p className="subtle trend-note">{trendNoteLabel}</p>}
-          </div>
         </div>
       </div>
 

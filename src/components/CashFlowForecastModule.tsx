@@ -47,6 +47,7 @@ type ForecastSliderControlProps = {
   formatValue?: (value: number) => string;
   tickValues?: number[];
   formatTickValue?: (value: number) => string;
+  minorTickStep?: number;
 };
 
 function formatDateKey(date: Date): string {
@@ -173,6 +174,7 @@ function ForecastSliderControl({
   formatValue = formatSignedPercent,
   tickValues,
   formatTickValue = formatValue,
+  minorTickStep,
 }: ForecastSliderControlProps) {
   const safeSpan = Math.max(max - min, 1);
   const sliderPercent = ((value - min) / safeSpan) * 100;
@@ -180,6 +182,10 @@ function ForecastSliderControl({
   const sliderTicks = (tickValues ?? [min, (min + max) / 2, max]).filter(
     (tick, index, list) => tick >= min && tick <= max && list.indexOf(tick) === index
   );
+  const minorTicks = minorTickStep
+    ? Array.from({ length: Math.floor((max - min) / minorTickStep) + 1 }, (_, i) => min + i * minorTickStep)
+        .filter((t) => t >= min && t <= max && !sliderTicks.some((mt) => Math.abs(mt - t) < 0.001))
+    : [];
 
   return (
     <label className="forecast-slider-control">
@@ -202,6 +208,16 @@ function ForecastSliderControl({
               <span
                 key={`${label}-tick-${tick}`}
                 className={`forecast-slider-tick${isZero ? ' is-zero' : ''}`}
+                style={{ left: `${tickPercent}%` }}
+              />
+            );
+          })}
+          {minorTicks.map((tick) => {
+            const tickPercent = ((tick - min) / safeSpan) * 100;
+            return (
+              <span
+                key={`${label}-minor-${tick}`}
+                className="forecast-slider-tick forecast-slider-tick--minor"
                 style={{ left: `${tickPercent}%` }}
               />
             );
@@ -287,17 +303,30 @@ export default function CashFlowForecastModule({
         ? 'Cash Balance Forecast'
         : 'Cumulative Cash Change Forecast'
       : 'Monthly Cash Flow Forecast';
-  const breakEvenLabel = decisionSignals.breakEvenMonth ? toMonthLabel(decisionSignals.breakEvenMonth) : 'Not visible yet';
   const troughMonthLabel = decisionSignals.cashTroughMonth ? toMonthLabel(decisionSignals.cashTroughMonth) : 'Not available';
   const troughBalanceLabel =
-    decisionSignals.cashTroughBalance === null ? 'Forecast unavailable' : formatCurrencyCompact(decisionSignals.cashTroughBalance);
-  const reserveBreachLabel = !decisionSignals.reserveBreachEvaluated
-    ? 'Not available'
-    : decisionSignals.reserveBreachMonth
-      ? toMonthLabel(decisionSignals.reserveBreachMonth)
-      : 'Not breached';
-  const negativeCashLabel =
-    data.length === 0 ? 'Not available' : decisionSignals.negativeCashMonth ? toMonthLabel(decisionSignals.negativeCashMonth) : 'Stays above zero';
+    decisionSignals.cashTroughBalance === null ? '—' : formatCurrencyCompact(decisionSignals.cashTroughBalance);
+
+  const riskVariant: 'safe' | 'warning' | 'critical' =
+    decisionSignals.negativeCashMonth ? 'critical' :
+    decisionSignals.reserveBreachMonth ? 'warning' : 'safe';
+  const riskStatusLabel = riskVariant === 'critical' ? 'Critical' : riskVariant === 'warning' ? 'Warning' : 'Safe';
+  const riskMessage =
+    riskVariant === 'critical' ? 'Cash goes negative' :
+    riskVariant === 'warning' ? 'Cash may drop below safe levels' :
+    'No cash shortfall expected';
+  const riskDetail =
+    riskVariant === 'critical'
+      ? `Projected deficit in ${toMonthLabel(decisionSignals.negativeCashMonth!)}`
+      : riskVariant === 'warning'
+        ? `Below reserve in ${toMonthLabel(decisionSignals.reserveBreachMonth!)}`
+        : 'Balance stays above zero across forecast';
+
+  const bufferStatusLabel = riskVariant === 'critical' ? 'Unsafe' : riskVariant === 'warning' ? 'Tight' : 'Healthy';
+  const bufferDetail =
+    riskVariant === 'critical' ? 'No cash cushion' :
+    riskVariant === 'warning' ? 'Below minimum reserve' :
+    'Above minimum reserve';
   const visibleSeasonalityWarning = useMemo(() => {
     if (!seasonality.warning) return null;
     return data.some((point) => point.month === seasonality.warning?.month) ? seasonality.warning : null;
@@ -323,39 +352,27 @@ export default function CashFlowForecastModule({
   return (
     <div className="forecast-cockpit">
 
-      <div className="kpi-grid" aria-label="Forecast decision signals">
-        <article className="kpi-card">
-          <div className="forecast-decision-head">
-            <span className="forecast-decision-label">Cash Stays Positive From</span>
-            <span className="forecast-decision-meta">First month with sustained positive cash</span>
-          </div>
-          <strong className="forecast-decision-value">{breakEvenLabel}</strong>
+      <div className="forecast-decision-grid" aria-label="Forecast decision signals">
+
+        <article className="forecast-decision-card">
+          <span className="forecast-decision-label">Cash Risk</span>
+          <span className={`forecast-status-badge forecast-status-badge--${riskVariant}`}>{riskStatusLabel}</span>
+          <span className="forecast-decision-message">{riskMessage}</span>
+          <span className="forecast-decision-meta">{riskDetail}</span>
         </article>
 
-        <article className="kpi-card">
-          <div className="forecast-decision-head">
-            <span className="forecast-decision-label">Lowest Cash Point</span>
-            <span className="forecast-decision-meta">The month your cash balance hits its floor</span>
-          </div>
-          <strong className="forecast-decision-value">{troughMonthLabel}</strong>
-          <span className="forecast-decision-subvalue">{troughBalanceLabel}</span>
+        <article className="forecast-decision-card">
+          <span className="forecast-decision-label">Lowest Cash Point</span>
+          <strong className="forecast-decision-value">{troughBalanceLabel}</strong>
+          <span className="forecast-decision-meta">{troughMonthLabel}</span>
         </article>
 
-        <article className="kpi-card">
-          <div className="forecast-decision-head">
-            <span className="forecast-decision-label">Safety Buffer Warning</span>
-            <span className="forecast-decision-meta">First month cash dips below your minimum reserve</span>
-          </div>
-          <strong className="forecast-decision-value">{reserveBreachLabel}</strong>
+        <article className="forecast-decision-card">
+          <span className="forecast-decision-label">Safety Buffer</span>
+          <span className={`forecast-status-badge forecast-status-badge--${riskVariant}`}>{bufferStatusLabel}</span>
+          <span className="forecast-decision-meta">{bufferDetail}</span>
         </article>
 
-        <article className="kpi-card">
-          <div className="forecast-decision-head">
-            <span className="forecast-decision-label">Cash Goes Negative</span>
-            <span className="forecast-decision-meta">First month projected balance turns negative</span>
-          </div>
-          <strong className="forecast-decision-value">{negativeCashLabel}</strong>
-        </article>
       </div>
 
       <section className="card forecast-chart-shell">
@@ -375,33 +392,34 @@ export default function CashFlowForecastModule({
           pointStatusByMonth={displayPointStatusByMonth}
           showRevenueExpenseInTooltip={viewMode === 'monthly'}
           rangeLabelOverride={monthlyRangeLabel}
-          forecastRangeLabel="Forecast horizon"
+          forecastRangeLabel=""
           forecastRangeValue={forecastRangeValue}
           forecastRangeOptions={forecastRangeOptions}
           onForecastRangeChange={onForecastRangeChange}
         />
 
         <div className="forecast-control-stack" aria-label="What-if controls">
-          <p className="forecast-control-label">Adjust Forecast Assumptions</p>
           <div className="forecast-slider-grid forecast-slider-grid--main">
             <ForecastSliderControl
               label="Revenue Growth"
-              min={-12}
-              max={12}
+              min={-25}
+              max={25}
               step={1}
               value={revenueGrowthPct}
               onChange={onRevenueGrowthChange}
-              tickValues={[-12, 0, 12]}
+              tickValues={[-25, 0, 25]}
+              minorTickStep={5}
             />
 
             <ForecastSliderControl
               label="Expense Change"
-              min={-12}
-              max={12}
+              min={-25}
+              max={25}
               step={1}
               value={expenseChangePct}
               onChange={onExpenseChange}
-              tickValues={[-12, 0, 12]}
+              tickValues={[-25, 0, 25]}
+              minorTickStep={5}
             />
           </div>
         </div>
