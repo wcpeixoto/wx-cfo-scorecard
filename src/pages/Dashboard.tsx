@@ -2714,6 +2714,19 @@ export default function Dashboard() {
           </div>
         )}
 
+        {activeTab === 'what-if' && (
+          <header className="top-bar glass-panel">
+            <div className="top-bar-main">
+              <div className="top-bar-copy">
+                <h2>Cash Balance Forecast</h2>
+                <p className="top-bar-context">
+                  Expected inflows, outflows, and projected balance
+                </p>
+              </div>
+            </div>
+          </header>
+        )}
+
         {hasImportedData && activeTab === 'what-if' && (
           <div className="stack-grid">
             <CashFlowForecastModule

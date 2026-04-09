@@ -347,7 +347,7 @@ export default function CashFlowForecastModule({
         ) : null}
 
         <div className="forecast-chart-header">
-          <h2 className="forecast-chart-title">{chartTitle}</h2>
+          <h2 className="forecast-chart-title">Projected Cash Balance</h2>
           <label className="forecast-inline-select">
             <span>Forecast horizon</span>
             <select value={forecastRangeValue} onChange={(event) => onForecastRangeChange(event.target.value)}>
