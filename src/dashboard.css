@@ -2365,6 +2365,15 @@ body {
   font-size: 10px;
 }
 
+/* Strip ApexCharts wrapper so only the custom tooltip HTML styling shows */
+.apexcharts-tooltip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+
 .tooltip-row-label {
   fill: #667085;
   font-size: 11px;
