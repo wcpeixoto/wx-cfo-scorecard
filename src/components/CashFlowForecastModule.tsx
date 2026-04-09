@@ -447,6 +447,7 @@ export default function CashFlowForecastModule({
           tooltipVariant="forecast"
           pointStatusByMonth={displayPointStatusByMonth}
           showRevenueExpenseInTooltip={viewMode === 'monthly'}
+          tooltipSingleLabel={viewMode === 'cumulative' ? 'Cash Balance' : undefined}
           rangeLabelOverride=""
           forecastRangeLabel=""
           hideDots

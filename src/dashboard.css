@@ -2318,6 +2318,17 @@ body {
   stroke-width: 2;
 }
 
+.trend-dot-active {
+  fill: #465fff;
+  stroke: #ffffff;
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.trend-dot-active.is-negative {
+  fill: #c85b72;
+}
+
 .tooltip-box {
   fill: #ffffff;
   stroke: #e4e7ec;

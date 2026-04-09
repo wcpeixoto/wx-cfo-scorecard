@@ -46,6 +46,7 @@ type TrendLineChartProps = {
   hideAxisLines?: boolean;
   showOnlyProjectedTicks?: boolean;
   showMonthlyXLabels?: boolean;
+  tooltipSingleLabel?: string;
 };
 
 type PlotPoint = {
@@ -560,6 +561,7 @@ export default function TrendLineChart({
   hideAxisLines = false,
   showOnlyProjectedTicks = false,
   showMonthlyXLabels = false,
+  tooltipSingleLabel,
 }: TrendLineChartProps) {
   const [internalTimeframe, setInternalTimeframe] = useState<TimeframeOption>(12);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -825,13 +827,13 @@ export default function TrendLineChart({
   const trendNoteLabel =
     trendMode === 'linear' ? null : `Trend: ${trendWindow ?? getAdaptiveAverageWindow(scopedData.length)}-mo avg`;
   const hasProjectedPoints = points.some((point) => point.status === 'projected');
-  const isForecastTooltip = tooltipVariant === 'forecast' && metric === 'net';
-  const showStatusInTooltip = hasProjectedPoints && !isForecastTooltip;
-  const showMetricBreakdownInTooltip = metric === 'net' && (showRevenueExpenseInTooltip || isForecastTooltip);
+  const isForecastTooltip = tooltipVariant === 'forecast' && metric === 'net' && !tooltipSingleLabel;
+  const showStatusInTooltip = hasProjectedPoints && !isForecastTooltip && !tooltipSingleLabel;
+  const showMetricBreakdownInTooltip = metric === 'net' && !tooltipSingleLabel && (showRevenueExpenseInTooltip || isForecastTooltip);
   const tooltipLineCount = 2 + (showStatusInTooltip ? 1 : 0) + (showMetricBreakdownInTooltip ? 2 : 0) + (showNetEnhancements ? 1 : 0);
   const tooltipWidth = isForecastTooltip ? 232 : showNetEnhancements ? 214 : 192;
   const tooltipHeight = isForecastTooltip ? (showNetEnhancements ? 98 : 84) : 16 + tooltipLineCount * 14;
-  const metricLabel = metric === 'income' ? 'Revenue' : metric === 'expense' ? 'Expenses' : 'Net cash flow';
+  const metricLabel = tooltipSingleLabel ?? (metric === 'income' ? 'Revenue' : metric === 'expense' ? 'Expenses' : 'Net cash flow');
   const showForecastPointLabels = isForecastTooltip && points.length > 0;
   const lastForecastPoint = showForecastPointLabels ? points[points.length - 1] : null;
   const worstForecastPoint = showForecastPointLabels
@@ -1157,6 +1159,15 @@ export default function TrendLineChart({
             </text>
           );
         })}
+
+        {hideDots && activePoint && (
+          <circle
+            cx={activePoint.x}
+            cy={activePoint.y}
+            r={4.5}
+            className={`trend-dot-active${metric === 'net' && activePoint.value < -EPSILON ? ' is-negative' : ''}`}
+          />
+        )}
 
         {activePoint && (
           <g className="chart-tooltip" pointerEvents="none">
