@@ -2715,7 +2715,7 @@ export default function Dashboard() {
         )}
 
         {activeTab === 'what-if' && (
-          <header className="top-bar glass-panel">
+          <header className="top-bar glass-panel what-if-header">
             <div className="top-bar-main">
               <div className="top-bar-copy">
                 <h2>Cash Flow Forecast</h2>
@@ -2723,7 +2723,7 @@ export default function Dashboard() {
                   Expected inflows, outflows, and projected balance
                 </p>
               </div>
-              <div className="top-controls">
+              <div className="top-controls top-controls-timeframe">
                 <div className="forecast-scenario-toggle" role="group" aria-label="Forecast scenario">
                   {(
                     [
@@ -2743,6 +2743,15 @@ export default function Dashboard() {
                     </button>
                   ))}
                 </div>
+                <button
+                  type="button"
+                  className="top-bar-freshness subtle clickable"
+                  onClick={() => navigateToTab('settings')}
+                  aria-label={`${lastUpdatedLabel}. Open Settings.`}
+                >
+                  <FiRefreshCw className="top-bar-freshness-icon" aria-hidden="true" />
+                  <span>{lastUpdatedLabel}</span>
+                </button>
               </div>
             </div>
           </header>
