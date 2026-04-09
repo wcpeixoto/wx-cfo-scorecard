@@ -36,7 +36,7 @@ function formatShortMonth(month: string): string {
   const [year, m] = month.split('-');
   const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const idx = parseInt(m, 10) - 1;
-  return `${names[idx] ?? m} '${year.slice(2)}`;
+  return `${names[idx] ?? m} ${year.slice(2)}`;
 }
 
 function formatCurrency(value: number): string {
@@ -56,10 +56,10 @@ function xAxisLabelStep(count: number): number {
 
 // Returns nice axis bounds that guarantee 0 falls on a tick boundary
 function computeNiceAxisBounds(dataMin: number, dataMax: number) {
-  const lo = Math.min(dataMin, 0);
+  const lo = dataMin < -100 ? Math.min(dataMin, 0) : 0;
   const hi = Math.max(dataMax, 0);
   const maxAbs = Math.max(Math.abs(lo), Math.abs(hi)) || 1000;
-  const roughInterval = maxAbs / 4;
+  const roughInterval = maxAbs / 2;
   const mag = Math.pow(10, Math.floor(Math.log10(roughInterval)));
   const interval = [1, 2, 2.5, 5, 10].map((c) => c * mag).find((c) => roughInterval <= c) ?? mag * 10;
   const axisMin = lo < 0 ? -Math.ceil(-lo / interval) * interval : 0;

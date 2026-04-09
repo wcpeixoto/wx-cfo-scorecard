@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TrendLineChart from './TrendLineChart';
 import type {
   CashFlowForecastStatus,
@@ -261,6 +261,21 @@ export default function CashFlowForecastModule({
   forecastEvents = [],
 }: CashFlowForecastModuleProps) {
   const [viewMode, setViewMode] = useState<ForecastViewMode>('cumulative');
+  const [horizonMenuOpen, setHorizonMenuOpen] = useState(false);
+  const horizonMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!horizonMenuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (horizonMenuRef.current && !horizonMenuRef.current.contains(e.target as Node)) {
+        setHorizonMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [horizonMenuOpen]);
+
+  const currentHorizonLabel = forecastRangeOptions.find((o) => o.value === forecastRangeValue)?.label ?? forecastRangeValue;
   const granularity: 'month' | 'week' = forecastRangeMonths < 6 ? 'week' : 'month';
   const startingCashBalance = Number.isFinite(currentCashBalance) ? currentCashBalance : 0;
 
@@ -374,13 +389,56 @@ export default function CashFlowForecastModule({
       </div>
 
       <section className="card forecast-chart-shell">
-        {/* TODO: render warning pill here when confidence is degraded */}
 
-        {visibleSeasonalityWarning ? (
-          <div className="forecast-warning-callout" role="status" aria-live="polite">
-            Heads up — this forecast follows seasonal patterns from prior years. If this year feels unusually different, use the sliders below to adjust.
+        <div className="forecast-chart-topbar">
+          <div className="forecast-chart-heading">
+            <h3 className="forecast-chart-title">Projected Cash Balance</h3>
+            <div className="forecast-info-help">
+              <button type="button" className="forecast-info-icon" aria-label="How this forecast works">&#9432;</button>
+              <div role="tooltip" className="forecast-info-panel">
+                <p className="forecast-info-title">How this forecast works</p>
+                <p className="forecast-info-body">Projected cash balance is based on recent operating cash trends, seasonal patterns from prior years, and the scenario assumptions shown below.</p>
+                <p className="forecast-info-important"><strong>Important:</strong> This forecast is directional, not exact. Use the sliders if this year is tracking differently than usual.</p>
+              </div>
+            </div>
           </div>
-        ) : null}
+          <div className="forecast-chart-actions">
+            <div className="chart-control-row">
+              <div className="timeframe-menu" ref={horizonMenuRef}>
+                <button
+                  type="button"
+                  className="timeframe-trigger"
+                  onClick={() => setHorizonMenuOpen((c) => !c)}
+                  aria-haspopup="menu"
+                  aria-expanded={horizonMenuOpen}
+                >
+                  {currentHorizonLabel} &#9662;
+                </button>
+                {horizonMenuOpen && (
+                  <ul className="timeframe-list" role="menu" aria-label="Select forecast horizon">
+                    {forecastRangeOptions.map((option) => (
+                      <li key={option.value}>
+                        <button
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={forecastRangeValue === option.value}
+                          className={forecastRangeValue === option.value ? 'is-active' : ''}
+                          onClick={() => { onForecastRangeChange(option.value); setHorizonMenuOpen(false); }}
+                        >
+                          {option.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <div className="chart-head-meta">
+              <p className="subtle chart-range-label">{monthlyRangeLabel}</p>
+            </div>
+          </div>
+        </div>
+
 
         <TrendLineChart
           data={displaySeries}
@@ -389,11 +447,11 @@ export default function CashFlowForecastModule({
           tooltipVariant="forecast"
           pointStatusByMonth={displayPointStatusByMonth}
           showRevenueExpenseInTooltip={viewMode === 'monthly'}
-          rangeLabelOverride={monthlyRangeLabel}
+          rangeLabelOverride=""
           forecastRangeLabel=""
-          forecastRangeValue={forecastRangeValue}
-          forecastRangeOptions={forecastRangeOptions}
-          onForecastRangeChange={onForecastRangeChange}
+          hideDots
+          hideTrend
+          hideAxisLines
         />
 
         <div className="forecast-control-stack" aria-label="What-if controls">

@@ -41,6 +41,9 @@ type TrendLineChartProps = {
   onCashFlowModeChange?: (nextMode: CashFlowMode) => void;
   onTimeframeChange?: (nextTimeframe: TimeframeOption) => void;
   onMonthPointClick?: (month: string) => void;
+  hideDots?: boolean;
+  hideTrend?: boolean;
+  hideAxisLines?: boolean;
 };
 
 type PlotPoint = {
@@ -209,28 +212,30 @@ function buildPositiveAxis(maxRaw: number): AxisConfig {
 }
 
 function chooseNetTickStep(range: number): number {
-  if (range < 15000) return 2500;
-  if (range <= 40000) return 5000;
-  return 10000;
+  if (range < 15000) return 5000;
+  if (range <= 80000) return 10000;
+  return 20000;
 }
 
 function buildStableNetAxis(values: number[], trendValues: number[]): AxisConfig {
   if (values.length === 0) {
     return {
-      min: -5000,
-      max: 5000,
-      ticks: [-5000, -2500, 0, 2500, 5000],
+      min: 0,
+      max: 10000,
+      ticks: [0, 10000],
     };
   }
 
   const allValues = [...values, ...trendValues];
-  const minRaw = Math.min(...allValues, 0);
+  const dataMin = Math.min(...allValues);
+  const minRaw = Math.min(dataMin, 0);
   const maxRaw = Math.max(...allValues, 0);
   const span = Math.max(maxRaw - minRaw, 1);
   const paddedMin = minRaw - span * 0.12;
   const paddedMax = maxRaw + span * 0.12;
   const step = chooseNetTickStep(paddedMax - paddedMin);
-  const min = Math.floor(Math.min(paddedMin, 0) / step) * step;
+  const hasNegativeData = dataMin < -100;
+  const min = hasNegativeData ? Math.floor(Math.min(paddedMin, 0) / step) * step : 0;
   const max = Math.ceil(Math.max(paddedMax, 0) / step) * step;
   const ticks: number[] = [];
   for (let current = min; current <= max + step * 0.1; current += step) {
@@ -249,7 +254,7 @@ function formatCurrencyTick(value: number): string {
   const sign = value < 0 ? '-' : '';
   const abs = Math.abs(value);
   if (abs >= 1000) {
-    return `${sign}$${Math.round(abs / 1000)}k`;
+    return `${sign}$${(abs / 1000).toFixed(abs >= 10000 ? 0 : 1)}k`;
   }
   return `${sign}$${Math.round(abs).toLocaleString()}`;
 }
@@ -280,7 +285,7 @@ function formatShortMonthLabel(month: string): string {
   if (!parsed) return month;
   const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const yy = String(parsed.year).slice(-2);
-  return `${shortMonths[parsed.month - 1]} ’${yy}`;
+  return `${shortMonths[parsed.month - 1]} ${yy}`;
 }
 
 function buildYearlyJanuaryIndices(points: PlotPoint[]): number[] {
@@ -486,6 +491,9 @@ export default function TrendLineChart({
   onCashFlowModeChange,
   onTimeframeChange,
   onMonthPointClick,
+  hideDots = false,
+  hideTrend = false,
+  hideAxisLines = false,
 }: TrendLineChartProps) {
   const [internalTimeframe, setInternalTimeframe] = useState<TimeframeOption>(12);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -926,31 +934,31 @@ export default function TrendLineChart({
         <defs>
           {isNetSeries ? (
             <>
-              <linearGradient id={areaGradientId} x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="rgba(93, 132, 247, 0.14)" />
-                <stop offset={toOffset(transitionStart)} stopColor="rgba(93, 132, 247, 0.12)" />
-                <stop offset={toOffset(zeroOffset)} stopColor="rgba(93, 132, 247, 0)" />
-                <stop offset={toOffset(transitionEnd)} stopColor="rgba(212, 147, 98, 0.1)" />
+              <linearGradient id={areaGradientId} x1="0" x2="0" y1={PADDING_TOP} y2={PADDING_TOP + innerHeight} gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="rgba(70, 95, 255, 0.25)" />
+                <stop offset={toOffset(transitionStart)} stopColor="rgba(70, 95, 255, 0.08)" />
+                <stop offset={toOffset(zeroOffset)} stopColor="rgba(70, 95, 255, 0)" />
+                <stop offset={toOffset(transitionEnd)} stopColor="rgba(212, 147, 98, 0.08)" />
                 <stop offset="100%" stopColor="rgba(212, 147, 98, 0)" />
               </linearGradient>
-              <linearGradient id={lineGradientId} x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="#4f78ff" />
-                <stop offset={toOffset(transitionStart)} stopColor="#4f78ff" />
+              <linearGradient id={lineGradientId} x1="0" x2="0" y1={PADDING_TOP} y2={PADDING_TOP + innerHeight} gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#465fff" />
+                <stop offset={toOffset(transitionStart)} stopColor="#465fff" />
                 <stop offset={toOffset(transitionEnd)} stopColor="#c85b72" />
                 <stop offset="100%" stopColor="#c85b72" />
               </linearGradient>
             </>
           ) : (
-            <linearGradient id={areaGradientId} x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="rgba(93, 132, 247, 0.14)" />
-              <stop offset="82%" stopColor="rgba(93, 132, 247, 0)" />
-              <stop offset="100%" stopColor="rgba(93, 132, 247, 0)" />
+            <linearGradient id={areaGradientId} x1="0" x2="0" y1={PADDING_TOP} y2={PADDING_TOP + innerHeight} gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="rgba(70, 95, 255, 0.25)" />
+              <stop offset="55%" stopColor="rgba(70, 95, 255, 0.02)" />
+              <stop offset="100%" stopColor="rgba(70, 95, 255, 0)" />
             </linearGradient>
           )}
         </defs>
 
-        <line x1={PADDING_X} x2={WIDTH - PADDING_X} y1={PADDING_TOP + innerHeight} y2={PADDING_TOP + innerHeight} className="axis-line" />
-        <line x1={PADDING_X} x2={PADDING_X} y1={PADDING_TOP} y2={PADDING_TOP + innerHeight} className="axis-line" />
+        {!hideAxisLines && <line x1={PADDING_X} x2={WIDTH - PADDING_X} y1={PADDING_TOP + innerHeight} y2={PADDING_TOP + innerHeight} className="axis-line" />}
+        {!hideAxisLines && <line x1={PADDING_X} x2={PADDING_X} y1={PADDING_TOP} y2={PADDING_TOP + innerHeight} className="axis-line" />}
 
         {yTicks.map((tick) => {
           const y = PADDING_TOP + ((axisMax - tick) / Math.max(axisMax - axisMin, 1)) * innerHeight;
@@ -960,7 +968,7 @@ export default function TrendLineChart({
 
         <path d={areaPath} fill={`url(#${areaGradientId})`} />
 
-        {hasTrend && <path d={trendPath} className="ma-path" />}
+        {hasTrend && !hideTrend && <path d={trendPath} className="ma-path" />}
         {actualLinePath && (
           <path d={actualLinePath} className="trend-path" stroke={isNetSeries ? `url(#${lineGradientId})` : undefined} />
         )}
@@ -972,10 +980,10 @@ export default function TrendLineChart({
           />
         )}
 
-        {points.map((point, index) => {
+        {!hideDots && points.map((point, index) => {
           const isLatest = index === points.length - 1;
           const isNegative = metric === 'net' && point.value < -EPSILON;
-          const dotFill = metric === 'net' ? (isNegative ? '#c85b72' : '#4f78ff') : undefined;
+          const dotFill = metric === 'net' ? (isNegative ? '#c85b72' : '#465fff') : undefined;
           const dotStyle =
             metric === 'net' || onMonthPointClick
               ? {
@@ -986,7 +994,7 @@ export default function TrendLineChart({
           const ringStyle =
             metric === 'net'
               ? {
-                  fill: isNegative ? 'rgba(200, 91, 114, 0.22)' : 'rgba(79, 120, 255, 0.2)',
+                  fill: isNegative ? 'rgba(200, 91, 114, 0.22)' : 'rgba(70, 95, 255, 0.2)',
                 }
               : undefined;
           return (

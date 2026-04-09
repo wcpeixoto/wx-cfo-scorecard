@@ -1035,7 +1035,109 @@ body {
 .forecast-chart-shell {
   display: grid;
   gap: 12px;
-  padding-top: 12px;
+}
+
+.forecast-chart-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.forecast-chart-heading {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.forecast-info-help {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.forecast-info-icon {
+  appearance: none;
+  border: 1px solid #E4E7EC;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  color: #98A2B3;
+  background: #F9FAFB;
+  font-size: 0.75rem;
+  cursor: help;
+  user-select: none;
+  line-height: 1;
+  padding: 0;
+}
+
+.forecast-info-icon:focus-visible {
+  outline: 2px solid #465FFF;
+  outline-offset: 2px;
+}
+
+.forecast-info-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 296px;
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+  padding: 12px 14px;
+  display: none;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.forecast-info-help:hover .forecast-info-panel,
+.forecast-info-help:focus-within .forecast-info-panel {
+  display: block;
+}
+
+.forecast-info-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #101828;
+}
+
+.forecast-info-body {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #667085;
+  line-height: 1.5;
+}
+
+.forecast-info-important {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: #667085;
+  line-height: 1.5;
+}
+
+.forecast-chart-title {
+  margin: 0;
+  font-size: 1.06rem;
+  font-weight: 700;
+  color: #101828;
+}
+
+.forecast-chart-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.forecast-chart-shell .card-head {
+  display: none;
 }
 
 .forecast-mode-row {
@@ -1188,6 +1290,13 @@ body {
   padding-top: 16px;
   padding-bottom: 6px;
   border-top: 1px solid var(--line);
+}
+
+.forecast-control-label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #667085;
 }
 
 .forecast-slider-grid {
@@ -2127,24 +2236,25 @@ body {
 }
 
 .axis-line {
-  stroke: #dbe5f6;
+  stroke: #E4E7EC;
   stroke-width: 1;
 }
 
 .axis-grid {
-  stroke: #e6edf9;
+  stroke: #E4E7EC;
   stroke-width: 1;
+  stroke-dasharray: 4;
 }
 
 .axis-zero {
-  stroke: #a8bbdf;
-  stroke-width: 1.9;
+  stroke: #9ca3af;
+  stroke-width: 0.75;
 }
 
 .trend-path {
   fill: none;
-  stroke: #4f78ff;
-  stroke-width: 2.65;
+  stroke: #465fff;
+  stroke-width: 1.75;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -2192,81 +2302,82 @@ body {
 }
 
 .trend-dot {
-  fill: #4f78ff;
-  stroke: #f6f9ff;
-  stroke-width: 1.8;
+  fill: #465fff;
+  stroke: #ffffff;
+  stroke-width: 2;
 }
 
 .trend-dot-latest-ring {
-  fill: rgba(79, 120, 255, 0.2);
+  fill: rgba(70, 95, 255, 0.2);
   stroke: none;
 }
 
 .trend-dot-latest {
-  fill: #4f78ff;
+  fill: #465fff;
   stroke: #ffffff;
-  stroke-width: 2.4;
+  stroke-width: 2;
 }
 
 .tooltip-box {
-  fill: #fbfcff;
-  stroke: rgba(20, 30, 55, 0.1);
+  fill: #ffffff;
+  stroke: #e4e7ec;
   stroke-width: 1;
-  filter: drop-shadow(0 6px 14px rgba(20, 30, 55, 0.08));
+  filter: drop-shadow(0 8px 24px rgba(16, 24, 40, 0.08));
 }
 
 .tooltip-title {
-  fill: #2a415f;
-  font-size: 11.5px;
-  font-weight: 700;
+  fill: #101828;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .tooltip-line {
-  fill: #556e8c;
+  fill: #667085;
   font-size: 11px;
 }
 
 .tooltip-line-value {
-  fill: #556e8c;
+  fill: #667085;
   font-weight: 700;
 }
 
 .tooltip-line-value.is-positive {
-  fill: #4f78ff;
+  fill: #465fff;
 }
 
 .tooltip-line-value.is-negative {
-  fill: #cf4f68;
+  fill: #f04438;
 }
 
 .tooltip-hint {
-  fill: #7b8da5;
-  font-size: 9.6px;
+  fill: #98a2b3;
+  font-size: 10px;
 }
 
 .tooltip-row-label {
-  fill: #7a8da5;
-  font-size: 10.4px;
+  fill: #667085;
+  font-size: 11px;
 }
 
 .tooltip-row-value {
-  fill: #4d607a;
-  font-size: 10.8px;
+  fill: #101828;
+  font-size: 11px;
   font-weight: 500;
 }
 
 .tooltip-row-value-net {
-  fill: #324b69;
-  font-weight: 600;
+  fill: #465fff;
+  font-weight: 700;
 }
 
 .tooltip-row-value-net.is-negative {
-  fill: #bf5d72;
+  fill: #f04438;
 }
 
 .axis-label {
-  fill: #6a7f98;
-  font-size: 12px;
+  fill: #6b7280;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .two-col-grid {
