@@ -731,6 +731,18 @@ body {
   outline-offset: 2px;
 }
 
+/* Trend explanation tooltip — positioned left-aligned, wraps body text */
+.trend-tooltip-panel {
+  right: auto;
+  left: 0;
+  min-width: 240px;
+  max-width: 320px;
+}
+
+.trend-tooltip-list li {
+  white-space: normal;
+}
+
 .error-banner {
   margin: 0;
   border: 1px solid #f2c8d4;
@@ -2060,6 +2072,12 @@ body {
   margin: 0;
 }
 
+.chart-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .chart-head-left {
   display: flex;
   flex-direction: column;
@@ -2264,6 +2282,23 @@ body {
   opacity: 1;
 }
 
+.trend-path-expense {
+  stroke: #F04438;
+}
+
+.trend-charts-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: stretch;
+}
+
+@media (max-width: 767px) {
+  .trend-charts-pair {
+    grid-template-columns: 1fr;
+  }
+}
+
 .forecast-point-label-layer {
   pointer-events: none;
 }
@@ -2398,6 +2433,14 @@ body {
   fill: #6b7280;
   font-size: 11px;
   font-weight: 500;
+}
+
+/* Trends page: larger labels for readability at half-width cards.
+   The SVG viewBox (760px) scales down to ~514px rendered, so
+   18px in SVG space ≈ 12px on screen at desktop side-by-side width.
+   Specificity (0,2,0) beats .axis-label (0,1,0) without !important. */
+.trend-charts-pair .axis-label {
+  font-size: 18px;
 }
 
 .two-col-grid {

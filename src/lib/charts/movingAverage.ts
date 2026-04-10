@@ -1,3 +1,23 @@
+/**
+ * Exponential Moving Average (EMA).
+ * α = 2 / (window + 1); EMA[0] = data[0]; EMA[i] = α*data[i] + (1-α)*EMA[i-1]
+ * Reacts faster to recent changes than SMA while remaining smooth.
+ */
+export function computeExponentialMovingAverage(values: number[], window: number): number[] {
+  if (values.length === 0) return [];
+  if (window <= 1) return [...values];
+
+  const alpha = 2 / (window + 1);
+  const results: number[] = new Array(values.length);
+  results[0] = values[0];
+
+  for (let index = 1; index < values.length; index += 1) {
+    results[index] = alpha * values[index] + (1 - alpha) * results[index - 1];
+  }
+
+  return results;
+}
+
 export function computeProgressiveMovingAverage(values: number[], window: number): number[] {
   if (values.length === 0) return [];
   if (window <= 1) return [...values];

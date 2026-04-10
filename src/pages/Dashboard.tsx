@@ -164,9 +164,9 @@ const TREND_TIMEFRAMES: TrendTimeframeOption[] = [6, 12, 24, 36, 'all'];
 type TrendsMaWindow = 6 | 12 | 24;
 type TrendsMaOption = { value: TrendsMaWindow; label: string };
 const TRENDS_MA_OPTIONS: TrendsMaOption[] = [
-  { value: 6, label: '6-Month Avg' },
-  { value: 12, label: '12-Month Avg' },
-  { value: 24, label: '24-Month Avg' },
+  { value: 6, label: '6-Month Trend' },
+  { value: 12, label: '12-Month Trend' },
+  { value: 24, label: '24-Month Trend' },
 ];
 const HIGHLIGHT_MIN_ABS_DELTA = 25;
 type ForecastRangeValue = '30d' | '60d' | '90d' | '6m' | '1y' | '2y' | '3y';
@@ -979,6 +979,13 @@ export default function Dashboard() {
       }),
     [currentCalendarMonth, currentCashBalance, filteredTxns, netCashFlowChartMode, previousCalendarMonth]
   );
+  const trendsRangeLabel = useMemo(() => {
+    const sliced = model.trend.slice(-trendsMaWindow);
+    if (sliced.length === 0) return '';
+    const start = toMonthLabel(sliced[0].month);
+    const end = toMonthLabel(sliced[sliced.length - 1].month);
+    return start === end ? start : `${start} – ${end}`;
+  }, [model.trend, trendsMaWindow]);
 
   const customPreviousDateRange = useMemo(
     () => previousEquivalentDateRange(parseDateToken(customStartDate), parseDateToken(customEndDate)),
@@ -2701,13 +2708,14 @@ export default function Dashboard() {
 
         {hasImportedData && activeTab === 'trends' && (
           <div className="stack-grid">
-            <TrendLineChart data={model.trend} metric="income" title="Revenue Trend" hideDots hideActualLine hideAxisLines trendWindowOverride={trendsMaWindow} />
-            <TrendLineChart data={model.trend} metric="expense" title="Expense Trend" hideDots hideActualLine hideAxisLines trendWindowOverride={trendsMaWindow} />
+            <div className="trend-charts-pair">
+              <TrendLineChart data={model.trend} metric="income" title="Revenue Trend" hideDots hideActualLine hideAxisLines useEma hideHover trendWindowOverride={trendsMaWindow} displayWindow={trendsMaWindow} rangeLabelOverride={trendsRangeLabel} showInterpretation interpretationVariant="revenue" showTrendTooltip yTickLabelStep={2} />
+              <TrendLineChart data={model.trend} metric="expense" title="Expense Trend" hideDots hideActualLine hideAxisLines useEma hideHover trendWindowOverride={trendsMaWindow} displayWindow={trendsMaWindow} rangeLabelOverride={trendsRangeLabel} showInterpretation interpretationVariant="expense" showTrendTooltip yTickLabelStep={2} />
+            </div>
 
             <article className="card table-card">
               <div className="card-head">
                 <h3>Monthly Rollups</h3>
-                <p className="subtle">Canonical monthly dataset: revenue, expenses, net cash flow, savings rate and transaction count</p>
               </div>
               <table>
                 <thead>
@@ -2721,7 +2729,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {model.monthlyRollups.slice(-trendsMaWindow).reverse().map((rollup) => (
+                  {model.monthlyRollups.filter((r) => r.month < currentCalendarMonth).slice(-trendsMaWindow).reverse().map((rollup) => (
                     <tr key={rollup.month}>
                       <td>{toMonthLabel(rollup.month)}</td>
                       <td>{formatCurrency(rollup.revenue)}</td>

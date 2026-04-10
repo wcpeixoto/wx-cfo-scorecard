@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
+import { computeExponentialMovingAverage, computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { toMonthLabel } from '../lib/kpis/compute';
 import type { CashFlowForecastStatus, CashFlowMode, TrendPoint } from '../lib/data/contract';
 
@@ -46,9 +46,16 @@ type TrendLineChartProps = {
   hideActualLine?: boolean;
   hideAxisLines?: boolean;
   trendWindowOverride?: number;
+  displayWindow?: number;
+  useEma?: boolean;
+  hideHover?: boolean;
+  showInterpretation?: boolean;
+  interpretationVariant?: 'revenue' | 'expense';
+  showTrendTooltip?: boolean;
   showOnlyProjectedTicks?: boolean;
   showMonthlyXLabels?: boolean;
   tooltipSingleLabel?: string;
+  yTickLabelStep?: number;
 };
 
 type PlotPoint = {
@@ -558,15 +565,23 @@ export default function TrendLineChart({
   hideActualLine = false,
   hideAxisLines = false,
   trendWindowOverride,
+  displayWindow,
+  useEma = false,
+  hideHover = false,
+  showInterpretation = false,
+  interpretationVariant,
+  showTrendTooltip = false,
   showOnlyProjectedTicks = false,
   showMonthlyXLabels = false,
   tooltipSingleLabel,
+  yTickLabelStep = 1,
 }: TrendLineChartProps) {
   const [internalTimeframe, setInternalTimeframe] = useState<TimeframeOption>(12);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const cashFlowTooltipId = useId();
+  const trendTooltipId = useId();
   const timeframe = controlledTimeframe ?? internalTimeframe;
   const setTimeframe = onTimeframeChange ?? setInternalTimeframe;
 
@@ -645,6 +660,7 @@ export default function TrendLineChart({
     trendPath,
     trendAreaPath,
     trendValues,
+    trendSignal,
     trendMode,
     trendWindow,
     trendSlopePerMonth,
@@ -663,6 +679,7 @@ export default function TrendLineChart({
         trendPath: '',
         trendAreaPath: '',
         trendValues: [] as number[],
+        trendSignal: null as { direction: 'Rising' | 'Declining' | 'Flat'; pct: number } | null,
         trendMode: 'ma' as const,
         trendWindow: null as number | null,
         trendSlopePerMonth: null as number | null,
@@ -693,13 +710,42 @@ export default function TrendLineChart({
       computedTrendMode = 'linear';
       computedTrendSlope = linear.slopePerMonth;
     } else {
-      computedTrendValues = computeProgressiveMovingAverage(values, averageWindow);
+      computedTrendValues = useEma
+        ? computeExponentialMovingAverage(values, averageWindow)
+        : computeProgressiveMovingAverage(values, averageWindow);
       computedTrendMode = 'ma';
       computedTrendWindow = averageWindow;
     }
 
-    const minRaw = Math.min(...values, 0);
-    const axisValues = hideActualLine && computedTrendValues.length > 0 ? computedTrendValues : values;
+    // Compute signal direction from the full EMA series before any display slicing.
+    // If this ran on the sliced array the lookback index (length-1-window) would always be -1.
+    const computedSignal: { direction: 'Rising' | 'Declining' | 'Flat'; pct: number } | null = (() => {
+      if (isNetMetric || computedTrendWindow === null || computedTrendValues.length === 0) return null;
+      const fullCurrent = computedTrendValues[computedTrendValues.length - 1];
+      const fullPriorIdx = computedTrendValues.length - 1 - computedTrendWindow;
+      if (fullPriorIdx < 0 || !Number.isFinite(computedTrendValues[fullPriorIdx]) || !Number.isFinite(fullCurrent)) return null;
+      const fullPrior = computedTrendValues[fullPriorIdx];
+      if (fullPrior === 0) return null;
+      const pct = ((fullCurrent - fullPrior) / Math.abs(fullPrior)) * 100;
+      const FLAT_THRESHOLD = 3;
+      if (pct > FLAT_THRESHOLD) return { direction: 'Rising' as const, pct };
+      if (pct < -FLAT_THRESHOLD) return { direction: 'Declining' as const, pct };
+      return { direction: 'Flat' as const, pct };
+    })();
+
+    // Slice for display only — EMA was computed on the full dataset above.
+    // displayWindow controls how many trailing data points are rendered.
+    const renderCount = displayWindow != null
+      ? Math.min(displayWindow, scopedData.length)
+      : scopedData.length;
+    const renderData = renderCount < scopedData.length ? scopedData.slice(-renderCount) : scopedData;
+    const renderValues = renderCount < scopedData.length ? values.slice(-renderCount) : values;
+    const renderTrendValues = renderCount < scopedData.length
+      ? computedTrendValues.slice(-renderCount)
+      : computedTrendValues;
+
+    const minRaw = Math.min(...renderValues, 0);
+    const axisValues = hideActualLine && renderTrendValues.length > 0 ? renderTrendValues : renderValues;
     const maxRaw = Math.max(...axisValues, 0);
     const axisDomainValues = isNetMetric
       ? scopedAxisDomainData.map((item) => {
@@ -713,9 +759,9 @@ export default function TrendLineChart({
       : buildPositiveAxis(maxRaw);
     const range = Math.max(axis.max - axis.min, 1);
 
-    const step = scopedData.length > 1 ? innerWidth / (scopedData.length - 1) : 0;
-    const computedPoints = scopedData.map((item, index) => {
-      const value = values[index];
+    const step = renderData.length > 1 ? innerWidth / (renderData.length - 1) : 0;
+    const computedPoints = renderData.map((item, index) => {
+      const value = renderValues[index];
       const x = PADDING_X + index * step;
       const y = PADDING_TOP + ((axis.max - value) / range) * innerHeight;
       const rawIncome = Number(item.income);
@@ -759,14 +805,14 @@ export default function TrendLineChart({
         : '';
 
     const computedTrendPath = isNetMetric
-      ? buildLinearTrendPath(computedPoints, computedTrendValues, axis.max, range, innerHeight)
-      : buildTrendPath(computedPoints, computedTrendValues, axis.max, range, innerHeight);
+      ? buildLinearTrendPath(computedPoints, renderTrendValues, axis.max, range, innerHeight)
+      : buildTrendPath(computedPoints, renderTrendValues, axis.max, range, innerHeight);
 
     const computedTrendAreaPath = computedTrendPath.length > 0 && computedPoints.length > 0
       ? `${computedTrendPath} L ${computedPoints[computedPoints.length - 1].x} ${zeroY} L ${computedPoints[0].x} ${zeroY} Z`
       : '';
 
-    const hasWeeklyGranularity = scopedData.some((item) => item.granularity === 'week');
+    const hasWeeklyGranularity = renderData.some((item) => item.granularity === 'week');
 
     return {
       points: computedPoints,
@@ -776,7 +822,8 @@ export default function TrendLineChart({
       areaPath: area,
       trendPath: computedTrendPath,
       trendAreaPath: computedTrendAreaPath,
-      trendValues: computedTrendValues,
+      trendValues: renderTrendValues,
+      trendSignal: computedSignal,
       trendMode: computedTrendMode,
       trendWindow: computedTrendWindow,
       trendSlopePerMonth: computedTrendSlope,
@@ -787,7 +834,7 @@ export default function TrendLineChart({
         ? buildWeeklyTickIndices(computedPoints, innerWidth)
         : buildAdaptiveXAxisTickIndices(computedPoints, innerWidth),
     };
-  }, [scopedData, scopedAxisDomainData, metric, innerHeight, innerWidth, enableTimeframeControl, timeframe, pointStatusByMonth, trendWindowOverride, hideActualLine]);
+  }, [scopedData, scopedAxisDomainData, metric, innerHeight, innerWidth, enableTimeframeControl, timeframe, pointStatusByMonth, trendWindowOverride, displayWindow, hideActualLine, useEma]);
 
   useEffect(() => {
     if (points.length === 0) {
@@ -829,10 +876,28 @@ export default function TrendLineChart({
   const rangeLabel = rangeLabelOverride || `${toMonthLabel(scopedData[0].month)} – ${toMonthLabel(scopedData[scopedData.length - 1].month)}`;
   const activePointIndex =
     activeIndex !== null && activeIndex >= 0 && activeIndex < points.length ? activeIndex : null;
-  const activePoint = activePointIndex !== null ? points[activePointIndex] ?? null : null;
+  const activePoint = hideHover ? null : (activePointIndex !== null ? points[activePointIndex] ?? null : null);
   const hasTrend = trendValues.length === points.length && trendValues.length > 0;
+  const effectiveTrendWindow = trendWindow ?? getAdaptiveAverageWindow(scopedData.length);
   const trendNoteLabel =
-    trendMode === 'linear' ? null : `Trend: ${trendWindow ?? getAdaptiveAverageWindow(scopedData.length)}-mo avg`;
+    trendMode === 'linear' ? null : `Smoothed over ${effectiveTrendWindow} months`;
+
+  // trendSignal uses the full pre-slice EMA series so the lookback window is always in bounds.
+  const trendInterpretation = (() => {
+    if (!showInterpretation || trendSignal === null) return null;
+    const pctText = `${Math.abs(trendSignal.pct).toFixed(1)}%`;
+    if (trendSignal.direction === 'Rising') {
+      // Rising: good for revenue (green), bad for expenses (red)
+      const badgeClass = interpretationVariant === 'expense' ? 'is-down' : 'is-up';
+      return { direction: 'Rising' as const, pctText, icon: '↑', badgeClass };
+    }
+    if (trendSignal.direction === 'Declining') {
+      // Declining: bad for revenue (red), good for expenses (green)
+      const badgeClass = interpretationVariant === 'expense' ? 'is-up' : 'is-down';
+      return { direction: 'Declining' as const, pctText, icon: '↓', badgeClass };
+    }
+    return { direction: 'Flat' as const, pctText, icon: '–', badgeClass: 'is-flat' };
+  })();
   const hasProjectedPoints = points.some((point) => point.status === 'projected');
   const isForecastTooltip = tooltipVariant === 'forecast' && metric === 'net' && !tooltipSingleLabel;
   const showStatusInTooltip = hasProjectedPoints && !isForecastTooltip && !tooltipSingleLabel;
@@ -863,11 +928,33 @@ export default function TrendLineChart({
     <article className="card chart-card">
       <div className={`card-head chart-head${showCashFlowControl ? ' chart-head-has-center' : ''}`}>
         <div className="chart-head-left">
-          <h3 className="chart-head-title">{title}</h3>
+          <div className="chart-title-row">
+            <h3 className="chart-head-title">{title}</h3>
+            {showTrendTooltip && (
+              <div className="cashflow-help">
+                <button
+                  type="button"
+                  className="cashflow-tooltip"
+                  aria-label="How this trend works"
+                  aria-describedby={trendTooltipId}
+                >
+                  ⓘ
+                </button>
+                <div id={trendTooltipId} role="tooltip" className="cashflow-tooltip-panel trend-tooltip-panel">
+                  <ul className="cashflow-tooltip-list trend-tooltip-list">
+                    <li><strong>How this trend works</strong></li>
+                    <li>This line smooths the last few months of results so you can see the direction more clearly without getting distracted by normal month-to-month swings.</li>
+                    <li><strong>Method used</strong></li>
+                    <li>We use an exponential moving average (EMA), which gives more weight to recent months and less weight to older months.</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
           {subtitle && <p className="subtle chart-head-subtitle">{subtitle}</p>}
           <div className="chart-head-meta">
             <p className="subtle chart-range-label">{rangeLabel}</p>
-            {hasTrend && trendNoteLabel && !hideTrend && <p className="subtle trend-note">{trendNoteLabel}</p>}
+            {hasTrend && trendNoteLabel && !hideTrend && !showInterpretation && <p className="subtle trend-note">{trendNoteLabel}</p>}
           </div>
         </div>
         {showCashFlowControl && (
@@ -908,6 +995,12 @@ export default function TrendLineChart({
           </div>
         )}
         <div className="chart-head-right">
+          {trendInterpretation && (
+            <span className={`kpi-badge ${trendInterpretation.badgeClass}`}>
+              <span aria-hidden="true" className="kpi-change-arrow">{trendInterpretation.icon}</span>
+              <span className="kpi-change-percent">{trendInterpretation.direction} {trendInterpretation.pctText}</span>
+            </span>
+          )}
           {(enableTimeframeControl || showForecastRangeControl || showRevenueMarginControl || showExpenseMarginControl || showSuggestedMargins) && (
             <div className="chart-control-row">
               <div className="timeframe-menu" ref={menuRef}>
@@ -1021,8 +1114,9 @@ export default function TrendLineChart({
             </>
           ) : hideActualLine ? (
             <linearGradient id={areaGradientId} x1="0" x2="0" y1="0" y2="1" gradientUnits="objectBoundingBox">
-              <stop offset="0%" stopColor="rgba(70, 95, 255, 0.28)" />
-              <stop offset="100%" stopColor="rgba(70, 95, 255, 0)" />
+              {/* Expense trend uses TailAdmin error red (#F04438); revenue uses brand blue (#465FFF) */}
+              <stop offset="0%" stopColor={metric === 'expense' ? 'rgba(240, 68, 56, 0.22)' : 'rgba(70, 95, 255, 0.28)'} />
+              <stop offset="100%" stopColor={metric === 'expense' ? 'rgba(240, 68, 56, 0)' : 'rgba(70, 95, 255, 0)'} />
             </linearGradient>
           ) : (
             <linearGradient id={areaGradientId} x1="0" x2="0" y1={PADDING_TOP} y2={PADDING_TOP + innerHeight} gradientUnits="userSpaceOnUse">
@@ -1046,7 +1140,7 @@ export default function TrendLineChart({
 
         {hasTrend && !hideTrend && !hideActualLine && <path d={trendPath} className="ma-path" />}
         {hideActualLine && hasTrend && (
-          <path d={trendPath} className="trend-path" />
+          <path d={trendPath} className={`trend-path${metric === 'expense' ? ' trend-path-expense' : ''}`} />
         )}
         {!hideActualLine && actualLinePath && (
           <path d={actualLinePath} className="trend-path" stroke={isNetSeries ? `url(#${lineGradientId})` : undefined} />
@@ -1162,7 +1256,8 @@ export default function TrendLineChart({
                 );
               })}
 
-        {yTicks.map((tick) => {
+        {yTicks.map((tick, index) => {
+          if (yTickLabelStep > 1 && index % yTickLabelStep !== 1) return null;
           const y = PADDING_TOP + ((axisMax - tick) / Math.max(axisMax - axisMin, 1)) * innerHeight;
           return (
             <text key={tick} x={PADDING_X - 12} y={y + 4} textAnchor="end" className="axis-label">
