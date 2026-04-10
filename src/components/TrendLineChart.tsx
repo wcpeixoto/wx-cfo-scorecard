@@ -646,6 +646,7 @@ export default function TrendLineChart({
     hasProjectedSegment,
     areaPath,
     trendPath,
+    trendAreaPath,
     trendValues,
     trendMode,
     trendWindow,
@@ -663,6 +664,7 @@ export default function TrendLineChart({
         hasProjectedSegment: false,
         areaPath: '',
         trendPath: '',
+        trendAreaPath: '',
         trendValues: [] as number[],
         trendMode: 'ma' as const,
         trendWindow: null as number | null,
@@ -762,6 +764,10 @@ export default function TrendLineChart({
       ? buildLinearTrendPath(computedPoints, computedTrendValues, axis.max, range, innerHeight)
       : buildTrendPath(computedPoints, computedTrendValues, axis.max, range, innerHeight);
 
+    const computedTrendAreaPath = computedTrendPath.length > 0 && computedPoints.length > 0
+      ? `${computedTrendPath} L ${computedPoints[computedPoints.length - 1].x} ${zeroY} L ${computedPoints[0].x} ${zeroY} Z`
+      : '';
+
     const hasWeeklyGranularity = scopedData.some((item) => item.granularity === 'week');
 
     return {
@@ -771,6 +777,7 @@ export default function TrendLineChart({
       hasProjectedSegment: computedHasProjectedSegment,
       areaPath: area,
       trendPath: computedTrendPath,
+      trendAreaPath: computedTrendAreaPath,
       trendValues: computedTrendValues,
       trendMode: computedTrendMode,
       trendWindow: computedTrendWindow,
@@ -1032,9 +1039,12 @@ export default function TrendLineChart({
           return <line key={`grid-${tick}`} x1={PADDING_X} x2={WIDTH - PADDING_X} y1={y} y2={y} className={lineClass} />;
         })}
 
-        {!hideActualLine && <path d={areaPath} fill={`url(#${areaGradientId})`} />}
+        <path d={hideActualLine ? trendAreaPath : areaPath} fill={`url(#${areaGradientId})`} />
 
-        {hasTrend && !hideTrend && <path d={trendPath} className="ma-path" />}
+        {hasTrend && !hideTrend && !hideActualLine && <path d={trendPath} className="ma-path" />}
+        {hideActualLine && hasTrend && (
+          <path d={trendPath} className="trend-path" />
+        )}
         {!hideActualLine && actualLinePath && (
           <path d={actualLinePath} className="trend-path" stroke={isNetSeries ? `url(#${lineGradientId})` : undefined} />
         )}
