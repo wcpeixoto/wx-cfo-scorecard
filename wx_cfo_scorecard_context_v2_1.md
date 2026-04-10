@@ -63,6 +63,17 @@ d761f8b  feat: add seasonal forecast engine and calibration
 ```
 Performance note: initial load is network-dependent. Boot profiling (`[BOOT]` logs in dev) shows the Supabase fetch accounts for ~85–95% of total startup time.
 
+### Supabase Project Configuration (NOT in repo)
+
+- `max_rows` is set to **50000** (Supabase default: 1000)
+
+Reason:
+- Required to allow full transaction history to be fetched in a single request
+- If `max_rows` is lower than dataset size, PostgREST silently truncates responses (HTTP 200 with partial data — no error raised)
+- The pagination loop in `sharedPersistence.ts → requestAllRows()` relies on this setting to avoid data loss
+
+**WARNING:** Lowering `max_rows` below dataset size causes silent data corruption — missing rows with no error, no warning, and no visible failure in the UI. Set via Supabase Dashboard → Settings → API → Max Rows.
+
 ### Operating cash classification (locked rules — never regress)
 Defined in `src/lib/cashFlow.ts`:
 
