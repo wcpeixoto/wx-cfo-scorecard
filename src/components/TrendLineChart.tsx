@@ -851,9 +851,6 @@ export default function TrendLineChart({
   const lineGradientId = `${areaGradientId}-line`;
   const isNetSeries = metric === 'net';
   const zeroOffset = clampRatio((axisMax - 0) / Math.max(axisMax - axisMin, 1));
-  const transitionBand = 0.03;
-  const transitionStart = clampRatio(zeroOffset - transitionBand);
-  const transitionEnd = clampRatio(zeroOffset + transitionBand);
 
   return (
     <article className="card chart-card">
@@ -1004,15 +1001,14 @@ export default function TrendLineChart({
             <>
               <linearGradient id={areaGradientId} x1="0" x2="0" y1={PADDING_TOP} y2={PADDING_TOP + innerHeight} gradientUnits="userSpaceOnUse">
                 <stop offset="0%" stopColor="rgba(70, 95, 255, 0.25)" />
-                <stop offset={toOffset(transitionStart)} stopColor="rgba(70, 95, 255, 0.08)" />
                 <stop offset={toOffset(zeroOffset)} stopColor="rgba(70, 95, 255, 0)" />
-                <stop offset={toOffset(transitionEnd)} stopColor="rgba(212, 147, 98, 0.08)" />
-                <stop offset="100%" stopColor="rgba(212, 147, 98, 0)" />
+                <stop offset={toOffset(zeroOffset)} stopColor="rgba(212, 147, 98, 0)" />
+                <stop offset="100%" stopColor="rgba(212, 147, 98, 0.25)" />
               </linearGradient>
               <linearGradient id={lineGradientId} x1="0" x2="0" y1={PADDING_TOP} y2={PADDING_TOP + innerHeight} gradientUnits="userSpaceOnUse">
                 <stop offset="0%" stopColor="#465fff" />
-                <stop offset={toOffset(transitionStart)} stopColor="#465fff" />
-                <stop offset={toOffset(transitionEnd)} stopColor="#c85b72" />
+                <stop offset={toOffset(zeroOffset)} stopColor="#465fff" />
+                <stop offset={toOffset(zeroOffset)} stopColor="#c85b72" />
                 <stop offset="100%" stopColor="#c85b72" />
               </linearGradient>
             </>
