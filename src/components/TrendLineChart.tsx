@@ -204,15 +204,10 @@ function buildSymmetricNetAxis(maxAbsRaw: number): AxisConfig {
 }
 
 function buildPositiveAxis(maxRaw: number): AxisConfig {
-  const base = maxRaw >= 50000 ? 5000 : 1000;
-  const roundedMax = Math.max(base * 4, Math.ceil(maxRaw / (base * 4)) * (base * 4));
-  const quarter = roundedMax / 4;
-
-  return {
-    min: 0,
-    max: roundedMax,
-    ticks: [0, quarter, quarter * 2, quarter * 3, roundedMax],
-  };
+  const step = 10000;
+  const roundedMax = Math.max(step, Math.ceil(maxRaw / step) * step);
+  const ticks = Array.from({ length: roundedMax / step + 1 }, (_, i) => i * step);
+  return { min: 0, max: roundedMax, ticks };
 }
 
 function chooseNetTickStep(range: number): number {
