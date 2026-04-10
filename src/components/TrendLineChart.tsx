@@ -45,6 +45,7 @@ type TrendLineChartProps = {
   hideTrend?: boolean;
   hideActualLine?: boolean;
   hideAxisLines?: boolean;
+  trendWindowOverride?: number;
   showOnlyProjectedTicks?: boolean;
   showMonthlyXLabels?: boolean;
   tooltipSingleLabel?: string;
@@ -556,6 +557,7 @@ export default function TrendLineChart({
   hideTrend = false,
   hideActualLine = false,
   hideAxisLines = false,
+  trendWindowOverride,
   showOnlyProjectedTicks = false,
   showMonthlyXLabels = false,
   tooltipSingleLabel,
@@ -677,7 +679,7 @@ export default function TrendLineChart({
     });
 
     const averageScope: TimeframeOption | number = enableTimeframeControl ? timeframe : scopedData.length;
-    const averageWindow = getAdaptiveAverageWindow(averageScope);
+    const averageWindow = trendWindowOverride ?? getAdaptiveAverageWindow(averageScope);
     const isNetMetric = metric === 'net';
 
     let computedTrendValues: number[] = [];
@@ -785,7 +787,7 @@ export default function TrendLineChart({
         ? buildWeeklyTickIndices(computedPoints, innerWidth)
         : buildAdaptiveXAxisTickIndices(computedPoints, innerWidth),
     };
-  }, [scopedData, scopedAxisDomainData, metric, innerHeight, innerWidth, enableTimeframeControl, timeframe, pointStatusByMonth]);
+  }, [scopedData, scopedAxisDomainData, metric, innerHeight, innerWidth, enableTimeframeControl, timeframe, pointStatusByMonth, trendWindowOverride, hideActualLine]);
 
   useEffect(() => {
     if (points.length === 0) {
@@ -811,7 +813,7 @@ export default function TrendLineChart({
       firstExists: trendValues.length > 0 ? Number.isFinite(trendValues[0]) : false,
       lastExists: trendValues.length > 0 ? Number.isFinite(trendValues[trendValues.length - 1]) : false,
     });
-  }, [metric, timeframe, trendMode, trendWindow, trendSlopePerMonth, points.length, trendValues]);
+  }, [metric, timeframe, trendWindowOverride, trendMode, trendWindow, trendSlopePerMonth, points.length, trendValues]);
 
   if (scopedData.length === 0) {
     return (

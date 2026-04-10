@@ -161,6 +161,13 @@ const DIG_HERE_PERIOD_OPTIONS: DigHerePeriodOption[] = [
 const EPSILON = 0.00001;
 type TrendTimeframeOption = 6 | 12 | 24 | 36 | 'all';
 const TREND_TIMEFRAMES: TrendTimeframeOption[] = [6, 12, 24, 36, 'all'];
+type TrendsMaWindow = 6 | 12 | 24;
+type TrendsMaOption = { value: TrendsMaWindow; label: string };
+const TRENDS_MA_OPTIONS: TrendsMaOption[] = [
+  { value: 6, label: '6-Month Avg' },
+  { value: 12, label: '12-Month Avg' },
+  { value: 24, label: '24-Month Avg' },
+];
 const HIGHLIGHT_MIN_ABS_DELTA = 25;
 type ForecastRangeValue = '30d' | '60d' | '90d' | '6m' | '1y' | '2y' | '3y';
 type ForecastRangeOption = { value: ForecastRangeValue; label: string; months: number };
@@ -591,6 +598,7 @@ export default function Dashboard() {
   const monthPickerRef = useRef<HTMLDivElement>(null);
   const bigPictureFilterMenuRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
+  const [trendsMaWindow, setTrendsMaWindow] = useState<TrendsMaWindow>(12);
   const [importedDataSet, setImportedDataSet] = useState<DataSet | null>(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -2354,6 +2362,21 @@ export default function Dashboard() {
                     </div>
                   )}
                 </div>
+              ) : activeTab === 'trends' ? (
+                <div className="kpi-timeframe-control">
+                  <div className="kpi-timeframe-toggle" role="group" aria-label="Moving average window selector">
+                    {TRENDS_MA_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={trendsMaWindow === option.value ? 'is-active' : ''}
+                        onClick={() => setTrendsMaWindow(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ) : (
                 <div className="kpi-timeframe-control">
                   <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
@@ -2678,8 +2701,8 @@ export default function Dashboard() {
 
         {hasImportedData && activeTab === 'trends' && (
           <div className="stack-grid">
-            <TrendLineChart data={model.trend} metric="income" title="Revenue Trend" hideDots hideActualLine hideAxisLines />
-            <TrendLineChart data={model.trend} metric="expense" title="Expense Trend" hideDots hideActualLine hideAxisLines />
+            <TrendLineChart data={model.trend} metric="income" title="Revenue Trend" hideDots hideActualLine hideAxisLines trendWindowOverride={trendsMaWindow} />
+            <TrendLineChart data={model.trend} metric="expense" title="Expense Trend" hideDots hideActualLine hideAxisLines trendWindowOverride={trendsMaWindow} />
 
             <article className="card table-card">
               <div className="card-head">
@@ -2698,7 +2721,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {model.monthlyRollups.map((rollup) => (
+                  {model.monthlyRollups.slice(-trendsMaWindow).reverse().map((rollup) => (
                     <tr key={rollup.month}>
                       <td>{toMonthLabel(rollup.month)}</td>
                       <td>{formatCurrency(rollup.revenue)}</td>
