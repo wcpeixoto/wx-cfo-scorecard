@@ -34,6 +34,9 @@ type CashFlowForecastModuleProps = {
   onReceivableDaysChange: (nextValue: number) => void;
   onPayableDaysChange: (nextValue: number) => void;
   forecastEvents?: ForecastEvent[];
+  onAddEvent?: (event: ForecastEvent) => void;
+  onUpdateEvent?: (event: ForecastEvent) => void;
+  onDeleteEvent?: (id: string) => void;
 };
 
 type ForecastViewMode = 'monthly' | 'cumulative';
@@ -259,10 +262,91 @@ export default function CashFlowForecastModule({
   onRevenueGrowthChange,
   onExpenseChange,
   forecastEvents = [],
+  onAddEvent,
+  onUpdateEvent,
+  onDeleteEvent,
 }: CashFlowForecastModuleProps) {
   const [viewMode, setViewMode] = useState<ForecastViewMode>('cumulative');
   const [horizonMenuOpen, setHorizonMenuOpen] = useState(false);
   const horizonMenuRef = useRef<HTMLDivElement>(null);
+
+  // Add Event modal state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [formMonth, setFormMonth] = useState('');
+  const [formTitle, setFormTitle] = useState('');
+  const [formAmount, setFormAmount] = useState('');
+  const [formErrors, setFormErrors] = useState<{ month?: string; title?: string }>({});
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+
+  // Next 24 months for the month selector
+  const forecastMonthOptions = useMemo(() => {
+    const today = new Date();
+    return Array.from({ length: 24 }, (_, i) => {
+      const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      return { value, label };
+    });
+  }, []);
+
+  function openAddModal() {
+    setEditingEventId(null);
+    setFormMonth('');
+    setFormTitle('');
+    setFormAmount('');
+    setFormErrors({});
+    setShowAddModal(true);
+  }
+
+  function openEditModal(event: ForecastEvent) {
+    setEditingEventId(event.id);
+    setFormMonth(event.month);
+    setFormTitle(event.title);
+    // Reconstruct signed amount: positive = cash in, negative = cash out
+    const reconstructed =
+      event.cashInImpact > 0
+        ? String(event.cashInImpact)
+        : event.cashOutImpact > 0
+          ? String(-event.cashOutImpact)
+          : '';
+    setFormAmount(reconstructed);
+    setFormErrors({});
+    setShowAddModal(true);
+  }
+
+  function handleAddEventSubmit() {
+    const errors: { month?: string; title?: string } = {};
+    if (!formMonth) errors.month = 'Month is required';
+    if (!formTitle.trim()) errors.title = 'Event title is required';
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    const amount = parseFloat(formAmount) || 0;
+    const eventData: ForecastEvent = {
+      id: editingEventId ?? (
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : Date.now().toString()
+      ),
+      month: formMonth,
+      type: 'one_time_revenue',
+      title: formTitle.trim(),
+      status: 'planned',
+      impactMode: 'fixed_amount',
+      cashInImpact: amount >= 0 ? amount : 0,
+      cashOutImpact: amount < 0 ? Math.abs(amount) : 0,
+      enabled: true,
+    };
+    if (editingEventId) {
+      onUpdateEvent?.(eventData);
+    } else {
+      onAddEvent?.(eventData);
+    }
+    setEditingEventId(null);
+    setShowAddModal(false);
+  }
 
   useEffect(() => {
     if (!horizonMenuOpen) return;
@@ -484,48 +568,151 @@ export default function CashFlowForecastModule({
         </div>
 
         <div className="forecast-events-section">
-          <div className="forecast-events-header">
-            <span className="forecast-events-title">Known Events</span>
-          </div>
-          {forecastEvents.length === 0 ? (
-            <p className="forecast-events-empty">No events added yet.</p>
-          ) : (
+          {forecastEvents.length > 0 && (
             <ul className="forecast-events-list">
               {[...forecastEvents]
                 .sort((a, b) => a.month.localeCompare(b.month))
                 .map((event) => (
                   <li key={event.id} className="forecast-event-row">
-                    <span className="forecast-event-month">{toMonthLabel(event.month)}</span>
-                    <span className="forecast-event-title">{event.title}</span>
-                    <span className="forecast-event-impacts">
-                      {event.cashInImpact > 0 && (
-                        <span className="forecast-event-impact forecast-event-impact--in">
-                          +{formatCurrencyCompact(event.cashInImpact)}
+                    {confirmDeleteId === event.id ? (
+                      <span className="forecast-event-delete-confirm">
+                        Remove this event?{' '}
+                        <button
+                          type="button"
+                          className="forecast-event-delete-confirm-yes"
+                          onClick={() => { onDeleteEvent?.(event.id); setConfirmDeleteId(null); }}
+                        >
+                          Yes
+                        </button>
+                        {' '}
+                        <button
+                          type="button"
+                          className="forecast-event-delete-confirm-cancel"
+                          onClick={() => setConfirmDeleteId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </span>
+                    ) : (
+                      <>
+                        <span className="forecast-event-month">{toMonthLabel(event.month)}</span>
+                        <span className="forecast-event-title">{event.title}</span>
+                        <span className="forecast-event-impacts">
+                          {event.cashInImpact > 0 && (
+                            <span className="forecast-event-impact forecast-event-impact--in">
+                              +{formatCurrencyCompact(event.cashInImpact)}
+                            </span>
+                          )}
+                          {event.cashOutImpact > 0 && (
+                            <span className="forecast-event-impact forecast-event-impact--out">
+                              -{formatCurrencyCompact(event.cashOutImpact)}
+                            </span>
+                          )}
                         </span>
-                      )}
-                      {event.cashOutImpact > 0 && (
-                        <span className="forecast-event-impact forecast-event-impact--out">
-                          -{formatCurrencyCompact(event.cashOutImpact)}
+                        <span
+                          className={`forecast-event-status ${
+                            event.status === 'tentative'
+                              ? 'is-caution'
+                              : event.status === 'committed'
+                                ? 'is-positive'
+                                : 'is-neutral'
+                          }`}
+                        >
+                          {event.status}
                         </span>
-                      )}
-                    </span>
-                    <span
-                      className={`forecast-event-status ${
-                        event.status === 'tentative'
-                          ? 'is-caution'
-                          : event.status === 'committed'
-                            ? 'is-positive'
-                            : 'is-neutral'
-                      }`}
-                    >
-                      {event.status}
-                    </span>
+                        <button
+                          type="button"
+                          className="forecast-event-edit-btn"
+                          onClick={() => openEditModal(event)}
+                          aria-label={`Edit ${event.title}`}
+                        >
+                          ✎
+                        </button>
+                        <button
+                          type="button"
+                          className="forecast-event-delete-btn"
+                          onClick={() => setConfirmDeleteId(event.id)}
+                          aria-label={`Remove ${event.title}`}
+                        >
+                          ✕
+                        </button>
+                      </>
+                    )}
                   </li>
                 ))}
             </ul>
           )}
+          <button type="button" className="forecast-event-add-btn" onClick={openAddModal}>
+            + Add Cash Event
+          </button>
         </div>
       </section>
+
+      {/* Add Event modal */}
+      {showAddModal && (
+        <div className="event-modal-overlay" role="dialog" aria-modal="true" aria-label="Add Event">
+          <div className="event-modal-panel">
+            <div className="event-modal-header">
+              <h3 className="event-modal-title">{editingEventId ? 'Edit Event' : 'Add Known Event'}</h3>
+            </div>
+            <div className="event-modal-body">
+              {/* Month */}
+              <div className="event-form-field">
+                <label className="event-form-label" htmlFor="evt-month">Month</label>
+                <select
+                  id="evt-month"
+                  className={`event-form-select${!formMonth ? ' is-placeholder' : ''}`}
+                  value={formMonth}
+                  onChange={(e) => { setFormMonth(e.target.value); setFormErrors((prev) => ({ ...prev, month: undefined })); }}
+                >
+                  <option value="" disabled>Select month</option>
+                  {forecastMonthOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                {formErrors.month && <span className="event-form-error">{formErrors.month}</span>}
+              </div>
+
+              {/* Title */}
+              <div className="event-form-field">
+                <label className="event-form-label" htmlFor="evt-title">Event Title</label>
+                <input
+                  id="evt-title"
+                  type="text"
+                  className="event-form-input"
+                  placeholder="e.g. Annual tax payment"
+                  maxLength={60}
+                  value={formTitle}
+                  onChange={(e) => { setFormTitle(e.target.value); setFormErrors((prev) => ({ ...prev, title: undefined })); }}
+                />
+                {formErrors.title && <span className="event-form-error">{formErrors.title}</span>}
+              </div>
+
+              {/* Amount */}
+              <div className="event-form-field">
+                <label className="event-form-label" htmlFor="evt-amount">Amount ($)</label>
+                <input
+                  id="evt-amount"
+                  type="number"
+                  className="event-form-input"
+                  placeholder="0"
+                  value={formAmount}
+                  onChange={(e) => setFormAmount(e.target.value)}
+                />
+                <span className="event-form-helper">Use + for money in, – for money out</span>
+              </div>
+            </div>
+            <div className="event-modal-footer">
+              <button type="button" className="event-modal-cancel" onClick={() => { setShowAddModal(false); setEditingEventId(null); }}>
+                Cancel
+              </button>
+              <button type="button" className="event-modal-submit" onClick={handleAddEventSubmit}>
+                {editingEventId ? 'Save Changes' : 'Add Event'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
