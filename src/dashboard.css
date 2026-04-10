@@ -3698,3 +3698,98 @@ body {
 }
 
 /* Signal card typography — see .forecast-decision-label and .forecast-decision-value above */
+
+/* ─── Dashboard Skeleton Loading State ────────────────────────────────── */
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+.skeleton-pulse {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* Base block — bar-shaped items (title rows, subtitle rows) */
+.skeleton-block {
+  background: var(--bg-muted);
+  border-radius: 8px;
+}
+
+/* Card-shaped block override */
+.skeleton-block--card {
+  background: var(--bg-muted);
+  border-radius: 16px;
+}
+
+/* Nav area */
+.skeleton-nav-title {
+  height: 18px;
+  width: 160px;
+  max-width: 100%;
+}
+
+.skeleton-nav-item {
+  height: 32px;
+  width: 80px;
+  border-radius: 8px;
+}
+
+/* Per-page header internals */
+.skeleton-page-title {
+  height: 20px;
+  width: 200px;
+  max-width: 100%;
+  margin-bottom: 8px;
+}
+
+.skeleton-page-subtitle {
+  height: 14px;
+  width: 280px;
+  max-width: 100%;
+}
+
+.skeleton-toggle-group {
+  height: 44px;
+  width: 220px;
+  background: var(--bg-muted);
+  border-radius: 12px;
+}
+
+/* KPI card placeholder — matches real kpi-card min-height */
+.skeleton-kpi-card {
+  min-height: 118px;
+}
+
+/* Main chart block inside a card */
+.skeleton-chart {
+  height: 280px;
+  background: var(--bg-muted);
+  border-radius: 8px;
+}
+
+/* Two-col secondary cards */
+.skeleton-medium-card {
+  min-height: 180px;
+}
+
+/* Right rail skeleton container — matches grid-area of .right-panel but neutral surface */
+.skeleton-right-rail {
+  grid-area: right;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+}
+
+/* Right rail skeleton blocks — sized to match real right-hero / right-card */
+.skeleton-right-hero {
+  height: 130px;
+}
+
+.skeleton-right-card {
+  height: 90px;
+}

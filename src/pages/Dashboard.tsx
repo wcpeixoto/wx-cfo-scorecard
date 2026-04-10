@@ -580,9 +580,74 @@ function getStoredAccountSettings(): AccountRecord[] {
   }
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="finance-app">
+      {/* Top nav — real chrome with skeleton content */}
+      <header className="app-top-nav">
+        <div className="app-top-nav-inner">
+          <div className="brand-wrap">
+            <img className="brand-logo" src={gracieSportsLogo} alt="" aria-hidden="true" />
+            <div className="skeleton-block skeleton-nav-title skeleton-pulse" />
+          </div>
+          <nav className="app-nav" aria-hidden="true">
+            <ul>
+              {NAV_ITEMS.map((item) => (
+                <li key={item.id}>
+                  <div className="skeleton-block skeleton-nav-item skeleton-pulse" />
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+      </header>
+
+      {/* Main content area */}
+      <section className="main-zone">
+        {/* Per-page header skeleton */}
+        <header className="top-bar glass-panel">
+          <div className="top-bar-main">
+            <div className="top-bar-copy">
+              <div className="skeleton-block skeleton-page-title skeleton-pulse" />
+              <div className="skeleton-block skeleton-page-subtitle skeleton-pulse" />
+            </div>
+            <div className="skeleton-toggle-group skeleton-pulse" />
+          </div>
+        </header>
+
+        {/* KPI row — 4 cards matching real kpi-grid */}
+        <div className="kpi-grid">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="skeleton-block skeleton-block--card skeleton-kpi-card skeleton-pulse" />
+          ))}
+        </div>
+
+        {/* Primary chart card */}
+        <article className="card">
+          <div className="skeleton-chart skeleton-pulse" />
+        </article>
+
+        {/* Secondary two-col row */}
+        <div className="two-col-grid">
+          <div className="skeleton-block skeleton-block--card skeleton-medium-card skeleton-pulse" />
+          <div className="skeleton-block skeleton-block--card skeleton-medium-card skeleton-pulse" />
+        </div>
+      </section>
+
+      {/* Right rail — neutral skeleton container (no dark navy) */}
+      <aside className="skeleton-right-rail">
+        <div className="skeleton-block skeleton-block--card skeleton-right-hero skeleton-pulse" />
+        <div className="skeleton-block skeleton-block--card skeleton-right-card skeleton-pulse" />
+        <div className="skeleton-block skeleton-block--card skeleton-right-card skeleton-pulse" />
+      </aside>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const sharedPersistenceEnabled = isSharedPersistenceConfigured();
   const profitabilityCashFlowMode: CashFlowMode = 'operating';
+  const [isInitializing, setIsInitializing] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>('big-picture');
   const [query, setQuery] = useState('');
   const [netChartTimeframe, setNetChartTimeframe] = useState<TrendTimeframeOption>(12);
@@ -649,6 +714,8 @@ export default function Dashboard() {
     } catch (importStateError) {
       const message = importStateError instanceof Error ? importStateError.message : 'Could not load imported transactions.';
       setImportError(message);
+    } finally {
+      setIsInitializing(false);
     }
   }, []);
 
@@ -2194,6 +2261,11 @@ export default function Dashboard() {
       ? 'Shared account settings'
       : 'No shared account settings saved yet; using in-memory/discovered defaults until an edit is synced.'
     : 'Browser-local account settings';
+
+  if (isInitializing) {
+    return <DashboardSkeleton />;
+  }
+
   return (
     <div className="finance-app">
       <header className="app-top-nav">
