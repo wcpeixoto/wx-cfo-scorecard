@@ -130,12 +130,16 @@ export default function NetCashFlowChart({
   const hasNegative = useMemo(() => values.some((v) => v < 0), [values]);
 
   // Compute nice axis bounds with 0 guaranteed as a tick boundary
-  const { yAxisMin, yAxisMax, yAxisTickAmount, zeroOffset } = useMemo(() => {
-    if (values.length === 0) return { yAxisMin: -1000, yAxisMax: 1000, yAxisTickAmount: 4, zeroOffset: 50 };
+  const { yAxisMin, yAxisMax, yAxisTickAmount, gradientZeroOffset } = useMemo(() => {
+    if (values.length === 0) return { yAxisMin: -1000, yAxisMax: 1000, yAxisTickAmount: 4, gradientZeroOffset: 50 };
     const dataMin = Math.min(...values);
     const dataMax = Math.max(...values);
-    const { axisMin, axisMax, tickAmount, zeroOffset } = computeNiceAxisBounds(dataMin, dataMax);
-    return { yAxisMin: axisMin, yAxisMax: axisMax, yAxisTickAmount: tickAmount, zeroOffset };
+    const { axisMin, axisMax, tickAmount } = computeNiceAxisBounds(dataMin, dataMax);
+    const clampedMax = Math.max(dataMax, 0);
+    const clampedMin = Math.min(dataMin, 0);
+    const dataRange = clampedMax - clampedMin;
+    const gradientZeroOffset = dataRange === 0 ? 50 : (clampedMax / dataRange) * 100;
+    return { yAxisMin: axisMin, yAxisMax: axisMax, yAxisTickAmount: tickAmount, gradientZeroOffset };
   }, [values]);
 
   const rangeLabel = useMemo(() => {
@@ -151,7 +155,8 @@ export default function NetCashFlowChart({
 
   const options = useMemo<ApexOptions>(() => {
     // Build dual-color gradient stops: blue above zero, red below zero
-    const z = zeroOffset;
+    // gradientZeroOffset is data-based (objectBoundingBox units), not axis-based
+    const z = gradientZeroOffset;
     const colorStops = hasPositive && hasNegative
       ? [
           [
@@ -283,7 +288,7 @@ export default function NetCashFlowChart({
     },
     legend: { show: false },
   });
-  }, [categories, months, onMonthPointClick, cashFlowMode, labelStep, hasPositive, hasNegative, zeroOffset, yAxisMin, yAxisMax, yAxisTickAmount]);
+  }, [categories, months, onMonthPointClick, cashFlowMode, labelStep, hasPositive, hasNegative, gradientZeroOffset, yAxisMin, yAxisMax, yAxisTickAmount]);
 
   const series = useMemo(() => [
     { name: cashFlowMode === 'total' ? 'Total' : 'Operating', data: values, type: 'area' },
