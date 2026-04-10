@@ -2678,8 +2678,8 @@ export default function Dashboard() {
 
         {hasImportedData && activeTab === 'trends' && (
           <div className="stack-grid">
-            <TrendLineChart data={model.trend} metric="income" title="Revenue Trend" />
-            <TrendLineChart data={model.trend} metric="expense" title="Expense Trend" />
+            <TrendLineChart data={model.trend} metric="income" title="Revenue Trend" hideDots hideTrend hideAxisLines />
+            <TrendLineChart data={model.trend} metric="expense" title="Expense Trend" hideDots hideTrend hideAxisLines />
 
             <article className="card table-card">
               <div className="card-head">

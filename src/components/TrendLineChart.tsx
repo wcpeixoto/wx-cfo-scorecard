@@ -860,7 +860,7 @@ export default function TrendLineChart({
           {subtitle && <p className="subtle chart-head-subtitle">{subtitle}</p>}
           <div className="chart-head-meta">
             <p className="subtle chart-range-label">{rangeLabel}</p>
-            {hasTrend && trendNoteLabel && <p className="subtle trend-note">{trendNoteLabel}</p>}
+            {hasTrend && trendNoteLabel && !hideTrend && <p className="subtle trend-note">{trendNoteLabel}</p>}
           </div>
         </div>
         {showCashFlowControl && (
