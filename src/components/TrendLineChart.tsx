@@ -1021,6 +1021,11 @@ export default function TrendLineChart({
                 <stop offset="100%" stopColor="#c85b72" />
               </linearGradient>
             </>
+          ) : hideActualLine ? (
+            <linearGradient id={areaGradientId} x1="0" x2="0" y1="0" y2="1" gradientUnits="objectBoundingBox">
+              <stop offset="0%" stopColor="rgba(70, 95, 255, 0.28)" />
+              <stop offset="100%" stopColor="rgba(70, 95, 255, 0)" />
+            </linearGradient>
           ) : (
             <linearGradient id={areaGradientId} x1="0" x2="0" y1={PADDING_TOP} y2={PADDING_TOP + innerHeight} gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="rgba(70, 95, 255, 0.25)" />
