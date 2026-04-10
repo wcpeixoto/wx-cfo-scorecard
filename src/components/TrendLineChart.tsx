@@ -43,6 +43,7 @@ type TrendLineChartProps = {
   onMonthPointClick?: (month: string) => void;
   hideDots?: boolean;
   hideTrend?: boolean;
+  hideActualLine?: boolean;
   hideAxisLines?: boolean;
   showOnlyProjectedTicks?: boolean;
   showMonthlyXLabels?: boolean;
@@ -558,6 +559,7 @@ export default function TrendLineChart({
   onMonthPointClick,
   hideDots = false,
   hideTrend = false,
+  hideActualLine = false,
   hideAxisLines = false,
   showOnlyProjectedTicks = false,
   showMonthlyXLabels = false,
@@ -1030,13 +1032,13 @@ export default function TrendLineChart({
           return <line key={`grid-${tick}`} x1={PADDING_X} x2={WIDTH - PADDING_X} y1={y} y2={y} className={lineClass} />;
         })}
 
-        <path d={areaPath} fill={`url(#${areaGradientId})`} />
+        {!hideActualLine && <path d={areaPath} fill={`url(#${areaGradientId})`} />}
 
         {hasTrend && !hideTrend && <path d={trendPath} className="ma-path" />}
-        {actualLinePath && (
+        {!hideActualLine && actualLinePath && (
           <path d={actualLinePath} className="trend-path" stroke={isNetSeries ? `url(#${lineGradientId})` : undefined} />
         )}
-        {hasProjectedSegment && forecastLinePath && (
+        {!hideActualLine && hasProjectedSegment && forecastLinePath && (
           <path
             d={forecastLinePath}
             className="trend-path trend-path-forecast"
