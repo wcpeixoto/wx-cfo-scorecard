@@ -8,23 +8,26 @@ This project is meant to be practical, fast, and reliable. It is a personal oper
 
 ## Stack
 
-- **React** — frontend single-page app
+- **React + TypeScript** — frontend single-page app
 - **Vite** — build tool and local dev server
 - **Node.js** — toolchain
 - **GitHub Pages** — deployment via GitHub Actions
-- **Browser storage** — IndexedDB and localStorage store imported transactions and account settings
+- **Styling** — Custom CSS (`dashboard.css`) following TailAdmin design tokens; does NOT use Tailwind utility classes
+- **Charts** — ApexCharts + custom SVG (`TrendLineChart`)
+- **Data persistence** — Supabase (shared, remote database; primary source of truth)
+- **Storage fallback** — IndexedDB (full alternative path used only when Supabase is not configured; not a cache layer)
 
 ## Important data behavior
 
-This app is browser-local.
+This app uses **Supabase as its primary data persistence layer** (added April 1, 2026).
 
-- **IndexedDB** stores imported transaction records from Quicken CSV files
-- **localStorage** stores account settings, user preferences, and discovered account mappings
-- This data is **not committed to git**
-- This data is **not synced between machines**
-- If a new machine or browser needs data, re-import the Quicken CSV
-
-This is important: the code syncs through GitHub, but the imported financial data does not.
+- **All transaction data is persisted in Supabase** (shared remote database)
+- **Data is synchronized across devices, browsers, and sessions** — re-importing CSV on each machine is no longer required
+- On first load, the app fetches from Supabase before computing KPIs, trends, and forecasts
+- The application **depends on network availability at boot** to hydrate data
+- **IndexedDB is a fallback only** — it is used as the full data path when Supabase env vars are not configured; when Supabase is configured (all current environments), IndexedDB is never read or written
+- **localStorage** still stores account settings and user preferences
+- Credentials (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) live in `.env.local` (gitignored) and GitHub Secrets — **not committed to the repo**
 
 ## Commands
 
@@ -77,8 +80,9 @@ If the real folder names differ, update this section to match reality.
 - Use feature branches for new work: `feature/[name]`
 - All changes go through PR, even when working solo
 - Do not edit `.github/workflows/` unless the deploy pipeline is understood
-- Do not add server-side code, secrets, or backend dependencies
-- Keep this a static-site architecture unless there is an explicit decision to change that
+- Do not add secrets or credentials to the repo — use `.env.local` and GitHub Secrets
+- Supabase is the intentional backend; do not remove or replace it without an explicit architectural decision
+- Do not add additional server-side dependencies beyond Supabase without a clear reason
 
 ## Development priorities
 
@@ -108,10 +112,12 @@ When making decisions, prioritize in this order:
 
 ## Known risks / watch-outs
 
-- Browser storage can make the app appear "empty" on a newly set up machine even when the code is correct
-- Clearing browser storage will remove imported local data
+- **App performance is network-dependent at boot** — initial load requires a Supabase fetch; slow startup may be caused by network latency, large dataset hydration, or synchronous computation after data load
+- **Graceful loading states are required** — skeleton UI must cover the Supabase hydration window
+- Safari-specific storage eviction is no longer a primary risk (Supabase replaces local persistence)
 - Deploy workflow should be treated carefully because a small change there can break publishing
 - Because this is personal finance software, incorrect calculations are worse than missing polish
+- Supabase credentials must remain in `.env.local` and GitHub Secrets — never committed to the repo
 
 ## Session notes
 
