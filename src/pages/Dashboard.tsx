@@ -645,6 +645,8 @@ function DashboardSkeleton() {
 }
 
 export default function Dashboard() {
+  const bootT0Ref = useRef(performance.now());
+  const bootPhaseLoggedRef = useRef<Record<string, boolean>>({});
   const sharedPersistenceEnabled = isSharedPersistenceConfigured();
   const profitabilityCashFlowMode: CashFlowMode = 'operating';
   const [isInitializing, setIsInitializing] = useState(true);
@@ -707,7 +709,12 @@ export default function Dashboard() {
 
   const loadImportedState = useCallback(async () => {
     try {
+      const idbT0 = performance.now();
       const snapshot = await getImportedTransactionsSnapshot();
+      if (import.meta.env.DEV && !bootPhaseLoggedRef.current.idb) {
+        bootPhaseLoggedRef.current.idb = true;
+        console.log('[BOOT] IndexedDB total:', Math.round(performance.now() - idbT0), 'ms');
+      }
       setImportedDataSet(snapshot.dataSet);
       setLastImportSummary(snapshot.lastImportSummary);
       setStoredImportedTransactionCount(snapshot.transactionCount);
@@ -722,6 +729,24 @@ export default function Dashboard() {
   useEffect(() => {
     void loadImportedState();
   }, [loadImportedState]);
+
+  // [BOOT] App mount baseline
+  useEffect(() => {
+    if (import.meta.env.DEV && !bootPhaseLoggedRef.current.mount) {
+      bootPhaseLoggedRef.current.mount = true;
+      console.log('[BOOT] App mounted: 0ms (baseline)');
+    }
+  }, []);
+
+  // [BOOT] Total boot time — fires once after skeleton → real dashboard transition
+  useEffect(() => {
+    if (!isInitializing && !bootPhaseLoggedRef.current.total) {
+      bootPhaseLoggedRef.current.total = true;
+      if (import.meta.env.DEV) {
+        console.log('[BOOT] Total boot time:', Math.round(performance.now() - bootT0Ref.current), 'ms');
+      }
+    }
+  }, [isInitializing]);
 
   useEffect(() => {
     if (!sharedPersistenceEnabled) return;
@@ -1027,13 +1052,20 @@ export default function Dashboard() {
   ]);
 
   const model = useMemo(
-    () =>
-      computeDashboardModel(filteredTxns, {
+    () => {
+      const kpiT0 = performance.now();
+      const result = computeDashboardModel(filteredTxns, {
         cashFlowMode: profitabilityCashFlowMode,
         anchorMonth: previousCalendarMonth ?? undefined,
         thisMonthAnchor: currentCalendarMonth,
         currentCashBalance,
-      }),
+      });
+      if (import.meta.env.DEV && !bootPhaseLoggedRef.current.kpi && filteredTxns.length > 0) {
+        bootPhaseLoggedRef.current.kpi = true;
+        console.log('[BOOT] KPI compute:', Math.round(performance.now() - kpiT0), 'ms');
+      }
+      return result;
+    },
     [currentCalendarMonth, currentCashBalance, filteredTxns, previousCalendarMonth, profitabilityCashFlowMode]
   );
   const netCashFlowChartModel = useMemo(
@@ -1514,8 +1546,9 @@ export default function Dashboard() {
     [forecastRange]
   );
   const forecastProjection = useMemo(
-    () =>
-      projectScenario(
+    () => {
+      const fcT0 = performance.now();
+      const result = projectScenario(
         model,
         {
           ...scenarioInput,
@@ -1523,7 +1556,13 @@ export default function Dashboard() {
         },
         forecastCurrentCashBalance,
         forecastEvents
-      ),
+      );
+      if (import.meta.env.DEV && !bootPhaseLoggedRef.current.forecast && model.monthlyRollups.length > 0) {
+        bootPhaseLoggedRef.current.forecast = true;
+        console.log('[BOOT] Forecast compute:', Math.round(performance.now() - fcT0), 'ms');
+      }
+      return result;
+    },
     [forecastCurrentCashBalance, forecastEvents, forecastRangeMonths, model, scenarioInput]
   );
   const scenarioProjection = useMemo(() => forecastProjection.points, [forecastProjection.points]);

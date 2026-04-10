@@ -420,15 +420,24 @@ async function getLocalImportedStoreSnapshotRaw(): Promise<{
   records: ImportedTransactionRecord[];
   summaries: TransactionImportSummary[];
 }> {
+  const t0Open = performance.now();
   const db = await openImportDb();
+  if (import.meta.env.DEV) {
+    console.log('[BOOT]   (a) IDB open:', Math.round(performance.now() - t0Open), 'ms');
+  }
   try {
     const tx = db.transaction([TRANSACTIONS_STORE, SUMMARIES_STORE], 'readonly');
     const transactionStore = tx.objectStore(TRANSACTIONS_STORE);
     const summaryStore = tx.objectStore(SUMMARIES_STORE);
+    const t0Read = performance.now();
     const records = (await requestToPromise(transactionStore.getAll())) as ImportedTransactionRecord[];
     const summaries = (await requestToPromise(summaryStore.getAll())) as TransactionImportSummary[];
     await transactionComplete(tx);
-    return {
+    if (import.meta.env.DEV) {
+      console.log('[BOOT]   (b) IDB getAll:', Math.round(performance.now() - t0Read), 'ms', `(${records.length} records)`);
+    }
+    const t0Post = performance.now();
+    const result = {
       records,
       summaries: summaries.map((summary) => ({
         ...summary,
@@ -437,6 +446,10 @@ async function getLocalImportedStoreSnapshotRaw(): Promise<{
         importMode: summary.importMode ?? 'append',
       })),
     };
+    if (import.meta.env.DEV) {
+      console.log('[BOOT]   (c) IDB post-read:', Math.round(performance.now() - t0Post), 'ms');
+    }
+    return result;
   } finally {
     db.close();
   }

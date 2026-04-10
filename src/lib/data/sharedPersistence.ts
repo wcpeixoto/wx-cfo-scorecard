@@ -222,19 +222,43 @@ export async function getSharedImportedStoreSnapshot(): Promise<{
 } | null> {
   if (!isConfigured()) return null;
 
+  let transactionFetchMs = 0;
+  let batchFetchMs = 0;
+
   const [transactionRows, batchRows] = await Promise.all([
-    requestAllRows<SharedImportTransactionRow>(
-      withWorkspaceFilter(`${IMPORTED_TRANSACTIONS_TABLE}?select=*&order=imported_at_iso.asc,fingerprint.asc`)
-    ),
-    request<SharedImportBatchRow[]>(
-      withWorkspaceFilter(`${IMPORT_BATCHES_TABLE}?select=*&order=imported_at_iso.desc`)
-    ),
+    (async () => {
+      const t0 = performance.now();
+      const rows = await requestAllRows<SharedImportTransactionRow>(
+        withWorkspaceFilter(`${IMPORTED_TRANSACTIONS_TABLE}?select=*&order=imported_at_iso.asc,fingerprint.asc`)
+      );
+      transactionFetchMs = Math.round(performance.now() - t0);
+      return rows;
+    })(),
+    (async () => {
+      const t0 = performance.now();
+      const rows = await request<SharedImportBatchRow[]>(
+        withWorkspaceFilter(`${IMPORT_BATCHES_TABLE}?select=*&order=imported_at_iso.desc`)
+      );
+      batchFetchMs = Math.round(performance.now() - t0);
+      return rows;
+    })(),
   ]);
 
-  return {
+  if (import.meta.env.DEV) {
+    console.log('[BOOT]   (a) Supabase txn fetch:', transactionFetchMs, 'ms', `(${transactionRows.length} rows)`);
+    console.log('[BOOT]   (b) Supabase batches fetch:', batchFetchMs, 'ms');
+  }
+
+  const t0Post = performance.now();
+  const result = {
     records: transactionRows.map(fromSharedTransactionRow),
-    summaries: batchRows.map(fromSharedBatchRow),
+    summaries: (batchRows ?? []).map(fromSharedBatchRow),
   };
+  if (import.meta.env.DEV) {
+    console.log('[BOOT]   (c) Supabase post-read mapping:', Math.round(performance.now() - t0Post), 'ms');
+  }
+
+  return result;
 }
 
 export async function replaceSharedImportedStore(

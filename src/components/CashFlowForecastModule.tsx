@@ -266,6 +266,16 @@ export default function CashFlowForecastModule({
   onUpdateEvent,
   onDeleteEvent,
 }: CashFlowForecastModuleProps) {
+  const chartMountT0Ref = useRef(performance.now());
+  const chartBootLoggedRef = useRef(false);
+
+  useEffect(() => {
+    if (import.meta.env.DEV && !chartBootLoggedRef.current) {
+      chartBootLoggedRef.current = true;
+      console.log('[BOOT] Charts render:', Math.round(performance.now() - chartMountT0Ref.current), 'ms');
+    }
+  }, []);
+
   const [viewMode, setViewMode] = useState<ForecastViewMode>('cumulative');
   const [horizonMenuOpen, setHorizonMenuOpen] = useState(false);
   const horizonMenuRef = useRef<HTMLDivElement>(null);
