@@ -702,7 +702,8 @@ export default function TrendLineChart({
     }
 
     const minRaw = Math.min(...values, 0);
-    const maxRaw = Math.max(...values, 0);
+    const axisValues = hideActualLine && computedTrendValues.length > 0 ? computedTrendValues : values;
+    const maxRaw = Math.max(...axisValues, 0);
     const axisDomainValues = isNetMetric
       ? scopedAxisDomainData.map((item) => {
           const numeric = Number(item.net);
