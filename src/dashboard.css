@@ -2373,7 +2373,7 @@ body {
 
 .tooltip-title {
   fill: #101828;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
 }
 
@@ -2411,12 +2411,12 @@ body {
 
 .tooltip-row-label {
   fill: #667085;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .tooltip-row-value {
   fill: #101828;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
 }
 

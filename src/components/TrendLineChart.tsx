@@ -903,7 +903,7 @@ export default function TrendLineChart({
   const showStatusInTooltip = hasProjectedPoints && !isForecastTooltip && !tooltipSingleLabel;
   const showMetricBreakdownInTooltip = metric === 'net' && !tooltipSingleLabel && (showRevenueExpenseInTooltip || isForecastTooltip);
   const tooltipLineCount = 2 + (showStatusInTooltip ? 1 : 0) + (showMetricBreakdownInTooltip ? 2 : 0) + (showNetEnhancements ? 1 : 0);
-  const tooltipWidth = isForecastTooltip ? 232 : showNetEnhancements ? 214 : 192;
+  const tooltipWidth = isForecastTooltip ? 232 : tooltipSingleLabel != null ? 156 : showNetEnhancements ? 214 : 192;
   const tooltipHeight = isForecastTooltip ? (showNetEnhancements ? 98 : 84) : 16 + tooltipLineCount * 14;
   const metricLabel = tooltipSingleLabel ?? (metric === 'income' ? 'Revenue' : metric === 'expense' ? 'Expenses' : 'Net cash flow');
   const showForecastPointLabels = isForecastTooltip && points.length > 0;
@@ -1136,6 +1136,18 @@ export default function TrendLineChart({
           return <line key={`grid-${tick}`} x1={PADDING_X} x2={WIDTH - PADDING_X} y1={y} y2={y} className={lineClass} />;
         })}
 
+        {activePoint && tooltipVariant === 'forecast' && (
+          <line
+            x1={activePoint.x}
+            x2={activePoint.x}
+            y1={PADDING_TOP}
+            y2={PADDING_TOP + innerHeight}
+            stroke="#D0D5DD"
+            strokeWidth={1}
+            strokeDasharray="4 3"
+          />
+        )}
+
         <path d={hideActualLine ? trendAreaPath : areaPath} fill={`url(#${areaGradientId})`} />
 
         {hasTrend && !hideTrend && !hideActualLine && <path d={trendPath} className="ma-path" />}
@@ -1300,7 +1312,7 @@ export default function TrendLineChart({
                 <>
                   <rect x={x} y={y} width={tooltipWidth} height={tooltipHeight} rx={10} ry={10} className="tooltip-box" />
                   <text x={x + 10} y={y + 14} className="tooltip-title">
-                    {activePoint.label}
+                    {tooltipSingleLabel != null ? activePoint.axisLabel : activePoint.label}
                   </text>
                   {isForecastTooltip ? (
                     <>
@@ -1333,20 +1345,30 @@ export default function TrendLineChart({
                           </tspan>
                         </text>
                       )}
-                      <text x={x + 10} y={valueLineY} className="tooltip-line">
-                        <tspan>{metricLabel}: </tspan>
-                        <tspan
-                          className={
-                            activePoint.value > EPSILON
-                              ? 'tooltip-line-value is-positive'
-                              : activePoint.value < -EPSILON
-                                ? 'tooltip-line-value is-negative'
-                                : 'tooltip-line-value'
-                          }
-                        >
-                          {formatCurrencyValue(activePoint.value)}
-                        </tspan>
-                      </text>
+                      {tooltipSingleLabel != null ? (
+                        <>
+                          <circle cx={x + 16} cy={valueLineY - 4} r={3.5} fill="#465FFF" />
+                          <text x={x + 26} y={valueLineY} className="tooltip-row-label">{metricLabel}</text>
+                          <text x={forecastRightX} y={valueLineY} textAnchor="end" className="tooltip-row-value">
+                            {formatCurrencyValue(activePoint.value)}
+                          </text>
+                        </>
+                      ) : (
+                        <text x={x + 10} y={valueLineY} className="tooltip-line">
+                          <tspan>{metricLabel}: </tspan>
+                          <tspan
+                            className={
+                              activePoint.value > EPSILON
+                                ? 'tooltip-line-value is-positive'
+                                : activePoint.value < -EPSILON
+                                  ? 'tooltip-line-value is-negative'
+                                  : 'tooltip-line-value'
+                            }
+                          >
+                            {formatCurrencyValue(activePoint.value)}
+                          </tspan>
+                        </text>
+                      )}
                       {showMetricBreakdownInTooltip && (
                         <text x={x + 10} y={revenueLineY} className="tooltip-line">
                           <tspan>Revenue: </tspan>
