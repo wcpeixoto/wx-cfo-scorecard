@@ -64,7 +64,7 @@ function buildHeaders(extra?: HeadersInit): Headers {
 }
 
 async function requestAllRows<T>(path: string): Promise<T[]> {
-  const PAGE_SIZE = 1000;
+  const PAGE_SIZE = 10000;
   const all: T[] = [];
   let from = 0;
 
