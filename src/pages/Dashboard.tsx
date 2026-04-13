@@ -2936,9 +2936,9 @@ export default function Dashboard() {
               onReceivableDaysChange={(nextValue) => updateCustomScenario({ receivableDays: nextValue })}
               onPayableDaysChange={(nextValue) => updateCustomScenario({ payableDays: nextValue })}
               forecastEvents={forecastEvents}
-              onAddEvent={(event) => setForecastEvents((prev) => [...prev, event])}
+              onAddEvent={(events) => setForecastEvents((prev) => [...prev, ...events])}
               onUpdateEvent={(updated) => setForecastEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)))}
-              onDeleteEvent={(id) => setForecastEvents((prev) => prev.filter((e) => e.id !== id))}
+              onDeleteEvent={(groupId) => setForecastEvents((prev) => prev.filter((e) => e.id.split('__')[1] !== groupId))}
             />
 
             <article className="card table-card">
