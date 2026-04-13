@@ -509,7 +509,7 @@ function ReserveGauge({ percentLabel, fillPercent, toneClass, reserveTarget }: {
   const trackStart = polarToXY(startAngle);
   const trackEnd = polarToXY(endAngle);
   const fillEnd = polarToXY(fillAngle);
-  const largeArc = clampedPercent > 50 ? 1 : 0;
+  const largeArc = 0;
 
   const trackPath = `M ${trackStart.x} ${trackStart.y} A ${radius} ${radius} 0 1 1 ${trackEnd.x} ${trackEnd.y}`;
   const fillPath = `M ${trackStart.x} ${trackStart.y} A ${radius} ${radius} 0 ${largeArc} 1 ${fillEnd.x} ${fillEnd.y}`;
