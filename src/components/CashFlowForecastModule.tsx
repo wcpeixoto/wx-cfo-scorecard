@@ -321,6 +321,7 @@ export default function CashFlowForecastModule({
   const [formErrors, setFormErrors] = useState<{ month?: string; title?: string }>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
 
   // Next 24 months for the month selector
   const forecastMonthOptions = useMemo(() => {
@@ -335,6 +336,7 @@ export default function CashFlowForecastModule({
 
   function openAddModal() {
     setEditingEventId(null);
+    setEditingGroupId(null);
     setFormMonth('');
     setFormTitle('');
     setFormAmount('');
@@ -343,19 +345,13 @@ export default function CashFlowForecastModule({
     setShowAddModal(true);
   }
 
-  function openEditModal(event: ForecastEvent) {
-    setEditingEventId(event.id);
-    setFormMonth(event.month);
-    setFormTitle(event.title);
-    setFormFrequency('once');
-    // Reconstruct signed amount: positive = cash in, negative = cash out
-    const reconstructed =
-      event.cashInImpact > 0
-        ? String(event.cashInImpact)
-        : event.cashOutImpact > 0
-          ? String(-event.cashOutImpact)
-          : '';
-    setFormAmount(reconstructed);
+  function openEditModal(group: (typeof groupedEventRows)[0]) {
+    setEditingEventId(group.firstEvent.id);
+    setEditingGroupId(group.groupId);
+    setFormMonth(group.firstEvent.month);
+    setFormTitle(group.title);
+    setFormFrequency(group.frequency);
+    setFormAmount(group.amount === 0 ? '' : String(group.amount));
     setFormErrors({});
     setShowAddModal(true);
   }
@@ -372,11 +368,17 @@ export default function CashFlowForecastModule({
     const cashInImpact = amount >= 0 ? amount : 0;
     const cashOutImpact = amount < 0 ? Math.abs(amount) : 0;
 
-    // Editing: single event update, preserve original id
-    if (editingEventId) {
-      onUpdateEvent?.({
-        id: editingEventId,
-        month: formMonth,
+    // Editing: delete old group + re-add with new parameters (works for all frequencies)
+    if (editingGroupId !== null) {
+      onDeleteEvent?.(editingGroupId);
+      const newGroupId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : Date.now().toString();
+      const editMonths = generateEventMonths(formMonth, formFrequency, forecastRangeMonths);
+      const editEvents: ForecastEvent[] = editMonths.map((month, index) => ({
+        id: `${formFrequency}__${newGroupId}__${index}`,
+        month,
         type: 'one_time_revenue',
         title: formTitle.trim(),
         status: 'planned',
@@ -384,8 +386,10 @@ export default function CashFlowForecastModule({
         cashInImpact,
         cashOutImpact,
         enabled: true,
-      });
+      }));
+      onAddEvent?.(editEvents);
       setEditingEventId(null);
+      setEditingGroupId(null);
       setShowAddModal(false);
       return;
     }
@@ -702,16 +706,14 @@ export default function CashFlowForecastModule({
                         )}
                       </span>
                       <span className="forecast-event-status is-neutral">{group.freqLabel}</span>
-                      {group.frequency === 'once' && (
-                        <button
-                          type="button"
-                          className="forecast-event-edit-btn"
-                          onClick={() => openEditModal(group.firstEvent)}
-                          aria-label={`Edit ${group.title}`}
-                        >
-                          ✎
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="forecast-event-edit-btn"
+                        onClick={() => openEditModal(group)}
+                        aria-label={`Edit ${group.title}`}
+                      >
+                        ✎
+                      </button>
                       <button
                         type="button"
                         className="forecast-event-delete-btn"
@@ -786,25 +788,23 @@ export default function CashFlowForecastModule({
                 <span className="event-form-helper">Use + for money in, – for money out</span>
               </div>
 
-              {/* Frequency — only shown when adding a new event */}
-              {!editingEventId && (
-                <div className="event-form-field">
-                  <label className="event-form-label" htmlFor="evt-frequency">Frequency</label>
-                  <select
-                    id="evt-frequency"
-                    className="event-form-select"
-                    value={formFrequency}
-                    onChange={(e) => setFormFrequency(e.target.value as EventFrequency)}
-                  >
-                    <option value="once">Once</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                  </select>
-                </div>
-              )}
+              {/* Frequency */}
+              <div className="event-form-field">
+                <label className="event-form-label" htmlFor="evt-frequency">Frequency</label>
+                <select
+                  id="evt-frequency"
+                  className="event-form-select"
+                  value={formFrequency}
+                  onChange={(e) => setFormFrequency(e.target.value as EventFrequency)}
+                >
+                  <option value="once">Once</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
             </div>
             <div className="event-modal-footer">
-              <button type="button" className="event-modal-cancel" onClick={() => { setShowAddModal(false); setEditingEventId(null); }}>
+              <button type="button" className="event-modal-cancel" onClick={() => { setShowAddModal(false); setEditingEventId(null); setEditingGroupId(null); }}>
                 Cancel
               </button>
               <button type="button" className="event-modal-submit" onClick={handleAddEventSubmit}>

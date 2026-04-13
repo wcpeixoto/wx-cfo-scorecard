@@ -2938,7 +2938,11 @@ export default function Dashboard() {
               forecastEvents={forecastEvents}
               onAddEvent={(events) => setForecastEvents((prev) => [...prev, ...events])}
               onUpdateEvent={(updated) => setForecastEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)))}
-              onDeleteEvent={(groupId) => setForecastEvents((prev) => prev.filter((e) => e.id.split('__')[1] !== groupId))}
+              onDeleteEvent={(groupId) => setForecastEvents((prev) => prev.filter((e) => {
+                const parts = e.id.split('__');
+                const eGroupId = parts.length === 3 ? parts[1] : e.id;
+                return eGroupId !== groupId;
+              }))}
             />
 
             <article className="card table-card">
