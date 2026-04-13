@@ -670,9 +670,32 @@ export default function CashFlowForecastModule({
             <ul className="forecast-events-list">
               {groupedEventRows.map((group) => (
                 <li key={group.groupId} className="forecast-event-row">
+                  <span className="forecast-event-month">{group.monthDisplay}</span>
+                  <span className="forecast-event-title">{group.title}</span>
+                  <span className="forecast-event-impacts">
+                    {group.amount > 0 && (
+                      <span className="forecast-event-impact forecast-event-impact--in">
+                        +{formatCurrencyCompact(group.amount)}
+                      </span>
+                    )}
+                    {group.amount < 0 && (
+                      <span className="forecast-event-impact forecast-event-impact--out">
+                        -{formatCurrencyCompact(Math.abs(group.amount))}
+                      </span>
+                    )}
+                  </span>
+                  <span className="forecast-event-status is-neutral">{group.freqLabel}</span>
+                  <button
+                    type="button"
+                    className="forecast-event-edit-btn"
+                    onClick={() => openEditModal(group)}
+                    aria-label={`Edit ${group.title}`}
+                  >
+                    ✎
+                  </button>
                   {confirmDeleteId === group.groupId ? (
-                    <span className="forecast-event-delete-confirm">
-                      Remove this event?{' '}
+                    <>
+                      <span>Remove this event?</span>
                       <button
                         type="button"
                         className="forecast-event-delete-confirm-yes"
@@ -680,7 +703,6 @@ export default function CashFlowForecastModule({
                       >
                         Yes
                       </button>
-                      {' '}
                       <button
                         type="button"
                         className="forecast-event-delete-confirm-cancel"
@@ -688,41 +710,16 @@ export default function CashFlowForecastModule({
                       >
                         Cancel
                       </button>
-                    </span>
-                  ) : (
-                    <>
-                      <span className="forecast-event-month">{group.monthDisplay}</span>
-                      <span className="forecast-event-title">{group.title}</span>
-                      <span className="forecast-event-impacts">
-                        {group.amount > 0 && (
-                          <span className="forecast-event-impact forecast-event-impact--in">
-                            +{formatCurrencyCompact(group.amount)}
-                          </span>
-                        )}
-                        {group.amount < 0 && (
-                          <span className="forecast-event-impact forecast-event-impact--out">
-                            -{formatCurrencyCompact(Math.abs(group.amount))}
-                          </span>
-                        )}
-                      </span>
-                      <span className="forecast-event-status is-neutral">{group.freqLabel}</span>
-                      <button
-                        type="button"
-                        className="forecast-event-edit-btn"
-                        onClick={() => openEditModal(group)}
-                        aria-label={`Edit ${group.title}`}
-                      >
-                        ✎
-                      </button>
-                      <button
-                        type="button"
-                        className="forecast-event-delete-btn"
-                        onClick={() => setConfirmDeleteId(group.groupId)}
-                        aria-label={`Remove ${group.title}`}
-                      >
-                        ✕
-                      </button>
                     </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="forecast-event-delete-btn"
+                      onClick={() => setConfirmDeleteId(group.groupId)}
+                      aria-label={`Remove ${group.title}`}
+                    >
+                      ✕
+                    </button>
                   )}
                 </li>
               ))}
