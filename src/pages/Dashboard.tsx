@@ -5,6 +5,7 @@ import gracieSportsLogo from '../assets/gracie-sports-logo.svg';
 import type { IconType } from 'react-icons';
 import { FiGrid, FiLayers, FiRefreshCw, FiSearch, FiSettings, FiSliders, FiTrendingUp } from 'react-icons/fi';
 import CashFlowForecastModule from '../components/CashFlowForecastModule';
+import LoadingScreen from '../components/LoadingScreen';
 import ExpenseDonut from '../components/ExpenseDonut';
 import DigHereHighlights from '../components/DigHereHighlights';
 import KpiCards from '../components/KpiCards';
@@ -650,6 +651,7 @@ export default function Dashboard() {
   const sharedPersistenceEnabled = isSharedPersistenceConfigured();
   const profitabilityCashFlowMode: CashFlowMode = 'operating';
   const [isInitializing, setIsInitializing] = useState(true);
+  const [showLoadingScreen, setShowLoadingScreen] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>('big-picture');
   const [query, setQuery] = useState('');
   const [netChartTimeframe, setNetChartTimeframe] = useState<TrendTimeframeOption>(12);
@@ -737,6 +739,14 @@ export default function Dashboard() {
       console.log('[BOOT] App mounted: 0ms (baseline)');
     }
   }, []);
+
+  // Fade out loading screen 300ms after data is ready, then unmount it
+  useEffect(() => {
+    if (!isInitializing) {
+      const timer = setTimeout(() => setShowLoadingScreen(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isInitializing]);
 
   // [BOOT] Total boot time — fires once after skeleton → real dashboard transition
   useEffect(() => {
@@ -2301,8 +2311,8 @@ export default function Dashboard() {
       : 'No shared account settings saved yet; using in-memory/discovered defaults until an edit is synced.'
     : 'Browser-local account settings';
 
-  if (isInitializing) {
-    return <DashboardSkeleton />;
+  if (showLoadingScreen) {
+    return <LoadingScreen isFading={!isInitializing} />;
   }
 
   return (
