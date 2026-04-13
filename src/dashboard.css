@@ -3459,7 +3459,7 @@ body {
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  opacity: 0;
+  opacity: 0.35;
   transition: opacity 0.15s, background 0.15s, color 0.15s;
 }
 
@@ -3487,7 +3487,7 @@ body {
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  opacity: 0;
+  opacity: 0.35;
   transition: opacity 0.15s, background 0.15s, color 0.15s;
 }
 
