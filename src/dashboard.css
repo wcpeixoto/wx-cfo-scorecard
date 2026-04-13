@@ -3828,14 +3828,14 @@ body {
 }
 
 .loading-screen__brand {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: #465FFF;
   letter-spacing: 0.05em;
 }
 
 .loading-screen__headline {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
   color: #101828;
   margin: 0;
