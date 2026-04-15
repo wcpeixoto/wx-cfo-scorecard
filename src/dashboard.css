@@ -2743,6 +2743,186 @@ body {
   color: var(--negative);
 }
 
+/* ─── Projection Table enhancements ─────────────────────────────────────── */
+
+.projection-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.projection-header h3 {
+  margin: 0;
+  font-size: 1.06rem;
+  flex: 0 0 auto;
+}
+
+.projection-header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.projection-compare-label {
+  color: #667085;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.projection-table-scroll {
+  overflow-x: auto;
+}
+
+.projection-year-pills {
+  display: flex;
+  gap: 8px;
+}
+
+.projection-year-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid #E4E7EC;
+  background: #F2F4F7;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.projection-year-pill.is-active {
+  background: #465FFF;
+  color: #FFFFFF;
+  border-color: #465FFF;
+}
+
+.projection-export-btn {
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid #E4E7EC;
+  background: #FFFFFF;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Grouped column headers */
+
+.table-card .projection-group-row th {
+  background: #F2F4F7;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  border-bottom: 1px solid #E4E7EC;
+}
+
+.projection-month-header {
+  text-align: left !important;
+  background: #FFFFFF !important;
+}
+
+.table-card .projection-sub-row th {
+  background: #FFFFFF;
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  color: #667085;
+}
+
+.projection-sub-forecast {
+  color: #101828 !important;
+  font-weight: 700 !important;
+  font-size: 16px !important;
+}
+
+.projection-sub-actual {
+  color: #667085 !important;
+  font-weight: 400 !important;
+  font-size: 16px !important;
+}
+
+/* Center-align all data cells except MONTH column in comparison mode */
+.table-card table.comparison-mode td:not(:first-child) {
+  text-align: center;
+}
+
+/* Group start border — separates CASH IN / CASH OUT / NET / VS PRIOR / BALANCE */
+.proj-group-start {
+  border-left: 2px solid #E4E7EC;
+}
+
+.projection-var-header {
+  vertical-align: middle;
+}
+
+/* Month column width control */
+.table-card table td:first-child,
+.table-card table th:first-child {
+  min-width: 110px;
+}
+
+.table-card table.comparison-mode td:first-child,
+.table-card table.comparison-mode th:first-child {
+  min-width: 80px;
+}
+
+.projection-var-positive {
+  color: #12B76A;
+  font-weight: 500;
+}
+
+.projection-var-negative {
+  color: #F04438;
+  font-weight: 500;
+}
+
+.projection-var-neutral {
+  color: #667085;
+}
+
+/* Data value hierarchy — forecast vs actuals */
+.proj-forecast-value {
+  color: #101828;
+  font-weight: 600;
+}
+
+.proj-actuals-value {
+  color: #98A2B3;
+  font-weight: 400;
+}
+
+/* Muted red for negative actuals values — lighter than full #F04438 */
+.proj-actuals-negative {
+  color: #F4A9A4;
+  font-weight: 400;
+}
+
+/* Totals row — appears below all monthly data rows */
+.proj-totals-row td {
+  border-top: 2px solid #E4E7EC;
+  background: #F9FAFB;
+  font-weight: 700;
+}
+
+/* Cash Out VAR % color logic is inverted: spending less than prior = good */
+.projection-var-cashout-positive {
+  color: #F04438;
+  font-weight: 500;
+}
+
+.projection-var-cashout-negative {
+  color: #12B76A;
+  font-weight: 500;
+}
+
 .settings-field {
   display: grid;
   gap: 8px;

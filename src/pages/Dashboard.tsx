@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { STORAGE_KEYS } from '../config';
 import gracieSportsLogo from '../assets/gracie-sports-logo.svg';
@@ -19,6 +19,7 @@ import TrajectoryPanel from '../components/TrajectoryPanel';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
 import { includeExpenseForDigHere, isCapitalDistributionCategory } from '../lib/cashFlow';
+import { computePriorYearActuals } from '../lib/kpis/priorYearActuals';
 import { runDataSanityChecks } from '../lib/dataSanity';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
 import {
@@ -1603,6 +1604,13 @@ export default function Dashboard() {
     return statuses;
   }, [visibleScenarioProjection]);
 
+  const currentForecastYear = new Date().getFullYear();
+  const priorYearActuals = useMemo(
+    () => computePriorYearActuals(baseTxns, currentForecastYear),
+    [baseTxns, currentForecastYear]
+  );
+  const [projectionActiveYears, setProjectionActiveYears] = useState<number[]>([]);
+
   const latestRollup = model.monthlyRollups[model.monthlyRollups.length - 1] ?? null;
   const previousRollup = model.monthlyRollups[model.monthlyRollups.length - 2] ?? null;
   const currentCalendarRollup = useMemo(
@@ -2946,31 +2954,273 @@ export default function Dashboard() {
             />
 
             <article className="card table-card">
-              <div className="card-head">
+              <div className="projection-header">
                 <h3>Projection Table</h3>
+                <div className="projection-header-center">
+                  <span className="projection-compare-label">Compare:</span>
+                  <div className="projection-year-pills">
+                    {[...priorYearActuals.detectedYears].sort((a, b) => b - a).map((year) => {
+                      const isActive = projectionActiveYears.includes(year);
+                      return (
+                        <button
+                          key={year}
+                          type="button"
+                          className={`projection-year-pill${isActive ? ' is-active' : ''}`}
+                          onClick={() =>
+                            setProjectionActiveYears((prev) =>
+                              isActive ? prev.filter((y) => y !== year) : [...prev, year]
+                            )
+                          }
+                        >
+                          {year}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="projection-export-btn"
+                  onClick={() => {
+                    const scenarioLabel = selectedScenarioKey;
+                    const today = new Date().toISOString().slice(0, 10);
+                    const filename = `wx-cfo-projection-${scenarioLabel}-${today}.csv`;
+                    const allDetectedAsc = [...priorYearActuals.years.map((ya) => ya.year)]
+                      .filter((y) => y !== currentForecastYear)
+                      .sort((a, b) => a - b);
+                    const headers = ['Month'];
+                    for (const y of allDetectedAsc) {
+                      headers.push(`${y} Cash In`, `${y} Cash Out`, `${y} Net`);
+                    }
+                    headers.push('Forecast Cash In', 'Forecast Cash Out', 'Forecast Net', 'Forecast Balance');
+                    const yearDataMap = new Map(priorYearActuals.years.map((ya) => [ya.year, ya]));
+                    const csvRows = [headers.join(',')];
+                    for (const row of visibleScenarioProjection) {
+                      const monthNum = Number.parseInt(row.month.slice(5, 7), 10);
+                      const cells: string[] = [toMonthLabel(row.month)];
+                      for (const y of allDetectedAsc) {
+                        const ya = yearDataMap.get(y);
+                        const ma = ya?.months[monthNum] ?? { cashIn: 0, cashOut: 0, net: 0 };
+                        cells.push(ma.cashIn.toFixed(2), ma.cashOut.toFixed(2), ma.net.toFixed(2));
+                      }
+                      cells.push(row.cashIn.toFixed(2), row.cashOut.toFixed(2), row.netCashFlow.toFixed(2), row.endingCashBalance.toFixed(2));
+                      csvRows.push(cells.join(','));
+                    }
+                    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const anchor = document.createElement('a');
+                    anchor.href = url;
+                    anchor.download = filename;
+                    anchor.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  Export CSV
+                </button>
               </div>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Month</th>
-                    <th>Projected Cash In</th>
-                    <th>Projected Cash Out</th>
-                    <th>Projected Net Cash</th>
-                    <th>{hasForecastCurrentCashBalance ? 'Projected Cash Balance' : 'Cumulative Net Change'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleScenarioProjection.map((row) => (
-                    <tr key={row.month}>
-                      <td>{toMonthLabel(row.month)}</td>
-                      <td>{formatCurrency(row.cashIn)}</td>
-                      <td>{formatCurrency(row.cashOut)}</td>
-                      <td className={row.netCashFlow < 0 ? 'is-negative' : undefined}>{formatCurrency(row.netCashFlow)}</td>
-                      <td className={row.endingCashBalance < 0 ? 'is-negative' : undefined}>{formatCurrency(row.endingCashBalance)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="projection-table-scroll">
+                {(() => {
+                  const sortedActiveDesc = [...projectionActiveYears].sort((a, b) => b - a);
+                  const hasActive = sortedActiveDesc.length > 0;
+                  const hasSingleYear = sortedActiveDesc.length === 1;
+                  const forecastYear = currentForecastYear;
+                  const yearDataMap = new Map(priorYearActuals.years.map((ya) => [ya.year, ya]));
+                  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+                  // Forecast totals — shared by both table modes
+                  const totalForecastCI = visibleScenarioProjection.reduce((s, r) => s + r.cashIn, 0);
+                  const totalForecastCO = visibleScenarioProjection.reduce((s, r) => s + r.cashOut, 0);
+                  const totalForecastNet = visibleScenarioProjection.reduce((s, r) => s + r.netCashFlow, 0);
+
+                  if (!hasActive) {
+                    return (
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Month</th>
+                            <th>Forecast Cash In</th>
+                            <th>Forecast Cash Out</th>
+                            <th>Forecast Net</th>
+                            <th>{hasForecastCurrentCashBalance ? 'Forecast Balance' : 'Cumulative Net'}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {visibleScenarioProjection.map((row) => (
+                            <tr key={row.month}>
+                              <td>{toMonthLabel(row.month)}</td>
+                              <td>{formatCurrency(row.cashIn)}</td>
+                              <td>{formatCurrency(row.cashOut)}</td>
+                              <td className={row.netCashFlow < 0 ? 'is-negative' : undefined}>{formatCurrency(row.netCashFlow)}</td>
+                              <td className={row.endingCashBalance < 0 ? 'is-negative' : undefined}>{formatCurrency(row.endingCashBalance)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="proj-totals-row">
+                            <td>Total</td>
+                            <td>{formatCurrency(totalForecastCI)}</td>
+                            <td>{formatCurrency(totalForecastCO)}</td>
+                            <td className={totalForecastNet < 0 ? 'is-negative' : undefined}>{formatCurrency(totalForecastNet)}</td>
+                            <td className="proj-actuals-value">&mdash;</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    );
+                  }
+
+                  // Actuals totals per active year
+                  const totalActuals = new Map<number, { cashIn: number; cashOut: number; net: number }>();
+                  for (const year of sortedActiveDesc) {
+                    let ci = 0, co = 0, net = 0;
+                    for (const row of visibleScenarioProjection) {
+                      const m = Number.parseInt(row.month.slice(5, 7), 10);
+                      const ma = yearDataMap.get(year)?.months[m] ?? { cashIn: 0, cashOut: 0, net: 0 };
+                      ci += ma.cashIn; co += ma.cashOut; net += ma.net;
+                    }
+                    totalActuals.set(year, { cashIn: ci, cashOut: co, net });
+                  }
+
+                  const fmtVarPct = (pct: number) => {
+                    const sign = pct >= 0 ? '+' : '-';
+                    const abs = Math.abs(pct).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                    return `${sign}${abs}%`;
+                  };
+
+                  const varColCount = hasSingleYear ? 1 : 0;
+                  const cashInCols = 1 + sortedActiveDesc.length + varColCount;
+                  const cashOutCols = 1 + sortedActiveDesc.length + varColCount;
+                  const netCols = 1 + sortedActiveDesc.length + varColCount;
+
+                  return (
+                    <table className="comparison-mode">
+                      <thead>
+                        <tr className="projection-group-row">
+                          <th rowSpan={2} className="projection-month-header">Month</th>
+                          <th colSpan={cashInCols} className="proj-group-start">Cash In</th>
+                          <th colSpan={cashOutCols} className="proj-group-start">Cash Out</th>
+                          <th colSpan={netCols} className="proj-group-start">Net</th>
+                        </tr>
+                        <tr className="projection-sub-row">
+                          {/* Cash In subcolumns */}
+                          <th className="projection-sub-forecast proj-group-start">{forecastYear}</th>
+                          {sortedActiveDesc.map((y) => <th key={`ci-${y}`} className="projection-sub-actual">{y}</th>)}
+                          {hasSingleYear && <th className="projection-sub-actual">%</th>}
+                          {/* Cash Out subcolumns */}
+                          <th className="projection-sub-forecast proj-group-start">{forecastYear}</th>
+                          {sortedActiveDesc.map((y) => <th key={`co-${y}`} className="projection-sub-actual">{y}</th>)}
+                          {hasSingleYear && <th className="projection-sub-actual">%</th>}
+                          {/* Net subcolumns */}
+                          <th className="projection-sub-forecast proj-group-start">{forecastYear}</th>
+                          {sortedActiveDesc.map((y) => <th key={`n-${y}`} className="projection-sub-actual">{y}</th>)}
+                          {hasSingleYear && <th className="projection-sub-actual">%</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleScenarioProjection.map((row) => {
+                          const monthNum = Number.parseInt(row.month.slice(5, 7), 10);
+                          const ma1 = hasSingleYear
+                            ? yearDataMap.get(sortedActiveDesc[0])?.months[monthNum] ?? { cashIn: 0, cashOut: 0, net: 0 }
+                            : null;
+                          const fmtVar = (pct: number) => fmtVarPct(pct);
+                          return (
+                            <tr key={row.month}>
+                              <td>{MONTH_NAMES[monthNum - 1]}</td>
+                              {/* Cash In group */}
+                              <td className="proj-group-start proj-forecast-value">{formatCurrency(row.cashIn)}</td>
+                              {sortedActiveDesc.map((year) => {
+                                const ma = yearDataMap.get(year)?.months[monthNum] ?? { cashIn: 0, cashOut: 0, net: 0 };
+                                const cls = ma.cashIn < 0 ? 'proj-actuals-negative' : 'proj-actuals-value';
+                                return <td key={`ci-${year}-${row.month}`} className={cls}>{formatCurrency(ma.cashIn)}</td>;
+                              })}
+                              {hasSingleYear && (() => {
+                                if (!ma1 || ma1.cashIn === 0) return <td className="projection-var-neutral">&mdash;</td>;
+                                const varPct = ((row.cashIn - ma1.cashIn) / Math.abs(ma1.cashIn)) * 100;
+                                const colorClass = varPct > 0 ? 'projection-var-positive' : 'projection-var-negative';
+                                return <td className={colorClass}>{fmtVar(varPct)}</td>;
+                              })()}
+                              {/* Cash Out group */}
+                              <td className="proj-group-start proj-forecast-value">{formatCurrency(row.cashOut)}</td>
+                              {sortedActiveDesc.map((year) => {
+                                const ma = yearDataMap.get(year)?.months[monthNum] ?? { cashIn: 0, cashOut: 0, net: 0 };
+                                const cls = ma.cashOut < 0 ? 'proj-actuals-negative' : 'proj-actuals-value';
+                                return <td key={`co-${year}-${row.month}`} className={cls}>{formatCurrency(ma.cashOut)}</td>;
+                              })}
+                              {hasSingleYear && (() => {
+                                if (!ma1 || ma1.cashOut === 0) return <td className="projection-var-neutral">&mdash;</td>;
+                                const varPct = ((row.cashOut - ma1.cashOut) / Math.abs(ma1.cashOut)) * 100;
+                                // Cash Out: inverted — spending more than prior = bad (red), less = good (green)
+                                const colorClass = varPct > 0 ? 'projection-var-cashout-positive' : 'projection-var-cashout-negative';
+                                return <td className={colorClass}>{fmtVar(varPct)}</td>;
+                              })()}
+                              {/* Net group */}
+                              <td className={`proj-group-start proj-forecast-value${row.netCashFlow < 0 ? ' is-negative' : ''}`}>{formatCurrency(row.netCashFlow)}</td>
+                              {sortedActiveDesc.map((year) => {
+                                const ma = yearDataMap.get(year)?.months[monthNum] ?? { cashIn: 0, cashOut: 0, net: 0 };
+                                const cls = ma.net < 0 ? 'proj-actuals-negative' : 'proj-actuals-value';
+                                return <td key={`n-${year}-${row.month}`} className={cls}>{formatCurrency(ma.net)}</td>;
+                              })}
+                              {hasSingleYear && (() => {
+                                if (!ma1 || ma1.net === 0) return <td className="projection-var-neutral">&mdash;</td>;
+                                const varPct = ((row.netCashFlow - ma1.net) / Math.abs(ma1.net)) * 100;
+                                const colorClass = varPct > 0 ? 'projection-var-positive' : 'projection-var-negative';
+                                return <td className={colorClass}>{fmtVar(varPct)}</td>;
+                              })()}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="proj-totals-row">
+                          <td>Total</td>
+                          {/* Cash In totals */}
+                          <td className="proj-group-start proj-forecast-value">{formatCurrency(totalForecastCI)}</td>
+                          {sortedActiveDesc.map((year) => {
+                            const tot = totalActuals.get(year) ?? { cashIn: 0, cashOut: 0, net: 0 };
+                            const cls = tot.cashIn < 0 ? 'proj-actuals-negative' : 'proj-actuals-value';
+                            return <td key={`tot-ci-${year}`} className={cls}>{formatCurrency(tot.cashIn)}</td>;
+                          })}
+                          {hasSingleYear && (() => {
+                            const tot = totalActuals.get(sortedActiveDesc[0]) ?? { cashIn: 0, cashOut: 0, net: 0 };
+                            if (tot.cashIn === 0) return <td className="proj-actuals-value">&mdash;</td>;
+                            const pct = ((totalForecastCI - tot.cashIn) / Math.abs(tot.cashIn)) * 100;
+                            const cls = pct > 0 ? 'projection-var-positive' : 'projection-var-negative';
+                            return <td className={cls}>{fmtVarPct(pct)}</td>;
+                          })()}
+                          {/* Cash Out totals */}
+                          <td className="proj-group-start proj-forecast-value">{formatCurrency(totalForecastCO)}</td>
+                          {sortedActiveDesc.map((year) => {
+                            const tot = totalActuals.get(year) ?? { cashIn: 0, cashOut: 0, net: 0 };
+                            const cls = tot.cashOut < 0 ? 'proj-actuals-negative' : 'proj-actuals-value';
+                            return <td key={`tot-co-${year}`} className={cls}>{formatCurrency(tot.cashOut)}</td>;
+                          })}
+                          {hasSingleYear && (() => {
+                            const tot = totalActuals.get(sortedActiveDesc[0]) ?? { cashIn: 0, cashOut: 0, net: 0 };
+                            if (tot.cashOut === 0) return <td className="proj-actuals-value">&mdash;</td>;
+                            const pct = ((totalForecastCO - tot.cashOut) / Math.abs(tot.cashOut)) * 100;
+                            // Cash Out: inverted — spending more than prior = bad (red), less = good (green)
+                            const cls = pct > 0 ? 'projection-var-cashout-positive' : 'projection-var-cashout-negative';
+                            return <td className={cls}>{fmtVarPct(pct)}</td>;
+                          })()}
+                          {/* Net totals */}
+                          <td className={`proj-group-start proj-forecast-value${totalForecastNet < 0 ? ' is-negative' : ''}`}>{formatCurrency(totalForecastNet)}</td>
+                          {sortedActiveDesc.map((year) => {
+                            const tot = totalActuals.get(year) ?? { cashIn: 0, cashOut: 0, net: 0 };
+                            const cls = tot.net < 0 ? 'proj-actuals-negative' : 'proj-actuals-value';
+                            return <td key={`tot-n-${year}`} className={cls}>{formatCurrency(tot.net)}</td>;
+                          })}
+                          {hasSingleYear && (() => {
+                            const tot = totalActuals.get(sortedActiveDesc[0]) ?? { cashIn: 0, cashOut: 0, net: 0 };
+                            if (tot.net === 0) return <td className="proj-actuals-value">&mdash;</td>;
+                            const pct = ((totalForecastNet - tot.net) / Math.abs(tot.net)) * 100;
+                            const cls = pct > 0 ? 'projection-var-positive' : 'projection-var-negative';
+                            return <td className={cls}>{fmtVarPct(pct)}</td>;
+                          })()}
+                        </tr>
+                      </tfoot>
+                    </table>
+                  );
+                })()}
+              </div>
             </article>
           </div>
         )}
