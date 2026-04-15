@@ -555,16 +555,25 @@ export default function CashFlowForecastModule({
     ? Math.round((avgNet / avgCashIn) * 100)
     : null;
 
-  // Card 2: scan full forecast for lowest balance
-  const lowestBalance = fullForecast.length > 0
-    ? fullForecast.reduce((min, p) => Math.min(min, p.endingCashBalance), Infinity)
-    : null;
+  // Card 2: find the month of the lowest balance across the full forecast,
+  // then spread the shortfall only over the months leading up to that point.
+  const SAFETY_GAP_FLOOR = 100; // gaps smaller than this are treated as safe
+  const lowestBalanceIdx = fullForecast.length > 0
+    ? fullForecast.reduce((minIdx, p, i) =>
+        p.endingCashBalance < fullForecast[minIdx].endingCashBalance ? i : minIdx, 0)
+    : -1;
+  const lowestBalance = lowestBalanceIdx >= 0 ? fullForecast[lowestBalanceIdx].endingCashBalance : null;
   const safetyGap = lowestBalance !== null && reserveTarget > 0
     ? reserveTarget - lowestBalance
     : null;
-  const isSafe = safetyGap === null || safetyGap <= 0;
-  const safetyMonthlyNeed = !isSafe && safetyGap !== null && fullForecast.length > 0
-    ? safetyGap / fullForecast.length
+  const isSafe = safetyGap === null || safetyGap <= SAFETY_GAP_FLOOR;
+  // If trough is in month 0, balance is already below safety — spread fix over full window.
+  // If trough is later, use months to that point (more precise).
+  const monthsToBreachPoint = !isSafe && lowestBalanceIdx > 0
+    ? lowestBalanceIdx + 1
+    : fullForecast.length || 1;
+  const safetyMonthlyNeed = !isSafe && safetyGap !== null
+    ? safetyGap / monthsToBreachPoint
     : 0;
 
   // Card 3: profit target gap
@@ -621,13 +630,15 @@ export default function CashFlowForecastModule({
           )}
         </article>
 
-        {/* Card 3 — To hit your profit goal */}
+        {/* Card 3 — Profit goal */}
         <article className="forecast-decision-card">
-          <span className="forecast-decision-label">To hit your profit goal you need</span>
-          {isAtGoal ? (
+          <span className="forecast-decision-label">{isAtGoal ? 'Your current profit' : 'To hit your profit goal you need'}</span>
+          {isAtGoal && avgNet !== null ? (
             <>
-              <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">You&rsquo;re already at your goal</strong>
-              <span className="forecast-decision-meta">Above {TARGET_NET_MARGIN * 100}% net profit</span>
+              <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">{fmtMonthlyValue(avgNet)}</strong>
+              {netMarginPct !== null && (
+                <span className="forecast-decision-meta">{netMarginPct}% net profit — this is solid</span>
+              )}
             </>
           ) : profitGap !== null && targetProfit !== null ? (
             <>
