@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import TrendLineChart from './TrendLineChart';
 import type {
   CashFlowForecastStatus,
@@ -6,6 +6,7 @@ import type {
   ForecastEvent,
   ForecastScenarioKey,
   ForecastSeasonalityMeta,
+  ScenarioPoint,
   TrendPoint,
 } from '../lib/data/contract';
 import { toMonthLabel } from '../lib/kpis/compute';
@@ -44,8 +45,18 @@ function generateEventMonths(startMonth: string, frequency: EventFrequency, fore
   return months;
 }
 
+// DECISION_WINDOW: number of forecast months used for profit and margin cards.
+// Cards 1 and 3 use forecast data, not trailing actuals.
+// Change this constant if the business logic needs to shift to actuals later.
+const DECISION_WINDOW_MONTHS = 12;
+
+// Target net margin for the "money goal" card.
+const TARGET_NET_MARGIN = 0.25;
+
 type CashFlowForecastModuleProps = {
   data: TrendPoint[];
+  fullForecast: ScenarioPoint[];
+  reserveTarget: number;
   pointStatusByMonth: Partial<Record<string, CashFlowForecastStatus>>;
   decisionSignals: ForecastDecisionSignals;
   seasonality: ForecastSeasonalityMeta;
@@ -278,6 +289,8 @@ function ForecastSliderControl({
 
 export default function CashFlowForecastModule({
   data,
+  fullForecast,
+  reserveTarget,
   pointStatusByMonth,
   decisionSignals,
   seasonality,
@@ -530,42 +543,100 @@ export default function CashFlowForecastModule({
     }).sort((a, b) => a.firstEvent.month.localeCompare(b.firstEvent.month));
   }, [forecastEvents]);
 
+  // --- Decision card computations ---
+  const decisionWindow = fullForecast.slice(0, DECISION_WINDOW_MONTHS);
+  const avgNet = decisionWindow.length > 0
+    ? decisionWindow.reduce((s, p) => s + p.netCashFlow, 0) / decisionWindow.length
+    : null;
+  const avgCashIn = decisionWindow.length > 0
+    ? decisionWindow.reduce((s, p) => s + p.cashIn, 0) / decisionWindow.length
+    : null;
+  const netMarginPct = avgNet !== null && avgCashIn !== null && avgCashIn > 0
+    ? Math.round((avgNet / avgCashIn) * 100)
+    : null;
+
+  // Card 2: scan full forecast for lowest balance
+  const lowestBalance = fullForecast.length > 0
+    ? fullForecast.reduce((min, p) => Math.min(min, p.endingCashBalance), Infinity)
+    : null;
+  const safetyGap = lowestBalance !== null && reserveTarget > 0
+    ? reserveTarget - lowestBalance
+    : null;
+  const isSafe = safetyGap === null || safetyGap <= 0;
+  const safetyMonthlyNeed = !isSafe && safetyGap !== null && fullForecast.length > 0
+    ? safetyGap / fullForecast.length
+    : 0;
+
+  // Card 3: profit target gap
+  const targetProfit = avgCashIn !== null ? avgCashIn * TARGET_NET_MARGIN : null;
+  const profitGap = avgNet !== null && targetProfit !== null ? targetProfit - avgNet : null;
+  const isAtGoal = profitGap !== null && profitGap <= 0;
+
+  function fmtMonthly(value: number): string {
+    const abs = Math.abs(value);
+    if (abs >= 1_000_000) return `$${(abs / 1_000_000).toFixed(1)}M/mo`;
+    if (abs >= 10_000) return `$${Math.round(abs / 1_000)}K/mo`;
+    if (abs >= 1_000) return `$${(abs / 1_000).toFixed(1)}K/mo`;
+    return `$${Math.round(abs).toLocaleString()}/mo`;
+  }
+
+  function fmtMonthlyValue(value: number): ReactNode {
+    const str = fmtMonthly(value);
+    const idx = str.lastIndexOf('/mo');
+    if (idx === -1) return str;
+    return <>{str.slice(0, idx)}<span className="forecast-mo">/mo</span></>;
+  }
+
   return (
     <div className="forecast-cockpit">
 
       <div className="forecast-decision-grid" aria-label="Forecast decision signals">
 
+        {/* Card 1 — At this pace */}
         <article className="forecast-decision-card">
-          <span className="forecast-decision-label">Cash Risk</span>
-          <strong className={`forecast-decision-value is-${cashRiskState}`}>
-            {cashRiskState === 'critical' ? 'Critical' : cashRiskState === 'warning' ? 'Warning' : 'Safe'}
-          </strong>
-          <span className="forecast-decision-detail">
-            {cashRiskState === 'critical' ? 'Cash goes negative' : cashRiskState === 'warning' ? 'Cash may drop below safe levels' : 'No cash shortfall expected'}
-          </span>
-          <span className="forecast-decision-meta">
-            {cashRiskState === 'critical' && negativeCashMonthLabel ? `Projected deficit in ${negativeCashMonthLabel}` : cashRiskState === 'warning' && reserveBreachMonthLabel ? `Below reserve in ${reserveBreachMonthLabel}` : 'Balance stays above zero across forecast'}
-          </span>
+          <span className="forecast-decision-label">At this pace, monthly profit is</span>
+          {avgNet !== null ? (
+            <strong className="forecast-decision-value forecast-decision-value--md">{fmtMonthlyValue(avgNet)}</strong>
+          ) : (
+            <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
+          )}
+          {netMarginPct !== null && (
+            <span className="forecast-decision-detail">That&rsquo;s about {netMarginPct}% net profit</span>
+          )}
         </article>
 
-        <article className="forecast-decision-card">
-          <span className="forecast-decision-label">Lowest Cash Point</span>
-          <strong className="forecast-decision-value">{cashTroughBalanceLabel}</strong>
-          <span className="forecast-decision-detail">Projected cash trough</span>
-          <span className="forecast-decision-meta">{cashTroughMonthLabel}</span>
+        {/* Card 2 — To stay above safety line */}
+        <article className={`forecast-decision-card${isSafe ? '' : ' forecast-decision-card--warning'}`}>
+          <span className="forecast-decision-label">To stay above your safety line you need</span>
+          {isSafe ? (
+            <>
+              <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">You&rsquo;re already above your safety line</strong>
+              <span className="forecast-decision-detail">Across your full forecast</span>
+            </>
+          ) : (
+            <>
+              <strong className="forecast-decision-value forecast-decision-value--md">+{fmtMonthlyValue(safetyMonthlyNeed)}</strong>
+              <span className="forecast-decision-meta">This covers 1 month of expenses</span>
+            </>
+          )}
         </article>
 
+        {/* Card 3 — To hit your profit goal */}
         <article className="forecast-decision-card">
-          <span className="forecast-decision-label">Safety Buffer</span>
-          <strong className={`forecast-decision-value is-${cashRiskState}`}>
-            {cashRiskState === 'critical' ? 'Unsafe' : cashRiskState === 'warning' ? 'Tight' : 'Healthy'}
-          </strong>
-          <span className="forecast-decision-detail">
-            {cashRiskState === 'critical' ? 'No cash cushion' : cashRiskState === 'warning' ? 'Below minimum reserve' : 'Above minimum reserve'}
-          </span>
-          <span className="forecast-decision-meta">
-            {cashRiskState === 'safe' ? 'Reserve threshold not breached' : reserveBreachMonthLabel ? `Breach projected in ${reserveBreachMonthLabel}` : 'Reserve threshold at risk'}
-          </span>
+          <span className="forecast-decision-label">To hit your profit goal you need</span>
+          {isAtGoal ? (
+            <>
+              <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">You&rsquo;re already at your goal</strong>
+              <span className="forecast-decision-meta">Above {TARGET_NET_MARGIN * 100}% net profit</span>
+            </>
+          ) : profitGap !== null && targetProfit !== null ? (
+            <>
+              <strong className="forecast-decision-value forecast-decision-value--md">+{fmtMonthlyValue(profitGap)}</strong>
+              <span className="forecast-decision-meta">This gets you to {fmtMonthly(targetProfit)} at {TARGET_NET_MARGIN * 100}% net profit</span>
+            </>
+          ) : (
+            <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
+          )}
         </article>
 
       </div>
@@ -621,6 +692,29 @@ export default function CashFlowForecastModule({
           </div>
         </div>
 
+        {displaySeries.length > 0 && (() => {
+          const initialBalance = displaySeries[0].net;
+          const finalBalance = displaySeries[displaySeries.length - 1].net;
+          const netChange = finalBalance - initialBalance;
+          const netSign = netChange > 0 ? '+' : netChange < 0 ? '−' : '';
+          const netColor = netChange > 0 ? 'is-positive' : netChange < 0 ? 'is-negative' : '';
+          return (
+            <div className="cash-summary-strip">
+              <div className="cash-summary-item">
+                <span className="cash-summary-label">Initial Balance</span>
+                <span className="cash-summary-value">{formatCurrencyCompact(initialBalance)}</span>
+              </div>
+              <div className="cash-summary-item">
+                <span className="cash-summary-label">Net Change</span>
+                <span className={`cash-summary-value ${netColor}`}>{netSign}{formatCurrencyCompact(Math.abs(netChange))}</span>
+              </div>
+              <div className="cash-summary-item">
+                <span className="cash-summary-label">Final Balance</span>
+                <span className="cash-summary-value cash-summary-value--final">{formatCurrencyCompact(finalBalance)}</span>
+              </div>
+            </div>
+          );
+        })()}
 
         <TrendLineChart
           data={displaySeries}

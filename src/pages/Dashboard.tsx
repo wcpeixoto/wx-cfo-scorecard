@@ -2921,6 +2921,8 @@ export default function Dashboard() {
           <div className="stack-grid">
             <CashFlowForecastModule
               data={cashFlowForecastTrend}
+              fullForecast={scenarioProjection}
+              reserveTarget={model.runway.reserveTarget}
               pointStatusByMonth={cashFlowForecastStatusByMonth}
               decisionSignals={forecastDecisionSignals}
               seasonality={forecastSeasonality}
