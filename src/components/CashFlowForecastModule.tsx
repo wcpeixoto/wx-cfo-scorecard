@@ -555,26 +555,48 @@ export default function CashFlowForecastModule({
     ? Math.round((avgNet / avgCashIn) * 100)
     : null;
 
-  // Card 2: find the month of the lowest balance across the full forecast,
-  // then spread the shortfall only over the months leading up to that point.
-  const SAFETY_GAP_FLOOR = 100; // gaps smaller than this are treated as safe
+  // Card 1 — Safety line coverage (full forecast horizon).
+  //
+  // SAFETY_LINE: fixed reserve target passed in from Dashboard — 1 month of trailing
+  // base-case average expenses. Intentionally scenario-independent: the definition of
+  // "safe" must not move when scenario inputs change. Goalposts stay fixed.
+  const fixedSafetyLine = reserveTarget;
+
+  // SAFETY_GAP_FLOOR: gaps within ±$100 are treated as zero to suppress rounding noise.
+  const SAFETY_GAP_FLOOR = 100;
+
+  // Scan the FULL forecast array (not the visible chart window) for the lowest balance.
+  // The horizon selector controls chart display only — this card always uses all months.
   const lowestBalanceIdx = fullForecast.length > 0
     ? fullForecast.reduce((minIdx, p, i) =>
         p.endingCashBalance < fullForecast[minIdx].endingCashBalance ? i : minIdx, 0)
     : -1;
   const lowestBalance = lowestBalanceIdx >= 0 ? fullForecast[lowestBalanceIdx].endingCashBalance : null;
-  const safetyGap = lowestBalance !== null && reserveTarget > 0
-    ? reserveTarget - lowestBalance
+
+  // gap = fixedSafetyLine − lowestProjectedBalance (positive = shortfall, negative = buffer)
+  const safetyGap = lowestBalance !== null && fixedSafetyLine > 0
+    ? fixedSafetyLine - lowestBalance
     : null;
   const isSafe = safetyGap === null || safetyGap <= SAFETY_GAP_FLOOR;
-  // If trough is in month 0, balance is already below safety — spread fix over full window.
-  // If trough is later, use months to that point (more precise).
-  const monthsToBreachPoint = !isSafe && lowestBalanceIdx > 0
-    ? lowestBalanceIdx + 1
-    : fullForecast.length || 1;
-  const safetyMonthlyNeed = !isSafe && safetyGap !== null
-    ? safetyGap / monthsToBreachPoint
-    : 0;
+
+  // bufferState drives the two card states:
+  //   'safe'    — lowest balance stays at or above the safety line
+  //   'at-risk' — lowest balance dips below the safety line
+  //   null      — no forecast data or no safety line configured
+  const bufferState: 'safe' | 'at-risk' | null =
+    fullForecast.length === 0 || fixedSafetyLine <= 0
+      ? null
+      : !isSafe
+        ? 'at-risk'
+        : 'safe';
+
+  // Shortfall: total lump-sum reserve gap (used in at-risk state; no /mo suffix).
+  const shortfall = safetyGap !== null && safetyGap > SAFETY_GAP_FLOOR ? safetyGap : null;
+
+  // Buffer: how far above the safety line the lowest balance sits (used in safe state).
+  const safeBuffer = bufferState === 'safe' && lowestBalance !== null
+    ? lowestBalance - fixedSafetyLine
+    : null;
 
   // Card 3: profit target gap
   const targetProfit = avgCashIn !== null ? avgCashIn * TARGET_NET_MARGIN : null;
@@ -596,37 +618,73 @@ export default function CashFlowForecastModule({
     return <>{str.slice(0, idx)}<span className="forecast-mo">/mo</span></>;
   }
 
+  // Signed variant: preserves the negative sign for values like avgNet.
+  // fmtMonthly always strips sign via Math.abs — this wrapper re-applies it.
+  function fmtMonthlyValueSigned(value: number): ReactNode {
+    const prefix = value < 0 ? '−' : '';
+    const str = fmtMonthly(value); // already uses Math.abs internally
+    const idx = str.lastIndexOf('/mo');
+    if (idx === -1) return <>{prefix}{str}</>;
+    return <>{prefix}{str.slice(0, idx)}<span className="forecast-mo">/mo</span></>;
+  }
+
   return (
     <div className="forecast-cockpit">
 
       <div className="forecast-decision-grid" aria-label="Forecast decision signals">
 
-        {/* Card 1 — At this pace */}
+        {/* Card 1 — Safety line coverage (full forecast horizon) */}
+        {bufferState !== null && (
+          <article className={`forecast-decision-card${bufferState === 'at-risk' ? ' forecast-decision-card--warning' : ''}`}>
+            {bufferState === 'safe' && safeBuffer !== null && (
+              <>
+                <span className="forecast-decision-label">To stay above your safety line</span>
+                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">{formatCurrencyCompact(safeBuffer)} above reserve</strong>
+                <span className="forecast-decision-detail">Across your full forecast</span>
+              </>
+            )}
+            {bufferState === 'safe' && safeBuffer === null && (
+              <>
+                <span className="forecast-decision-label">To stay above your safety line</span>
+                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">—</strong>
+                <span className="forecast-decision-detail">Across your full forecast</span>
+              </>
+            )}
+            {bufferState === 'at-risk' && shortfall !== null && (
+              <>
+                <span className="forecast-decision-label">To stay above your safety line</span>
+                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--warning">{formatCurrencyCompact(shortfall)} needed</strong>
+                <span className="forecast-decision-detail">You&rsquo;re short of your 1-month reserve</span>
+                <span className="forecast-decision-meta">Across your full forecast</span>
+              </>
+            )}
+            {bufferState === 'at-risk' && shortfall === null && (
+              <>
+                <span className="forecast-decision-label">Below your safety line</span>
+                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--warning">—</strong>
+                <span className="forecast-decision-detail">Across your full forecast</span>
+              </>
+            )}
+          </article>
+        )}
+        {bufferState === null && (
+          <article className="forecast-decision-card">
+            <span className="forecast-decision-label">Safety line</span>
+            <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
+            <span className="forecast-decision-detail">No reserve target set</span>
+          </article>
+        )}
+
+        {/* Card 2 — At this pace */}
         <article className="forecast-decision-card">
           <span className="forecast-decision-label">At this pace, monthly profit is</span>
           {avgNet !== null ? (
-            <strong className="forecast-decision-value forecast-decision-value--md">{fmtMonthlyValue(avgNet)}</strong>
+            <strong className="forecast-decision-value forecast-decision-value--md">{fmtMonthlyValueSigned(avgNet)}</strong>
           ) : (
             <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
           )}
-          {netMarginPct !== null && (
+          {netMarginPct !== null && avgCashIn !== null && avgCashIn > 0 && (
             <span className="forecast-decision-detail">That&rsquo;s about {netMarginPct}% net profit</span>
-          )}
-        </article>
-
-        {/* Card 2 — To stay above safety line */}
-        <article className={`forecast-decision-card${isSafe ? '' : ' forecast-decision-card--warning'}`}>
-          <span className="forecast-decision-label">To stay above your safety line you need</span>
-          {isSafe ? (
-            <>
-              <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">You&rsquo;re already above your safety line</strong>
-              <span className="forecast-decision-detail">Across your full forecast</span>
-            </>
-          ) : (
-            <>
-              <strong className="forecast-decision-value forecast-decision-value--md">+{fmtMonthlyValue(safetyMonthlyNeed)}</strong>
-              <span className="forecast-decision-meta">This covers 1 month of expenses</span>
-            </>
           )}
         </article>
 

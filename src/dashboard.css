@@ -848,10 +848,6 @@ body {
   line-height: 1.25;
 }
 
-.forecast-decision-value--safe {
-  color: #12B76A;
-}
-
 .forecast-mo {
   font-size: 0.75em;
 }
@@ -1346,6 +1342,14 @@ body {
   font-size: 32px;
   font-weight: 700;
   color: #101828;
+}
+
+.forecast-decision-value--safe {
+  color: #12B76A;
+}
+
+.forecast-decision-value--warning {
+  color: #F79009;
 }
 
 .forecast-decision-value.is-safe {

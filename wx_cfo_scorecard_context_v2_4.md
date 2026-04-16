@@ -1,6 +1,6 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: April 13, 2026*
+*Last updated: April 14, 2026*
 
 ---
 
@@ -11,8 +11,11 @@
 - **Performance investigation completed** — pagination bottleneck identified and fixed
 - **Loading screen added** — branded UX layer covers boot latency with Napoleon Hill quotes
 - **Trends page overhauled** — EMA smoothing, interpretation layer, signal pill, side-by-side layout
-- **Known Events input layer shipped** — Add Event modal, delete with confirmation
+- **Known Events input layer shipped** — Add Event modal, delete with confirmation,
+  separate Cash In / Cash Out fields, Status dropdown (planned/tentative/committed)
 - **Chart polish completed** — gradient zero-line fix, ghost dot removal, tooltip cleanup, axis labels
+- **CLAUDE.md rewritten** — reflects current architecture, required reading block added,
+  locked files documented, stale browser-local references removed
 
 ---
 
@@ -23,7 +26,7 @@ Built in React + Vite. Repo: `github.com:wcpeixoto/wx-cfo-scorecard.git`
 
 Wesley is product owner and operator.
 Claude Code / Codex handles implementation.
-This conversation handles architecture, diagnosis, and prompt engineering.
+Claude.ai (this conversation type) handles architecture, diagnosis, and prompt engineering.
 
 **One-sentence definition:**
 Wx CFO Scorecard turns accounting into plain-English operating clarity for small
@@ -35,15 +38,16 @@ business owners, using CFO-style signal design and Nubank-level usability.
 
 **Last known commits (most recent first):**
 ```
-0d450e8  feat(ui): add branded loading screen for Supabase boot
-8495eff  perf: PAGE_SIZE 1000 → 10000
-4cd2f63  docs: max_rows config dependency
-80ee1d0  chore: [BOOT] instrumentation
-cce8884  docs: Supabase architecture context update
-f39f059  fix(trends): axis label font override via CSS scoped rule
-[prior]  Trends: refine Revenue/Expense Trend cards for clearer decision UX
-[prior]  fix(what-if): thin x-axis month labels by horizon length
-[prior]  feat(what-if): Known Events input layer
+[latest]  docs: rewrite CLAUDE.md with current architecture and required reading block
+0d450e8   feat(ui): add branded loading screen for Supabase boot
+8495eff   perf: PAGE_SIZE 1000 → 10000
+4cd2f63   docs: max_rows config dependency
+80ee1d0   chore: [BOOT] instrumentation
+cce8884   docs: Supabase architecture context update
+f39f059   fix(trends): axis label font override via CSS scoped rule
+[prior]   Trends: refine Revenue/Expense Trend cards for clearer decision UX
+[prior]   fix(what-if): thin x-axis month labels by horizon length
+[prior]   feat(what-if): Known Events input layer
 ```
 
 **Working tree:** clean
@@ -62,6 +66,8 @@ f39f059  fix(trends): axis label font override via CSS scoped rule
 - `src/lib/charts/movingAverage.ts` — EMA function
 - `src/dashboard.css` — all custom styles
 - `UI_RULES.md` — visual standard reference (repo root)
+- `CLAUDE.md` — project rules and required reading block (repo root)
+- `wx_cfo_scorecard_context_v2_4.md` — this file
 
 ---
 
@@ -255,28 +261,16 @@ Used for Monthly Net Cash Flow on Big Picture.
 **X-axis:** Monthly labels at last data point per month, anchor month suppressed,
 auto-thinning by horizon length.
 
-**Known Events:**
+**Known Events (fully shipped):**
 - "Add Cash Event" button opens modal
-- Modal fields: Month (dropdown), Event Title, Amount (single field, +/- for in/out)
+- Modal fields: Month (dropdown), Event Title, Cash In amount, Cash Out amount,
+  Status (planned / tentative / committed)
 - Events apply to ALL scenarios (Option A decision — committed events are facts)
 - Delete with inline confirmation: "Remove this event? [Yes] [Cancel]"
 - Schema: `ForecastEvent` in `contract.ts` — DO NOT modify
-- Status field and separate Cash In / Cash Out fields not yet in modal — fix queued
 
 **Receivables/Payables timing controls** removed from What-If, not yet added
 to Settings page.
-
----
-
-## Known Events — Fix Queued
-
-The Add Event modal was simplified during implementation:
-- Single "Amount" field instead of separate Cash In / Cash Out fields
-- Status dropdown (planned/tentative/committed) not included
-- These should be added in the next Known Events polish pass
-
-The `ForecastEvent` schema in `contract.ts` already supports both fields.
-Do not modify the schema — only update the modal form.
 
 ---
 
@@ -361,14 +355,39 @@ Final forecast month = seasonal forecast + event cashInImpact - event cashOutImp
 
 ## Queued Roadmap
 
-### Immediate — Known Events modal fix
-- Add separate Cash In / Cash Out fields
-- Add Status dropdown (planned / tentative / committed)
-- Do NOT change ForecastEvent schema — only update the modal form
+### Group 4 — Projection Table ← NEXT UP
+Full spec designed and Codex prompt ready. Implement in next Claude Code session.
 
-### Group 4 — Projection Table
-- Add prior year actuals columns alongside projections
-- CSV export button
+**Feature 1: Prior year actuals with year toggle pills**
+- Detect available prior years dynamically from transaction data (no hardcoded years)
+- New pure utility: `src/lib/kpis/priorYearActuals.ts`
+  - Aggregates actuals by year and calendar month: Cash In, Cash Out, Net
+  - Returns `{ years: YearActuals[], detectedYears: number[] }`
+  - Excludes current forecast year from detectedYears
+  - Null-safe, pure function, no side effects
+- Year toggle pills in Projection Table card header, right-aligned
+  - Generated dynamically from detectedYears
+  - Multiple years can be active simultaneously
+- Column behavior:
+  - 0 years active: forecast columns only (current behavior)
+  - 1 year active: actuals columns + Var % column
+  - 2+ years active: actuals columns only, variance hidden
+- Variance % formula: `((forecastNet - actualNet) / Math.abs(actualNet)) * 100`
+  - Display "—" if actualNet === 0
+  - Color-coded: positive = #12B76A, negative = #F04438
+  - Format: "+6.3%" / "-4.1%", always signed
+
+**Feature 2: CSV export**
+- "Export CSV" button in card header, left-aligned
+- Always exports ALL detected years + current forecast scenario
+- Column order: Month, then per year [Year] Cash In / Cash Out / Net,
+  then Forecast Cash In / Cash Out / Net / Balance
+- No variance in CSV
+- Filename: `wx-cfo-projection-[scenario]-[YYYY-MM-DD].csv`
+- Plain JS Blob + anchor click, no external libraries
+
+**Locked files for this task:**
+`compute.ts`, `cashFlow.ts`, `contract.ts`, `sharedPersistence.ts`
 
 ### Phase 5.1 — Settings page
 - Move Receivables/Payables Timing controls to Settings
@@ -428,8 +447,9 @@ Do not invent new CSS-dependent class names. No inline styles."
 
 **6. Verification rule:**
 ```
-"Verification must use the running Vite dev server.
-If freshness cannot be confirmed, report:
+"Before UI verification, restart the dev server from current repo state
+or prove freshness with a unique new anchor visible in the UI.
+If neither can be confirmed, report:
 Verification provisional — runtime freshness unconfirmed."
 ```
 
