@@ -852,6 +852,10 @@ body {
   font-size: 0.75em;
 }
 
+.forecast-unit {
+  font-size: 0.75em;
+}
+
 .forecast-decision-card--warning {
   border-color: #F79009;
 }
@@ -1350,6 +1354,10 @@ body {
 
 .forecast-decision-value--warning {
   color: #F79009;
+}
+
+.forecast-decision-value--negative {
+  color: #F04438;
 }
 
 .forecast-decision-value.is-safe {

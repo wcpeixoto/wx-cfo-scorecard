@@ -203,11 +203,31 @@ function formatDays(value: number): string {
   return `${Math.round(value)}d`;
 }
 
+function fmtK(n: number): string {
+  const fixed = (n / 1_000).toFixed(1);
+  return fixed.endsWith('.0') ? String(Math.round(n / 1_000)) : fixed;
+}
+
 function formatCurrencyCompact(value: number): string {
   const abs = Math.abs(value);
-  if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  if (abs >= 1_000_000) {
+    const fixed = (value / 1_000_000).toFixed(1);
+    return `$${fixed.endsWith('.0') ? String(Math.round(value / 1_000_000)) : fixed}M`;
+  }
+  if (abs >= 1_000) return `$${fmtK(value)}K`;
   return `$${Math.round(value)}`;
+}
+
+// Wraps the K or M unit suffix in a smaller span (75% size).
+// Used wherever compact currency is rendered as a ReactNode hero value.
+function wrapUnit(str: string): ReactNode {
+  const match = str.match(/^(.*?)([KM])$/);
+  if (!match) return str;
+  return <>{match[1]}<span className="forecast-unit">{match[2]}</span></>;
+}
+
+function formatCurrencyCompactNode(value: number): ReactNode {
+  return wrapUnit(formatCurrencyCompact(value));
 }
 
 function ForecastSliderControl({
@@ -594,8 +614,10 @@ export default function CashFlowForecastModule({
   const shortfall = safetyGap !== null && safetyGap > SAFETY_GAP_FLOOR ? safetyGap : null;
 
   // Buffer: how far above the safety line the lowest balance sits (used in safe state).
+  // Clamped to zero: when the buffer is technically negative but within the ±$100 safe band,
+  // we are still in the safe state — display "$0 above reserve", never a negative value.
   const safeBuffer = bufferState === 'safe' && lowestBalance !== null
-    ? lowestBalance - fixedSafetyLine
+    ? Math.max(0, lowestBalance - fixedSafetyLine)
     : null;
 
   // Card 3: profit target gap
@@ -605,17 +627,19 @@ export default function CashFlowForecastModule({
 
   function fmtMonthly(value: number): string {
     const abs = Math.abs(value);
-    if (abs >= 1_000_000) return `$${(abs / 1_000_000).toFixed(1)}M/mo`;
-    if (abs >= 10_000) return `$${Math.round(abs / 1_000)}K/mo`;
-    if (abs >= 1_000) return `$${(abs / 1_000).toFixed(1)}K/mo`;
+    if (abs >= 1_000_000) {
+      const fixed = (abs / 1_000_000).toFixed(1);
+      return `$${fixed.endsWith('.0') ? String(Math.round(abs / 1_000_000)) : fixed}M/mo`;
+    }
+    if (abs >= 1_000) return `$${fmtK(abs)}K/mo`;
     return `$${Math.round(abs).toLocaleString()}/mo`;
   }
 
   function fmtMonthlyValue(value: number): ReactNode {
     const str = fmtMonthly(value);
     const idx = str.lastIndexOf('/mo');
-    if (idx === -1) return str;
-    return <>{str.slice(0, idx)}<span className="forecast-mo">/mo</span></>;
+    if (idx === -1) return wrapUnit(str);
+    return <>{wrapUnit(str.slice(0, idx))}<span className="forecast-mo">/mo</span></>;
   }
 
   // Signed variant: preserves the negative sign for values like avgNet.
@@ -624,8 +648,8 @@ export default function CashFlowForecastModule({
     const prefix = value < 0 ? '−' : '';
     const str = fmtMonthly(value); // already uses Math.abs internally
     const idx = str.lastIndexOf('/mo');
-    if (idx === -1) return <>{prefix}{str}</>;
-    return <>{prefix}{str.slice(0, idx)}<span className="forecast-mo">/mo</span></>;
+    if (idx === -1) return <>{prefix}{wrapUnit(str)}</>;
+    return <>{prefix}{wrapUnit(str.slice(0, idx))}<span className="forecast-mo">/mo</span></>;
   }
 
   return (
@@ -639,7 +663,7 @@ export default function CashFlowForecastModule({
             {bufferState === 'safe' && safeBuffer !== null && (
               <>
                 <span className="forecast-decision-label">To stay above your safety line</span>
-                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">{formatCurrencyCompact(safeBuffer)} above reserve</strong>
+                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">{formatCurrencyCompactNode(safeBuffer)} above reserve</strong>
                 <span className="forecast-decision-detail">Across your full forecast</span>
               </>
             )}
@@ -653,9 +677,8 @@ export default function CashFlowForecastModule({
             {bufferState === 'at-risk' && shortfall !== null && (
               <>
                 <span className="forecast-decision-label">To stay above your safety line</span>
-                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--warning">{formatCurrencyCompact(shortfall)} needed</strong>
-                <span className="forecast-decision-detail">You&rsquo;re short of your 1-month reserve</span>
-                <span className="forecast-decision-meta">Across your full forecast</span>
+                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--warning">{formatCurrencyCompactNode(shortfall)}</strong>
+                <span className="forecast-decision-detail">To reach your 1-month reserve</span>
               </>
             )}
             {bufferState === 'at-risk' && shortfall === null && (
@@ -677,9 +700,9 @@ export default function CashFlowForecastModule({
 
         {/* Card 2 — At this pace */}
         <article className="forecast-decision-card">
-          <span className="forecast-decision-label">At this pace, monthly profit is</span>
+          <span className="forecast-decision-label">At this pace, monthly result is</span>
           {avgNet !== null ? (
-            <strong className="forecast-decision-value forecast-decision-value--md">{fmtMonthlyValueSigned(avgNet)}</strong>
+            <strong className={`forecast-decision-value forecast-decision-value--md${avgNet < 0 ? ' forecast-decision-value--negative' : ''}`}>{fmtMonthlyValueSigned(avgNet)}</strong>
           ) : (
             <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
           )}
