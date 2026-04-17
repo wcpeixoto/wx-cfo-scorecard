@@ -51,12 +51,17 @@ function generateEventMonths(startMonth: string, frequency: EventFrequency, fore
 const DECISION_WINDOW_MONTHS = 12;
 
 // Target net margin for the "money goal" card.
-const TARGET_NET_MARGIN = 0.25;
+// This default is used only when no value is passed via props.
+const DEFAULT_TARGET_NET_MARGIN = 0.25;
 
 type CashFlowForecastModuleProps = {
   data: TrendPoint[];
   fullForecast: ScenarioPoint[];
   reserveTarget: number;
+  /** Optional: override the computed reserve target with a fixed amount from settings. */
+  fixedReserveAmount?: number | null;
+  /** Optional: override TARGET_NET_MARGIN from settings (0–1). Falls back to 0.25. */
+  targetNetMargin?: number | null;
   pointStatusByMonth: Partial<Record<string, CashFlowForecastStatus>>;
   decisionSignals: ForecastDecisionSignals;
   seasonality: ForecastSeasonalityMeta;
@@ -311,6 +316,8 @@ export default function CashFlowForecastModule({
   data,
   fullForecast,
   reserveTarget,
+  fixedReserveAmount,
+  targetNetMargin,
   pointStatusByMonth,
   decisionSignals,
   seasonality,
@@ -577,10 +584,15 @@ export default function CashFlowForecastModule({
 
   // Card 1 — Safety line coverage (full forecast horizon).
   //
-  // SAFETY_LINE: fixed reserve target passed in from Dashboard — 1 month of trailing
-  // base-case average expenses. Intentionally scenario-independent: the definition of
-  // "safe" must not move when scenario inputs change. Goalposts stay fixed.
-  const fixedSafetyLine = reserveTarget;
+  // SAFETY_LINE: When a fixedReserveAmount is provided from settings (fixed method),
+  // use that value. Otherwise fall back to reserveTarget (1 month of trailing expenses).
+  // Intentionally scenario-independent: the definition of "safe" must not move when
+  // scenario inputs change. Goalposts stay fixed.
+  const effectiveReserveTarget =
+    fixedReserveAmount != null && fixedReserveAmount > 0
+      ? fixedReserveAmount
+      : reserveTarget;
+  const fixedSafetyLine = effectiveReserveTarget;
 
   // SAFETY_GAP_FLOOR: gaps within ±$100 are treated as zero to suppress rounding noise.
   const SAFETY_GAP_FLOOR = 100;
@@ -621,7 +633,12 @@ export default function CashFlowForecastModule({
     : null;
 
   // Card 3: profit target gap
-  const targetProfit = avgCashIn !== null ? avgCashIn * TARGET_NET_MARGIN : null;
+  // Use targetNetMargin from settings if valid (>0), fall back to DEFAULT_TARGET_NET_MARGIN.
+  const effectiveTargetNetMargin =
+    targetNetMargin != null && targetNetMargin > 0
+      ? targetNetMargin
+      : DEFAULT_TARGET_NET_MARGIN;
+  const targetProfit = avgCashIn !== null ? avgCashIn * effectiveTargetNetMargin : null;
   const profitGap = avgNet !== null && targetProfit !== null ? targetProfit - avgNet : null;
   const isAtGoal = profitGap !== null && profitGap <= 0;
 
@@ -724,7 +741,7 @@ export default function CashFlowForecastModule({
           ) : profitGap !== null && targetProfit !== null ? (
             <>
               <strong className="forecast-decision-value forecast-decision-value--md">+{fmtMonthlyValue(profitGap)}</strong>
-              <span className="forecast-decision-meta">This gets you to {fmtMonthly(targetProfit)} at {TARGET_NET_MARGIN * 100}% net profit</span>
+              <span className="forecast-decision-meta">This gets you to {fmtMonthly(targetProfit)} at {Math.round(effectiveTargetNetMargin * 100)}% net profit</span>
             </>
           ) : (
             <strong className="forecast-decision-value forecast-decision-value--md">—</strong>

@@ -582,6 +582,46 @@ function getStoredAccountSettings(): AccountRecord[] {
   }
 }
 
+// Business rules persisted in localStorage.
+// Schema dependency: a future `shared_business_rules` Supabase table would be needed
+// to sync these across devices, using the same workspace_id pattern as shared_account_settings.
+type BusinessRules = {
+  targetNetMargin: number | null;       // 0–1 decimal, e.g. 0.25 for 25%
+  safetyReserveMethod: 'monthly' | 'fixed';
+  safetyReserveAmount: number | null;   // used only when method = 'fixed'
+};
+
+const DEFAULT_BUSINESS_RULES: BusinessRules = {
+  targetNetMargin: null,
+  safetyReserveMethod: 'monthly',
+  safetyReserveAmount: null,
+};
+
+function getStoredBusinessRules(): BusinessRules {
+  if (typeof window === 'undefined') return { ...DEFAULT_BUSINESS_RULES };
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.businessRules);
+    if (!raw) return { ...DEFAULT_BUSINESS_RULES };
+    const parsed = JSON.parse(raw) as Partial<BusinessRules>;
+    return {
+      targetNetMargin: typeof parsed.targetNetMargin === 'number' ? parsed.targetNetMargin : null,
+      safetyReserveMethod: parsed.safetyReserveMethod === 'fixed' ? 'fixed' : 'monthly',
+      safetyReserveAmount: typeof parsed.safetyReserveAmount === 'number' ? parsed.safetyReserveAmount : null,
+    };
+  } catch {
+    return { ...DEFAULT_BUSINESS_RULES };
+  }
+}
+
+function saveBusinessRules(rules: BusinessRules): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.businessRules, JSON.stringify(rules));
+  } catch {
+    // Storage failure is non-fatal; in-memory state remains correct.
+  }
+}
+
 function DashboardSkeleton() {
   return (
     <div className="finance-app">
@@ -690,6 +730,7 @@ export default function Dashboard() {
   const sharedAccountSettingsSyncArmedRef = useRef(false);
   const [sharedAccountSettingsReady, setSharedAccountSettingsReady] = useState(!sharedPersistenceEnabled);
   const [sharedAccountSettingsHasRemoteData, setSharedAccountSettingsHasRemoteData] = useState(false);
+  const [businessRules, setBusinessRules] = useState<BusinessRules>(getStoredBusinessRules);
   const scenarioInput = useMemo(
     () => (selectedScenarioKey === 'custom' ? customScenarioInput : FORECAST_SCENARIO_PRESETS[selectedScenarioKey]),
     [customScenarioInput, selectedScenarioKey]
@@ -709,6 +750,14 @@ export default function Dashboard() {
     },
     [customScenarioInput, selectedScenarioKey]
   );
+
+  const updateBusinessRules = useCallback((patch: Partial<BusinessRules>) => {
+    setBusinessRules((prev) => {
+      const next = { ...prev, ...patch };
+      saveBusinessRules(next);
+      return next;
+    });
+  }, []);
 
   const loadImportedState = useCallback(async () => {
     try {
@@ -2923,6 +2972,18 @@ export default function Dashboard() {
               data={cashFlowForecastTrend}
               fullForecast={scenarioProjection}
               reserveTarget={model.runway.reserveTarget}
+              fixedReserveAmount={
+                businessRules.safetyReserveMethod === 'fixed' &&
+                businessRules.safetyReserveAmount != null &&
+                businessRules.safetyReserveAmount > 0
+                  ? businessRules.safetyReserveAmount
+                  : null
+              }
+              targetNetMargin={
+                businessRules.targetNetMargin != null && businessRules.targetNetMargin > 0
+                  ? businessRules.targetNetMargin
+                  : null
+              }
               pointStatusByMonth={cashFlowForecastStatusByMonth}
               decisionSignals={forecastDecisionSignals}
               seasonality={forecastSeasonality}
@@ -3229,6 +3290,13 @@ export default function Dashboard() {
 
         {activeTab === 'settings' && (
           <div className="stack-grid">
+
+            {/* ── Section 1: DATA ─────────────────────────────────────── */}
+            <div className="settings-section-header">
+              <h3 className="settings-section-title">Data</h3>
+              <p className="settings-section-subtitle">Where your numbers come from</p>
+            </div>
+
             <article className="card settings-card">
               <div className="card-head">
                 <h3>Direct CSV Import</h3>
@@ -3352,6 +3420,12 @@ export default function Dashboard() {
               ) : null}
             </article>
 
+            {/* ── Section 2: ACCOUNTS ─────────────────────────────────── */}
+            <div className="settings-section-header">
+              <h3 className="settings-section-title">Accounts</h3>
+              <p className="settings-section-subtitle">Which accounts drive your forecast</p>
+            </div>
+
             <article className="card settings-card">
               <div className="card-head">
                 <h3>Account Setup</h3>
@@ -3362,7 +3436,7 @@ export default function Dashboard() {
               </div>
 
               <div className="account-setup-summary">
-                <p className="account-setup-summary-title">Forecast cash foundation</p>
+                <p className="account-setup-summary-title">Cash anchor</p>
                 <p className="account-setup-summary-copy">
                   Forecast starting cash uses <strong>active Cash accounts only</strong>. Non-cash accounts are ignored in the forecast anchor even if they are marked <strong>In Forecast</strong>.
                 </p>
@@ -3386,17 +3460,6 @@ export default function Dashboard() {
                   <li>The forecast uses the computed balance from cash accounts as its starting point.</li>
                 </ul>
               </div>
-
-              {forecastFoundationWarnings.length > 0 ? (
-                <div className="account-setup-warnings" role="status" aria-live="polite">
-                  <p className="account-setup-warning-title">Check before trusting forecast output</p>
-                  <ul>
-                    {forecastFoundationWarnings.map((warning) => (
-                      <li key={warning}>{warning}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
 
               {accountRecords.length === 0 ? (
                 <p className="empty-state">No account names have been discovered from the current data source yet.</p>
@@ -3476,11 +3539,19 @@ export default function Dashboard() {
                                 )}
                               </span>
                               <span className="account-balance-note">
-                                {forecastCashAnchorAccountIds.has(record.id)
-                                  ? 'Feeds forecast cash'
-                                  : record.active && record.includeInCashForecast && record.accountType !== 'Cash'
-                                    ? 'Ignored for cash anchor'
-                                    : 'Not used in forecast'}
+                                {record.accountType === 'Cash' && record.includeInCashForecast
+                                  ? 'Cash anchor'
+                                  : record.accountType !== 'Cash' && record.includeInCashForecast
+                                    ? <>
+                                        Included in forecast{' '}
+                                        <span
+                                          className="account-balance-note-warn"
+                                          title="This account is included in the forecast but is not a cash account. Verify this is intentional."
+                                        >
+                                          ⚠
+                                        </span>
+                                      </>
+                                    : 'Excluded'}
                               </span>
                             </div>
                           </td>
@@ -3518,6 +3589,109 @@ export default function Dashboard() {
                 </div>
               )}
             </article>
+
+            {/* ── Section 3: RULES ────────────────────────────────────── */}
+            <div className="settings-section-header">
+              <h3 className="settings-section-title">Rules</h3>
+              <p className="settings-section-subtitle">The assumptions behind your numbers</p>
+            </div>
+
+            <article className="card settings-card">
+              <div className="rules-list">
+
+                {/* Rule 1 — Profit target */}
+                <div className="rules-row">
+                  <div className="rules-row-info">
+                    <span className="rules-row-label">Profit target</span>
+                    <span className="rules-row-sub">Cards use this as the monthly goal threshold</span>
+                  </div>
+                  <div className="rules-row-control">
+                    <div className="rules-pct-input-wrap">
+                      <input
+                        className="rules-pct-input"
+                        type="number"
+                        min="1"
+                        max="100"
+                        step="1"
+                        aria-label="Profit target percentage"
+                        value={
+                          businessRules.targetNetMargin != null
+                            ? Math.round(businessRules.targetNetMargin * 100)
+                            : 25
+                        }
+                        onChange={(event) => {
+                          const raw = Number.parseFloat(event.target.value);
+                          if (Number.isFinite(raw) && raw > 0 && raw <= 100) {
+                            updateBusinessRules({ targetNetMargin: raw / 100 });
+                          }
+                        }}
+                      />
+                      <span className="rules-pct-suffix">%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Rule 2 — Safety reserve */}
+                <div className="rules-row">
+                  <div className="rules-row-info">
+                    <span className="rules-row-label">Safety reserve</span>
+                    <span className="rules-row-sub">
+                      {businessRules.safetyReserveMethod === 'fixed'
+                        ? 'Fixed reserve amount used as the safety floor'
+                        : '1 month of average operating expenses'}
+                    </span>
+                  </div>
+                  <div className="rules-row-control rules-row-control--col">
+                    <div className="cashflow-toggle">
+                      <button
+                        type="button"
+                        className={businessRules.safetyReserveMethod === 'monthly' ? 'is-active' : ''}
+                        onClick={() => updateBusinessRules({ safetyReserveMethod: 'monthly' })}
+                      >
+                        1 month of expenses
+                      </button>
+                      <button
+                        type="button"
+                        className={businessRules.safetyReserveMethod === 'fixed' ? 'is-active' : ''}
+                        onClick={() => updateBusinessRules({ safetyReserveMethod: 'fixed' })}
+                      >
+                        Fixed amount
+                      </button>
+                    </div>
+                    {businessRules.safetyReserveMethod === 'fixed' && (
+                      <div className="rules-currency-input-wrap">
+                        <span className="rules-currency-prefix">$</span>
+                        <input
+                          className="rules-currency-input"
+                          type="number"
+                          min="0"
+                          step="1000"
+                          aria-label="Reserve target amount"
+                          placeholder="40000"
+                          value={businessRules.safetyReserveAmount ?? ''}
+                          onChange={(event) => {
+                            const raw = Number.parseFloat(event.target.value);
+                            updateBusinessRules({
+                              safetyReserveAmount: Number.isFinite(raw) && raw >= 0 ? raw : null,
+                            });
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Rule 3 — Cash flow timing (placeholder) */}
+                <div className="rules-row rules-row--coming-soon">
+                  <div className="rules-row-info">
+                    <span className="rules-row-label">Cash flow timing</span>
+                    <span className="rules-row-sub">Coming soon — receivables and payables timing offsets</span>
+                  </div>
+                </div>
+
+              </div>
+            </article>
+
           </div>
         )}
       </section>
