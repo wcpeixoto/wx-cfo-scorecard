@@ -15,7 +15,7 @@ small business owners, using CFO-style signal design and Nubank-level usability.
 
 Before doing any work, read these files in order:
 
-1. `wx_cfo_scorecard_context_v2_3.md` — current project state, architecture,
+1. `wx_cfo_scorecard_context_v2_4.md` — current project state, architecture,
    data layer, forecast engine, locked parameters, and queued roadmap
 2. `UI_RULES.md` — visual standard reference, must be read before any UI work
 3. This file (`CLAUDE.md`) — project rules, stack, and working discipline
@@ -43,9 +43,9 @@ Always read from the files directly.
 
 | Layer | Role |
 |---|---|
-| **Supabase** | Primary — transactions and import batches |
+| **Supabase** | Primary — transactions, import batches, account settings, workspace settings |
 | **IndexedDB** | Fallback only — not used when Supabase is configured |
-| **localStorage** | Account settings and user preferences |
+| **localStorage** | Legacy only — migrated to Supabase on first boot, then removed |
 
 **Critical Supabase configuration (not in repo — must be set manually):**
 ```
@@ -55,6 +55,48 @@ PostgREST silently truncates responses when `max_rows` is below dataset size.
 This returns HTTP 200 with partial data — no error, no warning, silent data loss.
 Never reduce `PAGE_SIZE` in `sharedPersistence.ts` without verifying
 `max_rows` >= `PAGE_SIZE`.
+
+---
+
+## Supabase tables
+
+### shared_workspace_settings
+
+**Infrastructure dependency — table must exist in Supabase before first use.**
+
+```sql
+create table shared_workspace_settings (
+  workspace_id text primary key,
+  target_net_margin numeric default 0.25,
+  safety_reserve_method text default 'monthly',
+  safety_reserve_amount numeric default 0,
+  suppress_duplicate_warnings boolean default false,
+  acknowledged_noncash_accounts jsonb default '[]'
+);
+```
+
+| Column | Type | Controls |
+|---|---|---|
+| `workspace_id` | text PK | Always `'default'` — single workspace, no multi-tenancy |
+| `target_net_margin` | numeric | Profit target (0–1 decimal, e.g. 0.25 = 25%) used in What-If signal cards |
+| `safety_reserve_method` | text | `'monthly'` = 1× avg monthly expenses; `'fixed'` = fixed dollar amount |
+| `safety_reserve_amount` | numeric | Dollar value used when `safety_reserve_method = 'fixed'` |
+| `suppress_duplicate_warnings` | boolean | When true, possible-duplicate count is hidden from System Status |
+| `acknowledged_noncash_accounts` | jsonb | Array of account IDs where non-cash forecast inclusion is confirmed intentional |
+
+**Data layer position:** sits alongside `shared_account_settings` in `sharedPersistence.ts`.
+
+**Boot behavior:**
+1. On mount, `getSharedWorkspaceSettings()` reads the row for `workspace_id = 'default'`.
+2. If the row exists — load it, remove any stale localStorage.
+3. If no row exists — check localStorage for legacy `finance_dashboard_business_rules` values, migrate them, write to Supabase, remove localStorage.
+4. If neither exists — insert the default row.
+5. If the table does not yet exist — reads return `null` gracefully and defaults are used in memory; writes are logged but non-fatal.
+
+**Write pattern:** upsert on `workspace_id` conflict. Only one row can ever exist.
+
+**localStorage keys removed after migration:**
+- `finance_dashboard_business_rules` (the entire key)
 
 ---
 
@@ -73,7 +115,7 @@ Never reduce `PAGE_SIZE` in `sharedPersistence.ts` without verifying
 | `src/components/LoadingScreen.tsx` | Branded boot loading screen |
 | `src/dashboard.css` | All custom styles — class-based, no Tailwind in JSX |
 | `UI_RULES.md` | Visual standard reference (repo root) |
-| `wx_cfo_scorecard_context_v2_3.md` | Full project state and architecture context |
+| `wx_cfo_scorecard_context_v2_4.md` | Full project state and architecture context |
 
 ---
 
@@ -114,7 +156,7 @@ public/                 — static assets
 .github/workflows/      — GitHub Actions deploy workflow
 UI_RULES.md             — visual standard (repo root)
 CLAUDE.md               — this file
-wx_cfo_scorecard_context_v2_3.md — full project context
+wx_cfo_scorecard_context_v2_4.md — full project context
 ```
 
 ---
@@ -201,7 +243,7 @@ Every task must follow this sequence:
 2. Confirm current branch and git status
 3. Understand whether the task is bug fix, validation, or feature work
 4. Ask for the task prompt or check the queued roadmap in
-   `wx_cfo_scorecard_context_v2_3.md`
+   `wx_cfo_scorecard_context_v2_4.md`
 
 ---
 

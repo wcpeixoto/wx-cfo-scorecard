@@ -23,9 +23,13 @@ import { computePriorYearActuals } from '../lib/kpis/priorYearActuals';
 import { runDataSanityChecks } from '../lib/dataSanity';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
 import {
+  DEFAULT_WORKSPACE_SETTINGS,
   getSharedAccountSettings,
+  getSharedWorkspaceSettings,
   isSharedPersistenceConfigured,
   saveSharedAccountSettings,
+  saveSharedWorkspaceSettings,
+  type WorkspaceSettings,
 } from '../lib/data/sharedPersistence';
 import { toISODateOnly } from '../lib/data/normalize';
 import {
@@ -582,43 +586,56 @@ function getStoredAccountSettings(): AccountRecord[] {
   }
 }
 
-// Business rules persisted in localStorage.
-// Schema dependency: a future `shared_business_rules` Supabase table would be needed
-// to sync these across devices, using the same workspace_id pattern as shared_account_settings.
-type BusinessRules = {
-  targetNetMargin: number | null;       // 0–1 decimal, e.g. 0.25 for 25%
-  safetyReserveMethod: 'monthly' | 'fixed';
-  safetyReserveAmount: number | null;   // used only when method = 'fixed'
-};
+// Business rules — previously stored in localStorage under finance_dashboard_business_rules.
+// Now persisted in Supabase shared_workspace_settings (workspace_id = 'default').
+// The WorkspaceSettings type is the canonical shape; BusinessRules is a local alias for clarity.
+type BusinessRules = WorkspaceSettings;
 
-const DEFAULT_BUSINESS_RULES: BusinessRules = {
-  targetNetMargin: null,
-  safetyReserveMethod: 'monthly',
-  safetyReserveAmount: null,
-};
+const DEFAULT_BUSINESS_RULES: BusinessRules = { ...DEFAULT_WORKSPACE_SETTINGS };
 
-function getStoredBusinessRules(): BusinessRules {
-  if (typeof window === 'undefined') return { ...DEFAULT_BUSINESS_RULES };
+// One-time migration: read legacy localStorage values into WorkspaceSettings shape.
+// Returns null if no localStorage values found (caller should use Supabase defaults).
+function migrateLocalStorageBusinessRules(): Partial<BusinessRules> | null {
+  if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEYS.businessRules);
-    if (!raw) return { ...DEFAULT_BUSINESS_RULES };
-    const parsed = JSON.parse(raw) as Partial<BusinessRules>;
-    return {
-      targetNetMargin: typeof parsed.targetNetMargin === 'number' ? parsed.targetNetMargin : null,
-      safetyReserveMethod: parsed.safetyReserveMethod === 'fixed' ? 'fixed' : 'monthly',
-      safetyReserveAmount: typeof parsed.safetyReserveAmount === 'number' ? parsed.safetyReserveAmount : null,
-    };
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+
+    // Map old snake_case and null-able fields to the new shape.
+    const migrated: Partial<BusinessRules> = {};
+
+    if (typeof parsed.targetNetMargin === 'number') {
+      migrated.targetNetMargin = parsed.targetNetMargin;
+    }
+    if (parsed.safetyReserveMethod === 'fixed' || parsed.safetyReserveMethod === 'monthly') {
+      migrated.safetyReserveMethod = parsed.safetyReserveMethod;
+    }
+    if (typeof parsed.safetyReserveAmount === 'number' && parsed.safetyReserveAmount >= 0) {
+      migrated.safetyReserveAmount = parsed.safetyReserveAmount;
+    }
+    if (typeof parsed.suppress_duplicate_warnings === 'boolean') {
+      migrated.suppressDuplicateWarnings = parsed.suppress_duplicate_warnings;
+    }
+    if (Array.isArray(parsed.acknowledged_noncash_accounts)) {
+      migrated.acknowledgedNoncashAccounts = (parsed.acknowledged_noncash_accounts as unknown[]).filter(
+        (id): id is string => typeof id === 'string'
+      );
+    }
+
+    const hasAnyValue = Object.keys(migrated).length > 0;
+    return hasAnyValue ? migrated : null;
   } catch {
-    return { ...DEFAULT_BUSINESS_RULES };
+    return null;
   }
 }
 
-function saveBusinessRules(rules: BusinessRules): void {
+function clearLocalStorageBusinessRules(): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(STORAGE_KEYS.businessRules, JSON.stringify(rules));
+    window.localStorage.removeItem(STORAGE_KEYS.businessRules);
   } catch {
-    // Storage failure is non-fatal; in-memory state remains correct.
+    // Non-fatal.
   }
 }
 
@@ -730,7 +747,7 @@ export default function Dashboard() {
   const sharedAccountSettingsSyncArmedRef = useRef(false);
   const [sharedAccountSettingsReady, setSharedAccountSettingsReady] = useState(!sharedPersistenceEnabled);
   const [sharedAccountSettingsHasRemoteData, setSharedAccountSettingsHasRemoteData] = useState(false);
-  const [businessRules, setBusinessRules] = useState<BusinessRules>(getStoredBusinessRules);
+  const [businessRules, setBusinessRules] = useState<BusinessRules>(() => ({ ...DEFAULT_BUSINESS_RULES }));
   const scenarioInput = useMemo(
     () => (selectedScenarioKey === 'custom' ? customScenarioInput : FORECAST_SCENARIO_PRESETS[selectedScenarioKey]),
     [customScenarioInput, selectedScenarioKey]
@@ -754,7 +771,7 @@ export default function Dashboard() {
   const updateBusinessRules = useCallback((patch: Partial<BusinessRules>) => {
     setBusinessRules((prev) => {
       const next = { ...prev, ...patch };
-      saveBusinessRules(next);
+      void saveSharedWorkspaceSettings(next);
       return next;
     });
   }, []);
@@ -843,6 +860,50 @@ export default function Dashboard() {
     };
 
     void loadSharedSettings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sharedPersistenceEnabled]);
+
+  // Load workspace settings from Supabase on mount.
+  // If no row exists yet and localStorage has legacy values, migrate them.
+  // If neither exists, insert the default row.
+  useEffect(() => {
+    if (!sharedPersistenceEnabled) return;
+
+    let cancelled = false;
+
+    const loadWorkspaceSettings = async () => {
+      try {
+        const remote = await getSharedWorkspaceSettings();
+
+        if (cancelled) return;
+
+        if (remote !== null) {
+          // Row exists — use it, ensure any stale localStorage is gone.
+          setBusinessRules(remote);
+          clearLocalStorageBusinessRules();
+        } else {
+          // No row yet — check for localStorage migration.
+          const legacyValues = migrateLocalStorageBusinessRules();
+          const initial: BusinessRules = legacyValues
+            ? { ...DEFAULT_BUSINESS_RULES, ...legacyValues }
+            : { ...DEFAULT_BUSINESS_RULES };
+
+          if (!cancelled) setBusinessRules(initial);
+
+          // Write the resolved settings to Supabase (creates the row).
+          await saveSharedWorkspaceSettings(initial);
+          clearLocalStorageBusinessRules();
+        }
+      } catch (workspaceSettingsError) {
+        // Non-fatal: in-memory defaults remain correct.
+        console.warn('[workspace-settings] Load failed, using defaults.', workspaceSettingsError);
+      }
+    };
+
+    void loadWorkspaceSettings();
 
     return () => {
       cancelled = true;
@@ -2334,6 +2395,20 @@ export default function Dashboard() {
       if (sharedPersistenceEnabled) {
         sharedAccountSettingsSyncArmedRef.current = true;
       }
+      // Reset non-cash acknowledgement when forecast inclusion is disabled or account type changes to Cash.
+      if (
+        (field === 'includeInCashForecast' && value === false) ||
+        (field === 'accountType' && value === 'Cash')
+      ) {
+        setBusinessRules((prev) => {
+          const next = {
+            ...prev,
+            acknowledgedNoncashAccounts: prev.acknowledgedNoncashAccounts.filter((id) => id !== accountId),
+          };
+          void saveSharedWorkspaceSettings(next);
+          return next;
+        });
+      }
       setAccountRecords((previous) =>
         previous.map((record) =>
           record.id === accountId
@@ -2974,13 +3049,12 @@ export default function Dashboard() {
               reserveTarget={model.runway.reserveTarget}
               fixedReserveAmount={
                 businessRules.safetyReserveMethod === 'fixed' &&
-                businessRules.safetyReserveAmount != null &&
                 businessRules.safetyReserveAmount > 0
                   ? businessRules.safetyReserveAmount
                   : null
               }
               targetNetMargin={
-                businessRules.targetNetMargin != null && businessRules.targetNetMargin > 0
+                businessRules.targetNetMargin > 0
                   ? businessRules.targetNetMargin
                   : null
               }
@@ -3297,6 +3371,78 @@ export default function Dashboard() {
               <p className="settings-section-subtitle">Where your numbers come from</p>
             </div>
 
+            {/* ── System Status card ──────────────────────────────────── */}
+            {(() => {
+              const parseFailures = lastImportSummary?.parseFailures ?? 0;
+              const possibleDuplicates = lastImportSummary?.possibleDuplicatesFlagged ?? 0;
+              const acknowledgedSet = new Set(businessRules.acknowledgedNoncashAccounts);
+              const unacknowledgedNonCashAccounts = includedNonCashForecastAccounts.filter(
+                (record) => !acknowledgedSet.has(record.id)
+              );
+              const nonCashCount = unacknowledgedNonCashAccounts.length;
+              const hasCashAnchor = includedCashAccountCount > 0;
+              const rulesMarginValid =
+                businessRules.targetNetMargin === null ||
+                businessRules.targetNetMargin > 0;
+              // safetyReserveMethod is always 'monthly' or 'fixed' — always valid
+
+              // Evaluate status — first matching condition wins
+              let status: 'at-risk' | 'needs-review' | 'healthy';
+              const atRiskLines: string[] = [];
+
+              if (!hasImportedData) atRiskLines.push('No active data source');
+              if (parseFailures > 0) atRiskLines.push(`${parseFailures} parse failure${parseFailures === 1 ? '' : 's'} detected`);
+              if (hasImportedData && !hasCashAnchor) atRiskLines.push('No cash anchor account available');
+              if (!rulesMarginValid) atRiskLines.push('Required rules are missing');
+
+              const needsReviewLines: string[] = [];
+              if (!businessRules.suppressDuplicateWarnings && possibleDuplicates > 0) needsReviewLines.push(`${possibleDuplicates} possible duplicate${possibleDuplicates === 1 ? '' : 's'} to review`);
+              if (nonCashCount > 0) needsReviewLines.push(`${nonCashCount} non-cash account${nonCashCount === 1 ? '' : 's'} included in forecast — verify this is intentional`);
+
+              if (atRiskLines.length > 0) {
+                status = 'at-risk';
+              } else if (needsReviewLines.length > 0) {
+                status = 'needs-review';
+              } else {
+                status = 'healthy';
+              }
+
+              const badgeClass =
+                status === 'healthy' ? 'sys-status-badge is-healthy' :
+                status === 'needs-review' ? 'sys-status-badge is-needs-review' :
+                'sys-status-badge is-at-risk';
+
+              const badgeLabel =
+                status === 'healthy' ? 'Healthy' :
+                status === 'needs-review' ? 'Needs review' :
+                'At risk';
+
+              let statusLines: string[];
+              if (status === 'healthy') {
+                statusLines = [
+                  `Data imported — ${storedImportedTransactionCount.toLocaleString()} transactions`,
+                  'No parse errors',
+                  'Rules configured',
+                ];
+              } else if (status === 'needs-review') {
+                statusLines = needsReviewLines;
+              } else {
+                statusLines = atRiskLines.slice(0, 4);
+              }
+
+              return (
+                <article className="card settings-card sys-status-card">
+                  <p className="sys-status-title">System status</p>
+                  <span className={badgeClass}>{badgeLabel}</span>
+                  <ul className="sys-status-lines">
+                    {statusLines.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </article>
+              );
+            })()}
+
             <article className="card settings-card">
               <div className="card-head">
                 <h3>Direct CSV Import</h3>
@@ -3542,15 +3688,35 @@ export default function Dashboard() {
                                 {record.accountType === 'Cash' && record.includeInCashForecast
                                   ? 'Cash anchor'
                                   : record.accountType !== 'Cash' && record.includeInCashForecast
-                                    ? <>
-                                        Included in forecast{' '}
-                                        <span
-                                          className="account-balance-note-warn"
-                                          title="This account is included in the forecast but is not a cash account. Verify this is intentional."
-                                        >
-                                          ⚠
-                                        </span>
-                                      </>
+                                    ? businessRules.acknowledgedNoncashAccounts.includes(record.id)
+                                      ? <>
+                                          Included in forecast{' '}
+                                          <span className="account-balance-note-ok">✓</span>
+                                        </>
+                                      : <>
+                                          Included in forecast{' '}
+                                          <span
+                                            className="account-balance-note-warn"
+                                            title="This account is included in the forecast but is not a cash account. Verify this is intentional."
+                                          >
+                                            ⚠
+                                          </span>
+                                          {' '}
+                                          <button
+                                            type="button"
+                                            className="noncash-ack-btn"
+                                            onClick={() =>
+                                              updateBusinessRules({
+                                                acknowledgedNoncashAccounts: [
+                                                  ...businessRules.acknowledgedNoncashAccounts,
+                                                  record.id,
+                                                ],
+                                              })
+                                            }
+                                          >
+                                            This inclusion is intentional
+                                          </button>
+                                        </>
                                     : 'Excluded'}
                               </span>
                             </div>
@@ -3668,11 +3834,11 @@ export default function Dashboard() {
                           step="1000"
                           aria-label="Reserve target amount"
                           placeholder="40000"
-                          value={businessRules.safetyReserveAmount ?? ''}
+                          value={businessRules.safetyReserveAmount === 0 ? '' : businessRules.safetyReserveAmount}
                           onChange={(event) => {
                             const raw = Number.parseFloat(event.target.value);
                             updateBusinessRules({
-                              safetyReserveAmount: Number.isFinite(raw) && raw >= 0 ? raw : null,
+                              safetyReserveAmount: Number.isFinite(raw) && raw >= 0 ? raw : 0,
                             });
                           }}
                         />
@@ -3686,6 +3852,36 @@ export default function Dashboard() {
                   <div className="rules-row-info">
                     <span className="rules-row-label">Cash flow timing</span>
                     <span className="rules-row-sub">Coming soon — receivables and payables timing offsets</span>
+                  </div>
+                </div>
+
+                {/* Rule 4 — Duplicate warnings */}
+                <div className="rules-row">
+                  <div className="rules-row-info">
+                    <span className="rules-row-label">Duplicate warnings</span>
+                    <span className="rules-row-sub">
+                      {businessRules.suppressDuplicateWarnings
+                        ? 'Duplicate count is hidden from System Status'
+                        : 'Duplicate transactions are flagged in System Status'}
+                    </span>
+                  </div>
+                  <div className="rules-row-control">
+                    <div className="cashflow-toggle">
+                      <button
+                        type="button"
+                        className={!businessRules.suppressDuplicateWarnings ? 'is-active' : ''}
+                        onClick={() => updateBusinessRules({ suppressDuplicateWarnings: false })}
+                      >
+                        Show duplicate warnings
+                      </button>
+                      <button
+                        type="button"
+                        className={businessRules.suppressDuplicateWarnings ? 'is-active' : ''}
+                        onClick={() => updateBusinessRules({ suppressDuplicateWarnings: true })}
+                      >
+                        Suppress for full imports
+                      </button>
+                    </div>
                   </div>
                 </div>
 

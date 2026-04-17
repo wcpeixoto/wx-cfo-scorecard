@@ -4287,6 +4287,66 @@ body {
   user-select: none;
 }
 
+/* ── System Status card ──────────────────────────────────────────────── */
+
+.sys-status-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sys-status-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: #667085;
+}
+
+.sys-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  min-height: 26px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
+.sys-status-badge.is-healthy {
+  background: color-mix(in srgb, var(--positive) 14%, transparent);
+  color: var(--positive);
+  border: 1px solid color-mix(in srgb, var(--positive) 30%, transparent);
+}
+
+.sys-status-badge.is-needs-review {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
+}
+
+.sys-status-badge.is-at-risk {
+  background: color-mix(in srgb, var(--negative) 14%, transparent);
+  color: var(--negative);
+  border: 1px solid color-mix(in srgb, var(--negative) 30%, transparent);
+}
+
+.sys-status-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sys-status-lines li {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #667085;
+}
+
 /* Currency input */
 .rules-currency-input-wrap {
   display: flex;
@@ -4324,4 +4384,32 @@ body {
 .rules-currency-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+/* ── Non-cash acknowledgement ───────────────────────────────────────────── */
+
+/* Success checkmark that replaces the ⚠ after acknowledgement */
+.account-balance-note-ok {
+  color: #12B76A;
+  font-style: normal;
+}
+
+/* Inline action to acknowledge intentional non-cash forecast inclusion */
+.noncash-ack-btn {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: 0.74rem;
+  color: #465FFF;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  line-height: inherit;
+}
+
+.noncash-ack-btn:hover {
+  color: #3641F5;
 }

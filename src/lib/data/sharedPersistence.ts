@@ -6,6 +6,7 @@ const WORKSPACE_ID = (import.meta.env.VITE_SHARED_WORKSPACE_ID ?? 'default').tri
 const IMPORTED_TRANSACTIONS_TABLE = 'shared_imported_transactions';
 const IMPORT_BATCHES_TABLE = 'shared_import_batches';
 const ACCOUNT_SETTINGS_TABLE = 'shared_account_settings';
+const WORKSPACE_SETTINGS_TABLE = 'shared_workspace_settings';
 
 type SharedImportTransactionRow = {
   workspace_id: string;
@@ -50,6 +51,32 @@ type SharedAccountSettingRow = {
   active: boolean;
   is_user_configured: boolean;
   updated_at: string;
+};
+
+// Matches the shared_workspace_settings table schema.
+type SharedWorkspaceSettingRow = {
+  workspace_id: string;
+  target_net_margin: number;
+  safety_reserve_method: string;
+  safety_reserve_amount: number;
+  suppress_duplicate_warnings: boolean;
+  acknowledged_noncash_accounts: string[];
+};
+
+export type WorkspaceSettings = {
+  targetNetMargin: number;
+  safetyReserveMethod: 'monthly' | 'fixed';
+  safetyReserveAmount: number;
+  suppressDuplicateWarnings: boolean;
+  acknowledgedNoncashAccounts: string[];
+};
+
+export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
+  targetNetMargin: 0.25,
+  safetyReserveMethod: 'monthly',
+  safetyReserveAmount: 0,
+  suppressDuplicateWarnings: false,
+  acknowledgedNoncashAccounts: [],
 };
 
 function isConfigured(): boolean {
@@ -339,4 +366,60 @@ export async function saveSharedAccountSettings(records: AccountRecord[]): Promi
       headers: { Prefer: 'return=minimal' },
     }
   );
+}
+
+function fromSharedWorkspaceSettingRow(row: SharedWorkspaceSettingRow): WorkspaceSettings {
+  return {
+    targetNetMargin: typeof row.target_net_margin === 'number' ? row.target_net_margin : DEFAULT_WORKSPACE_SETTINGS.targetNetMargin,
+    safetyReserveMethod: row.safety_reserve_method === 'fixed' ? 'fixed' : 'monthly',
+    safetyReserveAmount: typeof row.safety_reserve_amount === 'number' ? row.safety_reserve_amount : DEFAULT_WORKSPACE_SETTINGS.safetyReserveAmount,
+    suppressDuplicateWarnings: row.suppress_duplicate_warnings === true,
+    acknowledgedNoncashAccounts: Array.isArray(row.acknowledged_noncash_accounts)
+      ? row.acknowledged_noncash_accounts.filter((id): id is string => typeof id === 'string')
+      : [],
+  };
+}
+
+function toSharedWorkspaceSettingRow(settings: WorkspaceSettings): SharedWorkspaceSettingRow {
+  return {
+    workspace_id: WORKSPACE_ID,
+    target_net_margin: settings.targetNetMargin,
+    safety_reserve_method: settings.safetyReserveMethod,
+    safety_reserve_amount: settings.safetyReserveAmount,
+    suppress_duplicate_warnings: settings.suppressDuplicateWarnings,
+    acknowledged_noncash_accounts: settings.acknowledgedNoncashAccounts,
+  };
+}
+
+export async function getSharedWorkspaceSettings(): Promise<WorkspaceSettings | null> {
+  if (!isConfigured()) return null;
+
+  try {
+    const rows = await request<SharedWorkspaceSettingRow[]>(
+      withWorkspaceFilter(`${WORKSPACE_SETTINGS_TABLE}?select=*`)
+    );
+    if (!rows || rows.length === 0) return null;
+    return fromSharedWorkspaceSettingRow(rows[0]);
+  } catch (err) {
+    // Table may not yet exist — return null so caller falls back to defaults.
+    console.warn('[workspace-settings] Read failed (table may not exist yet):', err);
+    return null;
+  }
+}
+
+export async function saveSharedWorkspaceSettings(settings: WorkspaceSettings): Promise<void> {
+  if (!isConfigured()) return;
+
+  try {
+    await request<unknown>(`${WORKSPACE_SETTINGS_TABLE}?on_conflict=workspace_id`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal,resolution=merge-duplicates',
+      },
+      body: JSON.stringify(toSharedWorkspaceSettingRow(settings)),
+    });
+  } catch (err) {
+    console.error('[workspace-settings] Write failed:', err);
+  }
 }
