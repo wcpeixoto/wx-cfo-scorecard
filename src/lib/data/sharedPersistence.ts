@@ -8,6 +8,17 @@ const IMPORT_BATCHES_TABLE = 'shared_import_batches';
 const ACCOUNT_SETTINGS_TABLE = 'shared_account_settings';
 const WORKSPACE_SETTINGS_TABLE = 'shared_workspace_settings';
 
+// TRANSACTION_FETCH_COLUMNS: explicit select list to minimize Supabase egress.
+// Only the `txn` jsonb payload is used by any downstream consumer on the read
+// path. All 11 scalar columns (fingerprint, possible_duplicate_key, import_id,
+// source_file_name, imported_at_iso, source_line_number, entered_date,
+// posted_date, transfer_account, possible_duplicate, workspace_id) are mapped
+// by fromSharedTransactionRow() but are discarded immediately by
+// buildSnapshotFromStore(), which only reads record.txn and records.length.
+// Scalar fields exist on ImportedTransactionRecord for the write path only.
+// Update this constant if new fields are added to downstream read consumers.
+const TRANSACTION_FETCH_COLUMNS = 'txn';
+
 type SharedImportTransactionRow = {
   workspace_id: string;
   fingerprint: string;
@@ -255,8 +266,11 @@ export async function getSharedImportedStoreSnapshot(): Promise<{
   const [transactionRows, batchRows] = await Promise.all([
     (async () => {
       const t0 = performance.now();
-      const rows = await requestAllRows<SharedImportTransactionRow>(
-        withWorkspaceFilter(`${IMPORTED_TRANSACTIONS_TABLE}?select=*&order=imported_at_iso.asc,fingerprint.asc`)
+      // Fetch only the txn jsonb column — all 11 scalar columns are unused on
+      // the read path (see TRANSACTION_FETCH_COLUMNS comment above).
+      // Type mismatch handled here at the fetch boundary; not propagated downstream.
+      const rows = await requestAllRows<{ txn: ImportedTransactionRecord['txn'] }>(
+        withWorkspaceFilter(`${IMPORTED_TRANSACTIONS_TABLE}?select=${TRANSACTION_FETCH_COLUMNS}&order=imported_at_iso.asc,fingerprint.asc`)
       );
       transactionFetchMs = Math.round(performance.now() - t0);
       return rows;
@@ -277,8 +291,19 @@ export async function getSharedImportedStoreSnapshot(): Promise<{
   }
 
   const t0Post = performance.now();
+  // Scalar fields are set to safe placeholder values — they are not read by
+  // buildSnapshotFromStore() or any downstream consumer on the read path.
+  // Only record.txn and records.length are used after this point.
   const result = {
-    records: transactionRows.map(fromSharedTransactionRow),
+    records: transactionRows.map((row): ImportedTransactionRecord => ({
+      fingerprint: '',
+      possibleDuplicateKey: '',
+      importId: '',
+      sourceFileName: '',
+      importedAtIso: '',
+      sourceLineNumber: 0,
+      txn: row.txn,
+    })),
     summaries: (batchRows ?? []).map(fromSharedBatchRow),
   };
   if (import.meta.env.DEV) {
