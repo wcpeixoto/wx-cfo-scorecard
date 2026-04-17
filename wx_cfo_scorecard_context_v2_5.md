@@ -417,8 +417,6 @@ Reconciliation: 0.00% variance confirmed. Engine is auditable and locked.
 ### Settings — Phase 5.1
 - Move Receivables/Payables Timing controls to Settings
   (sliders exist on What-If page but belong in Settings Rules section)
-- Migrate all remaining businessRules fields to `shared_workspace_settings`
-  (profit target and safety reserve are currently still in localStorage — migrate with same pattern)
 
 ### Phase 6 — Internal QA layer
 - Lightweight internal validation
