@@ -3,13 +3,11 @@ import type { ChangeEvent } from 'react';
 import { STORAGE_KEYS } from '../config';
 import gracieSportsLogo from '../assets/gracie-sports-logo.svg';
 import type { IconType } from 'react-icons';
-import { FiGrid, FiLayers, FiRefreshCw, FiSearch, FiSettings, FiSliders, FiTrendingUp } from 'react-icons/fi';
+import { FiGrid, FiRefreshCw, FiSettings, FiSliders, FiTarget, FiTrendingUp } from 'react-icons/fi';
 import CashFlowForecastModule from '../components/CashFlowForecastModule';
 import LoadingScreen from '../components/LoadingScreen';
-import ExpenseDonut from '../components/ExpenseDonut';
 import DigHereHighlights from '../components/DigHereHighlights';
 import KpiCards from '../components/KpiCards';
-import MoversList from '../components/MoversList';
 import TopCategoriesCard from '../components/TopCategoriesCard';
 import PeriodDropdown from '../components/PeriodDropdown';
 import TopPayeesTable from '../components/TopPayeesTable';
@@ -66,8 +64,7 @@ import type {
 
 type TabId =
   | 'big-picture'
-  | 'money-left'
-  | 'dig-here'
+  | 'where-to-focus'
   | 'trends'
   | 'what-if'
   | 'settings';
@@ -93,8 +90,7 @@ type BigPictureFilterFrameValue = Exclude<BigPictureFrameValue, BigPictureVisibl
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'big-picture', label: 'Big Picture', icon: FiGrid },
-  { id: 'money-left', label: 'MLOT', icon: FiLayers },
-  { id: 'dig-here', label: 'Dig Here', icon: FiSearch },
+  { id: 'where-to-focus', label: 'Where to Focus', icon: FiTarget },
   { id: 'trends', label: 'Trends', icon: FiTrendingUp },
   { id: 'what-if', label: 'What-If Scenarios', icon: FiSliders },
   { id: 'settings', label: 'Settings', icon: FiSettings },
@@ -211,12 +207,17 @@ type DigHereNavigationOptions = {
 function parseTabId(value: string | null): TabId | null {
   switch (value) {
     case 'big-picture':
-    case 'money-left':
-    case 'dig-here':
+    case 'where-to-focus':
     case 'trends':
     case 'what-if':
     case 'settings':
       return value;
+    // Backward-compat: legacy tab keys from the MLOT and Dig Here era
+    // redirect to the merged "Where to Focus" surface so bookmarked
+    // URLs never land on a blank state.
+    case 'money-left':
+    case 'dig-here':
+      return 'where-to-focus';
     default:
       return null;
   }
@@ -726,6 +727,7 @@ export default function Dashboard() {
   const bigPictureFilterMenuRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const [trendsMaWindow, setTrendsMaWindow] = useState<TrendsMaWindow>(12);
+  const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [importedDataSet, setImportedDataSet] = useState<DataSet | null>(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -1348,11 +1350,11 @@ export default function Dashboard() {
 
   const activeDigHereMonth = digHereFocusMonth;
   const activeDigHereStartMonth =
-    !digHereFocusMonth && activeTab === 'dig-here'
+    !digHereFocusMonth && activeTab === 'where-to-focus'
       ? digHereStartMonth ?? defaultDigHereRange.startMonth
       : digHereStartMonth;
   const activeDigHereEndMonth =
-    !digHereFocusMonth && activeTab === 'dig-here'
+    !digHereFocusMonth && activeTab === 'where-to-focus'
       ? digHereEndMonth ?? defaultDigHereRange.endMonth
       : digHereEndMonth;
 
@@ -2140,7 +2142,7 @@ export default function Dashboard() {
     (nextTab: TabId) => {
       setIsMobileNavOpen(false);
 
-      const isFreshDigHereEntry = nextTab === 'dig-here';
+      const isFreshDigHereEntry = nextTab === 'where-to-focus';
 
       setActiveTab(nextTab);
       setDigHereFocusMonth(isFreshDigHereEntry ? null : digHereFocusMonth);
@@ -2204,7 +2206,7 @@ export default function Dashboard() {
         'replace'
       );
 
-      setActiveTab('dig-here');
+      setActiveTab('where-to-focus');
       setQuery(nextQuery);
       setDigHereFocusMonth(focusMonth);
       setDigHereStartMonth(startMonth);
@@ -2212,7 +2214,7 @@ export default function Dashboard() {
       setDigHereFocusContext(focusContext);
 
       writeDashboardUrlState({
-        tab: 'dig-here',
+        tab: 'where-to-focus',
         cashFlow: netCashFlowChartMode,
         queryText: nextQuery,
         month: focusMonth,
@@ -2243,7 +2245,7 @@ export default function Dashboard() {
     setDigHereEndMonth(null);
     setDigHereFocusContext(null);
     writeDashboardUrlState({
-      tab: 'dig-here',
+      tab: 'where-to-focus',
       cashFlow: netCashFlowChartMode,
       month: null,
       startMonth: null,
@@ -2319,7 +2321,7 @@ export default function Dashboard() {
       setDigHereMoverGrouping(nextGrouping);
       writeDashboardUrlState(
         {
-          tab: 'dig-here',
+          tab: 'where-to-focus',
           cashFlow: netCashFlowChartMode,
           queryText: query,
           month: digHereFocusMonth,
@@ -2504,125 +2506,17 @@ export default function Dashboard() {
           <div className="top-bar-main">
             <div className="top-bar-copy">
               <h2>
-                {activeTab === 'dig-here' ? 'Dig Here' : selectedBigPictureTitle}
+                {activeTab === 'where-to-focus' ? 'Where to Focus' : selectedBigPictureTitle}
               </h2>
               <p className="top-bar-context">
-                {activeTab === 'dig-here' ? digHereHeaderLabel : selectedHeaderComparisonLabel}
+                {activeTab === 'where-to-focus'
+                  ? "The biggest opportunities to improve your cash right now — and what's driving them"
+                  : selectedHeaderComparisonLabel}
               </p>
             </div>
 
             <div className="top-controls top-controls-timeframe">
-              {activeTab === 'dig-here' ? (
-                <div className="dig-here-period-control" ref={monthPickerRef}>
-                  <div className="dig-here-period-toggle" role="group" aria-label="Dig Here period selector">
-                    {DIG_HERE_PERIOD_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={
-                          option.value === 'custom'
-                            ? isMonthPickerOpen
-                              ? 'is-active'
-                              : ''
-                            : selectedDigHerePeriod === option.value
-                              ? 'is-active'
-                              : ''
-                        }
-                        onClick={() => applyDigHerePeriod(option.value)}
-                        aria-expanded={option.value === 'custom' ? isMonthPickerOpen : undefined}
-                        aria-haspopup={option.value === 'custom' ? 'dialog' : undefined}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  {isMonthPickerOpen && (
-                    <div className="dig-here-month-picker" role="dialog" aria-label="Choose Dig Here month or period">
-                      <div className="dig-here-picker-mode" role="group" aria-label="Focus mode">
-                        <button
-                          type="button"
-                          className={monthPickerMode === 'month' ? 'is-active' : ''}
-                          onClick={() => setMonthPickerMode('month')}
-                        >
-                          Month
-                        </button>
-                        <button
-                          type="button"
-                          className={monthPickerMode === 'period' ? 'is-active' : ''}
-                          onClick={() => setMonthPickerMode('period')}
-                        >
-                          Custom period
-                        </button>
-                      </div>
-
-                      {monthPickerMode === 'month' ? (
-                        <label className="dig-here-picker-field">
-                          Month
-                          <select
-                            value={monthPickerDraftMonth}
-                            onChange={(event) => setMonthPickerDraftMonth(event.target.value)}
-                          >
-                            {availableMonths.map((month) => (
-                              <option key={month} value={month}>
-                                {toMonthLabel(month)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      ) : (
-                        <div className="dig-here-picker-period-grid">
-                          <label className="dig-here-picker-field">
-                            Start
-                            <select
-                              value={monthPickerDraftStart}
-                              onChange={(event) => setMonthPickerDraftStart(event.target.value)}
-                            >
-                              {availableMonths.map((month) => (
-                                <option key={`start-${month}`} value={month}>
-                                  {toMonthLabel(month)}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="dig-here-picker-field">
-                            End
-                            <select
-                              value={monthPickerDraftEnd}
-                              onChange={(event) => setMonthPickerDraftEnd(event.target.value)}
-                            >
-                              {availableMonths.map((month) => (
-                                <option key={`end-${month}`} value={month}>
-                                  {toMonthLabel(month)}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        </div>
-                      )}
-
-                      <div className="dig-here-picker-buttons">
-                        <button
-                          type="button"
-                          className="is-primary"
-                          onClick={monthPickerMode === 'month' ? applyMonthChoice : applyPeriodChoice}
-                        >
-                          Apply
-                        </button>
-                        <button
-                          type="button"
-                          className="is-ghost"
-                          onClick={() => {
-                            resetDigHereFocus();
-                            setIsMonthPickerOpen(false);
-                          }}
-                        >
-                          Reset to default
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : activeTab === 'trends' ? (
+              {activeTab === 'where-to-focus' ? null : activeTab === 'trends' ? (
                 <div className="kpi-timeframe-control">
                   <div className="kpi-timeframe-toggle" role="group" aria-label="Moving average window selector">
                     {TRENDS_MA_OPTIONS.map((option) => (
@@ -2916,48 +2810,140 @@ export default function Dashboard() {
           </>
         )}
 
-        {hasImportedData && activeTab === 'money-left' && (
-          <div className="tab-grid">
-            <article className="card">
-              <div className="card-head">
-                <h3>Money Left on the Table</h3>
-                <p className="subtle">Potential savings from category overruns vs baseline</p>
-              </div>
-              <p className="hero-number">{formatCurrency(model.opportunityTotal)}</p>
+        {hasImportedData && activeTab === 'where-to-focus' && (() => {
+          // Strip "Control " prefix (from opportunity titles) then normalize
+          // Quicken subcategory colon separators into readable em-dashes.
+          // Display-only transform — compute.ts is untouched.
+          const formatCategoryLabel = (raw: string) =>
+            raw.replace(/^Control\s+/i, '').trim().replace(/:/g, ' — ');
+          const opportunities = model.opportunities;
+          const visibleOpportunities = showAllFocusCategories
+            ? opportunities
+            : opportunities.slice(0, 5);
+          const hasMoreOpportunities = opportunities.length > 5;
 
-              <ul className="opportunity-list">
-                {model.opportunities.map((item) => (
-                  <li key={item.title}>
-                    <div>
-                      <strong>{item.title}</strong>
-                      <p>{item.hint}</p>
-                    </div>
-                    <span>{formatCurrency(item.savings)}</span>
-                  </li>
-                ))}
-              </ul>
-            </article>
+          let bannerText: string;
+          if (opportunities.length >= 2) {
+            bannerText = `${formatCategoryLabel(opportunities[0].title)} and ${formatCategoryLabel(opportunities[1].title)} are your biggest opportunities to improve cash this month.`;
+          } else if (opportunities.length === 1) {
+            bannerText = `${formatCategoryLabel(opportunities[0].title)} is the main driver of higher costs this month.`;
+          } else {
+            bannerText = "You're in control this month. No major cost overruns detected.";
+          }
 
-            <ExpenseDonut slices={model.expenseSlices} />
-          </div>
-        )}
+          const movers = digHereInsights.movers;
+          const visibleMovers = movers.slice(0, 7);
+          const topIncreases = [...movers]
+            .filter((mover) => mover.delta > 0)
+            .sort((a, b) => b.delta - a.delta)
+            .slice(0, 3);
 
-        {hasImportedData && activeTab === 'dig-here' && (
-          <div className="stack-grid">
-            <div className="tab-grid">
-              <MoversList
-                movers={digHereInsights.movers}
-                title="Where to Look"
-                grouping={digHereMoverGrouping}
-                onGroupingChange={handleDigHereMoverGroupingChange}
-              />
+          const topPayeesSubtitle =
+            selectedDigHerePeriod === 'thisMonth'
+              ? 'Top payees by total spend this month'
+              : 'Top payees by total spend this period';
+
+          return (
+            <div className="stack-grid">
+              <article className="focus-banner">
+                <p>{bannerText}</p>
+              </article>
+
+              <article className="card focus-section">
+                <div className="card-head">
+                  <h3>What needs attention right now</h3>
+                  <p className="subtle">Spending that ran above your normal this month</p>
+                </div>
+                {opportunities.length === 0 ? (
+                  <p className="empty-state">You're in control this month. No major cost overruns detected.</p>
+                ) : (
+                  <>
+                    <ul className="focus-row-list">
+                      {visibleOpportunities.map((item) => (
+                        <li key={item.title} className="focus-row">
+                          <p className="focus-row-title">{formatCategoryLabel(item.title)}</p>
+                          <p className="focus-row-detail">About {formatCurrency(item.savings)} above your recent monthly norm</p>
+                          <p className="focus-row-sub">Higher than usual compared to recent months</p>
+                        </li>
+                      ))}
+                    </ul>
+                    {hasMoreOpportunities && (
+                      <button
+                        type="button"
+                        className="focus-view-all"
+                        onClick={() => setShowAllFocusCategories((current) => !current)}
+                      >
+                        {showAllFocusCategories ? 'Show fewer' : 'View all categories'}
+                      </button>
+                    )}
+                  </>
+                )}
+              </article>
+
+              <p className="focus-bridge">These issues didn't start this month — here's what's been changing over time.</p>
+
+              <article className="card focus-section">
+                <div className="card-head">
+                  <h3>What changed behind the scenes</h3>
+                  <p className="subtle">Biggest shifts compared to last year</p>
+                </div>
+                {movers.length === 0 ? (
+                  <p className="empty-state">No unusual changes compared to last year.</p>
+                ) : (
+                  <>
+                    {topIncreases.length > 0 && (
+                      <p className="focus-interpretation">
+                        Your biggest year-over-year increases were {topIncreases.map((mover) => formatCategoryLabel(mover.category)).join(', ')}.
+                      </p>
+                    )}
+                    <ul className="movers-list focus-movers-list">
+                      {visibleMovers.map((mover) => {
+                        const tone =
+                          mover.delta > 0 ? 'is-up' : mover.delta < 0 ? 'is-down' : 'is-flat';
+                        const arrow = mover.delta > 0 ? '▲' : mover.delta < 0 ? '▼' : '●';
+                        const sign = mover.delta > 0 ? '+' : mover.delta < 0 ? '-' : '';
+                        const pctText =
+                          mover.deltaPercent === null || Number.isNaN(mover.deltaPercent)
+                            ? 'n/a'
+                            : `${mover.deltaPercent > 0 ? '+' : ''}${Math.round(mover.deltaPercent)}%`;
+                        const directionWord =
+                          mover.delta > 0 ? 'Up' : mover.delta < 0 ? 'Down' : 'Flat';
+                        return (
+                          <li key={mover.category}>
+                            <div>
+                              <p>
+                                <span>{formatCategoryLabel(mover.category)}</span>
+                              </p>
+                              <small>
+                                {directionWord} {formatCurrency(Math.abs(mover.delta))} vs last year ({pctText})
+                              </small>
+                              <small className="focus-row-sub">
+                                From {formatCurrency(mover.previous)} to {formatCurrency(mover.current)}
+                              </small>
+                            </div>
+                            <div className={`mover-delta ${tone}`}>
+                              <div className="mover-delta-main">
+                                <span>{arrow}</span>
+                                <strong>{sign}{formatCurrency(Math.abs(mover.delta))}</strong>
+                              </div>
+                              <small>{pctText}</small>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </>
+                )}
+              </article>
+
               <TopPayeesTable
                 payees={digHereInsights.topPayees}
-                subtitle={selectedDigHerePeriod === 'thisMonth' ? 'Highest expense recipients this month' : 'Highest expense recipients this period'}
+                title="Where the money is going"
+                subtitle={topPayeesSubtitle}
               />
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {hasImportedData && activeTab === 'trends' && (
           <div className="stack-grid">

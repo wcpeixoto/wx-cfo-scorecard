@@ -4413,3 +4413,113 @@ body {
 .noncash-ack-btn:hover {
   color: #3641F5;
 }
+
+/* ============================================================
+   Where to Focus — merged MLOT + Dig Here surface
+   Action (Section 1) is bold and first; cause (Section 2) is
+   slightly lighter. Bridge sentence connects them quietly.
+   All tokens come from UI_RULES.md.
+   ============================================================ */
+
+.focus-banner {
+  background: #ECF3FF;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+
+.focus-banner p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #101828;
+  line-height: 1.5;
+}
+
+.focus-section {
+  /* reuses standard .card visuals */
+}
+
+.focus-row-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+.focus-row {
+  padding: 12px 0;
+  border-bottom: 1px solid #E4E7EC;
+  display: grid;
+  gap: 4px;
+}
+
+.focus-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.focus-row-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #101828;
+}
+
+.focus-row-detail {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #101828;
+}
+
+.focus-row-sub {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: #98A2B3;
+}
+
+.focus-view-all {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 12px 0 0;
+  margin: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: #465FFF;
+  cursor: pointer;
+  text-align: left;
+}
+
+.focus-view-all:hover {
+  color: #3641F5;
+}
+
+.focus-bridge {
+  margin: 4px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667085;
+  font-style: italic;
+}
+
+.focus-interpretation {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+  line-height: 1.5;
+}
+
+.focus-movers-list {
+  margin-top: 0;
+}
+
+.focus-movers-list small {
+  display: block;
+  margin-top: 2px;
+}
