@@ -662,8 +662,8 @@ export default function CashFlowForecastModule({
           <article className={`forecast-decision-card${bufferState === 'at-risk' ? ' forecast-decision-card--warning' : ''}`}>
             {bufferState === 'safe' && safeBuffer !== null && (
               <>
-                <span className="forecast-decision-label">To stay above your safety line</span>
-                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">{formatCurrencyCompactNode(safeBuffer)} above reserve</strong>
+                <span className="forecast-decision-label">You&rsquo;re above your safety line</span>
+                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">{formatCurrencyCompactNode(safeBuffer)}</strong>
                 <span className="forecast-decision-detail">Across your full forecast</span>
               </>
             )}

@@ -55,8 +55,75 @@ function looksLikeRangeRow(row: string[]): boolean {
   return nonEmpty.length === 1 && /^\d{1,2}\/\d{1,2}\/\d{2,4}\s+-\s+\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(nonEmpty[0]);
 }
 
+/**
+ * Returns true if ANY cell in the row starts with "Total" (case-insensitive).
+ * Quicken CSV exports include account subtotal rows like:
+ *   ,"Total Bank of America",,,,,,"212,317.81"
+ * These must be skipped before any field extraction or amount parsing to prevent
+ * the subtotal amount from being injected as a fake transaction.
+ */
+function looksLikeTotalRow(cells: string[]): boolean {
+  const firstField = (cells[0] ?? '').trim();
+  const secondField = (cells[1] ?? '').trim();
+  return /^total\b/i.test(firstField) || /^total\b/i.test(secondField);
+}
+
 function normalizeHeader(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+type ColumnMap = {
+  account: number;
+  date: number;
+  payee: number;
+  category: number;
+  amount: number;
+  memo: number;
+  transfer: number;
+  tags: number;
+  entered: number;
+  posted: number;
+};
+
+function buildColumnMap(headerCells: string[]): ColumnMap | null {
+  const normalized = headerCells.map((c) => c.trim().toLowerCase());
+
+  const account  = normalized.findIndex((c) => normalizeHeader(c) === 'account');
+  const date     = normalized.findIndex((c) => normalizeHeader(c) === 'date');
+  const amount   = normalized.findIndex((c) => normalizeHeader(c) === 'amount');
+  const payee    = normalized.findIndex((c) => normalizeHeader(c) === 'payee');
+  const category = normalized.findIndex((c) => normalizeHeader(c) === 'category');
+  const memo     = normalized.findIndex((c) => normalizeHeader(c).startsWith('memo'));
+  const transfer = normalized.findIndex((c) => normalizeHeader(c) === 'transfer');
+  const tags     = normalized.findIndex((c) => normalizeHeader(c) === 'tags');
+  const entered  = normalized.findIndex((c) => normalizeHeader(c) === 'entered');
+  const posted   = normalized.findIndex((c) => normalizeHeader(c) === 'posted');
+
+  // Date and Amount are required — abort if either is missing
+  if (date === -1 || amount === -1) {
+    const missing: string[] = [];
+    if (date === -1) missing.push('Date');
+    if (amount === -1) missing.push('Amount');
+    console.error(
+      `[IMPORT] Could not locate required columns (${missing.join(', ')}) in header row:`,
+      headerCells,
+    );
+    return null;
+  }
+
+  // Warn on duplicate column titles (use first match, already handled by findIndex)
+  const titles = normalized.map((c) => normalizeHeader(c));
+  const seen = new Map<string, number>();
+  titles.forEach((title, idx) => {
+    if (!title) return;
+    if (seen.has(title)) {
+      console.warn(`[IMPORT] Duplicate column title "${title}" at index ${idx}; using first occurrence at ${seen.get(title)}`);
+    } else {
+      seen.set(title, idx);
+    }
+  });
+
+  return { account, date, payee, category, amount, memo, transfer, tags, entered, posted };
 }
 
 function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
@@ -165,11 +232,25 @@ type ParsedCandidate = {
 function parseQuickenReportCsv(text: string, sourceFileName: string, importId: string, importedAtIso: string): {
   candidates: ParsedCandidate[];
   parseErrors: TransactionImportIssue[];
+  skippedStructuralRows: number;
 } {
   const rows = parseCsvRows(text);
+
+  // Locate the header row using a stricter detection rule:
+  // must contain Date AND Amount AND at least one of Payee/Category/Transfer/Memo/Tags.
+  // This prevents metadata rows that happen to share common words from being mistaken
+  // for the header.
   const headerIndex = rows.findIndex((row) => {
-    const normalized = row.map((cell) => normalizeHeader(cell));
-    return normalized.includes('account') && normalized.includes('date') && normalized.includes('payee') && normalized.includes('category') && normalized.includes('amount');
+    const normalized = row.map((cell) => normalizeHeader(cell.trim()));
+    const hasDate   = normalized.includes('date');
+    const hasAmount = normalized.includes('amount');
+    const hasOptional =
+      normalized.includes('payee') ||
+      normalized.includes('category') ||
+      normalized.includes('transfer') ||
+      normalized.some((c) => c.startsWith('memo')) ||
+      normalized.includes('tags');
+    return hasDate && hasAmount && hasOptional;
   });
 
   if (headerIndex < 0) {
@@ -179,66 +260,91 @@ function parseQuickenReportCsv(text: string, sourceFileName: string, importId: s
         {
           kind: 'parse-error',
           lineNumber: 0,
-          message: 'Could not identify Quicken report columns.',
+          message: 'Import failed: could not locate required columns (Date, Amount) in the CSV header row. Check that the file is a valid Quicken export.',
           rowPreview: [],
         },
       ],
+      skippedStructuralRows: 0,
     };
   }
 
   const header = rows[headerIndex].map((cell) => cell.trim());
-  const headerLookup = new Map<string, number>();
-  header.forEach((cell, index) => {
-    headerLookup.set(normalizeHeader(cell), index);
-  });
+  const colMap = buildColumnMap(header);
 
-  const accountIndex = headerLookup.get('account') ?? 2;
-  const dateIndex = headerLookup.get('date') ?? 3;
-  const enteredIndex = headerLookup.get('entered') ?? 4;
-  const postedIndex = headerLookup.get('posted') ?? 5;
-  const payeeIndex = headerLookup.get('payee') ?? 6;
-  const categoryIndex = headerLookup.get('category') ?? 7;
-  const transferIndex = headerLookup.get('transfer') ?? 8;
-  const amountIndex = headerLookup.get('amount') ?? 9;
-  const memoIndex = headerLookup.get('memonotes') ?? headerLookup.get('memo') ?? 10;
-  const tagsIndex = headerLookup.get('tags') ?? 11;
+  if (!colMap) {
+    return {
+      candidates: [],
+      parseErrors: [
+        {
+          kind: 'parse-error',
+          lineNumber: headerIndex + 1,
+          message: 'Import failed: could not locate required columns (Date, Amount) in the CSV header row. Check that the file is a valid Quicken export.',
+          rowPreview: header,
+        },
+      ],
+      skippedStructuralRows: 0,
+    };
+  }
 
   const candidates: ParsedCandidate[] = [];
   const parseErrors: TransactionImportIssue[] = [];
+  let skippedStructuralRows = 0;
   let currentAccountHeader = '';
 
   for (let i = headerIndex + 1; i < rows.length; i += 1) {
-    const row = rows[i].map((cell) => cell.trim());
-    if (row.every((cell) => cell.length === 0)) continue;
-    if (looksLikeSeparatorRow(row)) continue;
-    if (looksLikeRangeRow(row)) continue;
+    const rawCells = rows[i]; // untrimmed cells — used for rawRow reconstruction
+    const row = rawCells.map((cell) => cell.trim());
+    const lineNumber = i + 1;
+    // rawRow: reconstructed from untrimmed cells as a proxy for the original CSV line
+    const rawRow = rawCells.join(',');
+    const cells = row; // trimmed cells alias for log clarity
 
-    const accountCell = row[accountIndex] ?? '';
-    const dateCell = row[dateIndex] ?? '';
-    const amountCell = row[amountIndex] ?? '';
+    // --- Structural skip checks: evaluate BEFORE any field extraction ---
+    // These are not parse failures — they are known non-transaction rows in
+    // Quicken CSV exports. Skip them immediately without touching any field.
+    if (row.every((cell) => cell.length === 0)) { skippedStructuralRows += 1; continue; }
+    if (looksLikeTotalRow(row)) {
+      skippedStructuralRows += 1;
+      continue;
+    }
+    if (looksLikeSeparatorRow(row)) { skippedStructuralRows += 1; continue; }
+    if (looksLikeRangeRow(row)) { skippedStructuralRows += 1; continue; }
+
+    // --- Field extraction begins only after structural rows are ruled out ---
+    const accountCell = colMap.account >= 0 ? (row[colMap.account] ?? '') : '';
+    const dateCell    = colMap.date    >= 0 ? (row[colMap.date]    ?? '') : '';
+    const amountCell  = colMap.amount  >= 0 ? (row[colMap.amount]  ?? '') : '';
     const nonEmpty = row.filter(Boolean);
 
     if (!dateCell && !amountCell && nonEmpty.length === 1) {
       currentAccountHeader = accountCell || nonEmpty[0];
+      skippedStructuralRows += 1;
       continue;
     }
 
     const accountName = accountCell || currentAccountHeader;
-    if (!accountName && !dateCell && !amountCell) continue;
+    if (!accountName && !dateCell && !amountCell) { skippedStructuralRows += 1; continue; }
 
+    // Only count as a parse failure if the row has a valid date (it intended to be a
+    // transaction) but is missing another required field.
+    const looksLikeTransactionRow = Boolean(dateCell);
     if (!accountName || !dateCell || !amountCell) {
-      parseErrors.push({
-        kind: 'parse-error',
-        lineNumber: i + 1,
-        message: 'Missing required account, date, or amount field.',
-        rowPreview: row,
-      });
+      if (looksLikeTransactionRow) {
+        parseErrors.push({
+          kind: 'parse-error',
+          lineNumber: i + 1,
+          message: 'Missing required account, date, or amount field.',
+          rowPreview: row,
+        });
+      } else {
+        skippedStructuralRows += 1;
+      }
       continue;
     }
 
     const isoDate = toISODateOnly(dateCell);
-    const enteredDate = toISODateOnly(row[enteredIndex] ?? '');
-    const postedDate = toISODateOnly(row[postedIndex] ?? '');
+    const enteredDate = toISODateOnly(colMap.entered >= 0 ? (row[colMap.entered] ?? '') : '');
+    const postedDate  = toISODateOnly(colMap.posted  >= 0 ? (row[colMap.posted]  ?? '') : '');
     const rawAmount = parseAmount(amountCell);
     if (!isoDate || rawAmount === null) {
       parseErrors.push({
@@ -250,11 +356,11 @@ function parseQuickenReportCsv(text: string, sourceFileName: string, importId: s
       continue;
     }
 
-    const payee = (row[payeeIndex] ?? '').trim();
-    const category = (row[categoryIndex] ?? '').trim() || 'Uncategorized';
-    const transferAccount = (row[transferIndex] ?? '').trim();
-    const memo = (row[memoIndex] ?? '').trim();
-    const tags = parseTags((row[tagsIndex] ?? '').trim());
+    const payee           = (colMap.payee    >= 0 ? (row[colMap.payee]    ?? '') : '').trim();
+    const category        = ((colMap.category >= 0 ? (row[colMap.category] ?? '') : '').trim()) || 'Uncategorized';
+    const transferAccount = (colMap.transfer  >= 0 ? (row[colMap.transfer] ?? '') : '').trim();
+    const memo            = (colMap.memo      >= 0 ? (row[colMap.memo]     ?? '') : '').trim();
+    const tags            = parseTags((colMap.tags >= 0 ? (row[colMap.tags] ?? '') : '').trim());
     const amount = Math.abs(rawAmount);
     const type = classifyType(rawAmount);
 
@@ -316,7 +422,11 @@ function parseQuickenReportCsv(text: string, sourceFileName: string, importId: s
     }
   });
 
-  return { candidates, parseErrors };
+  if (import.meta.env.DEV) {
+    console.log(`[IMPORT] parseQuickenReportCsv: ${candidates.length} candidates, ${parseErrors.length} parse errors, ${skippedStructuralRows} structural rows skipped`);
+  }
+
+  return { candidates, parseErrors, skippedStructuralRows };
 }
 
 function sortTransactions(txns: Txn[]): Txn[] {
@@ -513,7 +623,10 @@ export async function importQuickenReportCsv(file: File): Promise<TransactionImp
   const importId = createImportId();
   const importedAtIso = new Date().toISOString();
   const text = await file.text();
-  const { candidates, parseErrors } = parseQuickenReportCsv(text, sourceFileName, importId, importedAtIso);
+  const { candidates, parseErrors, skippedStructuralRows } = parseQuickenReportCsv(text, sourceFileName, importId, importedAtIso);
+  if (import.meta.env.DEV) {
+    console.log(`[IMPORT] ${file.name}: ${candidates.length} transaction candidates, ${parseErrors.length} parse errors, ${skippedStructuralRows} structural rows skipped (Total/header/separator)`);
+  }
 
   if (isSharedPersistenceConfigured()) {
     const { acceptedRecords, summary } = computeImportOutcome(
