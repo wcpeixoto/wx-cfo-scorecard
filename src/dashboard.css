@@ -4841,25 +4841,43 @@ body {
 
 .app-header {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 24px;
+  flex-direction: column;
   background: #FFFFFF;
-  border-bottom: 1px solid #E4E7EC;
   position: sticky;
   top: 0;
   z-index: 20;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .app-header {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 24px;
+    border-bottom: 1px solid #E4E7EC;
+  }
 }
 
 .app-header-menu {
   display: none;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: 1px solid #E4E7EC;
   border-radius: 8px;
-  padding: 8px;
-  color: #101828;
-  font-size: 18px;
+  padding: 0;
+  width: 44px;
+  height: 44px;
+  color: #344054;
   cursor: pointer;
+  flex-shrink: 0;
+}
+
+@media (min-width: 1024px) {
+  .app-header-menu {
+    display: flex;
+  }
 }
 
 .app-header-search {
@@ -4930,54 +4948,31 @@ body {
   }
 }
 
-/* === Mobile header: search-behind-icon pattern === */
+/* === Mobile header ============================================== */
+
+/* Row 1: hamburger | brand | search-icon */
 .app-header-mobile-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  height: 56px;
+  width: 100%;
+  padding: 12px;
+  border-bottom: 1px solid #E4E7EC;
 }
 @media (min-width: 1024px) {
   .app-header-mobile-row { display: none; }
 }
 
-.app-header-search-row {
+/* Hamburger inside mobile row — no border, flush with grid cell */
+.app-header-mobile-row .app-header-menu {
   display: flex;
-  align-items: center;
-  padding: 8px 16px;
-  border-bottom: 1px solid #E4E7EC;
-  background: #FFFFFF;
-}
-@media (min-width: 1024px) {
-  .app-header-search-row { display: none; }
-}
-
-.app-header-desktop-search {
-  display: none;
-}
-@media (min-width: 1024px) {
-  .app-header-desktop-search {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex: 1;
-  }
-}
-
-.app-header-search-icon-btn {
   width: 40px;
   height: 40px;
   border: none;
-  background: transparent;
   border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #667085;
+  color: #344054;
 }
-.app-header-search-icon-btn:hover {
+.app-header-mobile-row .app-header-menu:hover {
   background: #F2F4F7;
 }
 
@@ -4985,8 +4980,36 @@ body {
   font-size: 16px;
   font-weight: 600;
   color: #101828;
-  flex: 1;
-  padding-left: 8px;
+  text-align: center;
+}
+
+/* Search icon button (right cell) */
+.app-header-search-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #344054;
+}
+.app-header-search-icon-btn:hover {
+  background: #F2F4F7;
+}
+
+/* Row 2: search expand (shown when search icon tapped) */
+.app-header-search-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #E4E7EC;
+  background: #FFFFFF;
+}
+@media (min-width: 1024px) {
+  .app-header-search-row { display: none; }
 }
 
 .app-header-search-row input {
@@ -5005,34 +5028,17 @@ body {
   border-color: #465FFF;
 }
 
-/* === Mobile header polish: brand centering === */
-.app-header-mobile-row {
-  height: 64px;
+/* Desktop search bar (hidden on mobile) */
+.app-header-desktop-search {
+  display: none;
 }
-
-.app-header-mobile-row > :first-child,
-.app-header-mobile-row > :last-child {
-  width: 40px;
-  flex-shrink: 0;
-}
-
-.app-header-mobile-brand {
-  flex: 1;
-  text-align: center;
-  padding-left: 0;
-}
-
-/* === Mobile header: align hamburger to match search icon — no border, no padding === */
-.app-header-mobile-row .app-header-menu {
-  border: none;
-  padding: 0;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-sizing: border-box;
+@media (min-width: 1024px) {
+  .app-header-desktop-search {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+  }
 }
 
 /* === Settings: subnav, width constraint, section visibility === */
