@@ -1,19 +1,29 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: April 17, 2026*
+*Last updated: April 18, 2026*
 
 ---
 
-## What Changed Recently (April 2026 — this session)
+## What Changed Recently (April 18, 2026 — this session)
 
-- **Settings page restructured** — three sections: Data / Accounts / Rules
-- **System Status card shipped** — Healthy / Needs review / At risk, computed from existing state
-- **Duplicate warning suppression** — toggle in Rules; suppressed duplicates no longer trigger Needs review
-- **Non-cash inclusion acknowledgement** — per-account inline action; acknowledged accounts no longer trigger warning
-- **`shared_workspace_settings` table created** — all business rules migrated from localStorage to Supabase
-- **CSV parser fixed** — dynamic column map from header row; `looksLikeTotalRow` scoped to fields 0 and 1 only
-- **What-If decision cards overhauled** — safety card calculation fixed, profit card margin sign fixed, goal-met state unblocked
-- **max_rows confirmed at 10,000** — context doc previously said 50,000; actual value is 10,000 (matches PAGE_SIZE)
+- **TailAdmin shell migration** — left sidebar nav, HashRouter routing, right rail removed globally
+- **Mobile header rebuilt** — hamburger + centered "Wx CFO" brand + collapsible search icon
+- **Mobile overflow fixed** — five root causes: grid track sizing (`minmax(0,1fr)`), flex toggle wrapping, table scroll, SVG intrinsic width
+- **Settings subnav shipped** — segmented toggle (Data / Accounts / Rules), date header suppressed on `/settings`, content constrained to 880px
+- **Owner Distributions chart added** — stacked bar (Actual + Annualized), interpretation signal pill, placed in Big Picture two-column section
+- **CLAUDE.md updated** — TailAdmin source reference section added with lookup table
+- **`priority_history` Supabase table designed** — schema locked for "Today" page V1 (not yet created in Supabase)
+- **"Today" page architecture specced** — full V1 spec including signals, ranker, AI prose layer, memory, followup logic
+
+### Previous session (April 17, 2026)
+- Settings page restructured — three sections: Data / Accounts / Rules
+- System Status card shipped — Healthy / Needs review / At risk
+- Duplicate warning suppression toggle in Rules
+- Non-cash inclusion acknowledgement per account
+- `shared_workspace_settings` table created — all business rules migrated from localStorage
+- CSV parser fixed — dynamic column map, `looksLikeTotalRow` scoped to fields 0 and 1
+- What-If decision cards overhauled — safety card, margin sign, goal-met state
+- max_rows confirmed at 10,000
 
 ---
 
@@ -36,15 +46,12 @@ business owners, using CFO-style signal design and Nubank-level usability.
 
 **Last known commits (most recent first):**
 ```
+7040a99  feat(settings): subnav tabs, suppress date header, constrain content width
+283e190  feat(big-picture): Owner Distributions chart card
+c8a7526  fix: mobile header clean rebuild (TailAdmin structure, centered brand)
+e941163  feat: shell migration — HashRouter routing, left sidebar, remove right rail
 407d54c  Settings Phase 1: Data/Accounts/Rules structure, System Status card,
          duplicate suppression, non-cash acknowledgement, shared_workspace_settings migration
-e602617  Settings Phase 1: restructure into Data / Accounts / Rules, add configurable
-         profit target and safety reserve, fix anchor label logic, replace warning block
-         with inline indicator
-61deaa9  Fix CSV import parser: dynamic column map, hard abort on missing required
-         columns, fix looksLikeTotalRow to check fields 0 and 1 only
-5c4acdf  fix(what-if): safety card copy, unit sizing, negative color, and decimal trimming
-d3d9036  refactor(what-if): overhaul decision cards — safety, profit margin, and card order
 ```
 
 **Working tree:** clean
@@ -55,7 +62,12 @@ d3d9036  refactor(what-if): overhaul decision cards — safety, profit margin, a
 - `src/components/LoadingScreen.tsx` — branded boot loading screen (DO NOT TOUCH)
 - `src/components/CashFlowForecastModule.tsx` — forecast UI + Known Events + decision cards
 - `src/components/TrendLineChart.tsx` — custom SVG chart (shared)
-- `src/pages/Dashboard.tsx` — data wiring, state, tab routing, boot sequence, Settings page
+- `src/components/AppSidebar.tsx` — left sidebar nav (TailAdmin shell migration)
+- `src/components/AppHeader.tsx` — sticky top header with search + mobile hamburger
+- `src/components/OwnerDistributionsChart.tsx` — stacked bar chart, Big Picture
+- `src/context/SidebarContext.tsx` — sidebar collapse/mobile state
+- `src/pages/Dashboard.tsx` — data wiring, state, route rendering, boot sequence
+- `src/App.tsx` — HashRouter + SidebarProvider wrapping Dashboard
 - `src/lib/kpis/compute.ts` — forecast engine (DO NOT TOUCH)
 - `src/lib/cashFlow.ts` — operating cash rules (DO NOT TOUCH)
 - `src/lib/data/contract.ts` — TypeScript types (DO NOT TOUCH schema)
@@ -64,8 +76,19 @@ d3d9036  refactor(what-if): overhaul decision cards — safety, profit margin, a
 - `src/lib/charts/movingAverage.ts` — EMA function
 - `src/dashboard.css` — all custom styles
 - `UI_RULES.md` — visual standard reference (repo root)
-- `CLAUDE.md` — project rules and required reading block (repo root)
-- `wx_cfo_scorecard_context_v2_5.md` — this file
+- `CLAUDE.md` — project rules, TailAdmin source reference, working discipline (repo root)
+- `wx_cfo_scorecard_context_v2_6.md` — this file
+
+**Routing (HashRouter):**
+```
+#/           → Big Picture (index)
+#/focus      → Where to Focus
+#/trends     → Trends
+#/forecast   → Forecast (What-If Scenarios)
+#/settings   → Settings
+#/ui-lab     → UI Lab (DEV only)
+```
+Note: `#/today` route not yet created — pending "Today" page V1 implementation.
 
 ---
 
@@ -130,7 +153,8 @@ It returns HTTP 200 with partial data — no error, no warning, silent data loss
 - `shared_imported_transactions`
 - `shared_import_batches`
 - `shared_account_settings`
-- `shared_workspace_settings` ← new as of April 17, 2026
+- `shared_workspace_settings` ← added April 17, 2026
+- `priority_history` ← designed April 18, 2026 — **NOT YET CREATED in Supabase**
 
 **Current Supabase project:**
 - Region: `us-west-2` (Oregon) — suboptimal for East Coast users, minor latency penalty
@@ -414,23 +438,143 @@ Reconciliation: 0.00% variance confirmed. Engine is auditable and locked.
 
 ## Queued Roadmap
 
+### "Today" Page — V1 (next major feature)
+Full architecture spec locked April 18, 2026. See "Today Page Architecture" section below.
+
+**Implementation sequence:**
+1. `src/lib/priorities/` — signals, ranker, types, copy (rules engine, no AI)
+2. `priority_history` Supabase table — create + wire read/write in sharedPersistence.ts
+3. `copy.ts` — template fallback prose for all 6 signal types
+4. `ai.ts` — AI prose layer (Claude API), structured input, JSON output, fallback to copy.ts
+5. `TodayPage.tsx` + `HeroPriorityCard.tsx` + `CoreConstraints.tsx` — UI
+6. Routing — `#/today` as new landing, `#/big-picture` for Big Picture, nav update
+
+### TailAdmin Migration — In Progress
+Shell migration complete. Remaining pages:
+- Where to Focus — desktop width fix (content too wide after right rail removal)
+- Big Picture — TailAdmin card migration
+- What-If / Forecast — TailAdmin card migration
+- Trends — TailAdmin card migration
+
 ### Settings — Phase 5.1
-- Move Receivables/Payables Timing controls to Settings
-  (sliders exist on What-If page but belong in Settings Rules section)
+- Move Receivables/Payables Timing controls from What-If to Settings Rules section
 
 ### Phase 6 — Internal QA layer
 - Lightweight internal validation
 - Category leakage detection
 - Transfer classification checks
 
-### Phase 7 — Decision UX
-- Move from data display to decision support
-- Attention states, risk highlights, action guidance
-- Apply Nubank philosophy to forecast surface
+### Global Language Pass (deferred — after full TailAdmin migration)
+- What-If → Forecast rename
+- Settings → Data & Setup rename
+- Full copy review
 
 ### Performance (deferred)
-- Column pruning: replace `select=*` with explicit column list
-- Staged loading: fetch only recent history on boot, lazy-load full history
+- Column pruning already done (select=* replaced with txn-only fetch)
+- Staged loading: fetch only recent history on boot, lazy-load full history (only if egress constraint returns)
+
+---
+
+## "Today" Page — V1 Architecture
+
+**Product philosophy:** Three layers in order of value:
+- Layer 1 — Financial truth (deterministic rules)
+- Layer 2 — Decision clarity (one hero priority)
+- Layer 3 — Behavior change (followup loop)
+
+**Page name:** "Today" — the new landing page at `#/today`
+**AI provider:** Claude (Sonnet) for V1. ChatGPT to be tested for V2 dialogue layer.
+**V2 dialogue deferred:** three-button interaction, commitment capture, trade-off conservation rule
+
+### File structure (to be created)
+```
+src/lib/priorities/
+  types.ts     ← shared TypeScript types
+  signals.ts   ← detect + evaluate each signal
+  rank.ts      ← score and select hero + secondary
+  copy.ts      ← template fallback prose per signal type
+  ai.ts        ← Claude API prose layer, falls back to copy.ts
+
+src/components/
+  TodayPage.tsx           ← page shell + layout
+  HeroPriorityCard.tsx    ← hero card, AI prose, severity
+  SecondaryPriority.tsx   ← compact supporting card
+  CoreConstraints.tsx     ← reserve + forward cash always-on
+```
+
+### 6 signals (V1)
+| Signal | Type | Severity | Weight |
+|---|---|---|---|
+| Operating reserve below floor | `reserve_critical` / `reserve_warning` | critical / warning | 1.0 / 0.7 |
+| Forward cash flow negative | `cash_flow_negative` / `cash_flow_tight` | critical / warning | 0.9 / 0.6 |
+| Expense surge (single category >25% above 3mo avg, >$500) | `expense_surge` | critical / warning | 0.7 |
+| Revenue decline (trailing 3mo vs prior 3mo, >15% / >5%) | `revenue_decline` | critical / warning | 0.7 / 0.4 |
+| Owner distributions above pace (annualized >120% of prior avg) | `owner_distributions_high` | warning | 0.5 |
+| No urgent signals | `steady_state` | healthy | 0 |
+
+### Ranker — priority ladder (not score formula)
+```
+1. reserve_critical
+2. cash_flow_negative
+3. reserve_warning
+4. cash_flow_tight
+5. expense_surge
+6. revenue_decline
+7. owner_distributions_high
+→ steady_state if nothing fires
+```
+Hero = top of ladder. Secondary = next 0–2.
+
+### AI prose layer
+**Input:** structured Signal object + optional prior history row
+**Output:** JSON with keys: `headline`, `why`, `currentState`, `action`, `alternative`, `followupNote`
+**Fallback:** `copy.ts` template strings if API call fails — page never breaks
+
+**Tone calibration in system prompt:**
+- healthy → calm, warm, forward-looking
+- warning → focused, direct, supportive
+- critical → emotionally present, stakes-aware, never accusatory
+- repeat signal (metric worsened) → acknowledge difficulty, Robbins-style emotional engagement, open question
+
+### `priority_history` Supabase table (NOT YET CREATED)
+```sql
+create table priority_history (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id text not null default 'default',
+  fired_at timestamptz not null default now(),
+  signal_type text not null,
+  severity text not null,
+  metric_value numeric,
+  target_value numeric,
+  category_flagged text,
+  gap_amount numeric,
+  recommended_action text,
+  ai_headline text,
+  committed_action text,     -- V2: populated when owner responds
+  outcome_metric numeric,    -- populated on next fire of same signal
+  resolved_at timestamptz    -- populated when signal stops firing
+);
+```
+~50–100 rows/year. Free tier forever. Upsert pattern: same signal type within 7 days updates existing row rather than creating new one.
+
+### V2 — Trade-off Conservation Rule (deferred)
+When owner rejects primary action in dialogue layer:
+- `gap_amount` is fixed — cannot be negotiated down
+- AI must present alternatives totaling >= `gap_amount`
+- Partial solutions acknowledged but conversation stays open until full gap is addressed
+- "Partial solution rule": if owner offers partial fix, AI surfaces remaining gap immediately
+
+### Routing change
+```
+#/today      → Today (new landing page, index)
+#/           → redirects to #/today
+#/big-picture → Big Picture (moved from index)
+#/focus      → Where to Focus (unchanged)
+#/trends     → Trends (unchanged)
+#/forecast   → Forecast (unchanged)
+#/settings   → Settings (unchanged)
+#/ui-lab     → UI Lab (DEV only, unchanged)
+```
 
 ---
 
@@ -497,3 +641,5 @@ Suggest commit message only — never git add, never commit
 | Forecast engine | Parameters locked — do not change without re-running grid search calibration |
 | Operating cash rules | Locked — do not regress transfer exclusions or classification logic |
 | businessRules localStorage | Legacy only — all reads/writes now go through shared_workspace_settings |
+| Claude API key | Required for Today page AI prose layer — must be in env vars, never in repo |
+| AI cost | ~$0.006–0.010 per AI call (1500 tokens in / 500 out). Design for prompt caching from day one — same data inputs = cached = 90% cheaper |
