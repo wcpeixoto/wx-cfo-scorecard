@@ -3231,34 +3231,36 @@ export default function Dashboard() {
                 <p className="ta-page-subtitle">Where your data comes from and how your forecast works</p>
               </div>
 
-              <div className="settings-subnav">
-                <button
-                  type="button"
-                  className={`settings-subnav-btn${activeSection === 'data' ? ' settings-subnav-btn--active' : ''}`}
-                  onClick={() => setActiveSection('data')}
-                >
-                  Data
-                </button>
-                <button
-                  type="button"
-                  className={`settings-subnav-btn${activeSection === 'accounts' ? ' settings-subnav-btn--active' : ''}`}
-                  onClick={() => setActiveSection('accounts')}
-                >
-                  Accounts
-                </button>
-                <button
-                  type="button"
-                  className={`settings-subnav-btn${activeSection === 'rules' ? ' settings-subnav-btn--active' : ''}`}
-                  onClick={() => setActiveSection('rules')}
-                >
-                  Rules
-                </button>
+              <div className="settings-subnav-wrap">
+                <div className="settings-subnav">
+                  <button
+                    type="button"
+                    className={`settings-subnav-btn${activeSection === 'data' ? ' is-active' : ''}`}
+                    onClick={() => setActiveSection('data')}
+                  >
+                    Data
+                  </button>
+                  <button
+                    type="button"
+                    className={`settings-subnav-btn${activeSection === 'accounts' ? ' is-active' : ''}`}
+                    onClick={() => setActiveSection('accounts')}
+                  >
+                    Accounts
+                  </button>
+                  <button
+                    type="button"
+                    className={`settings-subnav-btn${activeSection === 'rules' ? ' is-active' : ''}`}
+                    onClick={() => setActiveSection('rules')}
+                  >
+                    Rules
+                  </button>
+                </div>
               </div>
 
-              <div className="settings-content-column">
+              <div className="settings-content-shell">
 
               {/* ── Section 1: DATA ─────────────────────────────────────── */}
-              <div className={activeSection === 'data' ? '' : 'settings-section--hidden'}>
+              <div className={`settings-section-pane${activeSection === 'data' ? '' : ' is-hidden'}`}>
               <div className="ta-section">
                 <div className="ta-section-header">
                   <h2 className="ta-section-title">Data</h2>
@@ -3478,7 +3480,7 @@ export default function Dashboard() {
               </div>{/* end data wrapper */}
 
               {/* ── Section 2: ACCOUNTS ─────────────────────────────────── */}
-              <div className={activeSection === 'accounts' ? '' : 'settings-section--hidden'}>
+              <div className={`settings-section-pane${activeSection === 'accounts' ? '' : ' is-hidden'}`}>
               <div className="ta-section">
                 <div className="ta-section-header">
                   <h2 className="ta-section-title">Accounts</h2>
@@ -3679,7 +3681,7 @@ export default function Dashboard() {
               </div>{/* end accounts wrapper */}
 
               {/* ── Section 3: RULES ────────────────────────────────────── */}
-              <div className={activeSection === 'rules' ? '' : 'settings-section--hidden'}>
+              <div className={`settings-section-pane${activeSection === 'rules' ? '' : ' is-hidden'}`}>
               <div className="ta-section">
                 <div className="ta-section-header">
                   <h2 className="ta-section-title">Rules</h2>
@@ -3821,7 +3823,7 @@ export default function Dashboard() {
               </div>
               </div>{/* end rules wrapper */}
 
-              </div>{/* end settings-content-column */}
+              </div>{/* end settings-content-shell */}
             </div>
           </div>
         )}

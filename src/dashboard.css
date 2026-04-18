@@ -5042,48 +5042,67 @@ body {
 }
 
 /* === Settings: subnav, width constraint, section visibility === */
-.settings-content-column {
-  max-width: 860px;
-  width: 100%;
+
+/* Subnav wrapper */
+.settings-subnav-wrap {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 16px;
+  margin-bottom: 24px;
 }
 
+/* Segmented control track — matches TailAdmin ChartTab */
 .settings-subnav {
   display: inline-flex;
   align-items: center;
+  gap: 2px;
   background: #F2F4F7;
-  border: 1px solid #E4E7EC;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 2px;
-  gap: 0;
-  margin-bottom: 24px;
-  height: 44px;
+  min-height: 44px;
+  /* no border on track — matches TailAdmin ChartTab */
 }
 
+/* Button base */
 .settings-subnav-btn {
-  height: 40px;
-  padding: 0 20px;
   border: none;
-  border-radius: 10px;
   background: transparent;
+  color: #667085;
+  border-radius: 6px;
+  min-height: 38px;
+  padding: 0 18px;
+  font: inherit;
   font-size: 14px;
   font-weight: 500;
-  color: #667085;
   cursor: pointer;
-  font-family: inherit;
+  transition: all 150ms ease;
   white-space: nowrap;
 }
 .settings-subnav-btn:hover {
   color: #344054;
 }
 
-.settings-subnav-btn--active {
+/* Active button — matches TailAdmin ChartTab active state */
+.settings-subnav-btn.is-active {
   background: #FFFFFF;
   color: #101828;
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  box-shadow: 0px 1px 2px 0px rgba(16, 24, 40, 0.05);
 }
 
-.settings-section--hidden {
+/* Content column — constrained width */
+.settings-content-shell {
+  max-width: 880px;
+  width: 100%;
+  display: grid;
+  gap: 24px;
+}
+
+/* Section pane visibility */
+.settings-section-pane {
+  display: block;
+}
+.settings-section-pane.is-hidden {
   display: none;
 }
 
