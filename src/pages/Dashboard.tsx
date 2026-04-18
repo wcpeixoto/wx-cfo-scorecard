@@ -16,6 +16,7 @@ import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import TrajectoryPanel from '../components/TrajectoryPanel';
+import OwnerDistributionsChart from '../components/OwnerDistributionsChart';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
 import { includeExpenseForDigHere, isCapitalDistributionCategory } from '../lib/cashFlow';
@@ -2612,6 +2613,8 @@ export default function Dashboard() {
                   </div>
                 </div>
               </article>
+
+              <OwnerDistributionsChart transactions={baseTxns} />
             </div>
 
             <div className="two-col-grid">

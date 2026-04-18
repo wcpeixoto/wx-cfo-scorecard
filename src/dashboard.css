@@ -5127,6 +5127,83 @@ body {
   overflow: hidden;
 }
 
+/* ── Owner Distributions Chart card ─────────────────────────── */
+
+/* 3-column override for the runway-highlights grid on desktop */
+@media (min-width: 961px) {
+  .runway-highlights-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.owner-dist-card {
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+  overflow: hidden;
+  padding: 20px 20px 0 20px;
+}
+
+.owner-dist-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.owner-dist-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.owner-dist-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #101828;
+  margin: 0;
+}
+
+.owner-dist-subtitle {
+  font-size: 14px;
+  color: #667085;
+  margin: 0;
+}
+
+.owner-dist-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.owner-dist-pill.is-above-avg {
+  color: #F04438;
+  background: #FEF3F2;
+}
+
+.owner-dist-pill.is-below-avg {
+  color: #12B76A;
+  background: #ECFDF3;
+}
+
+.owner-dist-pill.is-on-track {
+  color: #667085;
+  background: #F2F4F7;
+}
+
+.owner-dist-pill.is-insufficient {
+  color: #667085;
+  background: #F2F4F7;
+}
+
+.owner-dist-chart {
+  padding-bottom: 20px;
+}
+
 /* Trends overflow fix — trend-charts-pair must also shrink below content size */
 .trend-charts-pair {
   min-width: 0;
