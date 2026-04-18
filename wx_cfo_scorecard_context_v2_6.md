@@ -33,7 +33,7 @@ A CFO-level financial dashboard for **Gracie Sports Fairfield**, a BJJ gym.
 Built in React + Vite. Repo: `github.com:wcpeixoto/wx-cfo-scorecard.git`
 
 Wesley is product owner and operator.
-Claude Code / Codex handles implementation.
+Claude Code handles implementation.
 Claude.ai (this conversation type) handles architecture, diagnosis, and prompt engineering.
 
 **One-sentence definition:**
@@ -580,7 +580,7 @@ When owner rejects primary action in dialogue layer:
 
 ## Prompt Discipline Rules
 
-Every Codex prompt must include:
+Every Claude Code prompt must include:
 
 **1. UI rule (first line):**
 ```
