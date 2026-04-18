@@ -7,6 +7,8 @@ type KpiCardsProps = {
 
 const EPSILON = 0.00001;
 
+const HEALTH_METRIC_IDS = new Set(['net', 'savingsRate']);
+
 function formatValue(value: number, format: KpiCard['format']): string {
   if (format === 'currency') {
     return value.toLocaleString(undefined, {
@@ -67,10 +69,19 @@ export default function KpiCards({ cards, vsLabel = 'vs prior period' }: KpiCard
         const absoluteDelta = formatAbsoluteDelta(card);
         const percentDelta = formatPercentDelta(card.deltaPercent);
 
+        const isHealthMetric = HEALTH_METRIC_IDS.has(card.id);
+        const valueColorClass = isHealthMetric
+          ? card.value < -EPSILON
+            ? ' is-negative'
+            : card.value > EPSILON
+              ? ' is-positive'
+              : ''
+          : '';
+
         return (
           <article className="kpi-card" key={card.id}>
             <p className="kpi-label">{card.label}</p>
-            <p className="kpi-value">{formatValue(card.value, card.format)}</p>
+            <p className={`kpi-value${valueColorClass}`}>{formatValue(card.value, card.format)}</p>
             <div className="kpi-footer">
               <span className={`kpi-badge ${trendClass}`}>
                 <span aria-hidden="true" className="kpi-change-arrow">

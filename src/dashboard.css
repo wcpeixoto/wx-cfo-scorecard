@@ -808,6 +808,9 @@ body {
   color: var(--text-primary);
 }
 
+.kpi-value.is-negative { color: #F04438; }
+.kpi-value.is-positive { color: #12B76A; }
+
 .kpi-footer {
   margin-top: 10px;
   display: flex;
