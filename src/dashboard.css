@@ -5243,3 +5243,213 @@ body {
     gap: 8px;
   }
 }
+
+/* ─── Today page ─────────────────────────────────────────────────────── */
+
+.today-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.today-header {
+  margin-bottom: 0;
+}
+
+/* Severity pill — shared by hero and secondary */
+.today-severity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.today-severity-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.today-severity-pill.is-critical {
+  color: #F04438;
+  background: #FEF3F2;
+}
+
+.today-severity-pill.is-warning {
+  color: #F79009;
+  background: #FFFAEB;
+}
+
+.today-severity-pill.is-healthy {
+  color: #12B76A;
+  background: #ECFDF3;
+}
+
+/* Hero card */
+.today-hero-card {
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.today-hero-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  opacity: 1;
+  transition: opacity 100ms ease;
+}
+
+.today-hero-body.is-fading {
+  opacity: 0;
+}
+
+.today-hero-headline {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #101828;
+  line-height: 1.3;
+}
+
+.today-hero-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.today-hero-label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+}
+
+.today-hero-text {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 400;
+  color: #101828;
+  line-height: 1.5;
+}
+
+.today-hero-followup {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #667085;
+  line-height: 1.5;
+}
+
+/* Secondary cards row */
+.today-secondary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.today-secondary-row.is-pair {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.today-secondary-card {
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.today-secondary-headline {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #101828;
+  line-height: 1.3;
+}
+
+.today-secondary-line {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+  line-height: 1.5;
+}
+
+/* Core constraints strip */
+.today-constraints {
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 20px;
+}
+
+.today-constraints-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.today-constraints-label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+}
+
+.today-constraints-value {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: #101828;
+  line-height: 1.15;
+}
+
+.today-constraints-value.is-negative {
+  color: #F04438;
+}
+
+.today-constraints-helper {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #667085;
+}
+
+.today-constraints-divider {
+  background: #E4E7EC;
+  width: 1px;
+  align-self: stretch;
+}
+
+@media (max-width: 767px) {
+  .today-secondary-row.is-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .today-constraints {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .today-constraints-divider {
+    width: 100%;
+    height: 1px;
+  }
+}

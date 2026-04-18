@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router';
-import { FiGrid, FiTarget, FiTrendingUp, FiSliders, FiSettings, FiLayout, FiChevronLeft, FiX } from 'react-icons/fi';
+import { FiGrid, FiTarget, FiTrendingUp, FiSliders, FiSettings, FiLayout, FiChevronLeft, FiX, FiClock } from 'react-icons/fi';
 import gracieSportsLogo from '../assets/gracie-sports-logo.svg';
 import { useSidebar } from '../context/SidebarContext';
 
@@ -11,6 +11,7 @@ type SidebarItem = {
 };
 
 const PRIMARY_ITEMS: SidebarItem[] = [
+  { to: '/today', label: 'Today', icon: FiClock },
   { to: '/', label: 'Big Picture', icon: FiGrid, end: true },
   { to: '/focus', label: 'Where to Focus', icon: FiTarget },
   { to: '/trends', label: 'Trends', icon: FiTrendingUp },

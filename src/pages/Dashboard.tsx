@@ -17,6 +17,7 @@ import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import TrajectoryPanel from '../components/TrajectoryPanel';
 import OwnerDistributionsChart from '../components/OwnerDistributionsChart';
+import { TodayPage } from '../components/TodayPage';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
 import { includeExpenseForDigHere, isCapitalDistributionCategory } from '../lib/cashFlow';
@@ -66,6 +67,7 @@ import type {
 } from '../lib/data/contract';
 
 type TabId =
+  | 'today'
   | 'big-picture'
   | 'where-to-focus'
   | 'trends'
@@ -87,6 +89,7 @@ type BigPictureVisibleFrameValue = 'thisMonth' | 'lastMonth' | 'last3Months';
 type BigPictureFilterFrameValue = Exclude<BigPictureFrameValue, BigPictureVisibleFrameValue>;
 
 const TAB_TO_PATH: Record<TabId, string> = {
+  today: '/today',
   'big-picture': '/',
   'where-to-focus': '/focus',
   trends: '/trends',
@@ -99,6 +102,8 @@ function pathToTab(pathname: string): TabId {
   // HashRouter pathname is the part after the #
   const normalized = pathname.replace(/\/+$/, '') || '/';
   switch (normalized) {
+    case '/today':
+      return 'today';
     case '/':
     case '/big-picture':
       return 'big-picture';
@@ -2377,7 +2382,7 @@ export default function Dashboard() {
       <div className="app-main-column">
         <AppHeader query={query} onQueryChange={setQuery} />
       <section className="main-zone">
-        {activeTab !== 'what-if' && activeTab !== 'settings' && <header className="top-bar glass-panel">
+        {activeTab !== 'today' && activeTab !== 'what-if' && activeTab !== 'settings' && <header className="top-bar glass-panel">
           <div className="top-bar-main">
             <div className="top-bar-copy">
               <h2>
@@ -2527,6 +2532,10 @@ export default function Dashboard() {
               ) : null}
             </div>
           </article>
+        )}
+
+        {hasImportedData && activeTab === 'today' && (
+          <TodayPage model={model} txns={filteredTxns} />
         )}
 
         {hasImportedData && activeTab === 'big-picture' && (
