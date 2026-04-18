@@ -15,7 +15,7 @@ small business owners, using CFO-style signal design and Nubank-level usability.
 
 Before doing any work, read these files in order:
 
-1. `wx_cfo_scorecard_context_v2_5.md` — current project state, architecture,
+1. `wx_cfo_scorecard_context_v2_6.md` — current project state, architecture,
    data layer, forecast engine, locked parameters, and queued roadmap
 2. `UI_RULES.md` — visual standard reference, must be read before any UI work
 3. This file (`CLAUDE.md`) — project rules, stack, and working discipline
@@ -119,7 +119,7 @@ create table shared_workspace_settings (
 | `src/components/LoadingScreen.tsx` | Branded boot loading screen |
 | `src/dashboard.css` | All custom styles — class-based, no Tailwind in JSX |
 | `UI_RULES.md` | Visual standard reference (repo root) |
-| `wx_cfo_scorecard_context_v2_5.md` | Full project state and architecture context |
+| `wx_cfo_scorecard_context_v2_6.md` | Full project state and architecture context |
 
 ---
 
@@ -160,7 +160,7 @@ public/                 — static assets
 .github/workflows/      — GitHub Actions deploy workflow
 UI_RULES.md             — visual standard (repo root)
 CLAUDE.md               — this file
-wx_cfo_scorecard_context_v2_5.md — full project context
+wx_cfo_scorecard_context_v2_6.md — full project context
 ```
 
 ---
@@ -282,7 +282,7 @@ Every task must follow this sequence:
 2. Confirm current branch and git status
 3. Understand whether the task is bug fix, validation, or feature work
 4. Ask for the task prompt or check the queued roadmap in
-   `wx_cfo_scorecard_context_v2_5.md`
+   `wx_cfo_scorecard_context_v2_6.md`
 
 ---
 
