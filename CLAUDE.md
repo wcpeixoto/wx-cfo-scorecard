@@ -20,6 +20,10 @@ Before doing any work, read these files in order:
 2. `UI_RULES.md` — visual standard reference, must be read before any UI work
 3. This file (`CLAUDE.md`) — project rules, stack, and working discipline
 
+For any UI work, also check the TailAdmin source at:
+`code/Code Supporting Docs/free-react-tailwind-admin-dashboard-main/`
+See the **TailAdmin source reference** section below for the lookup table.
+
 Do not skip this step. Do not rely on prior conversation context.
 Always read from the files directly.
 
@@ -176,6 +180,39 @@ Before writing any UI code, read `UI_RULES.md`.
 
 ---
 
+## TailAdmin source reference
+
+The TailAdmin free React source is the authoritative reference for all
+UI patterns, component structure, layout behavior, and CSS decisions.
+
+**Location:** `code/Code Supporting Docs/free-react-tailwind-admin-dashboard-main/`
+
+Before writing any new UI component, layout class, or interactive pattern,
+check the TailAdmin source first. If a pattern exists there, replicate it —
+do not invent an equivalent.
+
+| Decision type | Where to look |
+|---|---|
+| Shell layout (sidebar, header, main content) | `src/layout/` |
+| Nav item structure and active states | `src/layout/AppSidebar.tsx` |
+| Sidebar collapse / hover / mobile behavior | `src/context/SidebarContext.tsx` |
+| Tab and toggle patterns | `src/components/common/ChartTab.tsx` |
+| Card, badge, button, modal primitives | `src/components/ui/` |
+| Form inputs and controls | `src/components/form/` |
+| CSS tokens (colors, spacing, radius, shadows) | `src/index.css` — `@theme` block |
+| Mobile header pattern | `src/layout/AppHeader.tsx` |
+
+**Rules:**
+- If a pattern exists in TailAdmin source → replicate it, do not invent an equivalent
+- If a pattern does not exist in TailAdmin source → check `UI_RULES.md` for token
+  values before writing new CSS
+- Never use Tailwind utility classes in JSX — translate TailAdmin patterns into
+  CSS classes in `src/dashboard.css`
+- When in doubt about any visual decision, read the TailAdmin source before
+  asking or guessing
+
+---
+
 ## Locked files — do not modify without explicit instruction
 
 - `src/lib/kpis/compute.ts` — forecast engine, parameters locked via grid search
@@ -226,7 +263,9 @@ When making decisions, prioritize in this order:
 
 Every task must follow this sequence:
 
-1. Read `UI_RULES.md` before any UI code
+1. Read `UI_RULES.md` before any UI code. For any new UI pattern,
+   also check the TailAdmin source reference section in this file
+   and look up the relevant pattern before writing anything.
 2. Run pre-flight: `git branch`, `git status --short`, `git log --oneline -3`
 3. Diagnosis first — describe the problem in plain English before writing code
 4. Propose fix with before/after — implement only after approval if ambiguous
