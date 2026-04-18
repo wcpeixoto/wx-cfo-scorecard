@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { STORAGE_KEYS } from '../config';
-import gracieSportsLogo from '../assets/gracie-sports-logo.svg';
-import type { IconType } from 'react-icons';
-import { FiGrid, FiRefreshCw, FiSettings, FiSliders, FiTarget, FiTrendingUp } from 'react-icons/fi';
+import { useLocation, useNavigate } from 'react-router';
+import { FiRefreshCw } from 'react-icons/fi';
+import { AppSidebar } from '../components/AppSidebar';
+import { AppHeader } from '../components/AppHeader';
+import { useSidebar } from '../context/SidebarContext';
 import CashFlowForecastModule from '../components/CashFlowForecastModule';
 import LoadingScreen from '../components/LoadingScreen';
 import DigHereHighlights from '../components/DigHereHighlights';
@@ -67,13 +69,8 @@ type TabId =
   | 'where-to-focus'
   | 'trends'
   | 'what-if'
-  | 'settings';
-
-type NavItem = {
-  id: TabId;
-  label: string;
-  icon: IconType;
-};
+  | 'settings'
+  | 'ui-lab';
 
 type BigPictureFrameValue = KpiComparisonTimeframe | 'custom';
 type KpiFrameOption = { value: BigPictureFrameValue; label: string };
@@ -88,13 +85,40 @@ type BigPictureKpiComparison = KpiTimeframeComparison & {
 type BigPictureVisibleFrameValue = 'thisMonth' | 'lastMonth' | 'last3Months';
 type BigPictureFilterFrameValue = Exclude<BigPictureFrameValue, BigPictureVisibleFrameValue>;
 
-const NAV_ITEMS: NavItem[] = [
-  { id: 'big-picture', label: 'Big Picture', icon: FiGrid },
-  { id: 'where-to-focus', label: 'Where to Focus', icon: FiTarget },
-  { id: 'trends', label: 'Trends', icon: FiTrendingUp },
-  { id: 'what-if', label: 'What-If Scenarios', icon: FiSliders },
-  { id: 'settings', label: 'Settings', icon: FiSettings },
-];
+const TAB_TO_PATH: Record<TabId, string> = {
+  'big-picture': '/',
+  'where-to-focus': '/focus',
+  trends: '/trends',
+  'what-if': '/forecast',
+  settings: '/settings',
+  'ui-lab': '/ui-lab',
+};
+
+function pathToTab(pathname: string): TabId {
+  // HashRouter pathname is the part after the #
+  const normalized = pathname.replace(/\/+$/, '') || '/';
+  switch (normalized) {
+    case '/':
+    case '/big-picture':
+      return 'big-picture';
+    case '/focus':
+    case '/where-to-focus':
+    case '/money-left':
+    case '/dig-here':
+      return 'where-to-focus';
+    case '/trends':
+      return 'trends';
+    case '/forecast':
+    case '/what-if':
+      return 'what-if';
+    case '/settings':
+      return 'settings';
+    case '/ui-lab':
+      return 'ui-lab';
+    default:
+      return 'big-picture';
+  }
+}
 
 const DEFAULT_SCENARIO: ScenarioInput = {
   scenarioKey: 'base',
@@ -203,25 +227,6 @@ type DigHereNavigationOptions = {
   endMonth?: string | null;
   focusContext?: DigHereFocusContext;
 };
-
-function parseTabId(value: string | null): TabId | null {
-  switch (value) {
-    case 'big-picture':
-    case 'where-to-focus':
-    case 'trends':
-    case 'what-if':
-    case 'settings':
-      return value;
-    // Backward-compat: legacy tab keys from the MLOT and Dig Here era
-    // redirect to the merged "Where to Focus" surface so bookmarked
-    // URLs never land on a blank state.
-    case 'money-left':
-    case 'dig-here':
-      return 'where-to-focus';
-    default:
-      return null;
-  }
-}
 
 function parseMonthToken(value: string | null): string | null {
   if (!value) return null;
@@ -643,63 +648,35 @@ function clearLocalStorageBusinessRules(): void {
 function DashboardSkeleton() {
   return (
     <div className="finance-app">
-      {/* Top nav — real chrome with skeleton content */}
-      <header className="app-top-nav">
-        <div className="app-top-nav-inner">
-          <div className="brand-wrap">
-            <img className="brand-logo" src={gracieSportsLogo} alt="" aria-hidden="true" />
-            <div className="skeleton-block skeleton-nav-title skeleton-pulse" />
-          </div>
-          <nav className="app-nav" aria-hidden="true">
-            <ul>
-              {NAV_ITEMS.map((item) => (
-                <li key={item.id}>
-                  <div className="skeleton-block skeleton-nav-item skeleton-pulse" />
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </div>
-      </header>
-
-      {/* Main content area */}
-      <section className="main-zone">
-        {/* Per-page header skeleton */}
-        <header className="top-bar glass-panel">
-          <div className="top-bar-main">
-            <div className="top-bar-copy">
-              <div className="skeleton-block skeleton-page-title skeleton-pulse" />
-              <div className="skeleton-block skeleton-page-subtitle skeleton-pulse" />
+      <AppSidebar />
+      <div className="app-main-column">
+        <section className="main-zone">
+          <header className="top-bar glass-panel">
+            <div className="top-bar-main">
+              <div className="top-bar-copy">
+                <div className="skeleton-block skeleton-page-title skeleton-pulse" />
+                <div className="skeleton-block skeleton-page-subtitle skeleton-pulse" />
+              </div>
+              <div className="skeleton-toggle-group skeleton-pulse" />
             </div>
-            <div className="skeleton-toggle-group skeleton-pulse" />
+          </header>
+
+          <div className="kpi-grid">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="skeleton-block skeleton-block--card skeleton-kpi-card skeleton-pulse" />
+            ))}
           </div>
-        </header>
 
-        {/* KPI row — 4 cards matching real kpi-grid */}
-        <div className="kpi-grid">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="skeleton-block skeleton-block--card skeleton-kpi-card skeleton-pulse" />
-          ))}
-        </div>
+          <article className="card">
+            <div className="skeleton-chart skeleton-pulse" />
+          </article>
 
-        {/* Primary chart card */}
-        <article className="card">
-          <div className="skeleton-chart skeleton-pulse" />
-        </article>
-
-        {/* Secondary two-col row */}
-        <div className="two-col-grid">
-          <div className="skeleton-block skeleton-block--card skeleton-medium-card skeleton-pulse" />
-          <div className="skeleton-block skeleton-block--card skeleton-medium-card skeleton-pulse" />
-        </div>
-      </section>
-
-      {/* Right rail — neutral skeleton container (no dark navy) */}
-      <aside className="skeleton-right-rail">
-        <div className="skeleton-block skeleton-block--card skeleton-right-hero skeleton-pulse" />
-        <div className="skeleton-block skeleton-block--card skeleton-right-card skeleton-pulse" />
-        <div className="skeleton-block skeleton-block--card skeleton-right-card skeleton-pulse" />
-      </aside>
+          <div className="two-col-grid">
+            <div className="skeleton-block skeleton-block--card skeleton-medium-card skeleton-pulse" />
+            <div className="skeleton-block skeleton-block--card skeleton-medium-card skeleton-pulse" />
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
@@ -711,7 +688,10 @@ export default function Dashboard() {
   const profitabilityCashFlowMode: CashFlowMode = 'operating';
   const [isInitializing, setIsInitializing] = useState(true);
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabId>('big-picture');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const activeTab: TabId = pathToTab(location.pathname);
+  const { setMobileOpen } = useSidebar();
   const [query, setQuery] = useState('');
   const [netChartTimeframe, setNetChartTimeframe] = useState<TrendTimeframeOption>(12);
   const [digHereFocusMonth, setDigHereFocusMonth] = useState<string | null>(null);
@@ -739,9 +719,9 @@ export default function Dashboard() {
   const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('lastMonth');
   const [netCashFlowChartMode, setNetCashFlowChartMode] = useState<CashFlowMode>('operating');
   const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
   const [forecastEvents, setForecastEvents] = useState<ForecastEvent[]>(DEFAULT_FORECAST_EVENTS);
+  const [activeSection, setActiveSection] = useState<'data' | 'accounts' | 'rules'>('data');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [isBigPictureFilterOpen, setIsBigPictureFilterOpen] = useState(false);
@@ -913,35 +893,25 @@ export default function Dashboard() {
   }, [sharedPersistenceEnabled]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(location.search);
+    const cashFlow = parseCashFlowMode(params.get('cf'));
+    const nextQuery = params.get('q');
+    const month = parseMonthToken(params.get('month'));
+    const startMonth = parseMonthToken(params.get('start'));
+    const endMonth = parseMonthToken(params.get('end'));
+    const focusContext = parseDigHereFocusContext(params.get('focus'));
+    const moverGrouping = parseMoverGrouping(params.get('mg'));
 
-    const syncStateFromUrl = () => {
-      const params = new URLSearchParams(window.location.search);
-      const tab = parseTabId(params.get('tab'));
-      const cashFlow = parseCashFlowMode(params.get('cf'));
-      const nextQuery = params.get('q');
-      const month = parseMonthToken(params.get('month'));
-      const startMonth = parseMonthToken(params.get('start'));
-      const endMonth = parseMonthToken(params.get('end'));
-      const focusContext = parseDigHereFocusContext(params.get('focus'));
-      const moverGrouping = parseMoverGrouping(params.get('mg'));
+    const validRange = startMonth && endMonth && startMonth <= endMonth;
 
-      const validRange = startMonth && endMonth && startMonth <= endMonth;
-
-      setActiveTab(tab ?? 'big-picture');
-      setNetCashFlowChartMode(cashFlow ?? 'operating');
-      setQuery(nextQuery ?? '');
-      setDigHereFocusMonth(validRange ? null : month);
-      setDigHereStartMonth(validRange ? startMonth : null);
-      setDigHereEndMonth(validRange ? endMonth : null);
-      setDigHereFocusContext(focusContext);
-      setDigHereMoverGrouping(moverGrouping ?? 'subcategories');
-    };
-
-    syncStateFromUrl();
-    window.addEventListener('popstate', syncStateFromUrl);
-    return () => window.removeEventListener('popstate', syncStateFromUrl);
-  }, []);
+    setNetCashFlowChartMode(cashFlow ?? 'operating');
+    setQuery(nextQuery ?? '');
+    setDigHereFocusMonth(validRange ? null : month);
+    setDigHereStartMonth(validRange ? startMonth : null);
+    setDigHereEndMonth(validRange ? endMonth : null);
+    setDigHereFocusContext(focusContext);
+    setDigHereMoverGrouping(moverGrouping ?? 'subcategories');
+  }, [location.search]);
 
   const activeDataSet = importedDataSet;
   const baseTxns = useMemo(() => activeDataSet?.txns ?? [], [activeDataSet?.txns]);
@@ -1661,8 +1631,8 @@ export default function Dashboard() {
   ]);
 
   useEffect(() => {
-    setIsMobileNavOpen(false);
-  }, [activeTab]);
+    setMobileOpen(false);
+  }, [activeTab, setMobileOpen]);
 
   const forecastRangeMonths = useMemo(
     () => FORECAST_RANGE_OPTIONS.find((option) => option.value === forecastRange)?.months ?? 3,
@@ -1725,17 +1695,6 @@ export default function Dashboard() {
 
   const latestRollup = model.monthlyRollups[model.monthlyRollups.length - 1] ?? null;
   const previousRollup = model.monthlyRollups[model.monthlyRollups.length - 2] ?? null;
-  const currentCalendarRollup = useMemo(
-    () => model.monthlyRollups.find((rollup) => rollup.month === currentCalendarMonth) ?? null,
-    [currentCalendarMonth, model.monthlyRollups]
-  );
-  const previousCalendarRollup = useMemo(
-    () =>
-      previousCalendarMonth
-        ? model.monthlyRollups.find((rollup) => rollup.month === previousCalendarMonth) ?? null
-        : null,
-    [model.monthlyRollups, previousCalendarMonth]
-  );
   const selectedBigPictureTitle = useMemo(() => {
     if (kpiTimeframe === 'custom') return 'Custom Range';
     if (kpiTimeframe === 'thisMonth') return toMonthLabel(currentCalendarMonth);
@@ -2083,68 +2042,31 @@ export default function Dashboard() {
       },
       mode: 'push' | 'replace' = 'push'
     ) => {
-      if (typeof window === 'undefined') return;
-      const url = new URL(window.location.href);
-      url.searchParams.set('tab', next.tab);
-      url.searchParams.delete('view');
-      if (next.cashFlow !== 'operating') {
-        url.searchParams.set('cf', next.cashFlow);
-      } else {
-        url.searchParams.delete('cf');
-      }
-
-      if (next.queryText?.trim()) {
-        url.searchParams.set('q', next.queryText.trim());
-      } else {
-        url.searchParams.delete('q');
-      }
-
-      if (next.month) {
-        url.searchParams.set('month', next.month);
-      } else {
-        url.searchParams.delete('month');
-      }
-
-      if (next.startMonth) {
-        url.searchParams.set('start', next.startMonth);
-      } else {
-        url.searchParams.delete('start');
-      }
-
-      if (next.endMonth) {
-        url.searchParams.set('end', next.endMonth);
-      } else {
-        url.searchParams.delete('end');
-      }
-
-      if (next.focusContext) {
-        url.searchParams.set('focus', next.focusContext);
-      } else {
-        url.searchParams.delete('focus');
-      }
-
+      const params = new URLSearchParams();
+      if (next.cashFlow !== 'operating') params.set('cf', next.cashFlow);
+      if (next.queryText?.trim()) params.set('q', next.queryText.trim());
+      if (next.month) params.set('month', next.month);
+      if (next.startMonth) params.set('start', next.startMonth);
+      if (next.endMonth) params.set('end', next.endMonth);
+      if (next.focusContext) params.set('focus', next.focusContext);
       if (next.moverGrouping && next.moverGrouping !== 'subcategories') {
-        url.searchParams.set('mg', next.moverGrouping);
-      } else {
-        url.searchParams.delete('mg');
+        params.set('mg', next.moverGrouping);
       }
 
-      if (mode === 'replace') {
-        window.history.replaceState({}, '', url);
-      } else {
-        window.history.pushState({}, '', url);
-      }
+      const path = TAB_TO_PATH[next.tab] ?? '/';
+      const searchString = params.toString();
+      const search = searchString ? `?${searchString}` : '';
+      navigate({ pathname: path, search }, { replace: mode === 'replace' });
     },
-    []
+    [navigate]
   );
 
   const navigateToTab = useCallback(
     (nextTab: TabId) => {
-      setIsMobileNavOpen(false);
+      setMobileOpen(false);
 
       const isFreshDigHereEntry = nextTab === 'where-to-focus';
 
-      setActiveTab(nextTab);
       setDigHereFocusMonth(isFreshDigHereEntry ? null : digHereFocusMonth);
       setDigHereStartMonth(isFreshDigHereEntry ? null : digHereStartMonth);
       setDigHereEndMonth(isFreshDigHereEntry ? null : digHereEndMonth);
@@ -2206,7 +2128,6 @@ export default function Dashboard() {
         'replace'
       );
 
-      setActiveTab('where-to-focus');
       setQuery(nextQuery);
       setDigHereFocusMonth(focusMonth);
       setDigHereStartMonth(startMonth);
@@ -2451,58 +2372,11 @@ export default function Dashboard() {
 
   return (
     <div className="finance-app">
-      <header className="app-top-nav">
-        <div className="app-top-nav-inner">
-          <div className="brand-wrap">
-            <img className="brand-logo" src={gracieSportsLogo} alt="Gracie Sports logo" />
-            <div>
-              <h1>Financial Dashboard</h1>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="app-nav-toggle"
-            aria-label="Toggle navigation menu"
-            aria-controls="app-top-nav-menu"
-            aria-expanded={isMobileNavOpen}
-            onClick={() => setIsMobileNavOpen((current) => !current)}
-          >
-            ☰
-          </button>
-
-          <nav id="app-top-nav-menu" className={isMobileNavOpen ? 'app-nav is-open' : 'app-nav'} aria-label="Main navigation">
-            <ul>
-              {NAV_ITEMS.map((item) => (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    className={activeTab === item.id ? 'top-nav-item is-active' : 'top-nav-item'}
-                    onClick={() => navigateToTab(item.id)}
-                  >
-                    <item.icon className="top-nav-icon" aria-hidden="true" />
-                    <span>{item.label}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </nav>
-
-          <div className="app-top-nav-search">
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search payee, category, memo..."
-              aria-label="Search transactions"
-            />
-          </div>
-
-        </div>
-      </header>
-
+      <AppSidebar />
+      <div className="app-main-column">
+        <AppHeader query={query} onQueryChange={setQuery} />
       <section className="main-zone">
-        {activeTab !== 'what-if' && <header className="top-bar glass-panel">
+        {activeTab !== 'what-if' && activeTab !== 'settings' && <header className="top-bar glass-panel">
           <div className="top-bar-main">
             <div className="top-bar-copy">
               <h2>
@@ -3350,570 +3224,735 @@ export default function Dashboard() {
 
         {activeTab === 'settings' && (
           <div className="stack-grid">
+            <div className="ta-page">
 
-            {/* ── Section 1: DATA ─────────────────────────────────────── */}
-            <div className="settings-section-header">
-              <h3 className="settings-section-title">Data</h3>
-              <p className="settings-section-subtitle">Where your numbers come from</p>
-            </div>
-
-            {/* ── System Status card ──────────────────────────────────── */}
-            {(() => {
-              const parseFailures = lastImportSummary?.parseFailures ?? 0;
-              const possibleDuplicates = lastImportSummary?.possibleDuplicatesFlagged ?? 0;
-              const acknowledgedSet = new Set(businessRules.acknowledgedNoncashAccounts);
-              const unacknowledgedNonCashAccounts = includedNonCashForecastAccounts.filter(
-                (record) => !acknowledgedSet.has(record.id)
-              );
-              const nonCashCount = unacknowledgedNonCashAccounts.length;
-              const hasCashAnchor = includedCashAccountCount > 0;
-              const rulesMarginValid =
-                businessRules.targetNetMargin === null ||
-                businessRules.targetNetMargin > 0;
-              // safetyReserveMethod is always 'monthly' or 'fixed' — always valid
-
-              // Evaluate status — first matching condition wins
-              let status: 'at-risk' | 'needs-review' | 'healthy';
-              const atRiskLines: string[] = [];
-
-              if (!hasImportedData) atRiskLines.push('No active data source');
-              if (parseFailures > 0) atRiskLines.push(`${parseFailures} parse failure${parseFailures === 1 ? '' : 's'} detected`);
-              if (hasImportedData && !hasCashAnchor) atRiskLines.push('No cash anchor account available');
-              if (!rulesMarginValid) atRiskLines.push('Required rules are missing');
-
-              const needsReviewLines: string[] = [];
-              if (!businessRules.suppressDuplicateWarnings && possibleDuplicates > 0) needsReviewLines.push(`${possibleDuplicates} possible duplicate${possibleDuplicates === 1 ? '' : 's'} to review`);
-              if (nonCashCount > 0) needsReviewLines.push(`${nonCashCount} non-cash account${nonCashCount === 1 ? '' : 's'} included in forecast — verify this is intentional`);
-
-              if (atRiskLines.length > 0) {
-                status = 'at-risk';
-              } else if (needsReviewLines.length > 0) {
-                status = 'needs-review';
-              } else {
-                status = 'healthy';
-              }
-
-              const badgeClass =
-                status === 'healthy' ? 'sys-status-badge is-healthy' :
-                status === 'needs-review' ? 'sys-status-badge is-needs-review' :
-                'sys-status-badge is-at-risk';
-
-              const badgeLabel =
-                status === 'healthy' ? 'Healthy' :
-                status === 'needs-review' ? 'Needs review' :
-                'At risk';
-
-              let statusLines: string[];
-              if (status === 'healthy') {
-                statusLines = [
-                  `Data imported — ${storedImportedTransactionCount.toLocaleString()} transactions`,
-                  'No parse errors',
-                  'Rules configured',
-                ];
-              } else if (status === 'needs-review') {
-                statusLines = needsReviewLines;
-              } else {
-                statusLines = atRiskLines.slice(0, 4);
-              }
-
-              return (
-                <article className="card settings-card sys-status-card">
-                  <p className="sys-status-title">System status</p>
-                  <span className={badgeClass}>{badgeLabel}</span>
-                  <ul className="sys-status-lines">
-                    {statusLines.map((line) => (
-                      <li key={line}>{line}</li>
-                    ))}
-                  </ul>
-                </article>
-              );
-            })()}
-
-            <article className="card settings-card">
-              <div className="card-head">
-                <h3>Direct CSV Import</h3>
-                <p className="subtle">{importDescription}</p>
+              <div className="ta-page-header">
+                <h1 className="ta-page-title">Settings</h1>
+                <p className="ta-page-subtitle">Where your data comes from and how your forecast works</p>
               </div>
 
-              <input
-                ref={importFileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="sr-only"
-                onChange={(event) => void handleImportCsvSelection(event)}
-              />
-
-              <div className="settings-actions">
-                <button type="button" onClick={() => importFileInputRef.current?.click()} disabled={importLoading}>
-                  {importLoading ? 'Importing...' : 'Import Quicken CSV'}
+              <div className="settings-subnav">
+                <button
+                  type="button"
+                  className={`settings-subnav-btn${activeSection === 'data' ? ' settings-subnav-btn--active' : ''}`}
+                  onClick={() => setActiveSection('data')}
+                >
+                  Data
                 </button>
                 <button
                   type="button"
-                  className="ghost-btn"
-                  onClick={() => void handleClearImportedData()}
-                  disabled={importLoading || storedImportedTransactionCount === 0}
+                  className={`settings-subnav-btn${activeSection === 'accounts' ? ' settings-subnav-btn--active' : ''}`}
+                  onClick={() => setActiveSection('accounts')}
                 >
-                  {clearImportedDataLabel}
+                  Accounts
+                </button>
+                <button
+                  type="button"
+                  className={`settings-subnav-btn${activeSection === 'rules' ? ' settings-subnav-btn--active' : ''}`}
+                  onClick={() => setActiveSection('rules')}
+                >
+                  Rules
                 </button>
               </div>
 
-              {importError ? <p className="settings-error">{importError}</p> : null}
+              <div className="settings-content-column">
 
-              <div className="settings-meta">
-                <p>
-                  Active analysis source:{' '}
-                  <strong>{activeDataSet?.sourceLabel ?? 'No imported dataset loaded'}</strong>
-                </p>
-                {lastImportSummary?.latestTxnMonth ? (
-                  <p>
-                    Updated through: <strong>{toMonthLabel(lastImportSummary.latestTxnMonth)}</strong>
-                  </p>
-                ) : null}
-                <p>
-                  Imported transactions stored: <strong>{storedImportedTransactionCount.toLocaleString()}</strong>
-                </p>
-                <p>
-                  Imported data active:{' '}
-                  <strong>
-                    {importedSourceStatus}
-                  </strong>
-                </p>
-                <p>
-                  Source precedence: <strong>{sourcePrecedenceLabel}</strong>
-                </p>
-                {importedDataSet ? (
-                  <>
-                    <p>
-                      Source storage:{' '}
-                      <strong>{lastImportSummary?.storageScope === 'shared' ? 'Shared imported dataset' : 'Browser-local imported dataset'}</strong>
-                    </p>
-                    <p>
-                      Import mode: <strong>{importModeLabel}</strong>
-                    </p>
-                  </>
-                ) : null}
-              </div>
-
-              {lastImportSummary ? (
-                <div className="import-summary">
-                  <div className="import-summary-grid">
-                    <div>
-                      <span className="import-summary-label">Source file</span>
-                      <strong>{lastImportSummary.sourceFileName}</strong>
-                    </div>
-                    <div>
-                      <span className="import-summary-label">Imported</span>
-                      <strong>{formatTimestamp(lastImportSummary.importedAtIso)}</strong>
-                    </div>
-                    <div>
-                      <span className="import-summary-label">New imported</span>
-                      <strong>{lastImportSummary.newImported}</strong>
-                    </div>
-                    <div>
-                      <span className="import-summary-label">Exact duplicates skipped</span>
-                      <strong>{lastImportSummary.exactDuplicatesSkipped}</strong>
-                    </div>
-                    <div>
-                      <span className="import-summary-label">Possible duplicates imported</span>
-                      <strong>{lastImportSummary.possibleDuplicatesFlagged}</strong>
-                    </div>
-                    <div>
-                      <span className="import-summary-label">Parse failures</span>
-                      <strong>{lastImportSummary.parseFailures}</strong>
-                    </div>
-                  </div>
-
-                  {lastImportSummary.possibleDuplicateExamples.length > 0 ? (
-                    <div className="import-summary-section">
-                      <h4>Possible duplicates</h4>
-                      <ul className="import-issue-list">
-                        {lastImportSummary.possibleDuplicateExamples.map((issue) => (
-                          <li key={`dup-${issue.lineNumber}`}>
-                            <strong>Line {issue.lineNumber}.</strong> {issue.message}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-
-                  {lastImportSummary.parseFailureExamples.length > 0 ? (
-                    <div className="import-summary-section">
-                      <h4>Parse failures</h4>
-                      <ul className="import-issue-list">
-                        {lastImportSummary.parseFailureExamples.map((issue) => (
-                          <li key={`parse-${issue.lineNumber}`}>
-                            <strong>{issue.lineNumber > 0 ? `Line ${issue.lineNumber}.` : 'Import error.'}</strong> {issue.message}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
+              {/* ── Section 1: DATA ─────────────────────────────────────── */}
+              <div className={activeSection === 'data' ? '' : 'settings-section--hidden'}>
+              <div className="ta-section">
+                <div className="ta-section-header">
+                  <h2 className="ta-section-title">Data</h2>
                 </div>
-              ) : null}
-            </article>
+                <div className="ta-section-body">
 
-            {/* ── Section 2: ACCOUNTS ─────────────────────────────────── */}
-            <div className="settings-section-header">
-              <h3 className="settings-section-title">Accounts</h3>
-              <p className="settings-section-subtitle">Which accounts drive your forecast</p>
-            </div>
+                  {/* System Status card */}
+                  <div className="ta-card sys-status-card">
+                    <div className="ta-card-header">
+                      <h3 className="ta-card-title">System Status</h3>
+                    </div>
+                    <div className="ta-card-body">
+                      {(() => {
+                        const parseFailures = lastImportSummary?.parseFailures ?? 0;
+                        const possibleDuplicates = lastImportSummary?.possibleDuplicatesFlagged ?? 0;
+                        const acknowledgedSet = new Set(businessRules.acknowledgedNoncashAccounts);
+                        const unacknowledgedNonCashAccounts = includedNonCashForecastAccounts.filter(
+                          (record) => !acknowledgedSet.has(record.id)
+                        );
+                        const nonCashCount = unacknowledgedNonCashAccounts.length;
+                        const hasCashAnchor = includedCashAccountCount > 0;
+                        const rulesMarginValid =
+                          businessRules.targetNetMargin === null ||
+                          businessRules.targetNetMargin > 0;
+                        // safetyReserveMethod is always 'monthly' or 'fixed' — always valid
 
-            <article className="card settings-card">
-              <div className="card-head">
-                <h3>Account Setup</h3>
-                <p className="subtle">Auto-discovered from imported CSV data. Your edits become the source of truth for future imports.</p>
-                <p className="subtle">
-                  Settings storage: <strong>{accountSettingsSourceLabel}</strong>
-                </p>
-              </div>
+                        // Evaluate status — first matching condition wins
+                        let status: 'at-risk' | 'needs-review' | 'healthy';
+                        const atRiskLines: string[] = [];
 
-              <div className="account-setup-summary">
-                <p className="account-setup-summary-title">Cash anchor</p>
-                <p className="account-setup-summary-copy">
-                  Forecast starting cash uses <strong>active Cash accounts only</strong>. Non-cash accounts are ignored in the forecast anchor even if they are marked <strong>In Forecast</strong>.
-                </p>
-                <div className="account-setup-summary-grid">
-                  <div>
-                    <span className="account-setup-summary-label">Loaded data window</span>
-                    <strong>{forecastWindowLabel}</strong>
+                        if (!hasImportedData) atRiskLines.push('No active data source');
+                        if (parseFailures > 0) atRiskLines.push(`${parseFailures} parse failure${parseFailures === 1 ? '' : 's'} detected`);
+                        if (hasImportedData && !hasCashAnchor) atRiskLines.push('No cash anchor account available');
+                        if (!rulesMarginValid) atRiskLines.push('Required rules are missing');
+
+                        const needsReviewLines: string[] = [];
+                        if (!businessRules.suppressDuplicateWarnings && possibleDuplicates > 0) needsReviewLines.push(`${possibleDuplicates} possible duplicate${possibleDuplicates === 1 ? '' : 's'} to review`);
+                        if (nonCashCount > 0) needsReviewLines.push(`${nonCashCount} non-cash account${nonCashCount === 1 ? '' : 's'} included in forecast — verify this is intentional`);
+
+                        if (atRiskLines.length > 0) {
+                          status = 'at-risk';
+                        } else if (needsReviewLines.length > 0) {
+                          status = 'needs-review';
+                        } else {
+                          status = 'healthy';
+                        }
+
+                        const badgeClass =
+                          status === 'healthy' ? 'sys-status-badge is-healthy' :
+                          status === 'needs-review' ? 'sys-status-badge is-needs-review' :
+                          'sys-status-badge is-at-risk';
+
+                        const badgeLabel =
+                          status === 'healthy' ? 'Healthy' :
+                          status === 'needs-review' ? 'Needs review' :
+                          'At risk';
+
+                        let statusLines: string[];
+                        if (status === 'healthy') {
+                          statusLines = [
+                            `Data imported — ${storedImportedTransactionCount.toLocaleString()} transactions`,
+                            'No parse errors',
+                            'Rules configured',
+                          ];
+                        } else if (status === 'needs-review') {
+                          statusLines = needsReviewLines;
+                        } else {
+                          statusLines = atRiskLines.slice(0, 4);
+                        }
+
+                        return (
+                          <>
+                            <p className="sys-status-title">System status</p>
+                            <span className={badgeClass}>{badgeLabel}</span>
+                            <ul className="sys-status-lines">
+                              {statusLines.map((line) => (
+                                <li key={line}>{line}</li>
+                              ))}
+                            </ul>
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
-                  <div>
-                    <span className="account-setup-summary-label">Included accounts</span>
-                    <strong>{includedForecastAccounts.length.toLocaleString()} total · {includedCashAccountCount.toLocaleString()} cash</strong>
+
+                  {/* Direct CSV Import card */}
+                  <div className="ta-card">
+                    <div className="ta-card-header">
+                      <h3 className="ta-card-title">Direct CSV Import</h3>
+                    </div>
+                    <div className="ta-card-body">
+                      <div className="card-head">
+                        <h3>Direct CSV Import</h3>
+                        <p className="subtle">{importDescription}</p>
+                      </div>
+
+                      <input
+                        ref={importFileInputRef}
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="sr-only"
+                        onChange={(event) => void handleImportCsvSelection(event)}
+                      />
+
+                      <div className="settings-actions">
+                        <button type="button" onClick={() => importFileInputRef.current?.click()} disabled={importLoading}>
+                          {importLoading ? 'Importing...' : 'Import Quicken CSV'}
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => void handleClearImportedData()}
+                          disabled={importLoading || storedImportedTransactionCount === 0}
+                        >
+                          {clearImportedDataLabel}
+                        </button>
+                      </div>
+
+                      {importError ? <p className="settings-error">{importError}</p> : null}
+
+                      <div className="settings-meta">
+                        <p>
+                          Active analysis source:{' '}
+                          <strong>{activeDataSet?.sourceLabel ?? 'No imported dataset loaded'}</strong>
+                        </p>
+                        {lastImportSummary?.latestTxnMonth ? (
+                          <p>
+                            Updated through: <strong>{toMonthLabel(lastImportSummary.latestTxnMonth)}</strong>
+                          </p>
+                        ) : null}
+                        <p>
+                          Imported transactions stored: <strong>{storedImportedTransactionCount.toLocaleString()}</strong>
+                        </p>
+                        <p>
+                          Imported data active:{' '}
+                          <strong>
+                            {importedSourceStatus}
+                          </strong>
+                        </p>
+                        <p>
+                          Source precedence: <strong>{sourcePrecedenceLabel}</strong>
+                        </p>
+                        {importedDataSet ? (
+                          <>
+                            <p>
+                              Source storage:{' '}
+                              <strong>{lastImportSummary?.storageScope === 'shared' ? 'Shared imported dataset' : 'Browser-local imported dataset'}</strong>
+                            </p>
+                            <p>
+                              Import mode: <strong>{importModeLabel}</strong>
+                            </p>
+                          </>
+                        ) : null}
+                      </div>
+
+                      {lastImportSummary ? (
+                        <div className="import-summary">
+                          <div className="import-summary-grid">
+                            <div>
+                              <span className="import-summary-label">Source file</span>
+                              <strong>{lastImportSummary.sourceFileName}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">Imported</span>
+                              <strong>{formatTimestamp(lastImportSummary.importedAtIso)}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">New imported</span>
+                              <strong>{lastImportSummary.newImported}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">Exact duplicates skipped</span>
+                              <strong>{lastImportSummary.exactDuplicatesSkipped}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">Possible duplicates imported</span>
+                              <strong>{lastImportSummary.possibleDuplicatesFlagged}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">Parse failures</span>
+                              <strong>{lastImportSummary.parseFailures}</strong>
+                            </div>
+                          </div>
+
+                          {lastImportSummary.possibleDuplicateExamples.length > 0 ? (
+                            <div className="import-summary-section">
+                              <h4>Possible duplicates</h4>
+                              <ul className="import-issue-list">
+                                {lastImportSummary.possibleDuplicateExamples.map((issue) => (
+                                  <li key={`dup-${issue.lineNumber}`}>
+                                    <strong>Line {issue.lineNumber}.</strong> {issue.message}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+
+                          {lastImportSummary.parseFailureExamples.length > 0 ? (
+                            <div className="import-summary-section">
+                              <h4>Parse failures</h4>
+                              <ul className="import-issue-list">
+                                {lastImportSummary.parseFailureExamples.map((issue) => (
+                                  <li key={`parse-${issue.lineNumber}`}>
+                                    <strong>{issue.lineNumber > 0 ? `Line ${issue.lineNumber}.` : 'Import error.'}</strong> {issue.message}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
-                  <div>
-                    <span className="account-setup-summary-label">Current cash basis</span>
-                    <strong>{formatCurrency(forecastCurrentCashBalance)}</strong>
-                  </div>
+
                 </div>
-                <ul className="account-setup-summary-notes">
-                  <li><strong>Starting Balance</strong> should be the account balance on <strong>{forecastWindowStartLabel}</strong>.</li>
-                  <li><strong>Current Balance</strong> is calculated as Starting Balance + loaded net transactions for that account.</li>
-                  <li>The forecast uses the computed balance from cash accounts as its starting point.</li>
-                </ul>
               </div>
+              </div>{/* end data wrapper */}
 
-              {accountRecords.length === 0 ? (
-                <p className="empty-state">No account names have been discovered from the current data source yet.</p>
-              ) : (
-                <div className="settings-table-wrap">
-                  <table className="account-settings-table">
-                    <thead>
-                      <tr>
-                        <th>Detected Account</th>
-                        <th>Account Name</th>
-                        <th>Type</th>
-                        <th>Starting Balance at Window Start</th>
-                        <th>Current Balance (computed)</th>
-                        <th>In Forecast</th>
-                        <th>Active</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {accountRecords.map((record) => (
-                        <tr key={record.id}>
-                          <td>
-                            <span className="account-source-name">{record.discoveredAccountName}</span>
-                          </td>
-                          <td>
-                            <input
-                              className="settings-table-input"
-                              type="text"
-                              value={record.accountName}
-                              onChange={(event) => handleAccountRecordChange(record.id, 'accountName', event.target.value)}
-                            />
-                          </td>
-                          <td>
-                            <select
-                              className="settings-table-input"
-                              value={record.accountType}
-                              onChange={(event) =>
-                                handleAccountRecordChange(record.id, 'accountType', event.target.value as AccountType)
-                              }
-                            >
-                              <option value="Cash">Cash</option>
-                              <option value="Credit Card">Credit Card</option>
-                              <option value="Loan">Loan</option>
-                              <option value="Other">Other</option>
-                            </select>
-                          </td>
-                          <td>
-                            <div className="account-balance-input-cell">
+              {/* ── Section 2: ACCOUNTS ─────────────────────────────────── */}
+              <div className={activeSection === 'accounts' ? '' : 'settings-section--hidden'}>
+              <div className="ta-section">
+                <div className="ta-section-header">
+                  <h2 className="ta-section-title">Accounts</h2>
+                </div>
+                <div className="ta-section-body">
+
+                  <div className="ta-card">
+                    <div className="ta-card-header">
+                      <h3 className="ta-card-title">Account Setup</h3>
+                    </div>
+                    <div className="ta-card-body">
+                      <div className="card-head">
+                        <h3>Account Setup</h3>
+                        <p className="subtle">Auto-discovered from imported CSV data. Your edits become the source of truth for future imports.</p>
+                        <p className="subtle">
+                          Settings storage: <strong>{accountSettingsSourceLabel}</strong>
+                        </p>
+                      </div>
+
+                      <div className="account-setup-summary">
+                        <p className="account-setup-summary-title">Cash anchor</p>
+                        <p className="account-setup-summary-copy">
+                          Forecast starting cash uses <strong>active Cash accounts only</strong>. Non-cash accounts are ignored in the forecast anchor even if they are marked <strong>In Forecast</strong>.
+                        </p>
+                        <div className="account-setup-summary-grid">
+                          <div>
+                            <span className="account-setup-summary-label">Loaded data window</span>
+                            <strong>{forecastWindowLabel}</strong>
+                          </div>
+                          <div>
+                            <span className="account-setup-summary-label">Included accounts</span>
+                            <strong>{includedForecastAccounts.length.toLocaleString()} total · {includedCashAccountCount.toLocaleString()} cash</strong>
+                          </div>
+                          <div>
+                            <span className="account-setup-summary-label">Current cash basis</span>
+                            <strong>{formatCurrency(forecastCurrentCashBalance)}</strong>
+                          </div>
+                        </div>
+                        <ul className="account-setup-summary-notes">
+                          <li><strong>Starting Balance</strong> should be the account balance on <strong>{forecastWindowStartLabel}</strong>.</li>
+                          <li><strong>Current Balance</strong> is calculated as Starting Balance + loaded net transactions for that account.</li>
+                          <li>The forecast uses the computed balance from cash accounts as its starting point.</li>
+                        </ul>
+                      </div>
+
+                      {accountRecords.length === 0 ? (
+                        <p className="empty-state">No account names have been discovered from the current data source yet.</p>
+                      ) : (
+                        <div className="settings-table-wrap">
+                          <table className="account-settings-table">
+                            <thead>
+                              <tr>
+                                <th>Detected Account</th>
+                                <th>Account Name</th>
+                                <th>Type</th>
+                                <th>Starting Balance at Window Start</th>
+                                <th>Current Balance (computed)</th>
+                                <th>In Forecast</th>
+                                <th>Active</th>
+                                <th>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {accountRecords.map((record) => (
+                                <tr key={record.id}>
+                                  <td>
+                                    <span className="account-source-name">{record.discoveredAccountName}</span>
+                                  </td>
+                                  <td>
+                                    <input
+                                      className="settings-table-input"
+                                      type="text"
+                                      value={record.accountName}
+                                      onChange={(event) => handleAccountRecordChange(record.id, 'accountName', event.target.value)}
+                                    />
+                                  </td>
+                                  <td>
+                                    <select
+                                      className="settings-table-input"
+                                      value={record.accountType}
+                                      onChange={(event) =>
+                                        handleAccountRecordChange(record.id, 'accountType', event.target.value as AccountType)
+                                      }
+                                    >
+                                      <option value="Cash">Cash</option>
+                                      <option value="Credit Card">Credit Card</option>
+                                      <option value="Loan">Loan</option>
+                                      <option value="Other">Other</option>
+                                    </select>
+                                  </td>
+                                  <td>
+                                    <div className="account-balance-input-cell">
+                                      <input
+                                        className="settings-table-input"
+                                        type="number"
+                                        step="0.01"
+                                        value={record.startingBalance}
+                                        aria-label={`${record.accountName} starting balance at window start`}
+                                        onChange={(event) => {
+                                          const nextValue = Number.parseFloat(event.target.value);
+                                          handleAccountRecordChange(
+                                            record.id,
+                                            'startingBalance',
+                                            Number.isFinite(nextValue) ? nextValue : 0
+                                          );
+                                        }}
+                                      />
+                                      <span className="account-input-hint">
+                                        {Math.abs(record.startingBalance) <= EPSILON && forecastCashAnchorAccountIds.has(record.id)
+                                          ? `Needed for forecast basis as of ${forecastWindowStartLabel}`
+                                          : `Balance on ${forecastWindowStartLabel}`}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <div className="account-balance-cell">
+                                      <span className="account-balance-computed">
+                                        {formatCurrency(
+                                          record.startingBalance +
+                                            (accountBalanceMap.get(record.id) ?? 0)
+                                        )}
+                                      </span>
+                                      <span className="account-balance-note">
+                                        {record.accountType === 'Cash' && record.includeInCashForecast
+                                          ? 'Cash anchor'
+                                          : record.accountType !== 'Cash' && record.includeInCashForecast
+                                            ? businessRules.acknowledgedNoncashAccounts.includes(record.id)
+                                              ? <>
+                                                  Included in forecast{' '}
+                                                  <span className="account-balance-note-ok">✓</span>
+                                                </>
+                                              : <>
+                                                  Included in forecast{' '}
+                                                  <span
+                                                    className="account-balance-note-warn"
+                                                    title="This account is included in the forecast but is not a cash account. Verify this is intentional."
+                                                  >
+                                                    ⚠
+                                                  </span>
+                                                  {' '}
+                                                  <button
+                                                    type="button"
+                                                    className="noncash-ack-btn"
+                                                    onClick={() =>
+                                                      updateBusinessRules({
+                                                        acknowledgedNoncashAccounts: [
+                                                          ...businessRules.acknowledgedNoncashAccounts,
+                                                          record.id,
+                                                        ],
+                                                      })
+                                                    }
+                                                  >
+                                                    This inclusion is intentional
+                                                  </button>
+                                                </>
+                                            : 'Excluded'}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <label className="settings-checkbox">
+                                      <input
+                                        type="checkbox"
+                                        checked={record.includeInCashForecast}
+                                        onChange={(event) =>
+                                          handleAccountRecordChange(record.id, 'includeInCashForecast', event.target.checked)
+                                        }
+                                      />
+                                      <span>{record.includeInCashForecast ? 'Included' : 'Excluded'}</span>
+                                    </label>
+                                  </td>
+                                  <td>
+                                    <label className="settings-checkbox">
+                                      <input
+                                        type="checkbox"
+                                        checked={record.active}
+                                        onChange={(event) => handleAccountRecordChange(record.id, 'active', event.target.checked)}
+                                      />
+                                      <span>{record.active ? 'Active' : 'Inactive'}</span>
+                                    </label>
+                                  </td>
+                                  <td>
+                                    <span className={record.isUserConfigured ? 'settings-badge is-user' : 'settings-badge is-auto'}>
+                                      {record.isUserConfigured ? 'User configured' : 'Auto-discovered'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+              </div>{/* end accounts wrapper */}
+
+              {/* ── Section 3: RULES ────────────────────────────────────── */}
+              <div className={activeSection === 'rules' ? '' : 'settings-section--hidden'}>
+              <div className="ta-section">
+                <div className="ta-section-header">
+                  <h2 className="ta-section-title">Rules</h2>
+                </div>
+                <div className="ta-section-body">
+
+                  <div className="ta-card">
+                    <div className="ta-card-header">
+                      <h3 className="ta-card-title">Rules</h3>
+                    </div>
+                    <div className="ta-card-body">
+                      <div className="rules-list">
+
+                        {/* Rule 1 — Profit target */}
+                        <div className="rules-row">
+                          <div className="rules-row-info">
+                            <span className="rules-row-label">Profit target</span>
+                            <span className="rules-row-sub">Cards use this as the monthly goal threshold</span>
+                          </div>
+                          <div className="rules-row-control">
+                            <div className="rules-pct-input-wrap">
                               <input
-                                className="settings-table-input"
+                                className="rules-pct-input"
                                 type="number"
-                                step="0.01"
-                                value={record.startingBalance}
-                                aria-label={`${record.accountName} starting balance at window start`}
+                                min="1"
+                                max="100"
+                                step="1"
+                                aria-label="Profit target percentage"
+                                value={
+                                  businessRules.targetNetMargin != null
+                                    ? Math.round(businessRules.targetNetMargin * 100)
+                                    : 25
+                                }
                                 onChange={(event) => {
-                                  const nextValue = Number.parseFloat(event.target.value);
-                                  handleAccountRecordChange(
-                                    record.id,
-                                    'startingBalance',
-                                    Number.isFinite(nextValue) ? nextValue : 0
-                                  );
+                                  const raw = Number.parseFloat(event.target.value);
+                                  if (Number.isFinite(raw) && raw > 0 && raw <= 100) {
+                                    updateBusinessRules({ targetNetMargin: raw / 100 });
+                                  }
                                 }}
                               />
-                              <span className="account-input-hint">
-                                {Math.abs(record.startingBalance) <= EPSILON && forecastCashAnchorAccountIds.has(record.id)
-                                  ? `Needed for forecast basis as of ${forecastWindowStartLabel}`
-                                  : `Balance on ${forecastWindowStartLabel}`}
-                              </span>
+                              <span className="rules-pct-suffix">%</span>
                             </div>
-                          </td>
-                          <td>
-                            <div className="account-balance-cell">
-                              <span className="account-balance-computed">
-                                {formatCurrency(
-                                  record.startingBalance +
-                                    (accountBalanceMap.get(record.id) ?? 0)
-                                )}
-                              </span>
-                              <span className="account-balance-note">
-                                {record.accountType === 'Cash' && record.includeInCashForecast
-                                  ? 'Cash anchor'
-                                  : record.accountType !== 'Cash' && record.includeInCashForecast
-                                    ? businessRules.acknowledgedNoncashAccounts.includes(record.id)
-                                      ? <>
-                                          Included in forecast{' '}
-                                          <span className="account-balance-note-ok">✓</span>
-                                        </>
-                                      : <>
-                                          Included in forecast{' '}
-                                          <span
-                                            className="account-balance-note-warn"
-                                            title="This account is included in the forecast but is not a cash account. Verify this is intentional."
-                                          >
-                                            ⚠
-                                          </span>
-                                          {' '}
-                                          <button
-                                            type="button"
-                                            className="noncash-ack-btn"
-                                            onClick={() =>
-                                              updateBusinessRules({
-                                                acknowledgedNoncashAccounts: [
-                                                  ...businessRules.acknowledgedNoncashAccounts,
-                                                  record.id,
-                                                ],
-                                              })
-                                            }
-                                          >
-                                            This inclusion is intentional
-                                          </button>
-                                        </>
-                                    : 'Excluded'}
-                              </span>
-                            </div>
-                          </td>
-                          <td>
-                            <label className="settings-checkbox">
-                              <input
-                                type="checkbox"
-                                checked={record.includeInCashForecast}
-                                onChange={(event) =>
-                                  handleAccountRecordChange(record.id, 'includeInCashForecast', event.target.checked)
-                                }
-                              />
-                              <span>{record.includeInCashForecast ? 'Included' : 'Excluded'}</span>
-                            </label>
-                          </td>
-                          <td>
-                            <label className="settings-checkbox">
-                              <input
-                                type="checkbox"
-                                checked={record.active}
-                                onChange={(event) => handleAccountRecordChange(record.id, 'active', event.target.checked)}
-                              />
-                              <span>{record.active ? 'Active' : 'Inactive'}</span>
-                            </label>
-                          </td>
-                          <td>
-                            <span className={record.isUserConfigured ? 'settings-badge is-user' : 'settings-badge is-auto'}>
-                              {record.isUserConfigured ? 'User configured' : 'Auto-discovered'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </article>
+                          </div>
+                        </div>
 
-            {/* ── Section 3: RULES ────────────────────────────────────── */}
-            <div className="settings-section-header">
-              <h3 className="settings-section-title">Rules</h3>
-              <p className="settings-section-subtitle">The assumptions behind your numbers</p>
+                        {/* Rule 2 — Safety reserve */}
+                        <div className="rules-row">
+                          <div className="rules-row-info">
+                            <span className="rules-row-label">Safety reserve</span>
+                            <span className="rules-row-sub">
+                              {businessRules.safetyReserveMethod === 'fixed'
+                                ? 'Fixed reserve amount used as the safety floor'
+                                : '1 month of average operating expenses'}
+                            </span>
+                          </div>
+                          <div className="rules-row-control rules-row-control--col">
+                            <div className="cashflow-toggle">
+                              <button
+                                type="button"
+                                className={businessRules.safetyReserveMethod === 'monthly' ? 'is-active' : ''}
+                                onClick={() => updateBusinessRules({ safetyReserveMethod: 'monthly' })}
+                              >
+                                1 month of expenses
+                              </button>
+                              <button
+                                type="button"
+                                className={businessRules.safetyReserveMethod === 'fixed' ? 'is-active' : ''}
+                                onClick={() => updateBusinessRules({ safetyReserveMethod: 'fixed' })}
+                              >
+                                Fixed amount
+                              </button>
+                            </div>
+                            {businessRules.safetyReserveMethod === 'fixed' && (
+                              <div className="rules-currency-input-wrap">
+                                <span className="rules-currency-prefix">$</span>
+                                <input
+                                  className="rules-currency-input"
+                                  type="number"
+                                  min="0"
+                                  step="1000"
+                                  aria-label="Reserve target amount"
+                                  placeholder="40000"
+                                  value={businessRules.safetyReserveAmount === 0 ? '' : businessRules.safetyReserveAmount}
+                                  onChange={(event) => {
+                                    const raw = Number.parseFloat(event.target.value);
+                                    updateBusinessRules({
+                                      safetyReserveAmount: Number.isFinite(raw) && raw >= 0 ? raw : 0,
+                                    });
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Rule 3 — Cash flow timing (placeholder) */}
+                        <div className="rules-row rules-row--coming-soon">
+                          <div className="rules-row-info">
+                            <span className="rules-row-label">Cash flow timing</span>
+                            <span className="rules-row-sub">Coming soon — receivables and payables timing offsets</span>
+                          </div>
+                        </div>
+
+                        {/* Rule 4 — Duplicate warnings */}
+                        <div className="rules-row">
+                          <div className="rules-row-info">
+                            <span className="rules-row-label">Duplicate warnings</span>
+                            <span className="rules-row-sub">
+                              {businessRules.suppressDuplicateWarnings
+                                ? 'Duplicate count is hidden from System Status'
+                                : 'Duplicate transactions are flagged in System Status'}
+                            </span>
+                          </div>
+                          <div className="rules-row-control">
+                            <div className="cashflow-toggle">
+                              <button
+                                type="button"
+                                className={!businessRules.suppressDuplicateWarnings ? 'is-active' : ''}
+                                onClick={() => updateBusinessRules({ suppressDuplicateWarnings: false })}
+                              >
+                                Show duplicate warnings
+                              </button>
+                              <button
+                                type="button"
+                                className={businessRules.suppressDuplicateWarnings ? 'is-active' : ''}
+                                onClick={() => updateBusinessRules({ suppressDuplicateWarnings: true })}
+                              >
+                                Suppress for full imports
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+              </div>{/* end rules wrapper */}
+
+              </div>{/* end settings-content-column */}
+            </div>
+          </div>
+        )}
+
+        {import.meta.env.DEV && activeTab === 'ui-lab' && (
+          <div className="stack-grid">
+
+            {/* ── Page header ─────────────────────────────────────────── */}
+            <div className="ui-lab-header">
+              <div className="ui-lab-header-copy">
+                <h2 className="ui-lab-title">UI Lab</h2>
+                <p className="ui-lab-subtitle">Use this page to settle layout, spacing, and component patterns before applying them to production surfaces.</p>
+              </div>
+              <span className="ui-lab-dev-badge">Dev only</span>
             </div>
 
-            <article className="card settings-card">
-              <div className="rules-list">
-
-                {/* Rule 1 — Profit target */}
-                <div className="rules-row">
-                  <div className="rules-row-info">
-                    <span className="rules-row-label">Profit target</span>
-                    <span className="rules-row-sub">Cards use this as the monthly goal threshold</span>
-                  </div>
-                  <div className="rules-row-control">
-                    <div className="rules-pct-input-wrap">
-                      <input
-                        className="rules-pct-input"
-                        type="number"
-                        min="1"
-                        max="100"
-                        step="1"
-                        aria-label="Profit target percentage"
-                        value={
-                          businessRules.targetNetMargin != null
-                            ? Math.round(businessRules.targetNetMargin * 100)
-                            : 25
-                        }
-                        onChange={(event) => {
-                          const raw = Number.parseFloat(event.target.value);
-                          if (Number.isFinite(raw) && raw > 0 && raw <= 100) {
-                            updateBusinessRules({ targetNetMargin: raw / 100 });
-                          }
-                        }}
-                      />
-                      <span className="rules-pct-suffix">%</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Rule 2 — Safety reserve */}
-                <div className="rules-row">
-                  <div className="rules-row-info">
-                    <span className="rules-row-label">Safety reserve</span>
-                    <span className="rules-row-sub">
-                      {businessRules.safetyReserveMethod === 'fixed'
-                        ? 'Fixed reserve amount used as the safety floor'
-                        : '1 month of average operating expenses'}
-                    </span>
-                  </div>
-                  <div className="rules-row-control rules-row-control--col">
-                    <div className="cashflow-toggle">
-                      <button
-                        type="button"
-                        className={businessRules.safetyReserveMethod === 'monthly' ? 'is-active' : ''}
-                        onClick={() => updateBusinessRules({ safetyReserveMethod: 'monthly' })}
-                      >
-                        1 month of expenses
-                      </button>
-                      <button
-                        type="button"
-                        className={businessRules.safetyReserveMethod === 'fixed' ? 'is-active' : ''}
-                        onClick={() => updateBusinessRules({ safetyReserveMethod: 'fixed' })}
-                      >
-                        Fixed amount
-                      </button>
-                    </div>
-                    {businessRules.safetyReserveMethod === 'fixed' && (
-                      <div className="rules-currency-input-wrap">
-                        <span className="rules-currency-prefix">$</span>
-                        <input
-                          className="rules-currency-input"
-                          type="number"
-                          min="0"
-                          step="1000"
-                          aria-label="Reserve target amount"
-                          placeholder="40000"
-                          value={businessRules.safetyReserveAmount === 0 ? '' : businessRules.safetyReserveAmount}
-                          onChange={(event) => {
-                            const raw = Number.parseFloat(event.target.value);
-                            updateBusinessRules({
-                              safetyReserveAmount: Number.isFinite(raw) && raw >= 0 ? raw : 0,
-                            });
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Rule 3 — Cash flow timing (placeholder) */}
-                <div className="rules-row rules-row--coming-soon">
-                  <div className="rules-row-info">
-                    <span className="rules-row-label">Cash flow timing</span>
-                    <span className="rules-row-sub">Coming soon — receivables and payables timing offsets</span>
-                  </div>
-                </div>
-
-                {/* Rule 4 — Duplicate warnings */}
-                <div className="rules-row">
-                  <div className="rules-row-info">
-                    <span className="rules-row-label">Duplicate warnings</span>
-                    <span className="rules-row-sub">
-                      {businessRules.suppressDuplicateWarnings
-                        ? 'Duplicate count is hidden from System Status'
-                        : 'Duplicate transactions are flagged in System Status'}
-                    </span>
-                  </div>
-                  <div className="rules-row-control">
-                    <div className="cashflow-toggle">
-                      <button
-                        type="button"
-                        className={!businessRules.suppressDuplicateWarnings ? 'is-active' : ''}
-                        onClick={() => updateBusinessRules({ suppressDuplicateWarnings: false })}
-                      >
-                        Show duplicate warnings
-                      </button>
-                      <button
-                        type="button"
-                        className={businessRules.suppressDuplicateWarnings ? 'is-active' : ''}
-                        onClick={() => updateBusinessRules({ suppressDuplicateWarnings: true })}
-                      >
-                        Suppress for full imports
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
+            {/* ── Section 1: KPI Cards ─────────────────────────────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">KPI Cards</h3>
+                <p className="ui-lab-section-subtitle">Metric tiles with value, label, delta, and trend indicator</p>
               </div>
-            </article>
+              <div className="ui-lab-placeholder">
+                <span className="ui-lab-placeholder-label">Patterns go here</span>
+              </div>
+            </div>
+
+            {/* ── Section 2: Chart Cards ───────────────────────────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Chart Cards</h3>
+                <p className="ui-lab-section-subtitle">Chart container with title, subtitle, toolbar placeholder, and chart area</p>
+              </div>
+              <div className="ui-lab-placeholder">
+                <span className="ui-lab-placeholder-label">Patterns go here</span>
+              </div>
+            </div>
+
+            {/* ── Section 3: Status Cards ──────────────────────────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Status Cards</h3>
+                <p className="ui-lab-section-subtitle">System status, health indicators, and alert states</p>
+              </div>
+              <div className="ui-lab-placeholder">
+                <span className="ui-lab-placeholder-label">Patterns go here</span>
+              </div>
+            </div>
+
+            {/* ── Section 4: Section Headers ───────────────────────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Section Headers</h3>
+                <p className="ui-lab-section-subtitle">Page titles, section titles, and subtitles with optional controls</p>
+              </div>
+              <div className="ui-lab-placeholder">
+                <span className="ui-lab-placeholder-label">Patterns go here</span>
+              </div>
+            </div>
+
+            {/* ── Section 5: Insight Banners ───────────────────────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Insight Banners</h3>
+                <p className="ui-lab-section-subtitle">Callout blocks for top-level interpretive sentences</p>
+              </div>
+              <div className="ui-lab-placeholder">
+                <span className="ui-lab-placeholder-label">Patterns go here</span>
+              </div>
+            </div>
+
+            {/* ── Section 6: Tables ────────────────────────────────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Tables</h3>
+                <p className="ui-lab-section-subtitle">Data rows, column headers, and sortable list patterns</p>
+              </div>
+              <div className="ui-lab-placeholder">
+                <span className="ui-lab-placeholder-label">Patterns go here</span>
+              </div>
+            </div>
+
+            {/* ── Section 7: Segmented Toggles ─────────────────────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Segmented Toggles</h3>
+                <p className="ui-lab-section-subtitle">Period selectors, view switchers, and option groups</p>
+              </div>
+              <div className="ui-lab-placeholder">
+                <span className="ui-lab-placeholder-label">Patterns go here</span>
+              </div>
+            </div>
+
+            {/* ── Section 8: Badges and Pills ──────────────────────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Badges and Pills</h3>
+                <p className="ui-lab-section-subtitle">Status labels, category tags, and count indicators</p>
+              </div>
+              <div className="ui-lab-placeholder">
+                <span className="ui-lab-placeholder-label">Patterns go here</span>
+              </div>
+            </div>
+
+            {/* ── Section 9: Empty States ───────────────────────────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Empty States</h3>
+                <p className="ui-lab-section-subtitle">Zero-data and loading placeholder patterns</p>
+              </div>
+              <div className="ui-lab-placeholder">
+                <span className="ui-lab-placeholder-label">Patterns go here</span>
+              </div>
+            </div>
+
+            {/* ── Section 10: Dark Mode Readiness ──────────────────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Dark Mode Readiness</h3>
+                <p className="ui-lab-section-subtitle">Placeholder space to validate dark variants — built alongside light, not retrofitted later</p>
+              </div>
+              <div className="ui-lab-placeholder">
+                <span className="ui-lab-placeholder-label">Patterns go here</span>
+              </div>
+            </div>
 
           </div>
         )}
       </section>
 
-      <aside className="right-panel">
-        <section className="right-hero">
-          <p className="eyebrow">Current Net</p>
-          <h3>{currentCalendarRollup ? formatCurrency(currentCalendarRollup.netCashFlow) : '$0'}</h3>
-          <p>
-            {currentCalendarRollup
-              ? `for ${toMonthLabel(currentCalendarRollup.month)} (${currentCalendarRollup.transactionCount.toLocaleString()} transactions)`
-              : 'Waiting for data'}
-          </p>
-
-          <div className="delta-chip">
-            <span>{(currentCalendarRollup?.netCashFlow ?? 0) >= (previousCalendarRollup?.netCashFlow ?? 0) ? '▲' : '▼'}</span>
-            <span>
-              vs previous {previousCalendarRollup ? formatCurrency(previousCalendarRollup.netCashFlow) : 'n/a'}
-            </span>
-          </div>
-        </section>
-
-        <section className="right-card">
-          <h4>Quick Health</h4>
-          <div className="mini-metrics">
-            <p>
-              Revenue <strong>{formatCurrency(currentCalendarRollup?.revenue ?? 0)}</strong>
-            </p>
-            <p>
-              Expense <strong>{formatCurrency(currentCalendarRollup?.expenses ?? 0)}</strong>
-            </p>
-            <p>
-              Savings Rate <strong>{(currentCalendarRollup?.savingsRate ?? 0).toFixed(1)}%</strong>
-            </p>
-            <p>
-              Opportunity <strong>{formatCurrency(model.opportunityTotal)}</strong>
-            </p>
-          </div>
-        </section>
-      </aside>
+      </div>
     </div>
   );
 }

@@ -302,6 +302,7 @@ body {
   grid-area: main;
   min-width: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 14px;
 }
@@ -2663,6 +2664,7 @@ body {
 .tab-grid,
 .stack-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 
@@ -2795,6 +2797,10 @@ body {
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.table-card {
+  overflow-x: auto;
 }
 
 .table-card table {
@@ -3511,7 +3517,7 @@ body {
   .two-col-grid,
   .donut-layout,
   .trajectory-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .forecast-toolbar {
@@ -4522,4 +4528,613 @@ body {
 .focus-movers-list small {
   display: block;
   margin-top: 2px;
+}
+
+/* === TailAdmin migration: structure layer === */
+.ta-page { padding: 24px; background: #F9FAFB; }
+.ta-page-header { margin-bottom: 24px; }
+.ta-page-title { font-size: 24px; font-weight: 600; color: #101828; }
+.ta-page-subtitle { font-size: 14px; color: #667085; margin-top: 4px; }
+.ta-section { margin-bottom: 32px; }
+.ta-section-header { margin-bottom: 12px; }
+.ta-section-title { font-size: 18px; font-weight: 600; color: #101828; }
+.ta-section-body { display: flex; flex-direction: column; gap: 16px; }
+.ta-card { background: #FFFFFF; border: 1px solid #E4E7EC; border-radius: 16px; padding: 24px; }
+.ta-card-header { margin-bottom: 12px; }
+.ta-card-title { font-size: 16px; font-weight: 600; color: #101828; }
+.ta-card-body { font-size: 14px; }
+
+/* ── UI Lab (dev-only page) ─────────────────────────────────────────── */
+
+.top-nav-item--dev {
+  color: #98A2B3;
+  font-style: italic;
+}
+
+.top-nav-item--dev:hover {
+  color: #667085;
+}
+
+.top-nav-item--dev.is-active {
+  color: #667085;
+  font-weight: 600;
+}
+
+.top-nav-item--dev.is-active::after {
+  background: #98A2B3;
+}
+
+.ui-lab-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+}
+
+.ui-lab-header-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ui-lab-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #101828;
+}
+
+.ui-lab-subtitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+}
+
+.ui-lab-dev-badge {
+  flex-shrink: 0;
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #98A2B3;
+  background: #F2F4F7;
+  border: 1px solid #E4E7EC;
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.ui-lab-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+}
+
+.ui-lab-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ui-lab-section-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #101828;
+}
+
+.ui-lab-section-subtitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: #98A2B3;
+}
+
+.ui-lab-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  border-radius: 8px;
+  border: 1.5px dashed #D0D5DD;
+  background: #F9FAFB;
+}
+
+.ui-lab-placeholder-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #98A2B3;
+}
+
+/* === Shell migration: sidebar + main column === */
+.finance-app {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: var(--app-sidebar-w, 260px) minmax(0, 1fr);
+  grid-template-areas: 'sidebar main';
+  gap: 0;
+  min-height: 100vh;
+  background: #F9FAFB;
+}
+
+.app-main-column {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100vh;
+}
+
+.app-main-column .main-zone {
+  width: min(1420px, 100% - 48px);
+  margin: 16px auto 24px;
+  padding: 0;
+}
+
+.app-sidebar {
+  grid-area: sidebar;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  width: var(--app-sidebar-w, 260px);
+  background: #FFFFFF;
+  border-right: 1px solid #E4E7EC;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px;
+  gap: 8px;
+  z-index: 30;
+}
+
+.app-sidebar.is-collapsed {
+  --app-sidebar-w: 72px;
+  width: 72px;
+  padding: 20px 8px;
+}
+
+.finance-app:has(.app-sidebar.is-collapsed) {
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.app-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 12px;
+  border-bottom: 1px solid #E4E7EC;
+  margin-bottom: 8px;
+}
+
+.app-sidebar-logo {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+}
+
+.app-sidebar-brand-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #101828;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.app-sidebar-mobile-close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #667085;
+  font-size: 18px;
+  cursor: pointer;
+  display: none;
+}
+
+.app-sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.app-sidebar-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #667085;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.app-sidebar-link:hover {
+  background: #F2F4F7;
+  color: #101828;
+}
+
+.app-sidebar-link.is-active {
+  background: #ECF3FF;
+  color: #465FFF;
+  font-weight: 600;
+}
+
+.app-sidebar-link--dev {
+  margin-top: 12px;
+  border-top: 1px dashed #E4E7EC;
+  padding-top: 14px;
+  color: #98A2B3;
+}
+
+.app-sidebar-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.app-sidebar.is-collapsed .app-sidebar-label {
+  display: none;
+}
+
+.app-sidebar.is-collapsed .app-sidebar-link {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.app-sidebar-collapse {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #667085;
+  background: transparent;
+  border: 1px solid #E4E7EC;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+.app-sidebar-collapse:hover {
+  background: #F2F4F7;
+  color: #101828;
+}
+
+.app-sidebar.is-collapsed .app-sidebar-collapse {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.app-sidebar.is-collapsed .app-sidebar-collapse .app-sidebar-icon {
+  transform: rotate(180deg);
+}
+
+.app-sidebar-scrim {
+  display: none;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E7EC;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.app-header-menu {
+  display: none;
+  background: transparent;
+  border: 1px solid #E4E7EC;
+  border-radius: 8px;
+  padding: 8px;
+  color: #101828;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.app-header-search {
+  position: relative;
+  flex: 1;
+  max-width: 520px;
+}
+
+.app-header-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #98A2B3;
+  width: 16px;
+  height: 16px;
+}
+
+.app-header-search input {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  border-radius: 8px;
+  border: 1px solid #E4E7EC;
+  background: #F9FAFB;
+  font-size: 14px;
+  color: #101828;
+  font-family: inherit;
+}
+
+.app-header-search input:focus {
+  outline: none;
+  border-color: #465FFF;
+  background: #FFFFFF;
+}
+
+@media (max-width: 1023px) {
+  .finance-app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'main';
+  }
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+  }
+  .app-sidebar.is-mobile-open {
+    transform: translateX(0);
+  }
+  .app-sidebar-mobile-close {
+    display: inline-flex;
+  }
+  .app-sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(16, 24, 40, 0.5);
+    z-index: 25;
+  }
+  .app-header-menu {
+    display: inline-flex;
+  }
+  .app-main-column .main-zone {
+    width: calc(100% - 32px);
+    margin: 12px auto 20px;
+  }
+}
+
+/* === Mobile header: search-behind-icon pattern === */
+.app-header-mobile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 56px;
+}
+@media (min-width: 1024px) {
+  .app-header-mobile-row { display: none; }
+}
+
+.app-header-search-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid #E4E7EC;
+  background: #FFFFFF;
+}
+@media (min-width: 1024px) {
+  .app-header-search-row { display: none; }
+}
+
+.app-header-desktop-search {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .app-header-desktop-search {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+  }
+}
+
+.app-header-search-icon-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #667085;
+}
+.app-header-search-icon-btn:hover {
+  background: #F2F4F7;
+}
+
+.app-header-mobile-brand {
+  font-size: 16px;
+  font-weight: 600;
+  color: #101828;
+  flex: 1;
+  padding-left: 8px;
+}
+
+.app-header-search-row input {
+  width: 100%;
+  height: 40px;
+  border: 1px solid #E4E7EC;
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 14px;
+  color: #101828;
+  background: #FFFFFF;
+  outline: none;
+  font-family: inherit;
+}
+.app-header-search-row input:focus {
+  border-color: #465FFF;
+}
+
+/* === Mobile header polish: brand centering === */
+.app-header-mobile-row {
+  height: 64px;
+}
+
+.app-header-mobile-row > :first-child,
+.app-header-mobile-row > :last-child {
+  width: 40px;
+  flex-shrink: 0;
+}
+
+.app-header-mobile-brand {
+  flex: 1;
+  text-align: center;
+  padding-left: 0;
+}
+
+/* === Mobile header: align hamburger to match search icon — no border, no padding === */
+.app-header-mobile-row .app-header-menu {
+  border: none;
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* === Settings: subnav, width constraint, section visibility === */
+.settings-content-column {
+  max-width: 860px;
+  width: 100%;
+}
+
+.settings-subnav {
+  display: inline-flex;
+  align-items: center;
+  background: #F2F4F7;
+  border: 1px solid #E4E7EC;
+  border-radius: 12px;
+  padding: 2px;
+  gap: 0;
+  margin-bottom: 24px;
+  height: 44px;
+}
+
+.settings-subnav-btn {
+  height: 40px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667085;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.settings-subnav-btn:hover {
+  color: #344054;
+}
+
+.settings-subnav-btn--active {
+  background: #FFFFFF;
+  color: #101828;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+}
+
+.settings-section--hidden {
+  display: none;
+}
+
+/* Mobile overflow fix — allow grid chain to shrink below content size */
+.main-zone,
+.stack-grid,
+.forecast-cockpit,
+.two-col-grid {
+  min-width: 0;
+}
+
+/* Grid items must also opt in to shrink below their min-content */
+.main-zone > *,
+.stack-grid > *,
+.two-col-grid > * {
+  min-width: 0;
+}
+
+/* SVG safety — chart viewBox should not drive container width */
+.trend-svg {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Trends overflow fix — trend-charts-pair must also shrink below content size */
+.trend-charts-pair {
+  min-width: 0;
+}
+
+/* Mobile: constrain toggle buttons so they don't overflow at 375px */
+@media (max-width: 767px) {
+  /* Trends page — MA window selector */
+  .kpi-timeframe-toggle {
+    width: 100%;
+  }
+  .kpi-timeframe-toggle button {
+    flex: 1;
+    font-size: 0.75rem;
+    padding: 6px 4px;
+    text-align: center;
+  }
+
+  /* What-If page — scenario selector (4 buttons, wrap to 2×2) */
+  .forecast-scenario-toggle {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .forecast-scenario-toggle button {
+    flex: 1 1 40%;
+    text-align: center;
+  }
+
+  /* Big Picture — categories donut shrinks to fit 309px card interior */
+  .top-categories-donut-wrap {
+    width: 130px;
+  }
+  .top-categories-layout {
+    gap: 8px;
+  }
 }
