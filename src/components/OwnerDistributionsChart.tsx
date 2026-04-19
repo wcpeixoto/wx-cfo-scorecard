@@ -114,7 +114,22 @@ const TARGET_BADGE_CONFIG: Record<DistributionStatus, { label: string; className
   above_target: { label: '↑ Above target', className: 'card-status-badge is-critical' },
 };
 
-export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, targetNetMargin }: Props) {
+function getTargetBadgeLabel(
+  status: DistributionStatus,
+  actualAmount?: number,
+  targetAmount?: number
+): string {
+  if (actualAmount != null && targetAmount != null && targetAmount > 0) {
+    const pct = Math.round((actualAmount / targetAmount) * 100);
+    if (isFinite(pct) && !isNaN(pct)) {
+      if (status === 'below_target') return `↓ ${pct}% of target`;
+      if (status === 'above_target') return `↑ ${pct}% of target`;
+    }
+  }
+  return TARGET_BADGE_CONFIG[status].label;
+}
+
+export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, distributionActualAmount, targetNetMargin }: Props) {
   const { years, actual, annualized, annualizedFullYear } = buildOwnerDistSeries(
     transactions,
     today
@@ -250,7 +265,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
           )}
         </div>
         {distributionStatus
-          ? <span className={TARGET_BADGE_CONFIG[distributionStatus].className}>{TARGET_BADGE_CONFIG[distributionStatus].label}</span>
+          ? <span className={TARGET_BADGE_CONFIG[distributionStatus].className}>{getTargetBadgeLabel(distributionStatus, distributionActualAmount, distributionTargetAmount)}</span>
           : <span className={`card-status-badge ${ownerDistBadgeClass(pill.variant)}`}>{pill.label}</span>
         }
       </div>
