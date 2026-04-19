@@ -790,8 +790,9 @@ Custom HTML tooltip renderers (`tooltip: { custom: ... }`) are not used.
 | Series text font size | `12px` |
 | Series text color | `#475467` |
 | Series value font weight | `500` |
-| Marker size | `6px × 6px` |
-| Marker border-radius | `50%` (circle) |
+| Marker size | `8px × 8px` |
+| Marker shape | Circle (`border-radius: 50%`) |
+| Marker color | `currentColor` (inherits series color set by ApexCharts) |
 | Marker margin-right | `6px` |
 | Font family | `Outfit`, sans-serif |
 
@@ -805,13 +806,38 @@ tooltip: {
 }
 ```
 
-This enables the `.apexcharts-theme-light` CSS class which the global tooltip styles in `dashboard.css` target.
+This enables the `.apexcharts-theme-light` CSS class which the
+global tooltip styles in `dashboard.css` target.
+
+### ApexCharts v4 marker behavior
+
+ApexCharts v4 renders tooltip markers via a `::before` pseudo-element
+using a Unicode glyph (`●`) rather than a plain `div` with
+`background-color` (the v3 approach used by TailAdmin's reference
+implementation).
+
+The correct fix for v4 is to suppress the glyph entirely and paint
+the marker directly using `background-color: currentColor`. ApexCharts
+sets the series color as `color: rgb(...)` on the marker element —
+`currentColor` picks that up and renders a solid filled circle
+identical in visual weight to the TailAdmin reference.
+
+Do not attempt to size the `::before` glyph — set `font-size: 0px`
+and `content: ""` to collapse it, then use `background-color` on the
+wrapper element for the fill.
+
+The working CSS implementation is in `dashboard.css` under
+`.apexcharts-tooltip-marker` and `.apexcharts-tooltip-marker::before`.
 
 ### Hard rules
 
-- Never use `tooltip: { custom: ... }` — custom HTML renderers bypass the design system
+- Never use `tooltip: { custom: ... }` — custom HTML renderers
+  bypass the design system
 - Never set tooltip background to `transparent`
-- The global `.apexcharts-tooltip` reset block must not exist in `dashboard.css` — it was removed in Phase 4.13
+- Never size the `::before` glyph to create a visible dot —
+  always use `background-color: currentColor` on the wrapper
+- The global `.apexcharts-tooltip` transparent reset block must
+  not exist in `dashboard.css` — it was removed in Phase 4.13
 
 ---
 
