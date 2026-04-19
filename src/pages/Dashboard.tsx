@@ -2428,7 +2428,7 @@ export default function Dashboard() {
         )}
 
         {hasImportedData && activeTab === 'today' && (
-          <TodayPage model={model} txns={filteredTxns} />
+          <TodayPage model={model} txns={filteredTxns} targetNetMargin={businessRules.targetNetMargin} />
         )}
 
         {hasImportedData && activeTab === 'big-picture' && (

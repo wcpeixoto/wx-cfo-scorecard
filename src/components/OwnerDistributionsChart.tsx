@@ -95,12 +95,23 @@ function ownerDistBadgeClass(variant: PillVariant): string {
   }
 }
 
+type DistributionStatus = 'below_target' | 'on_target' | 'above_target';
+
 type Props = {
   transactions: Txn[];
   today?: Date;
+  distributionStatus?: DistributionStatus;
+  distributionTargetAmount?: number;
+  distributionActualAmount?: number;
 };
 
-export default function OwnerDistributionsChart({ transactions, today = new Date() }: Props) {
+const TARGET_BADGE_CONFIG: Record<DistributionStatus, { label: string; className: string }> = {
+  below_target: { label: '↓ Below target', className: 'card-status-badge is-warning' },
+  on_target:    { label: '✓ On target',    className: 'card-status-badge is-healthy' },
+  above_target: { label: '↑ Above target', className: 'card-status-badge is-critical' },
+};
+
+export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus }: Props) {
   const { years, actual, annualized, annualizedFullYear } = buildOwnerDistSeries(
     transactions,
     today
@@ -207,7 +218,10 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         <div className="owner-dist-header-left">
           <h3 className="owner-dist-title">Owner Distributions</h3>
         </div>
-        <span className={`card-status-badge ${ownerDistBadgeClass(pill.variant)}`}>{pill.label}</span>
+        {distributionStatus
+          ? <span className={TARGET_BADGE_CONFIG[distributionStatus].className}>{TARGET_BADGE_CONFIG[distributionStatus].label}</span>
+          : <span className={`card-status-badge ${ownerDistBadgeClass(pill.variant)}`}>{pill.label}</span>
+        }
       </div>
       <div className="owner-dist-chart">
         <Chart options={options} series={series} type="bar" height={260} />
