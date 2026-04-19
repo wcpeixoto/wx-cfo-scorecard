@@ -771,6 +771,50 @@ Area opacity: 0.15–0.25. No 3D. No decorative gradients.
 
 ---
 
+## Tooltips (ApexCharts)
+
+All ApexCharts tooltips use the native tooltip with `theme: 'light'`.
+Custom HTML tooltip renderers (`tooltip: { custom: ... }`) are not used.
+
+| Property | Value |
+|---|---|
+| Background | `rgba(255, 255, 255, 0.96)` |
+| Border | `1px solid #E4E7EC` |
+| Border radius | `8px` |
+| Box shadow | `0px 1px 3px rgba(16,24,40,0.10), 0px 1px 2px rgba(16,24,40,0.06)` |
+| Padding | `12px` |
+| Title font size | `10px` |
+| Title color | `#344054` |
+| Title background | `transparent` |
+| Title border-bottom | `none` |
+| Series text font size | `12px` |
+| Series text color | `#475467` |
+| Series value font weight | `500` |
+| Marker size | `6px × 6px` |
+| Marker border-radius | `50%` (circle) |
+| Marker margin-right | `6px` |
+| Font family | `Outfit`, sans-serif |
+
+### Implementation rule
+
+Every ApexCharts instance must include:
+
+```ts
+tooltip: {
+  theme: 'light'
+}
+```
+
+This enables the `.apexcharts-theme-light` CSS class which the global tooltip styles in `dashboard.css` target.
+
+### Hard rules
+
+- Never use `tooltip: { custom: ... }` — custom HTML renderers bypass the design system
+- Never set tooltip background to `transparent`
+- The global `.apexcharts-tooltip` reset block must not exist in `dashboard.css` — it was removed in Phase 4.13
+
+---
+
 ## Anti-Patterns
 
 1. **Apex legend + custom JSX legend simultaneously.** Choose one.
@@ -925,6 +969,7 @@ Replace this section's content for each project that uses this base spec.
 - Domain-specific color semantics (e.g. financial positive/negative)
 - Any additional card or layout patterns beyond the TailAdmin base
 - **Legend row alignment override** — TailAdmin base is left-aligned (`flex items-center gap-6`). If a specific card requires a centered or right-aligned legend, declare it here by card name: e.g. "RevenueComparisonCard legend row: `flex items-center justify-center gap-6`". Any legend not listed here must follow the base left-aligned rule.
+- **Card overflow override** — TailAdmin base cards use default overflow (hidden). If a card contains a dropdown that must escape the card boundary, declare it here: e.g. "OwnerDistributionsChart `.owner-dist-card`: `overflow: visible` — required to allow the compare-year dropdown panel to escape the card boundary. Do not revert."
 
 ---
 

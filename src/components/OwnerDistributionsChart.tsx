@@ -210,40 +210,9 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       show: false,
     },
     tooltip: {
-      custom: ({ series, dataPointIndex, w }: {
-        series: number[][];
-        seriesIndex: number;
-        dataPointIndex: number;
-        w: { globals: { labels: string[] } };
-      }) => {
-        const actualVal = series[0]?.[dataPointIndex] ?? 0;
-        const forecastVal = series[1]?.[dataPointIndex] ?? 0;
-        const year = w.globals.labels[dataPointIndex] ?? '';
-
-        const hasActual = actualVal > 0;
-        const hasForecast = forecastVal > 0;
-
-        const wrap = 'background:#101828;color:#FFFFFF;padding:8px 12px;border-radius:8px;font-family:Outfit,sans-serif;font-size:13px;line-height:1.6;min-width:140px;';
-        const row = 'display:flex;justify-content:space-between;gap:16px;';
-        const muted = 'color:#98A2B3;';
-        const totalRow = 'display:flex;justify-content:space-between;gap:16px;font-weight:600;border-top:1px solid #374151;margin-top:4px;padding-top:4px;';
-
-        let inner = `<div style="${row}"><span style="${muted}">${year}</span></div>`;
-
-        if (hasActual && hasForecast) {
-          const total = actualVal + forecastVal;
-          inner += `<div style="${row}"><span style="${muted}">Actual</span><span>${formatCompact(actualVal)}</span></div>`;
-          inner += `<div style="${row}"><span style="${muted}">Forecast</span><span>${formatCompact(forecastVal)}</span></div>`;
-          inner += `<div style="${totalRow}"><span>Total</span><span>${formatCompact(total)}</span></div>`;
-        } else if (hasActual) {
-          inner += `<div style="${row}"><span>${formatCompact(actualVal)}</span></div>`;
-        } else if (hasForecast) {
-          inner += `<div style="${row}"><span style="${muted}">Forecast</span><span>${formatCompact(forecastVal)}</span></div>`;
-        } else {
-          inner += `<div style="${row}"><span>${formatCompact(0)}</span></div>`;
-        }
-
-        return `<div style="${wrap}">${inner}</div>`;
+      theme: 'light',
+      y: {
+        formatter: (val: number) => formatCompact(val),
       },
     },
   };

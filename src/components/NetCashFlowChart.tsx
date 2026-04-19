@@ -274,16 +274,9 @@ export default function NetCashFlowChart({
       yaxis: { lines: { show: true } },
     },
     tooltip: {
-      custom: ({ series, dataPointIndex }: { series: number[][], dataPointIndex: number }) => {
-        const val = series[0]?.[dataPointIndex];
-        if (val === undefined || val === null) return '';
-        const sign = val < 0 ? '-' : '';
-        const abs = Math.abs(val);
-        const formatted = `${sign}$${abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        const accentColor = val < 0 ? '#ef4444' : '#465fff';
-        const seriesName = cashFlowMode === 'total' ? 'Total' : 'Operating';
-        const monthLabel = categories[dataPointIndex] ?? '';
-        return `<div style="padding:10px 12px;background:#fff;border:1px solid #e4e7ec;border-radius:10px;box-shadow:0 10px 24px rgba(16,24,40,0.08);font-family:inherit;min-width:148px"><div style="font-size:11px;font-weight:600;color:#101828;margin-bottom:6px">${monthLabel}</div><div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:999px;background:${accentColor};flex-shrink:0;display:inline-block"></span><span style="font-size:11px;color:#667085">${seriesName}</span><span style="margin-left:auto;font-size:12px;font-weight:700;color:${accentColor}">${formatted}</span></div></div>`;
+      theme: 'light',
+      y: {
+        formatter: formatCurrency,
       },
     },
     legend: { show: false },
