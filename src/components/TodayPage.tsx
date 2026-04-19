@@ -42,7 +42,6 @@ export function TodayPage({ model, txns }: TodayPageProps) {
 
       {/* Context section */}
       <div className="today-context-section">
-        <p className="today-context-label">Context</p>
         <div className="today-context-grid">
           <OperatingReserveCard
             currentCashBalance={model.runway.currentCashBalance}

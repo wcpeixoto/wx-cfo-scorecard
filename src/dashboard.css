@@ -5481,15 +5481,6 @@ body {
   margin-top: 24px;
 }
 
-.today-context-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: #667085;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 0 0 12px;
-}
-
 .today-context-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -5500,4 +5491,51 @@ body {
   .today-context-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Hero card header — headline left, severity pill right, same row */
+.hero-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.hero-card-header .today-hero-headline {
+  margin: 0;
+  flex: 1;
+}
+
+/* Shared card status badge — single source of truth for both context cards */
+.card-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.card-status-badge.is-critical {
+  color: #F04438;
+  background: #FEF3F2;
+}
+
+.card-status-badge.is-warning {
+  color: #F79009;
+  background: #FFFAEB;
+}
+
+.card-status-badge.is-healthy {
+  color: #12B76A;
+  background: #ECFDF3;
+}
+
+.card-status-badge.is-neutral {
+  color: #667085;
+  background: #F2F4F7;
 }

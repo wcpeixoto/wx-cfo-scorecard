@@ -31,8 +31,8 @@ function reserveToneClassName(percent: number | null): string {
 
 function getReserveBadgeState(percent: number | null): { label: string; toneClassName: string } {
   if (percent === null) return { label: 'Unavailable', toneClassName: 'is-neutral' };
-  if (percent >= 100) return { label: 'At/above floor', toneClassName: 'is-positive' };
-  return { label: 'Below floor', toneClassName: 'is-caution' };
+  if (percent >= 100) return { label: 'At/above floor', toneClassName: 'is-healthy' };
+  return { label: '↓ Below floor', toneClassName: 'is-warning' };
 }
 
 function computeCoverageWeeks(currentCashBalance: number, reserveTarget: number): number {
@@ -125,7 +125,7 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
           <h3>Operating Reserve</h3>
           <span className="reserve-subtitle">3-month avg expenses</span>
         </div>
-        <span className={`reserve-badge ${reserveBadge.toneClassName}`}>{reserveBadge.label}</span>
+        <span className={`card-status-badge ${reserveBadge.toneClassName}`}>{reserveBadge.label}</span>
       </div>
 
       <ReserveGauge

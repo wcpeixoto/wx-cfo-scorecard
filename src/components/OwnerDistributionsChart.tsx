@@ -79,6 +79,15 @@ function computeSignalPill(
   return { label: '~ On track', variant: 'on-track' };
 }
 
+function ownerDistBadgeClass(variant: PillVariant): string {
+  switch (variant) {
+    case 'above-avg': return 'is-critical';
+    case 'below-avg': return 'is-warning';   // amber — below avg is a mixed signal, not a positive
+    case 'on-track': return 'is-neutral';
+    case 'insufficient': return 'is-neutral';
+  }
+}
+
 type Props = {
   transactions: Txn[];
   today?: Date;
@@ -163,7 +172,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
             What you've taken out of the business each year
           </p>
         </div>
-        <span className={`owner-dist-pill is-${pill.variant}`}>{pill.label}</span>
+        <span className={`card-status-badge ${ownerDistBadgeClass(pill.variant)}`}>{pill.label}</span>
       </div>
       <div className="owner-dist-chart">
         <Chart options={options} series={series} type="bar" height={260} />

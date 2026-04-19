@@ -76,15 +76,15 @@ export function HeroPriorityCard({ signal }: HeroPriorityCardProps) {
 
   return (
     <article className="today-hero-card">
-      {/* 1. Status pill */}
-      <span className={`today-severity-pill is-${signal.severity}`}>
-        <span className="today-severity-dot" aria-hidden="true" />
-        {severityLabel(signal.severity)}
-      </span>
-
       <div className={isFading ? 'today-hero-body is-fading' : 'today-hero-body'}>
-        {/* 2. Headline */}
-        <h2 className="today-hero-headline">{prose.headline}</h2>
+        {/* Header row: headline left, severity pill right */}
+        <div className="hero-card-header">
+          <h2 className="today-hero-headline">{prose.headline}</h2>
+          <span className={`today-severity-pill is-${signal.severity}`}>
+            <span className="today-severity-dot" aria-hidden="true" />
+            {severityLabel(signal.severity)}
+          </span>
+        </div>
 
         {/* 3. Action block — dominant, visually emphasized */}
         <div className="hero-action-block">
