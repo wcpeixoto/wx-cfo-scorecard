@@ -1625,12 +1625,8 @@ export default function Dashboard() {
     if (!compareYear) return;
 
     const year = parseInt(compareYear, 10);
-    if (
-      isNaN(year) ||
-      year <= 2000 ||
-      year >= 2100 ||
-      ![...priorYearActuals.detectedYears].includes(year)
-    ) return;
+    const currentYear = new Date().getFullYear();
+    if (isNaN(year) || year < 2020 || year > currentYear) return;
 
     if (year === compareYearHandledRef.current) return; // same year already applied, skip
 
