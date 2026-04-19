@@ -193,6 +193,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       axisBorder: { show: false },
       axisTicks: { show: false },
       labels: { style: { fontSize: '12px', colors: '#667085' } },
+      crosshairs: { width: 'barWidth' },
     },
     yaxis: {
       labels: {
@@ -211,8 +212,50 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
     },
     tooltip: {
       theme: 'light',
-      y: {
-        formatter: (val: number) => formatCompact(val),
+      shared: true,
+      intersect: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      custom: ({ series, dataPointIndex, w }: { series: number[][], dataPointIndex: number, w: any }) => {
+        const actualVal = Number(series[0]?.[dataPointIndex] ?? 0);
+        const forecastVal = Number(series[1]?.[dataPointIndex] ?? 0);
+        const total = actualVal + forecastVal;
+        const year = w.globals.labels?.[dataPointIndex] ?? '';
+
+        const dot = (color: string) =>
+          `<span style="background-color:${color};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;flex-shrink:0;vertical-align:middle;"></span>`;
+
+        let rows = '';
+        if (actualVal > 0) {
+          rows += `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
+            ${dot('#465FFF')}
+            <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
+              <span class="apexcharts-tooltip-text-y-label">Actual</span>
+              <span class="apexcharts-tooltip-text-y-value">${formatCompact(actualVal)}</span>
+            </div>
+          </div>`;
+        }
+        if (forecastVal > 0) {
+          rows += `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
+            ${dot('#9CB9FF')}
+            <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
+              <span class="apexcharts-tooltip-text-y-label">Forecast</span>
+              <span class="apexcharts-tooltip-text-y-value">${formatCompact(forecastVal)}</span>
+            </div>
+          </div>`;
+        }
+
+        const totalRow = (actualVal > 0 && forecastVal > 0)
+          ? `<div class="owl-tooltip-total">
+              <span class="owl-tooltip-total-label">Total</span>
+              <span class="owl-tooltip-total-value">${formatCompact(total)}</span>
+            </div>`
+          : '';
+
+        return `<div class="owl-tooltip-inner">
+          <div class="apexcharts-tooltip-title">${year}</div>
+          ${rows}
+          ${totalRow}
+        </div>`;
       },
     },
   };

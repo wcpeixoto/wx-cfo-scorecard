@@ -831,8 +831,14 @@ The working CSS implementation is in `dashboard.css` under
 
 ### Hard rules
 
-- Never use `tooltip: { custom: ... }` — custom HTML renderers
-  bypass the design system
+- Avoid `tooltip: { custom: ... }` for single-series charts — use
+  `theme: 'light'` + `y.formatter` instead, so the design system CSS
+  handles all rendering. Exception: use `custom` for multi-series
+  tooltips that need conditional rows (e.g. Actual/Forecast/Total)
+  where the standard renderer cannot express the layout. In that case,
+  emit inner HTML only (no outer wrapper), use inline marker styles
+  (not `.apexcharts-tooltip-marker`), and add scoped CSS classes for
+  any novel rows.
 - Never set tooltip background to `transparent`
 - Never size the `::before` glyph to create a visible dot —
   always use `background-color: currentColor` on the wrapper

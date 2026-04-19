@@ -2545,6 +2545,37 @@ body {
   font-weight: 500 !important;
 }
 
+/* Owner Distributions custom tooltip */
+.owl-tooltip-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.owl-tooltip-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-left: 18px;
+  padding-top: 6px;
+  margin-top: 4px;
+  border-top: 1px solid #E4E7EC;
+  gap: 12px;
+}
+
+.owl-tooltip-total-label {
+  font-size: 12px;
+  font-family: 'Outfit', sans-serif;
+  color: #475467;
+}
+
+.owl-tooltip-total-value {
+  font-size: 12px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  color: #101828;
+}
+
 .tooltip-row-label {
   fill: #667085;
   font-size: 10px;
