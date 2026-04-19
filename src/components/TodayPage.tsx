@@ -91,6 +91,7 @@ export function TodayPage({ model, txns, targetNetMargin }: TodayPageProps) {
               distributionStatus={distributionStatus.status}
               distributionTargetAmount={distributionStatus.targetAmount}
               distributionActualAmount={distributionStatus.actualAmount}
+              targetNetMargin={targetNetMargin}
             />
         </div>
       </div>

@@ -105,6 +105,7 @@ type Props = {
   distributionStatus?: DistributionStatus;
   distributionTargetAmount?: number;
   distributionActualAmount?: number;
+  targetNetMargin?: number;
 };
 
 const TARGET_BADGE_CONFIG: Record<DistributionStatus, { label: string; className: string }> = {
@@ -113,7 +114,7 @@ const TARGET_BADGE_CONFIG: Record<DistributionStatus, { label: string; className
   above_target: { label: '↑ Above target', className: 'card-status-badge is-critical' },
 };
 
-export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus }: Props) {
+export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, targetNetMargin }: Props) {
   const { years, actual, annualized, annualizedFullYear } = buildOwnerDistSeries(
     transactions,
     today
@@ -245,6 +246,11 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       <div className="owner-dist-header">
         <div className="owner-dist-header-left">
           <h3 className="owner-dist-title">Owner Distributions</h3>
+          {targetNetMargin && targetNetMargin > 0 && distributionTargetAmount && distributionTargetAmount > 0 && (
+            <p className="owner-dist-subtitle">
+              Target distribution for {today.getFullYear()}: ${Math.round(distributionTargetAmount / 1000)}<span className="forecast-unit">K</span>{' '}({Math.round(targetNetMargin * 100)}% net profit)
+            </p>
+          )}
         </div>
         {distributionStatus
           ? <span className={TARGET_BADGE_CONFIG[distributionStatus].className}>{TARGET_BADGE_CONFIG[distributionStatus].label}</span>

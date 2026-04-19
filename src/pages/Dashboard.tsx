@@ -2825,7 +2825,16 @@ export default function Dashboard() {
                 <div className="projection-header-center">
                   <span className="projection-compare-label">Compare:</span>
                   <div className="projection-year-pills">
-                    {[...priorYearActuals.detectedYears].sort((a, b) => b - a).map((year) => {
+                    {/* Phase 4.11: when compareYear URL param is present on load,
+                        use it as the active comparison year for this session only.
+                        If the year is outside the default 3, temporarily use it as
+                        the selected year — do not expand the list permanently.
+                        Behavior is replace-on-load only, not sticky across navigation. */}
+                    {[...priorYearActuals.detectedYears]
+                      .filter(y => y < currentForecastYear)
+                      .sort((a, b) => b - a)
+                      .slice(0, 3)
+                      .map((year) => {
                       const isActive = projectionActiveYears.includes(year);
                       return (
                         <button
