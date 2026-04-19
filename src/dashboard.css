@@ -2516,10 +2516,10 @@ body {
 }
 
 .apexcharts-tooltip-marker {
-  width: 8px !important;
-  height: 8px !important;
-  font-size: 8px !important;
-  line-height: 8px !important;
+  width: 10px !important;
+  height: 10px !important;
+  font-size: 10px !important;
+  line-height: 10px !important;
   margin-right: 6px !important;
   border-radius: 50% !important;
   overflow: hidden !important;
@@ -2527,8 +2527,8 @@ body {
 }
 
 .apexcharts-tooltip-marker::before {
-  font-size: 8px !important;
-  line-height: 8px !important;
+  font-size: 10px !important;
+  line-height: 10px !important;
 }
 
 .apexcharts-tooltip-text {
