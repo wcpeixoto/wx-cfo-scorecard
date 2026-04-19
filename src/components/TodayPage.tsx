@@ -2,10 +2,10 @@ import { useMemo } from 'react';
 import type { DashboardModel, Txn } from '../lib/data/contract';
 import { detectSignals } from '../lib/priorities/signals';
 import { rankPriorities } from '../lib/priorities/rank';
-import { getCoreConstraints } from '../lib/priorities/coreConstraints';
 import { HeroPriorityCard } from './HeroPriorityCard';
 import { SecondaryPriority } from './SecondaryPriority';
-import { CoreConstraints } from './CoreConstraints';
+import { OperatingReserveCard } from './OperatingReserveCard';
+import { OwnerDistributionsCard } from './OwnerDistributionsCard';
 
 interface TodayPageProps {
   model: DashboardModel;
@@ -15,7 +15,6 @@ interface TodayPageProps {
 export function TodayPage({ model, txns }: TodayPageProps) {
   const signals = useMemo(() => detectSignals(model, txns), [model, txns]);
   const { hero, secondary } = useMemo(() => rankPriorities(signals), [signals]);
-  const constraints = useMemo(() => getCoreConstraints(model), [model]);
 
   const secondaryClass =
     secondary.length === 2 ? 'today-secondary-row is-pair' : 'today-secondary-row';
@@ -41,11 +40,17 @@ export function TodayPage({ model, txns }: TodayPageProps) {
         </div>
       )}
 
-      <CoreConstraints
-        reservePercent={constraints.reservePercent}
-        forwardCashBalance={constraints.forwardCashBalance}
-        reserveTarget={constraints.reserveTarget}
-      />
+      {/* Context section */}
+      <div className="today-context-section">
+        <p className="today-context-label">Context</p>
+        <div className="today-context-grid">
+          <OperatingReserveCard
+            currentCashBalance={model.runway.currentCashBalance}
+            reserveTarget={model.runway.reserveTarget}
+          />
+          <OwnerDistributionsCard transactions={txns} />
+        </div>
+      </div>
     </div>
   );
 }

@@ -5453,3 +5453,51 @@ body {
     height: 1px;
   }
 }
+
+/* Hero action block — dominant, visually emphasized */
+.hero-action-block {
+  background: #ECF3FF;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 12px 0;
+}
+
+.hero-action-label {
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+  margin: 0 0 4px;
+}
+
+.hero-action-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #101828;
+  margin: 0;
+}
+
+/* Today context section */
+.today-context-section {
+  margin-top: 24px;
+}
+
+.today-context-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #667085;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 12px;
+}
+
+.today-context-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .today-context-grid {
+    grid-template-columns: 1fr;
+  }
+}

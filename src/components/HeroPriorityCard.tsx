@@ -26,7 +26,9 @@ export function HeroPriorityCard({ signal }: HeroPriorityCardProps) {
   const [isFading, setIsFading] = useState(false);
 
   // Guard against StrictMode double-invoke: ensure the network/AI fetch runs
-  // at most once per hero signal type.
+  // at most once per hero signal type. The cancelled flag gates only state
+  // updates — the async chain always runs to completion so getAIProse fires
+  // exactly once per stable signal type.
   const didRunRef = useRef<string | null>(null);
   const isFirstRenderRef = useRef(true);
 
@@ -74,34 +76,41 @@ export function HeroPriorityCard({ signal }: HeroPriorityCardProps) {
 
   return (
     <article className="today-hero-card">
+      {/* 1. Status pill */}
       <span className={`today-severity-pill is-${signal.severity}`}>
         <span className="today-severity-dot" aria-hidden="true" />
         {severityLabel(signal.severity)}
       </span>
 
       <div className={isFading ? 'today-hero-body is-fading' : 'today-hero-body'}>
+        {/* 2. Headline */}
         <h2 className="today-hero-headline">{prose.headline}</h2>
 
+        {/* 3. Action block — dominant, visually emphasized */}
+        <div className="hero-action-block">
+          <p className="hero-action-label">What to do</p>
+          <p className="hero-action-text">{prose.action}</p>
+        </div>
+
+        {/* 4. Why this matters */}
         <div className="today-hero-section">
           <p className="today-hero-label">Why this matters</p>
           <p className="today-hero-text">{prose.why}</p>
         </div>
 
+        {/* 5. Where you are now */}
         <div className="today-hero-section">
           <p className="today-hero-label">Where you are now</p>
           <p className="today-hero-text">{prose.currentState}</p>
         </div>
 
-        <div className="today-hero-section">
-          <p className="today-hero-label">What to do</p>
-          <p className="today-hero-text">{prose.action}</p>
-        </div>
-
+        {/* 6. Backup option */}
         <div className="today-hero-section">
           <p className="today-hero-label">If that's not possible</p>
           <p className="today-hero-text">{prose.alternative}</p>
         </div>
 
+        {/* 7. Quiet followup note */}
         <p className="today-hero-followup">{prose.followupNote}</p>
       </div>
     </article>
