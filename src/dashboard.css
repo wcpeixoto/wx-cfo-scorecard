@@ -5143,7 +5143,7 @@ body {
   background: #FFFFFF;
   border: 1px solid #E4E7EC;
   border-radius: 16px;
-  overflow: hidden;
+  overflow: visible;
   padding: 20px 20px 0 20px;
 }
 
@@ -5205,10 +5205,6 @@ body {
   background: #F2F4F7;
 }
 
-.owner-dist-chart {
-  padding-bottom: 4px;
-}
-
 .owner-dist-card .apexcharts-legend {
   display: none !important;
 }
@@ -5225,11 +5221,16 @@ body {
 
 .owner-dist-footer {
   display: flex;
-  justify-content: flex-start;
   align-items: center;
-  padding-left: 83px;
-  margin-top: 4px;
-  padding-bottom: 16px;
+  border-top: 1px solid #E4E7EC;
+  padding: 8px 20px 12px;
+}
+
+.owner-dist-footer .period-dropdown-menu {
+  top: auto;
+  bottom: calc(100% + 6px);
+  right: auto;
+  left: 0;
 }
 
 .owner-dist-legend-item {

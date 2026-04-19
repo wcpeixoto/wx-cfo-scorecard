@@ -266,30 +266,30 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
           </span>
         </div>
         <div className="owner-dist-chart">
-          <Chart options={options} series={series} type="bar" height={260} />
+          <Chart options={options} series={series} type="bar" height={229} />
         </div>
-        {actualYears.length > 0 && (
-          <div className="owner-dist-footer">
-            <div className="period-dropdown" ref={dropdownRef}>
-              <button
-                className="owner-dist-forecast-action"
-                onClick={() => setIsDropdownOpen(prev => !prev)}
-              >
-                Compare {currentYear} to a past year
-              </button>
-              {isDropdownOpen && (
-                <ul className="period-dropdown-menu">
-                  {actualYears.map(year => (
-                    <li key={year}>
-                      <button onClick={() => handleYearSelect(year)}>{year}</button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        )}
       </div>
+      {actualYears.length > 0 && (
+        <div className="owner-dist-footer">
+          <div className="period-dropdown" ref={dropdownRef}>
+            <button
+              className="owner-dist-forecast-action"
+              onClick={() => setIsDropdownOpen(prev => !prev)}
+            >
+              Compare {currentYear} to a past year
+            </button>
+            {isDropdownOpen && (
+              <ul className="period-dropdown-menu">
+                {actualYears.map(year => (
+                  <li key={year}>
+                    <button onClick={() => handleYearSelect(year)}>{year}</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
     </article>
   );
 }
