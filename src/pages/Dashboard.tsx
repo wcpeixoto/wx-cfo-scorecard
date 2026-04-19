@@ -638,6 +638,8 @@ export default function Dashboard() {
   const [isBigPictureFilterOpen, setIsBigPictureFilterOpen] = useState(false);
   const preserveAccountSettingsOnImportClearRef = useRef(false);
   const sharedAccountSettingsSyncArmedRef = useRef(false);
+  const compareYearHandledRef = useRef<number | null>(null);
+  const projectionTableRef = useRef<HTMLDivElement>(null);
   const [sharedAccountSettingsReady, setSharedAccountSettingsReady] = useState(!sharedPersistenceEnabled);
   const [sharedAccountSettingsHasRemoteData, setSharedAccountSettingsHasRemoteData] = useState(false);
   const [businessRules, setBusinessRules] = useState<BusinessRules>(() => ({ ...DEFAULT_BUSINESS_RULES }));
@@ -1603,6 +1605,50 @@ export default function Dashboard() {
     [baseTxns, currentForecastYear]
   );
   const [projectionActiveYears, setProjectionActiveYears] = useState<number[]>([]);
+
+  // Phase 4.11b: pill set = default 3 + any active years injected outside the default 3
+  const pillYears = useMemo(() => {
+    const defaultYears = [...priorYearActuals.detectedYears]
+      .filter(y => y < currentForecastYear)
+      .sort((a, b) => b - a)
+      .slice(0, 3);
+    const injected = projectionActiveYears.filter(
+      y => y < currentForecastYear && !defaultYears.includes(y)
+    );
+    return [...new Set([...injected, ...defaultYears])].sort((a, b) => b - a);
+  }, [priorYearActuals.detectedYears, currentForecastYear, projectionActiveYears]);
+
+  // Phase 4.11: deep-link handler — fires on each fresh arrival with a new compareYear param
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const compareYear = params.get('compareYear');
+    if (!compareYear) return;
+
+    const year = parseInt(compareYear, 10);
+    if (
+      isNaN(year) ||
+      year <= 2000 ||
+      year >= 2100 ||
+      ![...priorYearActuals.detectedYears].includes(year)
+    ) return;
+
+    if (year === compareYearHandledRef.current) return; // same year already applied, skip
+
+    compareYearHandledRef.current = year;
+    setProjectionActiveYears([year]);
+    setForecastRange('1y');
+    setTimeout(() => {
+      projectionTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+  }, [location.search, priorYearActuals]);
+
+  // Phase 4.11b: reset deep-link ref when user leaves What-If tab,
+  // so a fresh arrival with the same year fires again
+  useEffect(() => {
+    if (activeTab !== 'what-if') {
+      compareYearHandledRef.current = null;
+    }
+  }, [activeTab]);
 
   const latestRollup = model.monthlyRollups[model.monthlyRollups.length - 1] ?? null;
   const previousRollup = model.monthlyRollups[model.monthlyRollups.length - 2] ?? null;
@@ -2808,7 +2854,7 @@ export default function Dashboard() {
               }))}
             />
 
-            <article className="card table-card">
+            <article className="card table-card" ref={projectionTableRef}>
               <div className="projection-header">
                 <h3>Projection Table</h3>
                 <div className="projection-header-center">
@@ -2819,11 +2865,7 @@ export default function Dashboard() {
                         If the year is outside the default 3, temporarily use it as
                         the selected year — do not expand the list permanently.
                         Behavior is replace-on-load only, not sticky across navigation. */}
-                    {[...priorYearActuals.detectedYears]
-                      .filter(y => y < currentForecastYear)
-                      .sort((a, b) => b - a)
-                      .slice(0, 3)
-                      .map((year) => {
+                    {pillYears.map((year) => {
                       const isActive = projectionActiveYears.includes(year);
                       return (
                         <button
