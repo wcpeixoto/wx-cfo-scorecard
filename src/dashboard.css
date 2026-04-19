@@ -5207,6 +5207,24 @@ body {
   padding-bottom: 20px;
 }
 
+.owner-dist-forecast-action-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.owner-dist-forecast-action {
+  all: unset;
+  font-size: 12px;
+  font-weight: 500;
+  color: #465FFF;
+  cursor: pointer;
+}
+
+.owner-dist-forecast-action:hover {
+  color: #3641F5;
+}
+
 /* Trends overflow fix — trend-charts-pair must also shrink below content size */
 .trend-charts-pair {
   min-width: 0;

@@ -1,3 +1,5 @@
+import { useRef, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { Txn } from '../lib/data/contract';
@@ -120,6 +122,32 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
   const currentYear = today.getFullYear();
   const pill = computeSignalPill(years, actual, annualizedFullYear, currentYear);
 
+  const navigate = useNavigate();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Historical years only: year < currentYear with actual data, sorted descending
+  const actualYears = years
+    .filter((y, i) => y < currentYear && actual[i] > 0)
+    .sort((a, b) => b - a);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+    function handleOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [isDropdownOpen]);
+
+  function handleYearSelect(year: number) {
+    setIsDropdownOpen(false);
+    navigate({ pathname: '/forecast', search: `?compareYear=${year}` });
+  }
+
   const options: ApexOptions = {
     chart: {
       type: 'bar',
@@ -223,6 +251,27 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
           : <span className={`card-status-badge ${ownerDistBadgeClass(pill.variant)}`}>{pill.label}</span>
         }
       </div>
+      {actualYears.length > 0 && (
+        <div className="owner-dist-forecast-action-wrap">
+          <div className="period-dropdown" ref={dropdownRef}>
+            <button
+              className="owner-dist-forecast-action"
+              onClick={() => setIsDropdownOpen(prev => !prev)}
+            >
+              Compare in Forecast →
+            </button>
+            {isDropdownOpen && (
+              <ul className="period-dropdown-menu">
+                {actualYears.map(year => (
+                  <li key={year}>
+                    <button onClick={() => handleYearSelect(year)}>{year}</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
       <div className="owner-dist-chart">
         <Chart options={options} series={series} type="bar" height={260} />
       </div>
