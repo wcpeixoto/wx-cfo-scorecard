@@ -5206,13 +5206,54 @@ body {
 }
 
 .owner-dist-chart {
-  padding-bottom: 20px;
+  padding-bottom: 4px;
 }
 
-.owner-dist-forecast-action-wrap {
+.owner-dist-card .apexcharts-legend {
+  display: none !important;
+}
+
+.owner-dist-legend-row {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 20px;
+  padding-top: 20px;
+  padding-left: 0;
+  margin-top: 0;
+  width: 100%;
+}
+
+.owner-dist-footer {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding-left: 83px;
   margin-top: 4px;
+  padding-bottom: 16px;
+}
+
+.owner-dist-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #667085;
+  font-family: Outfit, sans-serif;
+}
+
+.owner-dist-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.owner-dist-legend-dot.actual {
+  background: #465FFF;
+}
+
+.owner-dist-legend-dot.forecast {
+  background: #9CB9FF;
 }
 
 .owner-dist-forecast-action {

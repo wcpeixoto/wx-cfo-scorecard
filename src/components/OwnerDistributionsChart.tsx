@@ -192,10 +192,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       xaxis: { lines: { show: false } },
     },
     legend: {
-      show: true,
-      position: 'top',
-      horizontalAlign: 'left',
-      fontFamily: 'Outfit, sans-serif',
+      show: false,
     },
     tooltip: {
       custom: ({ series, dataPointIndex, w }: {
@@ -257,29 +254,41 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
           : <span className={`card-status-badge ${ownerDistBadgeClass(pill.variant)}`}>{pill.label}</span>
         }
       </div>
-      {actualYears.length > 0 && (
-        <div className="owner-dist-forecast-action-wrap">
-          <div className="period-dropdown" ref={dropdownRef}>
-            <button
-              className="owner-dist-forecast-action"
-              onClick={() => setIsDropdownOpen(prev => !prev)}
-            >
-              Compare in Forecast →
-            </button>
-            {isDropdownOpen && (
-              <ul className="period-dropdown-menu">
-                {actualYears.map(year => (
-                  <li key={year}>
-                    <button onClick={() => handleYearSelect(year)}>{year}</button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+      <div>
+        <div className="owner-dist-legend-row">
+          <span className="owner-dist-legend-item">
+            <span className="owner-dist-legend-dot actual"></span>
+            Actual
+          </span>
+          <span className="owner-dist-legend-item">
+            <span className="owner-dist-legend-dot forecast"></span>
+            Forecast
+          </span>
         </div>
-      )}
-      <div className="owner-dist-chart">
-        <Chart options={options} series={series} type="bar" height={260} />
+        <div className="owner-dist-chart">
+          <Chart options={options} series={series} type="bar" height={260} />
+        </div>
+        {actualYears.length > 0 && (
+          <div className="owner-dist-footer">
+            <div className="period-dropdown" ref={dropdownRef}>
+              <button
+                className="owner-dist-forecast-action"
+                onClick={() => setIsDropdownOpen(prev => !prev)}
+              >
+                Compare {currentYear} to a past year
+              </button>
+              {isDropdownOpen && (
+                <ul className="period-dropdown-menu">
+                  {actualYears.map(year => (
+                    <li key={year}>
+                      <button onClick={() => handleYearSelect(year)}>{year}</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </article>
   );

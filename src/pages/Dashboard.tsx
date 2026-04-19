@@ -16,8 +16,6 @@ import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import TrajectoryPanel from '../components/TrajectoryPanel';
-import OwnerDistributionsChart from '../components/OwnerDistributionsChart';
-import { OperatingReserveCard } from '../components/OperatingReserveCard';
 import { TodayPage } from '../components/TodayPage';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
@@ -2450,38 +2448,29 @@ export default function Dashboard() {
               }
             />
 
-            <div className="two-col-grid runway-highlights-grid">
-              <DigHereHighlights
-                items={digHereHighlights}
-                timeframeLabel={`${selectedKpiFrameLabel} comparison`}
-                onTitleClick={() =>
-                  navigateToDigHere(
-                    selectedKpiComparison?.currentStartMonth && selectedKpiComparison?.currentEndMonth
-                      ? {
-                          startMonth: selectedKpiComparison.currentStartMonth,
-                          endMonth: selectedKpiComparison.currentEndMonth,
-                          focusContext: 'category-shifts',
-                        }
-                      : undefined
-                  )
-                }
-                onItemClick={(item) =>
-                  navigateToDigHere({
-                    category: item.category,
-                    startMonth: selectedKpiComparison?.currentStartMonth ?? null,
-                    endMonth: selectedKpiComparison?.currentEndMonth ?? null,
-                    focusContext: 'category-shifts',
-                  })
-                }
-              />
-
-              <OperatingReserveCard
-                currentCashBalance={currentCashBalance}
-                reserveTarget={model.runway.reserveTarget}
-              />
-
-              <OwnerDistributionsChart transactions={baseTxns} />
-            </div>
+            <DigHereHighlights
+              items={digHereHighlights}
+              timeframeLabel={`${selectedKpiFrameLabel} comparison`}
+              onTitleClick={() =>
+                navigateToDigHere(
+                  selectedKpiComparison?.currentStartMonth && selectedKpiComparison?.currentEndMonth
+                    ? {
+                        startMonth: selectedKpiComparison.currentStartMonth,
+                        endMonth: selectedKpiComparison.currentEndMonth,
+                        focusContext: 'category-shifts',
+                      }
+                    : undefined
+                )
+              }
+              onItemClick={(item) =>
+                navigateToDigHere({
+                  category: item.category,
+                  startMonth: selectedKpiComparison?.currentStartMonth ?? null,
+                  endMonth: selectedKpiComparison?.currentEndMonth ?? null,
+                  focusContext: 'category-shifts',
+                })
+              }
+            />
 
             <div className="two-col-grid">
               <article className="card preview-card">
