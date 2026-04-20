@@ -1591,14 +1591,6 @@ export default function Dashboard() {
       })),
     [visibleScenarioProjection]
   );
-  const cashFlowForecastStatusByMonth = useMemo<Partial<Record<string, CashFlowForecastStatus>>>(() => {
-    const statuses: Partial<Record<string, CashFlowForecastStatus>> = {};
-    visibleScenarioProjection.forEach((point) => {
-      statuses[point.month] = 'projected';
-    });
-    return statuses;
-  }, [visibleScenarioProjection]);
-
   const currentForecastYear = new Date().getFullYear();
   const priorYearActuals = useMemo(
     () => computePriorYearActuals(baseTxns, currentForecastYear),
@@ -2818,11 +2810,9 @@ export default function Dashboard() {
                   ? businessRules.targetNetMargin
                   : null
               }
-              pointStatusByMonth={cashFlowForecastStatusByMonth}
               decisionSignals={forecastDecisionSignals}
               seasonality={forecastSeasonality}
               currentCashBalance={forecastCurrentCashBalance}
-              hasCurrentCashBalance={hasForecastCurrentCashBalance}
               forecastRangeMonths={forecastRangeMonths}
               forecastRangeValue={forecastRange}
               forecastRangeOptions={FORECAST_RANGE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}

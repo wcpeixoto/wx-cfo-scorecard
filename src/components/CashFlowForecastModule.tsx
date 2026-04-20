@@ -62,11 +62,9 @@ type CashFlowForecastModuleProps = {
   fixedReserveAmount?: number | null;
   /** Optional: override TARGET_NET_MARGIN from settings (0–1). Falls back to 0.25. */
   targetNetMargin?: number | null;
-  pointStatusByMonth: Partial<Record<string, CashFlowForecastStatus>>;
   decisionSignals: ForecastDecisionSignals;
   seasonality: ForecastSeasonalityMeta;
   currentCashBalance: number;
-  hasCurrentCashBalance: boolean;
   forecastRangeMonths: number;
   forecastRangeValue: string;
   forecastRangeOptions: SelectOption[];
@@ -317,11 +315,9 @@ export default function CashFlowForecastModule({
   reserveTarget,
   fixedReserveAmount,
   targetNetMargin,
-  pointStatusByMonth,
   decisionSignals,
   seasonality,
   currentCashBalance,
-  hasCurrentCashBalance,
   forecastRangeMonths,
   forecastRangeValue,
   forecastRangeOptions,
