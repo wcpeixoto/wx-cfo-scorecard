@@ -5409,6 +5409,33 @@ body {
   .top-categories-layout {
     gap: 8px;
   }
+
+  /* Settings page — segmented toggle fills viewport width */
+  .settings-subnav {
+    width: 100%;
+  }
+  .settings-subnav-btn {
+    flex: 1;
+    min-width: 0;
+    padding: 0 8px;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Settings page — Rules tab rows stack vertically on narrow viewports */
+  .rules-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .rules-row-control {
+    flex-shrink: 1;
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .rules-row-control--col {
+    align-items: flex-start;
+  }
 }
 
 /* ─── Today page ─────────────────────────────────────────────────────── */
