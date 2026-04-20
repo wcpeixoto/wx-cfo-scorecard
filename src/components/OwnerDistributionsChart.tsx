@@ -116,14 +116,14 @@ const TARGET_BADGE_CONFIG: Record<DistributionStatus, { label: string; className
 
 function getTargetBadgeLabel(
   status: DistributionStatus,
-  actualAmount?: number,
+  forecastTotal?: number,
   targetAmount?: number
 ): string {
-  if (actualAmount != null && targetAmount != null && targetAmount > 0) {
-    const pct = Math.round((actualAmount / targetAmount) * 100);
+  if (forecastTotal != null && targetAmount != null && targetAmount > 0) {
+    const pct = Math.round((forecastTotal / targetAmount) * 100);
     if (isFinite(pct) && !isNaN(pct)) {
-      if (status === 'below_target') return `↓ ${pct}% of target`;
-      if (status === 'above_target') return `↑ ${pct}% of target`;
+      const arrow = pct >= 100 ? '↑' : '↓';
+      return `${arrow} Forecast ${pct}% of target`;
     }
   }
   return TARGET_BADGE_CONFIG[status].label;
@@ -281,7 +281,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
           )}
         </div>
         {distributionStatus
-          ? <span className={TARGET_BADGE_CONFIG[distributionStatus].className}>{getTargetBadgeLabel(distributionStatus, distributionActualAmount, distributionTargetAmount)}</span>
+          ? <span className={TARGET_BADGE_CONFIG[distributionStatus].className}>{getTargetBadgeLabel(distributionStatus, annualizedFullYear, distributionTargetAmount)}</span>
           : <span className={`card-status-badge ${ownerDistBadgeClass(pill.variant)}`}>{pill.label}</span>
         }
       </div>
