@@ -2843,33 +2843,6 @@ export default function Dashboard() {
             <article className="card table-card" ref={projectionTableRef}>
               <div className="projection-header">
                 <h3>Projection Table</h3>
-                <div className="projection-header-center">
-                  <span className="projection-compare-label">Compare:</span>
-                  <div className="projection-year-pills">
-                    {/* Phase 4.11: when compareYear URL param is present on load,
-                        use it as the active comparison year for this session only.
-                        If the year is outside the default 3, temporarily use it as
-                        the selected year — do not expand the list permanently.
-                        Behavior is replace-on-load only, not sticky across navigation. */}
-                    {pillYears.map((year) => {
-                      const isActive = projectionActiveYears.includes(year);
-                      return (
-                        <button
-                          key={year}
-                          type="button"
-                          className={`projection-year-pill${isActive ? ' is-active' : ''}`}
-                          onClick={() =>
-                            setProjectionActiveYears((prev) =>
-                              isActive ? prev.filter((y) => y !== year) : [...prev, year]
-                            )
-                          }
-                        >
-                          {year}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
                 <button
                   type="button"
                   className="projection-export-btn"
@@ -2909,6 +2882,33 @@ export default function Dashboard() {
                 >
                   Export CSV
                 </button>
+              </div>
+              <div className="table-subcontrols">
+                <span className="table-subcontrols-label">Compare</span>
+                <div className="projection-year-pills">
+                  {/* Phase 4.11: when compareYear URL param is present on load,
+                      use it as the active comparison year for this session only.
+                      If the year is outside the default 3, temporarily use it as
+                      the selected year — do not expand the list permanently.
+                      Behavior is replace-on-load only, not sticky across navigation. */}
+                  {pillYears.map((year) => {
+                    const isActive = projectionActiveYears.includes(year);
+                    return (
+                      <button
+                        key={year}
+                        type="button"
+                        className={`projection-year-pill${isActive ? ' is-active' : ''}`}
+                        onClick={() =>
+                          setProjectionActiveYears((prev) =>
+                            isActive ? prev.filter((y) => y !== year) : [...prev, year]
+                          )
+                        }
+                      >
+                        {year}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <div className="projection-table-scroll">
                 {(() => {

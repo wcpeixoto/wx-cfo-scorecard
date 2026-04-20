@@ -2921,27 +2921,27 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .projection-header h3 {
   margin: 0;
   font-size: 1.06rem;
-  flex: 0 0 auto;
+  flex: 1;
 }
 
-.projection-header-center {
-  flex: 1;
+.table-subcontrols {
   display: flex;
-  justify-content: center;
   align-items: center;
   gap: 8px;
+  margin-top: 6px;
+  margin-bottom: 10px;
 }
 
-.projection-compare-label {
-  color: #667085;
-  font-size: 14px;
+.table-subcontrols-label {
+  font-size: 12px;
   font-weight: 500;
+  color: #667085;
 }
 
 .projection-table-scroll {
