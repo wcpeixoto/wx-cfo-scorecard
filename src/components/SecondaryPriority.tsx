@@ -7,7 +7,7 @@ interface SecondaryPriorityProps {
 
 function severityLabel(severity: Signal['severity']): string {
   switch (severity) {
-    case 'critical': return 'Critical';
+    case 'critical': return 'Needs attention';
     case 'warning': return 'Watch';
     case 'healthy': return 'Healthy';
   }
