@@ -108,6 +108,17 @@ export default function ProjectedCashBalanceChart({
     return points;
   }, [knownEvents, data, categories, values]);
 
+  const initialBalance = data.length > 0 ? data[0].net : 0;
+  const useZeroBaseline = initialBalance <= 50000;
+
+  const yAxisMin = useZeroBaseline ? 0 : undefined;
+  const yAxisMax = useZeroBaseline
+    ? (() => {
+        const maxVal = Math.max(...data.map(d => d.net));
+        return Math.ceil((maxVal * 1.15) / 1000) * 1000;
+      })()
+    : undefined;
+
   const options = useMemo<ApexOptions>(
     () => ({
       chart: {
@@ -180,6 +191,8 @@ export default function ProjectedCashBalanceChart({
         },
       },
       yaxis: {
+        min: yAxisMin,
+        max: yAxisMax,
         labels: {
           formatter: formatCurrency,
           offsetX: -4,
@@ -211,7 +224,7 @@ export default function ProjectedCashBalanceChart({
       },
       legend: { show: false },
     }),
-    [categories, tooltipLabels, labelStep, eventAnnotationPoints, height]
+    [categories, tooltipLabels, labelStep, eventAnnotationPoints, height, yAxisMin, yAxisMax]
   );
 
   const series = useMemo(
