@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import TrendLineChart from './TrendLineChart';
+import ProjectedCashBalanceChart from './ProjectedCashBalanceChart';
 import type {
   CashFlowForecastStatus,
   ForecastDecisionSignals,
@@ -825,21 +825,10 @@ export default function CashFlowForecastModule({
           );
         })()}
 
-        <TrendLineChart
+        <ProjectedCashBalanceChart
           data={displaySeries}
-          metric="net"
-          title="Projected Cash Balance"
-          tooltipVariant="forecast"
-          pointStatusByMonth={displayPointStatusByMonth}
-          showRevenueExpenseInTooltip={viewMode === 'monthly'}
-          tooltipSingleLabel={viewMode === 'cumulative' ? 'Cash Balance' : undefined}
-          rangeLabelOverride=""
-          forecastRangeLabel=""
-          hideDots
-          hideTrend
-          hideAxisLines
-          showOnlyProjectedTicks
-          showMonthlyXLabels
+          granularity={granularity}
+          knownEvents={forecastEvents}
         />
 
         <div className="forecast-control-stack" aria-label="What-if controls">
