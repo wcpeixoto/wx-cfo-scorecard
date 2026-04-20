@@ -344,6 +344,19 @@ Item: `flex items-center gap-3 px-3 py-2 rounded-lg text-theme-sm hover:bg-gray-
 
 Light primary example: `bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400`
 
+### Shared badge primitive
+
+All card-level status badges use `.card-status-badge` with variants:
+- `.is-warning` — amber (`#F79009` / `#FFFAEB`)
+- `.is-critical` — red (`#F04438` / `#FEF3F2`)
+- `.is-healthy` — green (`#12B76A` / `#ECFDF3`)
+
+Badge spec: `font-size: 12px`, `font-weight: 500`, `padding: 4px 10px`,
+`border-radius: 999px`, `display: inline-flex`, `align-items: center`,
+`gap: 4px`.
+
+Never create a new badge pattern. Reuse `.card-status-badge`.
+
 ---
 
 ## Button
@@ -774,7 +787,19 @@ Area opacity: 0.15–0.25. No 3D. No decorative gradients.
 ## Tooltips (ApexCharts)
 
 All ApexCharts tooltips use the native tooltip with `theme: 'light'`.
-Custom HTML tooltip renderers (`tooltip: { custom: ... }`) are not used.
+Custom HTML tooltip renderers (`tooltip: { custom: ... }`) are not
+used — with one documented exception (see below).
+
+Every ApexCharts instance must include:
+
+```ts
+tooltip: {
+  theme: 'light'
+}
+```
+
+This enables the `.apexcharts-theme-light` CSS class which the
+global tooltip styles in `dashboard.css` target.
 
 | Property | Value |
 |---|---|
@@ -796,54 +821,55 @@ Custom HTML tooltip renderers (`tooltip: { custom: ... }`) are not used.
 | Marker margin-right | `6px` |
 | Font family | `Outfit`, sans-serif |
 
-### Implementation rule
+### ApexCharts v4/v5 marker behavior
 
-Every ApexCharts instance must include:
-
-```ts
-tooltip: {
-  theme: 'light'
-}
-```
-
-This enables the `.apexcharts-theme-light` CSS class which the
-global tooltip styles in `dashboard.css` target.
-
-### ApexCharts v4 marker behavior
-
-ApexCharts v4 renders tooltip markers via a `::before` pseudo-element
+ApexCharts v4+ renders tooltip markers via a `::before` pseudo-element
 using a Unicode glyph (`●`) rather than a plain `div` with
 `background-color` (the v3 approach used by TailAdmin's reference
 implementation).
 
-The correct fix for v4 is to suppress the glyph entirely and paint
-the marker directly using `background-color: currentColor`. ApexCharts
-sets the series color as `color: rgb(...)` on the marker element —
-`currentColor` picks that up and renders a solid filled circle
-identical in visual weight to the TailAdmin reference.
+The correct fix is to suppress the glyph and paint the marker using
+`background-color: currentColor`. ApexCharts sets the series color
+as `color: rgb(...)` on the marker element — `currentColor` picks
+that up and renders a solid filled circle.
 
-Do not attempt to size the `::before` glyph — set `font-size: 0px`
-and `content: ""` to collapse it, then use `background-color` on the
+Do not size the `::before` glyph — set `font-size: 0px` and
+`content: ""` to collapse it, then use `background-color` on the
 wrapper element for the fill.
 
-The working CSS implementation is in `dashboard.css` under
+The working CSS is in `dashboard.css` under
 `.apexcharts-tooltip-marker` and `.apexcharts-tooltip-marker::before`.
+
+### Bar chart crosshairs
+
+Bar charts must set `crosshairs: { width: 'barWidth' }` in the
+chart options. The default `'auto'` uses slot width which is
+significantly wider than the bar and looks wrong on hover.
+
+To hide the crosshair column background entirely while preserving
+tooltip behavior, add the appropriate opacity override to the
+crosshairs config (confirmed shape varies by ApexCharts version —
+check existing usage in the component before adding).
+
+### Exception — OwnerDistributionsChart custom tooltip
+
+`OwnerDistributionsChart.tsx` uses `tooltip: { custom: ... }` to
+render a Total row (Actual + Forecast = full year distribution).
+This is a deliberate, documented exception to the no-custom-tooltip
+rule. The custom renderer wrapper must include `.apexcharts-theme-light`
+so global tooltip CSS applies.
+
+This exception is scoped to `OwnerDistributionsChart.tsx` only.
+Do not generalize it to other charts.
 
 ### Hard rules
 
-- Avoid `tooltip: { custom: ... }` for single-series charts — use
-  `theme: 'light'` + `y.formatter` instead, so the design system CSS
-  handles all rendering. Exception: use `custom` for multi-series
-  tooltips that need conditional rows (e.g. Actual/Forecast/Total)
-  where the standard renderer cannot express the layout. In that case,
-  emit inner HTML only (no outer wrapper), use inline marker styles
-  (not `.apexcharts-tooltip-marker`), and add scoped CSS classes for
-  any novel rows.
+- Never use `tooltip: { custom: ... }` except in OwnerDistributionsChart
 - Never set tooltip background to `transparent`
-- Never size the `::before` glyph to create a visible dot —
-  always use `background-color: currentColor` on the wrapper
+- Never size the `::before` glyph — use `background-color: currentColor`
 - The global `.apexcharts-tooltip` transparent reset block must
   not exist in `dashboard.css` — it was removed in Phase 4.13
+- Every ApexCharts bar chart must have `crosshairs: { width: 'barWidth' }`
 
 ---
 
