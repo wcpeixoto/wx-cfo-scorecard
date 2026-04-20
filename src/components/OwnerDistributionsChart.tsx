@@ -193,7 +193,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       axisBorder: { show: false },
       axisTicks: { show: false },
       labels: { style: { fontSize: '12px', colors: '#667085' } },
-      crosshairs: { width: 'barWidth' },
+      crosshairs: { width: 'barWidth', opacity: 0 },
     },
     yaxis: {
       labels: {
@@ -206,6 +206,10 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       strokeDashArray: 4,
       yaxis: { lines: { show: true } },
       xaxis: { lines: { show: false } },
+    },
+    states: {
+      hover: { filter: { type: 'none' } },
+      active: { filter: { type: 'none' } },
     },
     legend: {
       show: false,
