@@ -5436,6 +5436,41 @@ body {
   .rules-row-control--col {
     align-items: flex-start;
   }
+
+  /* Settings — Accounts tab: grid item must opt in to shrink below its min-content */
+  .settings-section-pane {
+    min-width: 0;
+  }
+
+  /* Settings — Accounts tab: constrain Cash anchor block and above-table content */
+  .account-setup-summary {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .account-setup-summary * {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
+  }
+  .ta-card-body .card-head {
+    flex-wrap: wrap;
+  }
+
+  /* Settings — Rules tab: cashflow-toggle expands to fill the control area */
+  .rules-row-control .cashflow-toggle {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+  }
+  .rules-row-control .cashflow-toggle button {
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+  }
 }
 
 /* ─── Today page ─────────────────────────────────────────────────────── */
