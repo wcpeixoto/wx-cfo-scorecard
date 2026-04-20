@@ -3,6 +3,11 @@
 
 const EPSILON = 0.00001;
 
+/** Threshold below which the reserve is considered "getting tight".
+ *  At this point the owner is within 25% of the reserve floor —
+ *  close enough to warrant attention but not yet critical. */
+const RESERVE_TIGHT_THRESHOLD = 0.75;
+
 function formatCurrency(value: number): string {
   return value.toLocaleString(undefined, {
     style: 'currency',
@@ -29,10 +34,11 @@ function reserveToneClassName(percent: number | null): string {
   return 'is-caution';
 }
 
-function getReserveBadgeState(percent: number | null): { label: string; toneClassName: string } {
-  if (percent === null) return { label: 'Unavailable', toneClassName: 'is-neutral' };
-  if (percent >= 100) return { label: 'At/above floor', toneClassName: 'is-healthy' };
-  return { label: '↓ Below floor', toneClassName: 'is-warning' };
+function getReserveBadgeState(percentFunded: number | null): { label: string; className: string } {
+  if (percentFunded === null) return { label: '—', className: 'card-status-badge is-neutral' };
+  if (percentFunded >= 1.0) return { label: '✓ On track', className: 'card-status-badge is-healthy' };
+  if (percentFunded >= RESERVE_TIGHT_THRESHOLD) return { label: '↓ Getting tight', className: 'card-status-badge is-warning' };
+  return { label: '↓ Below reserve', className: 'card-status-badge is-critical' };
 }
 
 function computeCoverageWeeks(currentCashBalance: number, reserveTarget: number): number {
@@ -115,7 +121,7 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
   const reservePercent = getReservePercentDisplay(currentCashBalance, reserveTarget);
   const reserveFillPercent = reservePercent === null ? 0 : Math.min(Math.max(reservePercent, 0), 100);
   const reserveTone = reserveToneClassName(reservePercent);
-  const reserveBadge = getReserveBadgeState(reservePercent);
+  const reserveBadge = getReserveBadgeState(reservePercent !== null ? reservePercent / 100 : null);
   const coverageWeeks = computeCoverageWeeks(currentCashBalance, reserveTarget);
 
   return (
@@ -125,7 +131,7 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
           <h3>Operating Reserve</h3>
           <span className="reserve-subtitle">3-month avg expenses</span>
         </div>
-        <span className={`card-status-badge ${reserveBadge.toneClassName}`}>{reserveBadge.label}</span>
+        <span className={reserveBadge.className}>{reserveBadge.label}</span>
       </div>
 
       <ReserveGauge
