@@ -199,6 +199,44 @@ requestAllRows() loop:
 
 **Never reduce PAGE_SIZE without verifying max_rows ≥ PAGE_SIZE, or silent data loss will occur.**
 
+### Supabase growth warning
+
+Current dataset: ~4,843 transactions (as of April 2026).
+Current PAGE_SIZE: 10,000. Current max_rows: 10,000.
+
+**When the dataset approaches ~9,000 rows, the pagination refactor becomes
+mandatory.** The current implementation assumes rows fit within a single
+page fetch and will silently truncate beyond max_rows — returning HTTP 200
+with partial data and no error signal.
+
+Action required before crossing 9,000 rows:
+- Raise max_rows in Supabase dashboard settings
+- Refactor pagination loop to use `Content-Range` headers or
+  `Prefer: count=exact` rather than row-count-based termination
+- Add a visible warning in the UI when row count exceeds 80% of PAGE_SIZE
+
+This is a time-bomb failure mode — everything appears correct until it isn't.
+
+---
+
+## Time Window Rules (Critical)
+
+These rules prevent silent math inconsistencies across cards and charts.
+Violations in this area produce numbers that look correct but aren't.
+
+- All year-based charts and tooltips use **calendar year** (Jan 1 – Dec 31)
+- All badges and headline metrics tied to a chart must use the **same time
+  window** as that chart — no mixing within a single card
+- Trailing 12-month metrics must be explicitly labeled "Trailing 12 months"
+  wherever they appear in UI copy or tooltips
+- Mixing time windows in the same card is not allowed unless each metric
+  is explicitly labeled with its basis
+
+**Why this exists:** The Owner Distributions badge used trailing 12 months
+while the chart used calendar years — producing a silent mismatch that
+required a targeted fix. This class of bug will recur on revenue, expenses,
+and runway metrics without this rule.
+
 ---
 
 ## Boot Performance
@@ -501,6 +539,39 @@ Docs:
 - OwnerDistributionsChart.tsx custom tooltip exception documented
 - Operating Reserve and Owner Distributions removed from Big Picture — live on Today only
 - priority_history Supabase table created — signal fire history, ai_headline cache, outcome tracking
+
+### AI Determinism Rule
+
+For identical inputs (same signal type + same underlying metric values),
+AI prose output must be:
+
+- **Cached and reused** — do not make a new API call if a recent
+  `priority_history` row exists with a valid `ai_headline` for the
+  same signal type and severity
+- **Semantically consistent** — tone and meaning must not drift across
+  identical states; the owner should not see meaningfully different
+  messages for the same financial situation on different days
+
+**Why this exists:** Without caching, the same reserve warning at 55% funded
+could produce noticeably different prose on Monday vs Thursday — eroding
+trust in the system. Consistency is a trust signal, not just a cost control.
+
+Implementation note: the cache read path (check `priority_history` before
+calling `callAIProvider`) was deferred in Phase 3 and is queued as a P2
+item. This rule defines the behavior it must implement.
+
+### AI prose rollback path
+
+When `callAIProvider` is activated (proxy is live), the fallback system
+must remain fully functional at all times. `getFallbackCopy()` in `copy.ts`
+is the safety net — it must never be degraded or removed.
+
+If AI prose quality degrades or API costs spike unexpectedly, the rollback
+is: set `callAIProvider` to throw (as it does today). No other code changes
+required. The Today page returns to deterministic fallback copy immediately.
+
+This rollback must always be a one-function change. Do not architect the
+AI layer in a way that makes fallback require broader refactoring.
 
 ---
 

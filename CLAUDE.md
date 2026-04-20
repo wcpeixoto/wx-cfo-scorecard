@@ -11,6 +11,19 @@ small business owners, using CFO-style signal design and Nubank-level usability.
 
 ---
 
+## Source of Truth Hierarchy
+
+When two documents conflict, follow this order:
+
+1. `wx_cfo_scorecard_context_v2_6.md` — system behavior, data, architecture
+2. `UI_RULES.md` — all visual decisions
+3. `CLAUDE.md` — execution rules and workflow discipline
+
+If a rule appears in two places and they disagree, the higher document wins.
+Update the lower document to match — do not leave contradictions in place.
+
+---
+
 ## Required reading on session start
 
 Before doing any work, read these files in order:
@@ -238,8 +251,29 @@ do not invent an equivalent.
 - Fix confirmed friction before chasing theoretical improvements
 - Avoid speculative refactors when current behavior is working
 - Diagnosis before code: observe, trace cause, propose fix, implement only after approval
-- No server-side code, secrets, or backend dependencies
-- Keep this a static-site architecture unless explicitly decided otherwise
+- No secrets in the frontend bundle (`VITE_*` variables are client-exposed by design)
+
+### Architecture boundary
+
+The core app is a static site (Vite + GitHub Pages). This constraint applies
+to the main application bundle.
+
+**Allowed external services:**
+- Supabase — primary persistence layer (already in use)
+- Supabase Edge Functions — permitted for secure operations (AI proxy,
+  server-side key handling)
+- Cloudflare Workers — permitted as an alternative for the AI proxy
+
+**Not allowed:**
+- Custom backend servers or hosted API endpoints outside the above
+- Any secret keys in the frontend bundle (`VITE_*` variables are
+  client-exposed by design)
+- Direct browser-to-Anthropic API calls (key would be public)
+
+**Why the clarification:** The original "no server-side code" rule was
+written before the AI proxy requirement was identified. Edge Functions
+and Workers are serverless and stateless — they don't violate the
+static-site architecture principle, they extend it safely.
 - When modifying a file that was changed in the immediately prior
   phase, read the entire file before touching anything and confirm
   all prior phase changes are still present before writing new code.

@@ -1031,6 +1031,29 @@ Replace this section's content for each project that uses this base spec.
 
 ---
 
+# PART 6B — CARD COHERENCE RULE
+
+All numbers shown within a single card (badge, tooltip, subtitle, chart axes,
+KPI value) must be reconcilable by the user without external explanation.
+
+Rules:
+- If two elements in the same card can be derived from each other, they must
+  use the same time basis and the same calculation method
+- If two elements intentionally use different bases (e.g. YTD vs trailing),
+  each must be explicitly labeled — never leave the user to guess
+- Never display conflicting interpretations of the same metric in one card
+
+**Why this exists:** A badge saying "12% of target" and a chart showing
+calendar-year bars creates an implicit contradiction if the badge uses
+trailing 12 months. The user sees two numbers about the same thing that
+don't reconcile. This breaks trust faster than any visual defect.
+
+Time window consistency is a specific application of this rule and is
+governed by the Time Window Rules in `wx_cfo_scorecard_context_v2_6.md`.
+Both rules must be respected together.
+
+---
+
 # PART 7 — DECISION RULES
 
 These three sections close the gap between knowing the patterns and applying them correctly.
