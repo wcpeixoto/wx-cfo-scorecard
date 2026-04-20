@@ -16,7 +16,8 @@ small business owners, using CFO-style signal design and Nubank-level usability.
 Before doing any work, read these files in order:
 
 1. `wx_cfo_scorecard_context_v2_6.md` — current project state, architecture,
-   data layer, forecast engine, locked parameters, and queued roadmap
+   data layer, forecast engine, locked parameters, and queued roadmap.
+   **Today page V1 is shipped** (Phase 4.10d–f complete).
 2. `UI_RULES.md` — visual standard reference, must be read before any UI work
 3. This file (`CLAUDE.md`) — project rules, stack, and working discipline
 
@@ -117,6 +118,9 @@ create table shared_workspace_settings (
 | `src/components/CashFlowForecastModule.tsx` | Forecast UI + Known Events |
 | `src/components/TrendLineChart.tsx` | Custom SVG chart (shared) |
 | `src/components/LoadingScreen.tsx` | Branded boot loading screen |
+| `src/components/OperatingReserveCard.tsx` | Extracted from Dashboard — reserve gauge card |
+| `src/components/OwnerDistributionsChart.tsx` | Owner distributions chart + custom tooltip |
+| `src/lib/priorities/coreConstraints.ts` | Forward cash + reserve helper for Today page |
 | `src/dashboard.css` | All custom styles — class-based, no Tailwind in JSX |
 | `UI_RULES.md` | Visual standard reference (repo root) |
 | `wx_cfo_scorecard_context_v2_6.md` | Full project state and architecture context |
@@ -220,6 +224,9 @@ do not invent an equivalent.
 - `src/lib/data/contract.ts` — TypeScript schema, do not change shape
 - `src/lib/data/sharedPersistence.ts` — Supabase fetch layer, sensitive
 - `src/components/LoadingScreen.tsx` — boot UX, stable
+- `src/components/OperatingReserveCard.tsx` — extracted from Dashboard, stable
+- `src/components/OwnerDistributionsChart.tsx` — multi-series tooltip, stable
+- `src/lib/priorities/coreConstraints.ts` — Phase 4 helper, stable
 - `.github/workflows/` — deploy pipeline, do not touch casually
 
 ---
@@ -233,6 +240,10 @@ do not invent an equivalent.
 - Diagnosis before code: observe, trace cause, propose fix, implement only after approval
 - No server-side code, secrets, or backend dependencies
 - Keep this a static-site architecture unless explicitly decided otherwise
+- When modifying a file that was changed in the immediately prior
+  phase, read the entire file before touching anything and confirm
+  all prior phase changes are still present before writing new code.
+  Do not assume prior changes survived — verify from the file.
 
 ---
 
@@ -267,11 +278,17 @@ Every task must follow this sequence:
    also check the TailAdmin source reference section in this file
    and look up the relevant pattern before writing anything.
 2. Run pre-flight: `git branch`, `git status --short`, `git log --oneline -3`
-3. Diagnosis first — describe the problem in plain English before writing code
-4. Propose fix with before/after — implement only after approval if ambiguous
-5. Respect the DO NOT TOUCH file list for every task
-6. Verify on running Vite dev server — prove freshness before reporting results
-7. Post-task: `git diff --stat`, confirm only allowed files changed,
+3. If the target file was modified in the immediately prior phase or
+   commit, read the **entire file** before touching anything and
+   confirm all prior phase changes are still present. A targeted
+   inspection of only the section being changed is not sufficient —
+   prior fixes elsewhere in the same file must be verified intact
+   before writing new code.
+4. Diagnosis first — describe the problem in plain English before writing code
+5. Propose fix with before/after — implement only after approval if ambiguous
+6. Respect the DO NOT TOUCH file list for every task
+7. Verify on running Vite dev server — prove freshness before reporting results
+8. Post-task: `git diff --stat`, confirm only allowed files changed,
    suggest commit message
 
 ---
