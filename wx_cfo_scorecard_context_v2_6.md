@@ -46,16 +46,18 @@ business owners, using CFO-style signal design and Nubank-level usability.
 
 **Last known commits (most recent first):**
 ```
-7040a99  feat(settings): subnav tabs, suppress date header, constrain content width
-283e190  feat(big-picture): Owner Distributions chart card
-c8a7526  fix: mobile header clean rebuild (TailAdmin structure, centered brand)
-e941163  feat: shell migration — HashRouter routing, left sidebar, remove right rail
-407d54c  Settings Phase 1: Data/Accounts/Rules structure, System Status card,
-         duplicate suppression, non-cash acknowledgement, shared_workspace_settings migration
+d4cd2fe  feat(routing): Phase 5 — Today is now the landing page, Big Picture moves to /big-picture
+5b23cfd  feat(table): refine Total row, align fonts, drop 'Forecast' prefix from column headers
+61c66a3  docs: UI_RULES.md — tooltip spec, marker behavior, crosshair rules, custom tooltip exception
+5013b9b  docs: CLAUDE.md — full-file inspection rule + new component entries
+98a8e54  fix(today): Phase 4.16b — add directional arrow to reserve badge labels
 ```
 
 **Working tree:** clean
 **Active branch:** main
+**Last updated:** April 20, 2026
+**Today page V1:** SHIPPED
+**Phase 5 routing:** SHIPPED — Today is landing page, Big Picture at /big-picture
 **Deployment:** GitHub Pages via GitHub Actions — automatic on push to main
 
 **Key files:**
@@ -65,6 +67,16 @@ e941163  feat: shell migration — HashRouter routing, left sidebar, remove righ
 - `src/components/AppSidebar.tsx` — left sidebar nav (TailAdmin shell migration)
 - `src/components/AppHeader.tsx` — sticky top header with search + mobile hamburger
 - `src/components/OwnerDistributionsChart.tsx` — stacked bar chart, Big Picture
+- `src/components/TodayPage.tsx` — landing page, owns all signal detection and data derivation
+- `src/components/HeroPriorityCard.tsx` — hero decision card, async AI prose swap
+- `src/components/SecondaryPriority.tsx` — compact supporting signal cards
+- `src/components/CoreConstraints.tsx` — always-on reserve + forward cash strip (Today only)
+- `src/lib/priorities/types.ts` — Signal, RankedPriorities, PriorityHistoryRow types
+- `src/lib/priorities/signals.ts` — detectSignals(model, txns)
+- `src/lib/priorities/rank.ts` — rankPriorities(signals)
+- `src/lib/priorities/copy.ts` — getFallbackCopy(signal, priorHistory?)
+- `src/lib/priorities/ai.ts` — getAIProse stub (callAIProvider throws by design)
+- `src/lib/priorities/coreConstraints.ts` — getCoreConstraints(model)
 - `src/context/SidebarContext.tsx` — sidebar collapse/mobile state
 - `src/pages/Dashboard.tsx` — data wiring, state, route rendering, boot sequence
 - `src/App.tsx` — HashRouter + SidebarProvider wrapping Dashboard
@@ -81,14 +93,15 @@ e941163  feat: shell migration — HashRouter routing, left sidebar, remove righ
 
 **Routing (HashRouter):**
 ```
-#/           → Big Picture (index)
-#/focus      → Where to Focus
-#/trends     → Trends
-#/forecast   → Forecast (What-If Scenarios)
-#/settings   → Settings
-#/ui-lab     → UI Lab (DEV only)
+#/              → Today (landing page)
+#/today         → Today (alias, backward compatible)
+#/big-picture   → Big Picture (moved from /)
+#/focus         → Where to Focus
+#/trends        → Trends
+#/forecast      → Forecast (What-If Scenarios)
+#/settings      → Settings
+#/ui-lab        → UI Lab (DEV only)
 ```
-Note: `#/today` route not yet created — pending "Today" page V1 implementation.
 
 ---
 
@@ -436,145 +449,80 @@ Reconciliation: 0.00% variance confirmed. Engine is auditable and locked.
 
 ---
 
-## Queued Roadmap
+## Today Page V1 — Shipped April 19–20, 2026
 
-### "Today" Page — V1 (next major feature)
-Full architecture spec locked April 18, 2026. See "Today Page Architecture" section below.
+Phase 1  b919f99  Rules engine (types, signals, rank, copy)
+Phase 2  98ce3e3  Persistence layer (priority_history Supabase table)
+Phase 3  8934e24  AI prose adapter (callAIProvider stub, fallback wiring)
+Phase 4  1ee27c5  UI shell, routing, CoreConstraints
+Phase 4.5        Decision card layout, context integration, copy tightening
+Phase 4.6        Badge alignment, pill position, context label cleanup
+Phase 4.7        Signal-specific hero pill labels
+Phase 4.8        Custom dark tooltip for Owner Distributions
+Phase 4.9  9719d97  Distribution target badge (revenue × profit target)
+Phase 4.10 6a49871  Compare in Forecast navigation handoff
+Phase 4.10b       Distribution target subtitle + projection year contract
+Phase 4.10c       Subtitle format polish ($118k, parentheses)
+Phase 4.10d       Header reorg + Big Picture cleanup (reserve + distributions removed)
+Phase 4.10e       Layout revert (action below chart, legend left)
+Phase 4.11        compareYear deep link — scroll, year pill, 12-month horizon
+Phase 4.11b       Year injection fix + re-trigger fix (value-based ref)
+Phase 4.11c       Validation fix (range check replaces detectedYears)
+Phase 4.12 c0d56f5  Badge percentage display (↓ N% of target)
+Phase 4.13 45bc154  Tooltip standardization to TailAdmin pattern
+Phase 4.13b        Tooltip marker — solid fill via background-color: currentColor
+Phase 4.14/4.15 d9fb73b  Multi-series tooltip + crosshair barWidth + bar bottom flatten
+Phase 4.16        Reserve badge simplified (✓ On track / ↓ Getting tight / ↓ Below reserve)
+Phase 4.16b       Arrow added to reserve badge labels
+Phase 4.17a       Disable states.hover filter on Owner Distributions bars
+Phase 4.17b b736ea1  Hide crosshair column hover background (opacity 0)
+Phase 5    d4cd2fe  Today is landing page, Big Picture at /big-picture
 
-**Implementation sequence:**
-1. `src/lib/priorities/` — signals, ranker, types, copy (rules engine, no AI)
-2. `priority_history` Supabase table — create + wire read/write in sharedPersistence.ts
-3. `copy.ts` — template fallback prose for all 6 signal types
-4. `ai.ts` — AI prose layer (Claude API), structured input, JSON output, fallback to copy.ts
-5. `TodayPage.tsx` + `HeroPriorityCard.tsx` + `CoreConstraints.tsx` — UI
-6. Routing — `#/today` as new landing, `#/big-picture` for Big Picture, nav update
+Docs:
+61c66a3  UI_RULES.md — tooltip spec, marker behavior, crosshair rules, custom tooltip exception
+5013b9b  CLAUDE.md — full-file inspection rule + new component entries
 
-### TailAdmin Migration — In Progress
-Shell migration complete. Remaining pages:
-- Where to Focus — desktop width fix (content too wide after right rail removal)
-- Big Picture — TailAdmin card migration
-- What-If / Forecast — TailAdmin card migration
-- Trends — TailAdmin card migration
-
-### Settings — Phase 5.1
-- Move Receivables/Payables Timing controls from What-If to Settings Rules section
-
-### Phase 6 — Internal QA layer
-- Lightweight internal validation
-- Category leakage detection
-- Transfer classification checks
-
-### Global Language Pass (deferred — after full TailAdmin migration)
-- What-If → Forecast rename
-- Settings → Data & Setup rename
-- Full copy review
-
-### Performance (deferred)
-- Column pruning already done (select=* replaced with txn-only fetch)
-- Staged loading: fetch only recent history on boot, lazy-load full history (only if egress constraint returns)
+### Architecture changes (Today page)
+- OperatingReserveCard.tsx extracted from Dashboard.tsx inline block — now standalone
+- OwnerDistributionsChart.tsx custom tooltip exception documented
+- Operating Reserve and Owner Distributions removed from Big Picture — live on Today only
+- priority_history Supabase table created — signal fire history, ai_headline cache, outcome tracking
 
 ---
 
-## "Today" Page — V1 Architecture
+## Queued Roadmap
 
-**Product philosophy:** Three layers in order of value:
-- Layer 1 — Financial truth (deterministic rules)
-- Layer 2 — Decision clarity (one hero priority)
-- Layer 3 — Behavior change (followup loop)
+### Active queue (P1)
+- Settings page mobile overflow fix
+- Hero and secondary pill QA — verify all 8 signal states render correctly
+- General copy review — steady state, secondary cards, copy.ts templates, loading page
+- Projection Table polish — $ difference before %, spacing, full-year comparison
+- Big Picture layout review — confirm balance after card removals
 
-**Page name:** "Today" — the new landing page at `#/today`
-**AI provider:** Claude (Sonnet) for V1. ChatGPT to be tested for V2 dialogue layer.
-**V2 dialogue deferred:** three-button interaction, commitment capture, trade-off conservation rule
+### P2 — Feature work
+- Secure server proxy (Supabase Edge Function or Cloudflare Worker)
+  Required before callAIProvider can be activated
+- Full AI cache read path — skip API call when recent priority_history row exists
+- Phase 5.1 — Renewal engine (system-driven ForecastEvent from contract data)
+- Next owner distribution card — timing and amount of next payout
+- Add Monthly Revenue and Expenses to Big Picture
+- Forecast baseline comparison — faded baseline when adjusting scenarios
 
-### File structure (to be created)
-```
-src/lib/priorities/
-  types.ts     ← shared TypeScript types
-  signals.ts   ← detect + evaluate each signal
-  rank.ts      ← score and select hero + secondary
-  copy.ts      ← template fallback prose per signal type
-  ai.ts        ← Claude API prose layer, falls back to copy.ts
+### P3 — Performance
+- Egress reduction and payload optimization (~4MB boot payload)
+- Startup performance — sequential Supabase requests on boot
 
-src/components/
-  TodayPage.tsx           ← page shell + layout
-  HeroPriorityCard.tsx    ← hero card, AI prose, severity
-  SecondaryPriority.tsx   ← compact supporting card
-  CoreConstraints.tsx     ← reserve + forward cash always-on
-```
+### P4 — Strategic
+- Crisis mode
+- Sustainability breakdown (4 cards)
+- Top Expense Categories redesign (dual timeframe)
+- Warning near 10,000 input lines limit
+- Settings enhancements (logo upload, naming)
 
-### 6 signals (V1)
-| Signal | Type | Severity | Weight |
-|---|---|---|---|
-| Operating reserve below floor | `reserve_critical` / `reserve_warning` | critical / warning | 1.0 / 0.7 |
-| Forward cash flow negative | `cash_flow_negative` / `cash_flow_tight` | critical / warning | 0.9 / 0.6 |
-| Expense surge (single category >25% above 3mo avg, >$500) | `expense_surge` | critical / warning | 0.7 |
-| Revenue decline (trailing 3mo vs prior 3mo, >15% / >5%) | `revenue_decline` | critical / warning | 0.7 / 0.4 |
-| Owner distributions above pace (annualized >120% of prior avg) | `owner_distributions_high` | warning | 0.5 |
-| No urgent signals | `steady_state` | healthy | 0 |
-
-### Ranker — priority ladder (not score formula)
-```
-1. reserve_critical
-2. cash_flow_negative
-3. reserve_warning
-4. cash_flow_tight
-5. expense_surge
-6. revenue_decline
-7. owner_distributions_high
-→ steady_state if nothing fires
-```
-Hero = top of ladder. Secondary = next 0–2.
-
-### AI prose layer
-**Input:** structured Signal object + optional prior history row
-**Output:** JSON with keys: `headline`, `why`, `currentState`, `action`, `alternative`, `followupNote`
-**Fallback:** `copy.ts` template strings if API call fails — page never breaks
-
-**Tone calibration in system prompt:**
-- healthy → calm, warm, forward-looking
-- warning → focused, direct, supportive
-- critical → emotionally present, stakes-aware, never accusatory
-- repeat signal (metric worsened) → acknowledge difficulty, Robbins-style emotional engagement, open question
-
-### `priority_history` Supabase table (NOT YET CREATED)
-```sql
-create table priority_history (
-  id uuid primary key default gen_random_uuid(),
-  workspace_id text not null default 'default',
-  fired_at timestamptz not null default now(),
-  signal_type text not null,
-  severity text not null,
-  metric_value numeric,
-  target_value numeric,
-  category_flagged text,
-  gap_amount numeric,
-  recommended_action text,
-  ai_headline text,
-  committed_action text,     -- V2: populated when owner responds
-  outcome_metric numeric,    -- populated on next fire of same signal
-  resolved_at timestamptz    -- populated when signal stops firing
-);
-```
-~50–100 rows/year. Free tier forever. Upsert pattern: same signal type within 7 days updates existing row rather than creating new one.
-
-### V2 — Trade-off Conservation Rule (deferred)
-When owner rejects primary action in dialogue layer:
-- `gap_amount` is fixed — cannot be negotiated down
-- AI must present alternatives totaling >= `gap_amount`
-- Partial solutions acknowledged but conversation stays open until full gap is addressed
-- "Partial solution rule": if owner offers partial fix, AI surfaces remaining gap immediately
-
-### Routing change
-```
-#/today      → Today (new landing page, index)
-#/           → redirects to #/today
-#/big-picture → Big Picture (moved from index)
-#/focus      → Where to Focus (unchanged)
-#/trends     → Trends (unchanged)
-#/forecast   → Forecast (unchanged)
-#/settings   → Settings (unchanged)
-#/ui-lab     → UI Lab (DEV only, unchanged)
-```
+### P5 — Long term
+- QA layer / systematic testing
+- Decision UX layer (commit / not now / need help on hero card)
+- Owner Distributions explanatory footnote
 
 ---
 
@@ -643,3 +591,22 @@ Suggest commit message only — never git add, never commit
 | businessRules localStorage | Legacy only — all reads/writes now go through shared_workspace_settings |
 | Claude API key | Required for Today page AI prose layer — must be in env vars, never in repo |
 | AI cost | ~$0.006–0.010 per AI call (1500 tokens in / 500 out). Design for prompt caching from day one — same data inputs = cached = 90% cheaper |
+
+---
+
+## Locked Files — Do Not Modify Without Explicit Instruction
+
+- `src/lib/kpis/compute.ts`
+- `src/lib/cashFlow.ts`
+- `src/lib/data/contract.ts`
+- `src/lib/data/sharedPersistence.ts`
+- `src/components/LoadingScreen.tsx`
+- `src/components/OperatingReserveCard.tsx`
+- `src/components/OwnerDistributionsChart.tsx`
+- `src/lib/priorities/types.ts`
+- `src/lib/priorities/signals.ts`
+- `src/lib/priorities/rank.ts`
+- `src/lib/priorities/copy.ts`
+- `src/lib/priorities/ai.ts`
+- `src/lib/priorities/coreConstraints.ts`
+- `.github/workflows/`
