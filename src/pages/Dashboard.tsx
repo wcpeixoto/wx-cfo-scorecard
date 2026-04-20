@@ -88,8 +88,8 @@ type BigPictureVisibleFrameValue = 'thisMonth' | 'lastMonth' | 'last3Months';
 type BigPictureFilterFrameValue = Exclude<BigPictureFrameValue, BigPictureVisibleFrameValue>;
 
 const TAB_TO_PATH: Record<TabId, string> = {
-  today: '/today',
-  'big-picture': '/',
+  today: '/',
+  'big-picture': '/big-picture',
   'where-to-focus': '/focus',
   trends: '/trends',
   'what-if': '/forecast',
@@ -101,9 +101,9 @@ function pathToTab(pathname: string): TabId {
   // HashRouter pathname is the part after the #
   const normalized = pathname.replace(/\/+$/, '') || '/';
   switch (normalized) {
+    case '/':
     case '/today':
       return 'today';
-    case '/':
     case '/big-picture':
       return 'big-picture';
     case '/focus':
@@ -121,7 +121,7 @@ function pathToTab(pathname: string): TabId {
     case '/ui-lab':
       return 'ui-lab';
     default:
-      return 'big-picture';
+      return 'today';
   }
 }
 

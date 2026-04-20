@@ -12,7 +12,7 @@ type SidebarItem = {
 
 const PRIMARY_ITEMS: SidebarItem[] = [
   { to: '/today', label: 'Today', icon: FiClock },
-  { to: '/', label: 'Big Picture', icon: FiGrid, end: true },
+  { to: '/big-picture', label: 'Big Picture', icon: FiGrid },
   { to: '/focus', label: 'Where to Focus', icon: FiTarget },
   { to: '/trends', label: 'Trends', icon: FiTrendingUp },
   { to: '/forecast', label: 'What-If Scenarios', icon: FiSliders },
