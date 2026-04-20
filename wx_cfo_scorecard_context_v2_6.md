@@ -1,21 +1,35 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: April 18, 2026*
+*Last updated: April 20, 2026*
 
 ---
 
-## What Changed Recently (April 18, 2026 — this session)
+## What Changed Recently (April 20, 2026 — this session)
 
-- **TailAdmin shell migration** — left sidebar nav, HashRouter routing, right rail removed globally
-- **Mobile header rebuilt** — hamburger + centered "Wx CFO" brand + collapsible search icon
-- **Mobile overflow fixed** — five root causes: grid track sizing (`minmax(0,1fr)`), flex toggle wrapping, table scroll, SVG intrinsic width
-- **Settings subnav shipped** — segmented toggle (Data / Accounts / Rules), date header suppressed on `/settings`, content constrained to 880px
-- **Owner Distributions chart added** — stacked bar (Actual + Annualized), interpretation signal pill, placed in Big Picture two-column section
-- **CLAUDE.md updated** — TailAdmin source reference section added with lookup table
-- **`priority_history` Supabase table designed** — schema locked for "Today" page V1 (not yet created in Supabase)
-- **"Today" page architecture specced** — full V1 spec including signals, ranker, AI prose layer, memory, followup logic
+- **Settings mobile overflow fixed (Accounts + Rules)** — CSS-only fix in `src/dashboard.css`
+  - Root cause: `.settings-section-pane` is a CSS Grid item with default `min-width: auto`,
+    which allowed the 860px table's min-content to propagate up through the entire layout chain
+    (card → section → pane), making the document 950px wide on 393px viewports.
+  - Fix: `min-width: 0` on `.settings-section-pane` breaks the cascade. `overflow-x: auto`
+    on `.settings-table-wrap` then activates correctly — table scrolls within 263px wrapper.
+  - Secondary fixes: `min-width: 0` + `box-sizing` on `.account-setup-summary` and children;
+    `flex-wrap: wrap` on `.ta-card-body .card-head`; `.rules-row-control .cashflow-toggle`
+    expanded to full width with `flex: 1 1 0` buttons for "Suppress for full imports".
+  - All appended to existing `@media (max-width: 767px)` block at bottom of `dashboard.css`.
+  - No `overflow: hidden` used. Table scroll preserved and confirmed.
 
-### Previous session (April 17, 2026)
+### Previous session (April 20, 2026)
+- Settings page mobile overflow (tab toggle) fixed — `2d06313`
+- Today page V1 fully shipped — all phases through 4.17b and Phase 5 routing
+- Phase 5 routing — Today is landing page (`#/`), Big Picture at `#/big-picture`
+
+### Earlier sessions (April 18, 2026)
+- TailAdmin shell migration, mobile header rebuilt, Settings subnav shipped
+- Owner Distributions chart added to Big Picture
+- CLAUDE.md updated — TailAdmin source reference section
+- `priority_history` Supabase table designed (not yet created in Supabase)
+
+### April 17, 2026
 - Settings page restructured — three sections: Data / Accounts / Rules
 - System Status card shipped — Healthy / Needs review / At risk
 - Duplicate warning suppression toggle in Rules
@@ -46,11 +60,11 @@ business owners, using CFO-style signal design and Nubank-level usability.
 
 **Last known commits (most recent first):**
 ```
+60252d6  fix(mobile): Settings Accounts and Rules card overflow at 393px
+2d06313  fix(mobile): Settings page tab overflow on narrow viewports
+879bce8  docs: update project context to Phase 5 — Today page V1 fully shipped
 d4cd2fe  feat(routing): Phase 5 — Today is now the landing page, Big Picture moves to /big-picture
 5b23cfd  feat(table): refine Total row, align fonts, drop 'Forecast' prefix from column headers
-61c66a3  docs: UI_RULES.md — tooltip spec, marker behavior, crosshair rules, custom tooltip exception
-5013b9b  docs: CLAUDE.md — full-file inspection rule + new component entries
-98a8e54  fix(today): Phase 4.16b — add directional arrow to reserve badge labels
 ```
 
 **Working tree:** clean
@@ -493,7 +507,7 @@ Docs:
 ## Queued Roadmap
 
 ### Active queue (P1)
-- Settings page mobile overflow fix
+- ~~Settings page mobile overflow fix~~ — done `60252d6`
 - Hero and secondary pill QA — verify all 8 signal states render correctly
 - General copy review — steady state, secondary cards, copy.ts templates, loading page
 - Projection Table polish — $ difference before %, spacing, full-year comparison
