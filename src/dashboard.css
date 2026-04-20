@@ -3078,10 +3078,35 @@ body {
 }
 
 /* Totals row — appears below all monthly data rows */
-.proj-totals-row td {
-  border-top: 2px solid #E4E7EC;
-  background: #F9FAFB;
+.projection-table .total-row {
+  background-color: #F9FAFB;
+  border-top: 2px solid #D0D5DD;
+}
+
+.projection-table .total-row td {
+  border-top: 2px solid #D0D5DD;
   font-weight: 700;
+  padding-top: 14px;
+  padding-bottom: 14px;
+  letter-spacing: 0.01em;
+}
+
+.projection-table .total-row .total-label {
+  font-weight: 600;
+}
+
+.projection-table .total-row .balance-placeholder {
+  color: #9CA3AF;
+  text-align: center;
+  font-weight: 400;
+}
+
+.projection-table th {
+  font-size: 14px;
+}
+
+.projection-table td {
+  font-size: 14px;
 }
 
 /* Cash Out VAR % color logic is inverted: spending less than prior = good */

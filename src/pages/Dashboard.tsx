@@ -2857,7 +2857,7 @@ export default function Dashboard() {
                     for (const y of allDetectedAsc) {
                       headers.push(`${y} Cash In`, `${y} Cash Out`, `${y} Net`);
                     }
-                    headers.push('Forecast Cash In', 'Forecast Cash Out', 'Forecast Net', 'Forecast Balance');
+                    headers.push('Cash In', 'Cash Out', 'Net', 'Balance');
                     const yearDataMap = new Map(priorYearActuals.years.map((ya) => [ya.year, ya]));
                     const csvRows = [headers.join(',')];
                     for (const row of visibleScenarioProjection) {
@@ -2926,14 +2926,14 @@ export default function Dashboard() {
 
                   if (!hasActive) {
                     return (
-                      <table>
+                      <table className="projection-table">
                         <thead>
                           <tr>
                             <th>Month</th>
-                            <th>Forecast Cash In</th>
-                            <th>Forecast Cash Out</th>
-                            <th>Forecast Net</th>
-                            <th>{hasForecastCurrentCashBalance ? 'Forecast Balance' : 'Cumulative Net'}</th>
+                            <th>Cash In</th>
+                            <th>Cash Out</th>
+                            <th>Net</th>
+                            <th>{hasForecastCurrentCashBalance ? 'Balance' : 'Cumulative Net'}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2948,12 +2948,12 @@ export default function Dashboard() {
                           ))}
                         </tbody>
                         <tfoot>
-                          <tr className="proj-totals-row">
-                            <td>Total</td>
+                          <tr className="total-row">
+                            <td className="total-label">Total</td>
                             <td>{formatCurrency(totalForecastCI)}</td>
                             <td>{formatCurrency(totalForecastCO)}</td>
                             <td className={totalForecastNet < 0 ? 'is-negative' : undefined}>{formatCurrency(totalForecastNet)}</td>
-                            <td className="proj-actuals-value">&mdash;</td>
+                            <td className="balance-placeholder">&mdash;</td>
                           </tr>
                         </tfoot>
                       </table>
@@ -2984,7 +2984,7 @@ export default function Dashboard() {
                   const netCols = 1 + sortedActiveDesc.length + varColCount;
 
                   return (
-                    <table className="comparison-mode">
+                    <table className="projection-table comparison-mode">
                       <thead>
                         <tr className="projection-group-row">
                           <th rowSpan={2} className="projection-month-header">Month</th>
@@ -3062,8 +3062,8 @@ export default function Dashboard() {
                         })}
                       </tbody>
                       <tfoot>
-                        <tr className="proj-totals-row">
-                          <td>Total</td>
+                        <tr className="total-row">
+                          <td className="total-label">Total</td>
                           {/* Cash In totals */}
                           <td className="proj-group-start proj-forecast-value">{formatCurrency(totalForecastCI)}</td>
                           {sortedActiveDesc.map((year) => {
