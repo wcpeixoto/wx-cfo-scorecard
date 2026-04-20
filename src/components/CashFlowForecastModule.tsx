@@ -87,7 +87,6 @@ type CashFlowForecastModuleProps = {
   onDeleteEvent?: (groupId: string) => void;
 };
 
-type ForecastViewMode = 'monthly' | 'cumulative';
 type ForecastSliderControlProps = {
   label: string;
   value: number;
@@ -348,7 +347,6 @@ export default function CashFlowForecastModule({
     }
   }, []);
 
-  const [viewMode, setViewMode] = useState<ForecastViewMode>('cumulative');
   const [horizonMenuOpen, setHorizonMenuOpen] = useState(false);
   const horizonMenuRef = useRef<HTMLDivElement>(null);
 
@@ -495,22 +493,7 @@ export default function CashFlowForecastModule({
     });
   }, [startingCashBalance, weeklySeries]);
   const monthlyRangeLabel = data.length > 0 ? `${toMonthLabel(data[0].month)} – ${toMonthLabel(data[data.length - 1].month)}` : '';
-  const displaySeries =
-    granularity === 'week' ? (viewMode === 'monthly' ? weeklySeries : weeklyCumulativeSeries) : viewMode === 'monthly' ? data : cumulativeSeries;
-  const displayPointStatusByMonth = useMemo<Partial<Record<string, CashFlowForecastStatus>>>(() => {
-    if (granularity !== 'week') return pointStatusByMonth;
-    const statusByWeek: Partial<Record<string, CashFlowForecastStatus>> = {};
-    displaySeries.forEach((point) => {
-      statusByWeek[point.month] = 'projected';
-    });
-    return statusByWeek;
-  }, [displaySeries, granularity, pointStatusByMonth]);
-  const chartTitle =
-    viewMode === 'cumulative'
-      ? hasCurrentCashBalance
-        ? 'Cash Balance Forecast'
-        : 'Cumulative Cash Change Forecast'
-      : 'Monthly Cash Flow Forecast';
+  const displaySeries = granularity === 'week' ? weeklyCumulativeSeries : cumulativeSeries;
   const reserveBreached = !!decisionSignals.reserveBreachMonth;
   const hasNegativeCash = !!decisionSignals.negativeCashMonth;
   const cashRiskState: 'safe' | 'warning' | 'critical' = hasNegativeCash ? 'critical' : reserveBreached ? 'warning' : 'safe';
