@@ -781,9 +781,9 @@ export default function CashFlowForecastModule({
         </div>
 
         {displaySeries.length > 0 && (() => {
-          const initialBalance = displaySeries[0].net;
+          const initialBalance = startingCashBalance;
           const finalBalance = displaySeries[displaySeries.length - 1].net;
-          const netChange = finalBalance - initialBalance;
+          const netChange = finalBalance - startingCashBalance;
           const netSign = netChange > 0 ? '+' : netChange < 0 ? '−' : '';
           const netColor = netChange > 0 ? 'is-positive' : netChange < 0 ? 'is-negative' : '';
           return (
