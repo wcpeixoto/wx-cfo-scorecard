@@ -1,6 +1,102 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: April 20, 2026*
+*Last updated: April 21, 2026*
+
+---
+
+## What Changed Recently (April 21, 2026 — this session)
+
+### Efficiency Opportunities card — V1 shipped to Big Picture
+
+Replaced the "Money Left on the Table" card on Big Picture with a new
+Efficiency Opportunities card that benchmarks each cost category against
+its own best-ever 3-month stretch in the last 24 months.
+
+**Why this replaces the previous card:**
+- Benchmarked against proven internal performance, not last month's swing
+- Ratio-based — survives revenue volatility
+- Only flags gaps vs the business's own history — survives intentional
+  investment periods
+- Produces a defensible dollar number per category
+
+**Commits today (in order):**
+```
+84131c2  feat(ui-lab): refine bar colors, typography, column labels
+2948710  feat(ui-lab): finalize bar design — two-part green/red, soft colors, 130px track
+f940c88  docs: UI_RULES.md — add Efficiency Opportunities card component spec
+3716420  feat(ui-lab): wire Efficiency Opportunities card to computed data
+7bfbbbb  feat(big-picture): replace Money Left card with Efficiency Opportunities
+e4ba5b1  feat(efficiency): add suppression list for non-actionable categories
+```
+
+**Architecture:**
+
+New file: `src/lib/kpis/efficiencyOpportunities.ts`
+- Pure computation function, no React, no side effects
+- Signature: `computeEfficiencyOpportunities(model: DashboardModel, txns: Txn[]): EfficiencyOpportunitiesResult`
+- Anchored to `model.monthlyRollups` last entry to resolve latestMonth
+- Scans `filteredTxns` over a 24-month lookback window
+- Builds category-by-month spend map + month-level revenue map
+- Enumerates valid consecutive 3-month windows (revenue > 0, all months present)
+- Groups by `parentCategoryName`
+
+**Exclusion chain (applied in this order):**
+1. `shouldExcludeFromProfitability(txn)` — transfers, loans, uncategorized
+2. `isBusinessIncomeCategory(txn.category)` — revenue rows
+3. `isCapitalDistributionCategory(txn.category)` — owner draws
+4. `SUPPRESSED_CATEGORIES.has(parentCategoryName)` — non-actionable fixed categories
+
+**Suppression list (verified verbatim against live Supabase data):**
+```ts
+const SUPPRESSED_CATEGORIES = new Set<string>([
+  'Rent or Lease',         // fixed commitment, no near-term lever
+  'Depreciation',          // non-cash
+  'Amortization',          // not in current data — future-proof
+  'Taxes and Licenses',    // regulatory
+  'Interest Paid',         // debt service
+  'Loan',                  // debt service
+]);
+```
+
+Insurance intentionally **not** suppressed — owner confirmed actionable
+over a longer horizon. Refunds & Allowances intentionally **not** suppressed
+— treated as a signal (lead quality, onboarding, billing clarity) rather
+than a direct cost to cut.
+
+**Guards:**
+- Materiality: category's current 3-month average spend ≥ $100/mo
+- Window validity: ≥ 2 valid complete 3-month windows required
+- `todayRatio > 0` required to render bar
+- `console.debug` logs materiality threshold once per session
+
+**Unit discipline:**
+- All internal math in ratios (0.28, 0.43)
+- Display percents (28, 43) only at output boundary
+- `extraPerMonth = (todayRatio - bestRatio) * avgMonthlyRevenue`
+- `greenWidthPct = clamp((bestRatio / todayRatio) * 100, 0, 100)`
+
+**V1 "best" definition:**
+Absolute lowest 3-month average ratio among valid windows. No smoothing,
+no trimming, no credible-best logic. See P2 note below for V2 direction.
+
+**Result shape (single source of truth for the card):**
+```ts
+interface EfficiencyOpportunitiesResult {
+  windowLabel: string;          // "Jan – Mar 2026"
+  totalExtraPerMonth: number;   // sum of ALL qualifying rows
+  rows: EfficiencyRow[];        // top 4 by extraPerMonth
+}
+```
+
+**Card component: `src/components/EfficiencyOpportunitiesCard.tsx`**
+- Design locked at commit `2948710`
+- Accepts single `result` prop
+- `formatHeadline` / `formatExtra` helpers kept in component (presentation concern)
+- No CSS or structural changes during data-wiring phase
+
+**Wiring:**
+- `Dashboard.tsx` computes `efficiencyResult` via `useMemo(model, filteredTxns)`
+- Passed to both UI Lab and Big Picture instances
 
 ---
 
@@ -17,6 +113,8 @@
     expanded to full width with `flex: 1 1 0` buttons for "Suppress for full imports".
   - All appended to existing `@media (max-width: 767px)` block at bottom of `dashboard.css`.
   - No `overflow: hidden` used. Table scroll preserved and confirmed.
+
+---
 
 ### Previous session (April 20, 2026)
 - Settings page mobile overflow (tab toggle) fixed — `2d06313`
@@ -585,6 +683,24 @@ AI layer in a way that makes fallback require broader refactoring.
 - Big Picture layout review — confirm balance after card removals
 
 ### P2 — Feature work
+- Efficiency Opportunities — credible-best logic (V2)
+  V1 defines "your best" as the absolute lowest 3-month average ratio.
+  This can produce misleading gaps when a category was dormant during
+  the best window (e.g., COGS = 0% for a 3-month stretch creates an
+  artificial baseline). V2 should require the best window to have
+  meaningful category activity. Candidate rule: best window's average
+  spend must be ≥ 25% of the category's 24-month median spend, or a
+  similar activity floor. Goal is to ensure "best" reflects a realistic
+  repeatable operating state, not a statistical artifact. Defer until
+  after remaining P1 items.
+
+- Efficiency Opportunities — "Your best" drill-down modal
+  Clicking a row (or the "Your best %" cell) opens a modal showing the
+  best 3-month window vs today with a monthly breakdown table (month,
+  revenue, category spend, %). Includes a one-line plain-English insight
+  summarizing the gap. Design spec to be locked before implementation,
+  same playbook as the card itself.
+
 - Secure server proxy (Supabase Edge Function or Cloudflare Worker)
   Required before callAIProvider can be activated
 - Full AI cache read path — skip API call when recent priority_history row exists

@@ -5964,3 +5964,269 @@ body {
   color: #667085;
   background: #F2F4F7;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Efficiency Drilldown Modal
+   Overlay + panel follow TailAdmin modal spec (rounded-3xl = 24px,
+   backdrop bg-gray-400/50 + blur-32px). All eff-drill-* classes are
+   scoped to this modal only.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Overlay ──────────────────────────────────────────────────────────── */
+.eff-drill-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 16px;
+  /* TailAdmin: bg-gray-400/50 backdrop-blur-[32px] */
+  background: rgba(156, 163, 175, 0.5);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+}
+
+/* ─── Panel shell ──────────────────────────────────────────────────────── */
+.eff-drill-panel {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg-panel);
+  /* TailAdmin: rounded-3xl = 24px */
+  border-radius: 24px;
+  padding: 24px;
+  /* keep panel on top of the overlay click-through layer */
+  pointer-events: auto;
+}
+
+/* ─── Header ───────────────────────────────────────────────────────────── */
+.eff-drill-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Pill — wraps title + KPI amount + label in one row */
+.eff-drill-kpi-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 16px;
+  background: var(--bg-muted);
+  border-radius: 8px;
+  padding: 8px 20px;
+}
+
+.eff-drill-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #101828;
+  line-height: 1.3;
+}
+
+/* Amount + label sub-group — tight gap so they read as one unit */
+.eff-drill-kpi-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.eff-drill-kpi-amount {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1D2939;
+  line-height: 1.2;
+}
+
+.eff-drill-kpi-label {
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+}
+
+/* ─── Close button ─────────────────────────────────────────────────────── */
+.eff-drill-close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  color: #98A2B3;
+  padding: 0;
+  border-radius: 50%;
+  transition: color 0.15s;
+  font-family: inherit;
+}
+
+.eff-drill-close:hover {
+  color: #667085;
+}
+
+/* ─── Comparison table ─────────────────────────────────────────────────── */
+.eff-drill-table-wrap {
+  margin-top: 20px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.eff-drill-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  /* min-width keeps both groups balanced; overflow-x on wrapper handles narrow viewports */
+  min-width: 380px;
+}
+
+/* colgroup column widths — month 10%, revenue 16%, spend 14%, pct 10%.
+   Revenue→Spend and Spend→% gaps are equalized by reducing spend width. */
+.eff-drill-col-month   { width: 10%; }
+.eff-drill-col-revenue { width: 16%; }
+.eff-drill-col-spend   { width: 14%; }
+.eff-drill-col-pct     { width: 10%; }
+
+/* Group header cells — centered over their respective column groups */
+.eff-drill-group-th {
+  padding: 0 0 8px 0;
+  text-align: center;
+  vertical-align: bottom;
+  font-weight: normal;
+}
+
+.eff-drill-group-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #667085;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.eff-drill-group-period {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: #98A2B3;
+  margin-top: 2px;
+}
+
+/* Column header cells */
+.eff-drill-col-header-row .eff-drill-th {
+  padding: 6px 8px 6px 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #667085;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.eff-drill-th-left  { text-align: left; }
+.eff-drill-th-right { text-align: right; }
+
+/* Vertical divider — right border on column 4 (YOUR BEST %) cells */
+.eff-drill-col-divider {
+  border-right: 1px solid var(--line);
+  padding-right: 12px !important;
+}
+
+/* Left padding on col 5 cells (TODAY side) for visual gap after divider */
+.eff-drill-col-header-row .eff-drill-th:nth-child(5),
+.eff-drill-data-row td:nth-child(5),
+.eff-drill-avg-row td:nth-child(5) {
+  padding-left: 12px;
+}
+
+/* Data rows */
+.eff-drill-td {
+  padding: 8px 8px 8px 0;
+  font-size: 14px;
+  color: #1D2939;
+  border-bottom: 1px solid #F2F4F7;
+}
+
+.eff-drill-td-month {
+  color: #667085;
+  text-align: left;
+}
+
+.eff-drill-td-right {
+  text-align: right;
+}
+
+/* % spans — regular weight in data rows, bold reserved for Avg row (change 5) */
+.eff-drill-pct-best {
+  font-weight: 400;
+  color: #667085;
+}
+
+.eff-drill-pct-today {
+  font-weight: 400;
+  color: #1D2939;
+}
+
+/* Average row — TailAdmin summary row: #F9FAFB bg, stronger top border */
+.eff-drill-avg-row .eff-drill-td {
+  border-bottom: none;
+  border-top: 1px solid var(--line);
+}
+
+.eff-drill-avg-row--summary .eff-drill-td {
+  background: #F9FAFB;
+  font-weight: 500;
+  color: #1D2939;
+}
+
+/* Avg row % values — bold (overrides data-row weight) */
+.eff-drill-avg-row--summary .eff-drill-pct-best,
+.eff-drill-avg-row--summary .eff-drill-pct-today {
+  font-weight: 700;
+}
+
+/* Avg label — semibold, primary-strong */
+.eff-drill-td-avg-label {
+  text-align: left;
+  font-weight: 600;
+  color: #101828;
+}
+
+/* ─── Mobile ───────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .eff-drill-overlay {
+    align-items: flex-start;
+    padding: 48px 16px 16px;
+  }
+
+  .eff-drill-panel {
+    max-width: 100%;
+  }
+}
+
+/* ─── UI Lab: reopen button for dismissed modal mock ──────────────────── */
+.ui-lab-reopen-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667085;
+  background: var(--bg-muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.ui-lab-reopen-btn:hover {
+  background: var(--line);
+}
