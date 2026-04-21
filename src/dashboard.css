@@ -5000,6 +5000,29 @@ body {
   text-decoration: underline;
 }
 
+/* Efficiency card — mobile layout fixes */
+@media (max-width: 767px) {
+  /* Narrow EXTRA/mo column and add gap to recover category column width */
+  .eff-col-headers,
+  .eff-row {
+    grid-template-columns: 1fr 70px 70px 120px;
+    gap: 8px;
+  }
+
+  /* Hide anchor label — visible in drawer instead */
+  .eff-row-cat-anchor {
+    display: none;
+  }
+
+  /* Protect category name from aggressive truncation */
+  .eff-row-cat-col {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 /* === Shell migration: sidebar + main column === */
 .finance-app {
   width: auto;
