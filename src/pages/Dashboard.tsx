@@ -11,7 +11,7 @@ import LoadingScreen from '../components/LoadingScreen';
 import DigHereHighlights from '../components/DigHereHighlights';
 import KpiCards from '../components/KpiCards';
 import TopCategoriesCard from '../components/TopCategoriesCard';
-import PeriodDropdown from '../components/PeriodDropdown';
+import TimeframeToggle from '../components/TimeframeToggle';
 import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
@@ -618,7 +618,6 @@ export default function Dashboard() {
   const [monthPickerDraftStart, setMonthPickerDraftStart] = useState<string>('');
   const [monthPickerDraftEnd, setMonthPickerDraftEnd] = useState<string>('');
   const monthPickerRef = useRef<HTMLDivElement>(null);
-  const bigPictureFilterMenuRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const [trendsMaWindow, setTrendsMaWindow] = useState<TrendsMaWindow>(12);
 const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
@@ -638,7 +637,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [activeSection, setActiveSection] = useState<'data' | 'accounts' | 'rules'>('data');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-  const [isBigPictureFilterOpen, setIsBigPictureFilterOpen] = useState(false);
   const preserveAccountSettingsOnImportClearRef = useRef(false);
   const sharedAccountSettingsSyncArmedRef = useRef(false);
   const compareYearHandledRef = useRef<number | null>(null);
@@ -1942,30 +1940,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     };
   }, [isMonthPickerOpen]);
 
-  useEffect(() => {
-    if (!isBigPictureFilterOpen) return;
-
-    const handleOutsideClick = (event: MouseEvent) => {
-      const inMenu = bigPictureFilterMenuRef.current?.contains(event.target as Node);
-      if (!inMenu) {
-        setIsBigPictureFilterOpen(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsBigPictureFilterOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleOutsideClick);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isBigPictureFilterOpen]);
-
   const writeDashboardUrlState = useCallback(
     (
       next: {
@@ -2345,52 +2319,11 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 </div>
               ) : (
                 <div className="kpi-timeframe-control">
-                  <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
-                    {BIG_PICTURE_VISIBLE_FRAME_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={kpiTimeframe === option.value ? 'is-active' : ''}
-                        onClick={() => {
-                          setKpiTimeframe(option.value);
-                          setIsBigPictureFilterOpen(false);
-                        }}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                    <div className="timeframe-menu" ref={bigPictureFilterMenuRef}>
-                      <button
-                        type="button"
-                        className="timeframe-trigger"
-                        onClick={() => setIsBigPictureFilterOpen((current) => !current)}
-                        aria-haspopup="menu"
-                        aria-expanded={isBigPictureFilterOpen}
-                      >
-                        More ▾
-                      </button>
-                      {isBigPictureFilterOpen && (
-                        <ul className="timeframe-list" role="menu" aria-label="Select Big Picture filter timeframe">
-                          {BIG_PICTURE_FILTER_FRAME_OPTIONS.map((option) => (
-                            <li key={option.value}>
-                              <button
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={kpiTimeframe === option.value}
-                                className={kpiTimeframe === option.value ? 'is-active' : ''}
-                                onClick={() => {
-                                  setKpiTimeframe(option.value);
-                                  setIsBigPictureFilterOpen(false);
-                                }}
-                              >
-                                {option.label}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
+                  <TimeframeToggle
+                    options={BIG_PICTURE_FRAME_OPTIONS}
+                    selected={kpiTimeframe}
+                    onChange={(v) => setKpiTimeframe(v as BigPictureFrameValue)}
+                  />
                   {kpiTimeframe === 'custom' && (
                     <div className="kpi-custom-range" aria-label="Custom Big Picture date range">
                       <label>
@@ -2520,9 +2453,9 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 slices={kpiExpenseBreakdown.slices}
                 total={kpiExpenseBreakdown.total}
                 periodControl={
-                  <PeriodDropdown
-                    value={kpiTimeframe}
+                  <TimeframeToggle
                     options={BIG_PICTURE_FRAME_OPTIONS}
+                    selected={kpiTimeframe}
                     onChange={(v) => setKpiTimeframe(v as BigPictureFrameValue)}
                   />
                 }
