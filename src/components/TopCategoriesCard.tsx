@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import type { ExpenseSlice } from '../lib/data/contract';
+import { formatCompact } from '../lib/utils/formatCompact';
 
 type TopCategoriesCardProps = {
   slices: ExpenseSlice[];
@@ -55,12 +56,19 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
       },
     },
     tooltip: {
-      style: { fontFamily: 'inherit', fontSize: '13px' },
-      y: {
-        formatter: (val: number) => {
-          const pct = total > 0 ? Math.round((val / total) * 100) : 0;
-          return `${formatCurrency(val)} · ${pct}%`;
+      theme: 'light',
+      x: {
+        formatter: (_: string | number, opts?: { seriesIndex: number; w: { globals: { labels: string[]; series: number[] } } }) => {
+          if (!opts) return '';
+          const name = opts.w.globals.labels[opts.seriesIndex];
+          const series = opts.w.globals.series;
+          const tooltipTotal = series.reduce((a: number, b: number) => a + b, 0);
+          const pct = Math.round((series[opts.seriesIndex] / tooltipTotal) * 100);
+          return `${name} · ${pct}%`;
         },
+      },
+      y: {
+        formatter: (value: number) => formatCompact(value),
       },
     },
     states: {
