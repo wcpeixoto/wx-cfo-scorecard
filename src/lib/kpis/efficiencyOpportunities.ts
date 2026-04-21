@@ -27,7 +27,7 @@ const SUPPRESSED_CATEGORIES = new Set<string>([
 let debugLoggedOnce = false;
 
 export interface WindowMonthDetail {
-  monthLabel: string;  // e.g. "Jan 2025"
+  monthLabel: string;  // e.g. "Jan"
   revenue: number;
   spend: number;
   ratio: number;       // raw ratio, e.g. 0.28
@@ -106,9 +106,7 @@ function formatBestPeriodLabel(bestPct: number, startMonth: string, endMonth: st
 }
 
 function formatMonthLabel(month: string): string {
-  const parts = parseMonthParts(month);
-  if (!parts) return month;
-  return `${MONTH_SHORT[parts.monthIndex]} ${parts.year}`;
+  return monthShort(month);
 }
 
 function buildWindowDetail(
