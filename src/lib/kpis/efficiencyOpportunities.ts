@@ -172,10 +172,29 @@ export function computeEfficiencyOpportunities(
   const latestMonth = model.latestMonth;
   if (!latestMonth || !parseMonthParts(latestMonth)) return emptyResult;
 
-  // Build lookback month list (oldest → newest), size = LOOKBACK_MONTHS ending at latestMonth
+  // Derive the last complete month from the current date at runtime.
+  // A month is complete only if it is strictly before the current calendar month.
+  // e.g. on April 21 2026, April is incomplete → last complete month = March 2026.
+  const now = new Date();
+  const currentYearMonth = `${String(now.getFullYear()).padStart(4, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  // lastCompleteMonth is one month before the current calendar month.
+  const lastCompleteMonth = addMonths(currentYearMonth, -1);
+
+  // The window anchor is the lesser of latestMonth and lastCompleteMonth.
+  // This ensures we never include a month that is either in the future
+  // or is the current (incomplete) calendar month.
+  function monthIsEarlierOrEqual(a: string, b: string): boolean {
+    return a <= b; // ISO year-month strings sort lexicographically
+  }
+  const windowAnchor = monthIsEarlierOrEqual(latestMonth, lastCompleteMonth)
+    ? latestMonth
+    : lastCompleteMonth;
+
+  // Build lookback month list (oldest → newest), size = LOOKBACK_MONTHS ending at windowAnchor.
+  // All months in this list are guaranteed to be complete.
   const months: string[] = [];
   for (let i = LOOKBACK_MONTHS - 1; i >= 0; i -= 1) {
-    months.push(addMonths(latestMonth, -i));
+    months.push(addMonths(windowAnchor, -i));
   }
   const monthIndex = new Map<string, number>();
   months.forEach((m, i) => monthIndex.set(m, i));
@@ -235,7 +254,7 @@ export function computeEfficiencyOpportunities(
 
   if (validWindows.length === 0) return emptyResult;
 
-  // Current window = last valid window that ends at latestMonth
+  // Current window = last valid window that ends at windowAnchor (the last complete month)
   const latestIdx = months.length - 1;
   const currentWindow = validWindows.find((w) => w.endIdx === latestIdx);
   if (!currentWindow) return emptyResult;
