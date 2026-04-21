@@ -18,6 +18,7 @@ import NetCashFlowChart from '../components/NetCashFlowChart';
 import TrajectoryPanel from '../components/TrajectoryPanel';
 import { TodayPage } from '../components/TodayPage';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
+import { computeEfficiencyOpportunities } from '../lib/kpis/efficiencyOpportunities';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
 import { includeExpenseForDigHere, isCapitalDistributionCategory } from '../lib/cashFlow';
@@ -1074,6 +1075,10 @@ export default function Dashboard() {
       return result;
     },
     [currentCalendarMonth, currentCashBalance, filteredTxns, previousCalendarMonth, profitabilityCashFlowMode]
+  );
+  const efficiencyResult = useMemo(
+    () => computeEfficiencyOpportunities(model, filteredTxns),
+    [model, filteredTxns]
   );
   const netCashFlowChartModel = useMemo(
     () =>
@@ -3853,7 +3858,7 @@ export default function Dashboard() {
                 <p className="ui-lab-section-subtitle">Primary insight card — half-width, diagnostic list, dominant gap amounts. Static mock data.</p>
               </div>
               <div className="ui-lab-two-col-grid">
-                <EfficiencyOpportunitiesCard />
+                <EfficiencyOpportunitiesCard result={efficiencyResult} />
               </div>
             </div>
 
