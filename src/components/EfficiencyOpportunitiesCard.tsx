@@ -31,10 +31,7 @@ export function EfficiencyOpportunitiesCard({ result, variant = 'single' }: Prop
 
       {/* Pattern B header — title + explanation + context line */}
       <div className="eff-opp-header">
-        <h3 className="eff-opp-title" aria-label="Efficiency opportunities">These costs are taking more of your revenue than they did at your best.</h3>
-        <p className="eff-opp-explanation">
-          You're spending more on these than you did before, for this level of revenue.
-        </p>
+        <h3 className="eff-opp-title" aria-label="Efficiency opportunities">These costs are taking more of your revenue than they did at your best</h3>
         <p className="eff-opp-context">{windowLabel}  ·  vs your best 3-month stretch in the last 24 months</p>
       </div>
 
