@@ -2513,21 +2513,7 @@ export default function Dashboard() {
             />
 
             <div className="two-col-grid">
-              <article className="card preview-card">
-                <div className="card-head">
-                  <h3>Money Left on the Table</h3>
-                  <p className="subtle">Recoverable opportunity this month</p>
-                </div>
-                <p className="hero-number">{formatCurrency(model.opportunityTotal)}</p>
-                <ul className="opportunity-list">
-                  {model.opportunities.slice(0, 5).map((item) => (
-                    <li key={item.title}>
-                      <span>{item.title}</span>
-                      <strong>{formatCurrency(item.savings)}</strong>
-                    </li>
-                  ))}
-                </ul>
-              </article>
+              <EfficiencyOpportunitiesCard result={efficiencyResult} />
 
               <TopCategoriesCard
                 slices={kpiExpenseBreakdown.slices}
