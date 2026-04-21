@@ -11,6 +11,19 @@ const WINDOW_SIZE_MONTHS = 3;
 const LOOKBACK_MONTHS = 24;
 const MAX_ROWS = 4;
 
+// Categories the owner has no near-term operational lever to change.
+// Suppressed from Efficiency Opportunities regardless of gap size.
+// Names are exact matches against parentCategoryName() output — case-sensitive.
+// 'Amortization' not present in current data but kept for future-proofing.
+const SUPPRESSED_CATEGORIES = new Set<string>([
+  'Rent or Lease',
+  'Depreciation',
+  'Amortization',
+  'Taxes and Licenses',
+  'Interest Paid',
+  'Loan',
+]);
+
 let debugLoggedOnce = false;
 
 export interface EfficiencyRow {
@@ -147,6 +160,7 @@ export function computeEfficiencyOpportunities(
       if (isCapitalDistributionCategory(txn.category)) continue;
       const parent = parentCategoryName(txn.category);
       if (!parent) continue;
+      if (SUPPRESSED_CATEGORIES.has(parent)) continue;
       let arr = expenseByCatMonth.get(parent);
       if (!arr) {
         arr = new Array<number>(months.length).fill(0);
