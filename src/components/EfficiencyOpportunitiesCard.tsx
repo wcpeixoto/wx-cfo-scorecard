@@ -9,7 +9,7 @@ interface Props {
 
 function formatHeadline(totalPerMonth: number): string {
   const rounded = Math.round(totalPerMonth / 100) * 100;
-  return `~$${rounded.toLocaleString('en-US')}/mo`;
+  return `+$${rounded.toLocaleString('en-US')}/mo`;
 }
 
 function formatExtra(amount: number): string {
@@ -31,7 +31,7 @@ export function EfficiencyOpportunitiesCard({ result, variant = 'single' }: Prop
 
       {/* Pattern B header — title + explanation + context line */}
       <div className="eff-opp-header">
-        <h3 className="eff-opp-title">Efficiency opportunities</h3>
+        <h3 className="eff-opp-title" aria-label="Efficiency opportunities">These costs are taking more of your revenue than they did at your best.</h3>
         <p className="eff-opp-explanation">
           You're spending more on these than you did before, for this level of revenue.
         </p>

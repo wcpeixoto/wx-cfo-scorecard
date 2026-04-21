@@ -4812,12 +4812,12 @@ body {
   color: #D1D5DB;     /* gray-300 in dark mode */
 }
 
-/* Context line — de-emphasized metadata below explanation */
+/* Context line — metadata below explanation, pre-Prompt-2 subtitle size */
 .eff-opp-context {
   margin: 2px 0 0;
-  font-size: 12px;    /* text-theme-xs */
+  font-size: 14px;    /* text-theme-sm — reverted to pre-Prompt-2 subtitle size */
   font-weight: 400;
-  color: #667085;     /* secondary text — intentionally lighter than explanation */
+  color: #667085;     /* secondary text */
   line-height: 1.5;
 }
 
