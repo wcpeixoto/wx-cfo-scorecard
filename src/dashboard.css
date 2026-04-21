@@ -973,42 +973,56 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Top Expense Categories — custom donut tooltip (exception) */
-.ec-donut-tooltip {
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid #E4E7EC;
-  border-radius: 8px;
-  padding: 12px;
+/* Top Expense Categories — custom donut tooltip (exception)
+   Wrapper made transparent so only .ec-donut-tooltip is visible.
+   High-specificity rules needed to beat ApexCharts' own injected styles. */
+
+.top-categories-card .apexcharts-tooltip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+.apexcharts-tooltip .ec-donut-tooltip {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border: 1px solid #E4E7EC !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
   box-shadow: rgba(16, 24, 40, 0.10) 0px 1px 3px,
-              rgba(16, 24, 40, 0.06) 0px 1px 2px;
-  white-space: nowrap;
-  max-width: 200px;
-  font-family: Outfit, sans-serif;
+              rgba(16, 24, 40, 0.06) 0px 1px 2px !important;
+  max-width: 160px !important;
+  white-space: nowrap !important;
+  font-family: Outfit, sans-serif !important;
 }
 
-.ec-donut-tooltip__title {
-  font-size: 10px;
-  font-weight: 400;
-  color: rgb(52, 64, 84);
-  padding: 0 0 4px 0;
-  margin: 0;
+.apexcharts-tooltip .ec-donut-tooltip__title {
+  font-size: 10px !important;
+  font-weight: 400 !important;
+  color: rgb(52, 64, 84) !important;
+  padding: 0 0 4px 0 !important;
+  margin: 0 !important;
 }
 
-.ec-donut-tooltip__value {
-  font-size: 12px;
-  font-weight: 500;
-  color: rgb(71, 84, 103);
+.apexcharts-tooltip .ec-donut-tooltip__value {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: rgb(71, 84, 103) !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* Dark mode */
-.dark .ec-donut-tooltip {
-  background: rgba(30, 41, 59, 0.96);
-  border-color: #374151;
+.dark .apexcharts-tooltip .ec-donut-tooltip {
+  background: rgba(30, 41, 59, 0.96) !important;
+  border-color: #374151 !important;
 }
 
-.dark .ec-donut-tooltip__title,
-.dark .ec-donut-tooltip__value {
-  color: rgba(255, 255, 255, 0.85);
+.dark .apexcharts-tooltip .ec-donut-tooltip__title,
+.dark .apexcharts-tooltip .ec-donut-tooltip__value {
+  color: rgba(255, 255, 255, 0.85) !important;
 }
 
 .forecast-cockpit {
