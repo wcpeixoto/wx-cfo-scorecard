@@ -5000,13 +5000,47 @@ body {
   text-decoration: underline;
 }
 
-/* Efficiency card — mobile layout fixes */
+/* Combined best→today column header — mobile only; hidden on desktop */
+.eff-col-best-now {
+  display: none;
+  text-align: center;
+}
+
+/* Combined best→today cell — mobile only; hidden on desktop */
+.eff-row-combined-val {
+  display: none;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.dark .eff-row-combined-val {
+  color: #D1D5DB;
+}
+
+/* Efficiency card — mobile layout */
 @media (max-width: 767px) {
-  /* Narrow EXTRA/mo column and add gap to recover category column width */
+  /* 3-column grid: category | best→now | extra */
   .eff-col-headers,
   .eff-row {
-    grid-template-columns: 1fr 70px 70px 120px;
+    grid-template-columns: 1fr 90px 80px;
     gap: 8px;
+  }
+
+  /* Hide separate best/today columns — replaced by combined cell */
+  .eff-col-best,
+  .eff-col-today,
+  .eff-row-best-val,
+  .eff-row-today-val {
+    display: none;
+  }
+
+  /* Show combined best→now column */
+  .eff-col-best-now,
+  .eff-row-combined-val {
+    display: block;
   }
 
   /* Hide anchor label — visible in drawer instead */
@@ -5014,7 +5048,7 @@ body {
     display: none;
   }
 
-  /* Protect category name from aggressive truncation */
+  /* Protect category cell from aggressive truncation */
   .eff-row-cat-col {
     min-width: 0;
     white-space: nowrap;

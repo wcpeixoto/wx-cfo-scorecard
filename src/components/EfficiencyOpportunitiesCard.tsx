@@ -44,8 +44,10 @@ export function EfficiencyOpportunitiesCard({ result, variant = 'single' }: Prop
       {/* Column headers */}
       <div className="eff-col-headers">
         <span className="eff-col-cat">Category</span>
+        {/* Desktop: two separate columns. Mobile: single combined column */}
         <span className="eff-col-best">Your best</span>
         <span className="eff-col-today">Today</span>
+        <span className="eff-col-best-now">Best → Now</span>
         <span className="eff-col-extra">Extra/<span className="eff-col-extra-sub">mo</span></span>
       </div>
 
@@ -66,7 +68,7 @@ export function EfficiencyOpportunitiesCard({ result, variant = 'single' }: Prop
             <span className="eff-row-cat-anchor">{row.bestPeriodLabel}</span>
           </div>
 
-          {/* Col 2 — Your best % — center, muted, clickable */}
+          {/* Col 2 — Your best % — desktop only */}
           <span
             className="eff-row-best-val eff-row-cat-name--clickable"
             onClick={() => setSelectedRow(row)}
@@ -74,8 +76,16 @@ export function EfficiencyOpportunitiesCard({ result, variant = 'single' }: Prop
             {row.bestPct}%
           </span>
 
-          {/* Col 3 — Today % — center, stronger */}
+          {/* Col 3 — Today % — desktop only */}
           <span className="eff-row-today-val">{row.todayPct}%</span>
+
+          {/* Combined best→today — mobile only */}
+          <span
+            className="eff-row-combined-val eff-row-cat-name--clickable"
+            onClick={() => setSelectedRow(row)}
+          >
+            {row.bestPct}% → {row.todayPct}%
+          </span>
 
           {/* Col 4 — Extra amount (top) + bar (below) */}
           <div className="eff-row-extra-col">
