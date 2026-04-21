@@ -57,6 +57,8 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
     },
     tooltip: {
       theme: 'light',
+      shared: false,
+      intersect: true,
       x: {
         formatter: (_: string | number, opts?: { seriesIndex: number; w: { globals: { labels: string[]; series: number[] } } }) => {
           if (!opts) return '';
