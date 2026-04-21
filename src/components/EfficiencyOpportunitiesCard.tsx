@@ -3,8 +3,12 @@ interface EffRow {
   anchor: string;
   best: number;
   today: number;
-  barFill: number;  // % fill (gap to today) — red fill on gray track
+  barFill: number;  // % of bar that is "extra" (gap to today)
   extra: string;    // extra cost vs best, formatted
+}
+
+interface Props {
+  variant?: 'single' | 'comparison';
 }
 
 const MOCK_ROWS: EffRow[] = [
@@ -14,7 +18,9 @@ const MOCK_ROWS: EffRow[] = [
   { category: 'Refunds & allowances', anchor: 'was 1% avg (Mar–May 2024)', best: 1,  today: 4,  barFill: 75, extra: '+$1.4K' },
 ];
 
-export function EfficiencyOpportunitiesCard() {
+export function EfficiencyOpportunitiesCard({ variant = 'single' }: Props) {
+  const isComparison = variant === 'comparison';
+
   return (
     <div className="ta-card eff-opp-card">
 
@@ -59,8 +65,11 @@ export function EfficiencyOpportunitiesCard() {
           {/* Col 4 — Extra amount (top) + bar (below) */}
           <div className="eff-row-extra-col">
             <span className="eff-row-extra-amt">{row.extra}</span>
-            <div className="eff-bar">
-              <div className="eff-bar-fill" style={{ width: `${row.barFill}%` }} />
+
+            {/* Two-part bar: green (best) left + red (extra) right */}
+            <div className={isComparison ? 'eff-bar eff-bar--comparison' : 'eff-bar eff-bar--soft'}>
+              <div className="eff-bar-best" style={{ width: `${100 - row.barFill}%` }} />
+              <div className="eff-bar-extra" style={{ width: `${row.barFill}%` }} />
             </div>
           </div>
         </div>
@@ -68,8 +77,7 @@ export function EfficiencyOpportunitiesCard() {
 
       {/* Footnote */}
       <p className="eff-footnote">
-        "Your best" is the lowest a cost has been versus your revenue over any
-        3-month stretch in the last 24 months.
+        "Your best" is the lowest % of revenue a cost has been over any 3-month stretch in the last 24 months.
       </p>
 
     </div>

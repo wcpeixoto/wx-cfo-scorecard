@@ -4921,17 +4921,31 @@ body {
   max-width: 130px;
   height: 8px;
   border-radius: 4px;
-  background: #E4E7EC;  /* gray-200 track */
+  background: #F2F4F7;  /* muted surface track */
   overflow: hidden;
 }
 
-.eff-bar-fill {
-  position: absolute;
-  right: 0;
-  top: 0;
+
+/* Two-part bars — shared layout */
+.eff-bar--soft,
+.eff-bar--comparison {
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Left card — lightly softened */
+.eff-bar--soft .eff-bar-best  { background: #74D3AE; }  /* soft green */
+.eff-bar--soft .eff-bar-extra { background: #F87171; }  /* soft red */
+
+/* Right card — slightly muted */
+.eff-bar--comparison .eff-bar-best  { background: #2FBF7F; }  /* muted green */
+.eff-bar--comparison .eff-bar-extra { background: #E5534B; }  /* muted red */
+
+.eff-bar-best,
+.eff-bar-extra {
   height: 100%;
-  border-radius: 4px;
-  background: #F04438;  /* error red */
+  flex-shrink: 0;
 }
 
 /* Footnote */
