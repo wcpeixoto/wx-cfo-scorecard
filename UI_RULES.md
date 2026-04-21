@@ -1227,3 +1227,55 @@ The constraints below are calibrated to the actual TailAdmin source — not stri
 
 **Project Overlay**
 - [ ] All rules from Part 6 applied
+
+---
+
+## Component Spec: Efficiency Opportunities Card
+
+### Card shell
+- Class: `ta-card` — `border: 1px solid #E4E7EC`, `border-radius: 16px`, `background: #FFFFFF`, `padding: 24px`
+- Width: half-page on desktop (2-column grid), full width on mobile
+
+### Header (Pattern B)
+- Title: 18px, font-weight 600, color `#101828`
+- Subtitle: 14px, font-weight 400, color `#667085`, margin-top 4px
+
+### Headline strip
+- Background: `#F2F4F7`, border-radius 12px, padding `14px 20px`
+- Layout: flex row, `align-items: baseline`, gap 10px, flex-wrap
+- Amount: 30px, font-weight 700, color `#101828`
+- Label: 13px, font-weight 400, color `#667085`
+
+### Column headers
+- Grid: `1fr 70px 70px 140px`
+- Font: 12px, font-weight 500, color `#667085`, uppercase, letter-spacing 0.04em
+- Bottom border: `1px solid #E4E7EC`
+- Alignment: Category left · Your best center · Today center · Extra/mo right
+- "mo" in "Extra/mo" rendered via nested span with `text-transform: none`
+
+### Rows
+- Same 4-column grid: `1fr 70px 70px 140px`
+- Padding: 12px top and bottom
+- Row separator: `1px solid #E4E7EC` (last row: none)
+
+**Col 1 — Category**
+- Name: 14px, font-weight 600, color `#101828`, ellipsis on overflow
+- Anchor label: 12px, font-weight 400, color `#667085`
+
+**Col 2 — Your best %**
+- 14px, font-weight 700, color `#667085` (muted), center-aligned
+
+**Col 3 — Today %**
+- 14px, font-weight 700, color `#1D2939` (stronger), center-aligned
+
+**Col 4 — Extra/mo**
+- Amount: Outfit, 18px, font-weight 600, line-height 28px, color `#1D2939`, right-aligned
+- Bar: below amount, full column width, max-width 130px, height 8px, border-radius 4px
+  - Track: `#F2F4F7`
+  - Green segment (left — your best): `${100 - barFill}%` wide, color `#74D3AE`
+  - Red segment (right — extra cost): `${barFill}%` wide, color `#F87171`
+  - barFill = (today% - best%) / today% × 100, clamped 0–100
+
+### Footnote
+- 12px, font-weight 400, color `#667085`, line-height 1.6
+- Top border: `1px solid #E4E7EC`, padding-top 12px, margin-top 16px
