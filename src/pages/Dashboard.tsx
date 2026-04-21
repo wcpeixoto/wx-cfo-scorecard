@@ -17,6 +17,7 @@ import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import TrajectoryPanel from '../components/TrajectoryPanel';
 import { TodayPage } from '../components/TodayPage';
+import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
 import { includeExpenseForDigHere, isCapitalDistributionCategory } from '../lib/cashFlow';
@@ -3842,6 +3843,17 @@ export default function Dashboard() {
               </div>
               <div className="ui-lab-placeholder">
                 <span className="ui-lab-placeholder-label">Patterns go here</span>
+              </div>
+            </div>
+
+            {/* ── Section 11: Efficiency Opportunities Card ─────────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Efficiency Opportunities Card</h3>
+                <p className="ui-lab-section-subtitle">Primary insight card — half-width, diagnostic list, dominant gap amounts. Static mock data.</p>
+              </div>
+              <div className="ui-lab-two-col-grid">
+                <EfficiencyOpportunitiesCard />
               </div>
             </div>
 

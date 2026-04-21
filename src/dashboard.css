@@ -4763,6 +4763,189 @@ body {
   color: #98A2B3;
 }
 
+/* UI Lab — 2-column half-width preview grid */
+.ui-lab-two-col-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 767px) {
+  .ui-lab-two-col-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Efficiency Opportunities Card ───────────────────────────────────── */
+
+/* Card header */
+.eff-opp-header {
+  margin-bottom: 20px;
+}
+
+.eff-opp-title {
+  margin: 0;
+  font-size: 18px;    /* text-lg */
+  font-weight: 600;   /* font-semibold */
+  color: #101828;     /* primary strong */
+  line-height: 1.3;
+}
+
+.eff-opp-subtitle {
+  margin: 4px 0 0;    /* mt-1 */
+  font-size: 14px;    /* text-theme-sm */
+  font-weight: 400;
+  color: #667085;     /* secondary text */
+  line-height: 1.5;
+}
+
+/* Headline strip — amount + label on one baseline row */
+.eff-headline-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: #F2F4F7;  /* muted surface */
+  border-radius: 12px;  /* rounded-xl */
+  padding: 14px 20px;
+  margin-bottom: 20px;
+}
+
+.eff-headline-amount {
+  font-size: 30px;    /* text-title-sm */
+  font-weight: 700;   /* font-bold */
+  color: #101828;     /* primary strong */
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.eff-headline-label {
+  font-size: 13px;    /* between text-theme-xs and text-theme-sm — helper role */
+  font-weight: 400;
+  color: #667085;     /* secondary text */
+  line-height: 1.4;
+}
+
+/* Column headers — 4 columns: [1fr] [70px] [70px] [140px] */
+.eff-col-headers {
+  display: grid;
+  grid-template-columns: 1fr 70px 70px 140px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #E4E7EC;
+  font-size: 12px;    /* text-theme-xs */
+  font-weight: 500;
+  color: #667085;     /* secondary text */
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.eff-col-cat   { /* left-aligned default */ }
+.eff-col-best  { text-align: center; }
+.eff-col-today { text-align: center; }
+.eff-col-extra { text-align: right; }
+
+/* Data rows — same 4-column grid */
+.eff-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 70px 140px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #E4E7EC;
+}
+
+.eff-row-last {
+  border-bottom: none;
+}
+
+/* Col 1 — category + anchor */
+.eff-row-cat-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.eff-row-cat-name {
+  font-size: 14px;    /* text-theme-sm */
+  font-weight: 600;   /* semibold */
+  color: #101828;     /* primary strong */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eff-row-cat-anchor {
+  font-size: 12px;    /* text-theme-xs */
+  font-weight: 400;
+  color: #667085;     /* secondary text */
+}
+
+/* Col 2 — Your best % — center, muted */
+.eff-row-best-val {
+  font-size: 14px;    /* text-theme-sm */
+  font-weight: 700;   /* bold */
+  color: #667085;     /* secondary — intentionally muted vs Today */
+  text-align: center;
+}
+
+/* Col 3 — Today % — center, stronger than Your best */
+.eff-row-today-val {
+  font-size: 14px;    /* text-theme-sm */
+  font-weight: 700;   /* bold */
+  color: #1D2939;     /* gray-800 — stronger than #667085 */
+  text-align: center;
+}
+
+/* Col 4 — Extra amount on top, bar below */
+.eff-row-extra-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.eff-row-extra-amt {
+  font-size: 18px;    /* text-lg — step above text-base (16px) */
+  font-weight: 700;   /* bold */
+  color: #101828;     /* primary strong */
+  line-height: 1.1;
+}
+
+/* Progress bar — in Extra column, below amount */
+.eff-bar {
+  display: flex;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #E4E7EC;  /* track fallback */
+  overflow: visible;    /* allow green to show rounded right cap */
+}
+
+.eff-bar-green {
+  background: #12B76A;       /* success */
+  height: 100%;
+  flex-shrink: 0;
+  border-radius: 3px;        /* fully rounded — caps cleanly before red begins */
+}
+
+.eff-bar-red {
+  background: #F04438;       /* error */
+  height: 100%;
+  flex-shrink: 0;
+  border-radius: 0 3px 3px 0; /* rounded right side only */
+}
+
+/* Footnote */
+.eff-footnote {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid #E4E7EC;
+  font-size: 12px;    /* text-theme-xs */
+  font-weight: 400;
+  color: #667085;     /* secondary text */
+  line-height: 1.6;
+}
+
 /* === Shell migration: sidebar + main column === */
 .finance-app {
   width: auto;
