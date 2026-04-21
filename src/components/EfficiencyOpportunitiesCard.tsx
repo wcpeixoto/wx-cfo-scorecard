@@ -3,16 +3,15 @@ interface EffRow {
   anchor: string;
   best: number;
   today: number;
-  barGreen: number; // % of bar filled green (your best)
-  barRed: number;   // % of bar filled red (gap to today)
+  barFill: number;  // % fill (gap to today) — red fill on gray track
   extra: string;    // extra cost vs best, formatted
 }
 
 const MOCK_ROWS: EffRow[] = [
-  { category: 'Payroll',              anchor: 'was 28% avg (Jan–Mar 2025)', best: 28, today: 43, barGreen: 65, barRed: 35, extra: '+$5.9K' },
-  { category: 'Marketing',            anchor: 'was 2% avg (Jan–Mar 2024)',  best: 2,  today: 8,  barGreen: 25, barRed: 75, extra: '+$2.4K' },
-  { category: 'COGS',                 anchor: 'was 1% avg (Apr–Jun 2024)',  best: 1,  today: 6,  barGreen: 17, barRed: 83, extra: '+$1.8K' },
-  { category: 'Refunds & allowances', anchor: 'was 1% avg (Mar–May 2024)', best: 1,  today: 4,  barGreen: 25, barRed: 75, extra: '+$1.4K' },
+  { category: 'Payroll',              anchor: 'was 28% avg (Jan–Mar 2025)', best: 28, today: 43, barFill: 35, extra: '+$5.9K' },
+  { category: 'Marketing',            anchor: 'was 2% avg (Jan–Mar 2024)',  best: 2,  today: 8,  barFill: 75, extra: '+$2.4K' },
+  { category: 'COGS',                 anchor: 'was 1% avg (Apr–Jun 2024)',  best: 1,  today: 6,  barFill: 83, extra: '+$1.8K' },
+  { category: 'Refunds & allowances', anchor: 'was 1% avg (Mar–May 2024)', best: 1,  today: 4,  barFill: 75, extra: '+$1.4K' },
 ];
 
 export function EfficiencyOpportunitiesCard() {
@@ -36,7 +35,7 @@ export function EfficiencyOpportunitiesCard() {
         <span className="eff-col-cat">Category</span>
         <span className="eff-col-best">Your best</span>
         <span className="eff-col-today">Today</span>
-        <span className="eff-col-extra">Extra / mo</span>
+        <span className="eff-col-extra">Extra/<span className="eff-col-extra-sub">mo</span></span>
       </div>
 
       {/* Data rows */}
@@ -61,8 +60,7 @@ export function EfficiencyOpportunitiesCard() {
           <div className="eff-row-extra-col">
             <span className="eff-row-extra-amt">{row.extra}</span>
             <div className="eff-bar">
-              <div className="eff-bar-green" style={{ width: `${row.barGreen}%` }} />
-              <div className="eff-bar-red"   style={{ width: `${row.barRed}%` }} />
+              <div className="eff-bar-fill" style={{ width: `${row.barFill}%` }} />
             </div>
           </div>
         </div>
