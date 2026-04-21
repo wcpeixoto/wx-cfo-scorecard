@@ -56,21 +56,20 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
       },
     },
     tooltip: {
-      theme: 'light',
-      shared: false,
-      intersect: true,
-      x: {
-        formatter: (_: string | number, opts?: { seriesIndex: number; w: { globals: { labels: string[]; series: number[] } } }) => {
-          if (!opts) return '';
-          const name = opts.w.globals.labels[opts.seriesIndex];
-          const series = opts.w.globals.series;
-          const tooltipTotal = series.reduce((a: number, b: number) => a + b, 0);
-          const pct = Math.round((series[opts.seriesIndex] / tooltipTotal) * 100);
-          return `${name} · ${pct}%`;
-        },
-      },
-      y: {
-        formatter: (value: number) => formatCompact(value),
+      custom: ({ seriesIndex, w }: { seriesIndex: number; w: { globals: { labels: string[]; series: number[] } } }) => {
+        const name = w.globals.labels[seriesIndex];
+        const series = w.globals.series;
+        const value = series[seriesIndex];
+        const tooltipTotal = series.reduce((a: number, b: number) => a + b, 0);
+        const pct = Math.round((value / tooltipTotal) * 100);
+        const formatted = formatCompact(value);
+
+        return `
+          <div class="ec-donut-tooltip">
+            <div class="ec-donut-tooltip__title">${name} · ${pct}%</div>
+            <div class="ec-donut-tooltip__value">${formatted}</div>
+          </div>
+        `;
       },
     },
     states: {

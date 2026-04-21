@@ -859,12 +859,18 @@ This is a deliberate, documented exception to the no-custom-tooltip
 rule. The custom renderer wrapper must include `.apexcharts-theme-light`
 so global tooltip CSS applies.
 
-This exception is scoped to `OwnerDistributionsChart.tsx` only.
-Do not generalize it to other charts.
+### Exception — TopCategoriesCard custom tooltip
+
+`TopCategoriesCard.tsx` uses `tooltip: { custom: ... }` to render
+a single-slice tooltip on the donut chart. The standard x/y formatter
+pattern causes multi-series stacking on pie/donut charts. The custom
+renderer uses `.ec-donut-tooltip` classes defined in `dashboard.css`
+which visually match the dashboard tooltip standard. See the Pie/donut
+exception section in Part 6 for the full policy.
 
 ### Hard rules
 
-- Never use `tooltip: { custom: ... }` except in OwnerDistributionsChart
+- Never use `tooltip: { custom: ... }` except in OwnerDistributionsChart and TopCategoriesCard (documented exceptions above)
 - Never set tooltip background to `transparent`
 - Never size the `::before` glyph — use `background-color: currentColor`
 - The global `.apexcharts-tooltip` transparent reset block must
@@ -1054,15 +1060,26 @@ All ApexCharts tooltips in this project must follow this standard.
 - Reimplementing currency formatting inline —
   always import `formatTooltipY`
 
-### Per-chart exceptions (document here when added)
-- Top Expense Categories donut: marker hidden
-  (`.apexcharts-tooltip-marker { display: none }`)
-  — not meaningful on a pie/donut chart
+### Pie/donut exception
+
+Pie/donut charts may use a custom ApexCharts tooltip renderer when
+the standard tooltip pattern produces multi-series stacking or
+incorrect slice behavior. The custom renderer must visually match
+the dashboard tooltip standard (typography, colors, border, radius,
+shadow, spacing). This exception is narrowly scoped — it does not
+authorize custom tooltips on Cartesian charts (line, bar, area, column).
+
+### Current exceptions
+- Top Expense Categories donut (TopCategoriesCard.tsx) — uses
+  custom HTML tooltip to avoid series stacking
 - OwnerDistributionsChart: uses `tooltip: { custom: ... }` to
   render a Total row (Actual + Forecast = full year distribution).
   This is a deliberate, documented exception to the no-custom-tooltip
   rule. The custom renderer wrapper must include `.apexcharts-theme-light`
   so global tooltip CSS applies.
+
+### Per-chart exceptions (document here when added)
+- OwnerDistributionsChart: see Current exceptions above
 
 ---
 
