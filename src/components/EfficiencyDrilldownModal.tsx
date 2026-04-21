@@ -1,60 +1,49 @@
-// TODO: wire click trigger from EfficiencyOpportunitiesCard category
-// name in next prompt. Modal currently renders open in UI Lab only.
+import { formatCompact } from '../lib/utils/formatCompact';
+import type { EfficiencyRow } from '../lib/kpis/efficiencyOpportunities';
 
-export interface DrilldownRow {
-  month: string;     // short label, e.g. "Jan"
-  revenue: number;
-  spend: number;
-  pct: number;       // integer, e.g. 28
+function avg(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
-export interface EfficiencyDrilldownData {
-  categoryName: string;
-  bestWindowLabel: string;   // "Jan – Mar 2025"
-  todayWindowLabel: string;  // "Feb – Apr 2026"
-  bestRows: DrilldownRow[];
-  todayRows: DrilldownRow[];
-  bestAvgRevenue: number;
-  bestAvgSpend: number;
-  bestAvgPct: number;
-  todayAvgRevenue: number;
-  todayAvgSpend: number;
-  todayAvgPct: number;
-  insightText: string;
-  footerExtra: string;  // styled number portion only, e.g. "+$4,500"
+function formatKpi(amount: number): string {
+  if (amount >= 1000) {
+    const k = amount / 1000;
+    return `+$${k.toFixed(1)}K`;
+  }
+  return `+$${Math.round(amount)}`;
 }
 
 interface Props {
-  data: EfficiencyDrilldownData;
+  row: EfficiencyRow;
   onClose: () => void;
 }
 
-// formatCompact — thresholds match spec mock data table output.
-// Note: spec text says "10K+ no decimal" but mock data shows one decimal
-// for all K values (e.g. $38.2K, $10.7K). Implemented to match the data.
-function formatCompact(n: number): string {
-  const abs = Math.abs(n);
-  const sign = n < 0 ? '-' : '';
-  if (abs < 1000) return `${sign}$${Math.round(abs)}`;
-  if (abs < 100000) return `${sign}$${(abs / 1000).toFixed(1)}K`;
-  return `${sign}$${Math.round(abs / 1000)}K`;
-}
-
-export function EfficiencyDrilldownModal({ data, onClose }: Props) {
+export function EfficiencyDrilldownModal({ row, onClose }: Props) {
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) onClose();
   };
 
+  const { bestWindow, todayWindow } = row;
+
+  const bestAvgRevenue = avg(bestWindow.months.map((m) => m.revenue));
+  const bestAvgSpend = avg(bestWindow.months.map((m) => m.spend));
+  const bestAvgPct = Math.round(avg(bestWindow.months.map((m) => m.ratio)) * 100);
+
+  const todayAvgRevenue = avg(todayWindow.months.map((m) => m.revenue));
+  const todayAvgSpend = avg(todayWindow.months.map((m) => m.spend));
+  const todayAvgPct = Math.round(avg(todayWindow.months.map((m) => m.ratio)) * 100);
+
   return (
     <div className="eff-drill-overlay" onClick={handleOverlayClick}>
-      <div className="eff-drill-panel" role="dialog" aria-modal="true" aria-label={data.categoryName}>
+      <div className="eff-drill-panel" role="dialog" aria-modal="true" aria-label={row.category}>
 
         {/* ── Header ─────────────────────────────────────────────────── */}
         <div className="eff-drill-header">
           <div className="eff-drill-kpi-line">
-            <h2 className="eff-drill-title">{data.categoryName}</h2>
+            <h2 className="eff-drill-title">{row.category}</h2>
             <span className="eff-drill-kpi-stat">
-              <span className="eff-drill-kpi-amount">{data.footerExtra}/mo</span>
+              <span className="eff-drill-kpi-amount">{formatKpi(row.extraPerMonth)}/mo</span>
               <span className="eff-drill-kpi-label">extra spend vs your best</span>
             </span>
           </div>
@@ -82,11 +71,11 @@ export function EfficiencyDrilldownModal({ data, onClose }: Props) {
               <tr>
                 <th className="eff-drill-group-th" colSpan={4}>
                   <span className="eff-drill-group-name">YOUR BEST</span>
-                  <span className="eff-drill-group-period">{data.bestWindowLabel}</span>
+                  <span className="eff-drill-group-period">{bestWindow.label}</span>
                 </th>
                 <th className="eff-drill-group-th eff-drill-group-th--right" colSpan={4}>
                   <span className="eff-drill-group-name">TODAY</span>
-                  <span className="eff-drill-group-period">{data.todayWindowLabel}</span>
+                  <span className="eff-drill-group-period">{todayWindow.label}</span>
                 </th>
               </tr>
               {/* Column header row — month headers intentionally empty */}
@@ -102,21 +91,21 @@ export function EfficiencyDrilldownModal({ data, onClose }: Props) {
               </tr>
             </thead>
             <tbody>
-              {data.bestRows.map((bestRow, i) => {
-                const todayRow = data.todayRows[i];
+              {bestWindow.months.map((bestMonth, i) => {
+                const todayMonth = todayWindow.months[i];
                 return (
                   <tr key={i} className="eff-drill-data-row">
-                    <td className="eff-drill-td eff-drill-td-month">{bestRow.month}</td>
-                    <td className="eff-drill-td eff-drill-td-right">{formatCompact(bestRow.revenue)}</td>
-                    <td className="eff-drill-td eff-drill-td-right">{formatCompact(bestRow.spend)}</td>
+                    <td className="eff-drill-td eff-drill-td-month">{bestMonth.monthLabel}</td>
+                    <td className="eff-drill-td eff-drill-td-right">{formatCompact(bestMonth.revenue)}</td>
+                    <td className="eff-drill-td eff-drill-td-right">{formatCompact(bestMonth.spend)}</td>
                     <td className="eff-drill-td eff-drill-td-right eff-drill-col-divider">
-                      <span className="eff-drill-pct-best">{bestRow.pct}%</span>
+                      <span className="eff-drill-pct-best">{Math.round(bestMonth.ratio * 100)}%</span>
                     </td>
-                    <td className="eff-drill-td eff-drill-td-month">{todayRow.month}</td>
-                    <td className="eff-drill-td eff-drill-td-right">{formatCompact(todayRow.revenue)}</td>
-                    <td className="eff-drill-td eff-drill-td-right">{formatCompact(todayRow.spend)}</td>
+                    <td className="eff-drill-td eff-drill-td-month">{todayMonth.monthLabel}</td>
+                    <td className="eff-drill-td eff-drill-td-right">{formatCompact(todayMonth.revenue)}</td>
+                    <td className="eff-drill-td eff-drill-td-right">{formatCompact(todayMonth.spend)}</td>
                     <td className="eff-drill-td eff-drill-td-right">
-                      <span className="eff-drill-pct-today">{todayRow.pct}%</span>
+                      <span className="eff-drill-pct-today">{Math.round(todayMonth.ratio * 100)}%</span>
                     </td>
                   </tr>
                 );
@@ -125,16 +114,16 @@ export function EfficiencyDrilldownModal({ data, onClose }: Props) {
               {/* Average row — TailAdmin summary row pattern */}
               <tr className="eff-drill-avg-row eff-drill-avg-row--summary">
                 <td className="eff-drill-td eff-drill-td-avg-label">Avg</td>
-                <td className="eff-drill-td eff-drill-td-right">{formatCompact(data.bestAvgRevenue)}</td>
-                <td className="eff-drill-td eff-drill-td-right">{formatCompact(data.bestAvgSpend)}</td>
+                <td className="eff-drill-td eff-drill-td-right">{formatCompact(bestAvgRevenue)}</td>
+                <td className="eff-drill-td eff-drill-td-right">{formatCompact(bestAvgSpend)}</td>
                 <td className="eff-drill-td eff-drill-td-right eff-drill-col-divider">
-                  <span className="eff-drill-pct-best">{data.bestAvgPct}%</span>
+                  <span className="eff-drill-pct-best">{bestAvgPct}%</span>
                 </td>
                 <td className="eff-drill-td eff-drill-td-avg-label">Avg</td>
-                <td className="eff-drill-td eff-drill-td-right">{formatCompact(data.todayAvgRevenue)}</td>
-                <td className="eff-drill-td eff-drill-td-right">{formatCompact(data.todayAvgSpend)}</td>
+                <td className="eff-drill-td eff-drill-td-right">{formatCompact(todayAvgRevenue)}</td>
+                <td className="eff-drill-td eff-drill-td-right">{formatCompact(todayAvgSpend)}</td>
                 <td className="eff-drill-td eff-drill-td-right">
-                  <span className="eff-drill-pct-today">{data.todayAvgPct}%</span>
+                  <span className="eff-drill-pct-today">{todayAvgPct}%</span>
                 </td>
               </tr>
             </tbody>

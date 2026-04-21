@@ -1,4 +1,6 @@
-import type { EfficiencyOpportunitiesResult } from '../lib/kpis/efficiencyOpportunities';
+import { useState } from 'react';
+import type { EfficiencyOpportunitiesResult, EfficiencyRow } from '../lib/kpis/efficiencyOpportunities';
+import { EfficiencyDrilldownModal } from './EfficiencyDrilldownModal';
 
 interface Props {
   result: EfficiencyOpportunitiesResult;
@@ -21,6 +23,8 @@ function formatExtra(amount: number): string {
 export function EfficiencyOpportunitiesCard({ result, variant = 'single' }: Props) {
   const isComparison = variant === 'comparison';
   const { windowLabel, rows, totalExtraPerMonth } = result;
+
+  const [selectedRow, setSelectedRow] = useState<EfficiencyRow | null>(null);
 
   return (
     <div className="ta-card eff-opp-card">
@@ -53,7 +57,12 @@ export function EfficiencyOpportunitiesCard({ result, variant = 'single' }: Prop
         >
           {/* Col 1 — category name + anchor */}
           <div className="eff-row-cat-col">
-            <span className="eff-row-cat-name">{row.category}</span>
+            <span
+              className="eff-row-cat-name eff-row-cat-name--clickable"
+              onClick={() => setSelectedRow(row)}
+            >
+              {row.category}
+            </span>
             <span className="eff-row-cat-anchor">{row.bestPeriodLabel}</span>
           </div>
 
@@ -80,6 +89,13 @@ export function EfficiencyOpportunitiesCard({ result, variant = 'single' }: Prop
       <p className="eff-footnote">
         "Your best" is the lowest % of revenue a cost has been over any 3-month stretch in the last 24 months.
       </p>
+
+      {selectedRow && (
+        <EfficiencyDrilldownModal
+          row={selectedRow}
+          onClose={() => setSelectedRow(null)}
+        />
+      )}
 
     </div>
   );

@@ -26,6 +26,18 @@ const SUPPRESSED_CATEGORIES = new Set<string>([
 
 let debugLoggedOnce = false;
 
+export interface WindowMonthDetail {
+  monthLabel: string;  // e.g. "Jan 2025"
+  revenue: number;
+  spend: number;
+  ratio: number;       // raw ratio, e.g. 0.28
+}
+
+export interface WindowDetail {
+  label: string;                // e.g. "Jan – Mar 2025"
+  months: WindowMonthDetail[];  // always WINDOW_SIZE_MONTHS entries
+}
+
 export interface EfficiencyRow {
   category: string;
   bestPct: number;         // display percent, rounded
@@ -34,6 +46,8 @@ export interface EfficiencyRow {
   bestPeriodLabel: string; // "was 28% avg (Jan–Mar 2025)"
   greenWidthPct: number;   // 0-100
   redWidthPct: number;     // 0-100
+  bestWindow: WindowDetail;
+  todayWindow: WindowDetail;
 }
 
 export interface EfficiencyOpportunitiesResult {
@@ -89,6 +103,35 @@ function formatWindowLabel(startMonth: string, endMonth: string): string {
 
 function formatBestPeriodLabel(bestPct: number, startMonth: string, endMonth: string): string {
   return `was ${bestPct}% avg (${formatWindowLabel(startMonth, endMonth)})`;
+}
+
+function formatMonthLabel(month: string): string {
+  const parts = parseMonthParts(month);
+  if (!parts) return month;
+  return `${MONTH_SHORT[parts.monthIndex]} ${parts.year}`;
+}
+
+function buildWindowDetail(
+  startIdx: number,
+  endIdx: number,
+  months: string[],
+  revenueByMonth: number[],
+  spendByMonth: number[],
+): WindowDetail {
+  const label = formatWindowLabel(months[startIdx], months[endIdx]);
+  const monthDetails: WindowMonthDetail[] = [];
+  for (let k = startIdx; k <= endIdx; k += 1) {
+    const revenue = revenueByMonth[k];
+    const spend = spendByMonth[k];
+    const ratio = revenue > 0 ? spend / revenue : 0;
+    monthDetails.push({
+      monthLabel: formatMonthLabel(months[k]),
+      revenue,
+      spend,
+      ratio,
+    });
+  }
+  return { label, months: monthDetails };
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -262,6 +305,20 @@ export function computeEfficiencyOpportunities(
       bestPeriodLabel: formatBestPeriodLabel(bestPct, bestStartMonth, bestEndMonth),
       greenWidthPct,
       redWidthPct,
+      bestWindow: buildWindowDetail(
+        bestWindow.startIdx,
+        bestWindow.endIdx,
+        months,
+        revenueByMonth,
+        spendByMonth,
+      ),
+      todayWindow: buildWindowDetail(
+        currentWindow.startIdx,
+        currentWindow.endIdx,
+        months,
+        revenueByMonth,
+        spendByMonth,
+      ),
     });
   }
 

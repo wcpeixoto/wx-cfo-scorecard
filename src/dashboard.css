@@ -4959,6 +4959,21 @@ body {
   line-height: 1.6;
 }
 
+/* Efficiency card — clickable category name */
+.eff-row-cat-name--clickable {
+  cursor: pointer;
+}
+.eff-row-cat-name--clickable:hover {
+  text-decoration: underline;
+}
+.dark .eff-row-cat-name--clickable {
+  color: #F2F4F7;
+}
+.dark .eff-row-cat-name--clickable:hover {
+  color: #FFFFFF;
+  text-decoration: underline;
+}
+
 /* === Shell migration: sidebar + main column === */
 .finance-app {
   width: auto;

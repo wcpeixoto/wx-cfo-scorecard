@@ -19,7 +19,6 @@ import TrajectoryPanel from '../components/TrajectoryPanel';
 import { TodayPage } from '../components/TodayPage';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
 import { computeEfficiencyOpportunities } from '../lib/kpis/efficiencyOpportunities';
-import { EfficiencyDrilldownModal, type EfficiencyDrilldownData } from '../components/EfficiencyDrilldownModal';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
 import { includeExpenseForDigHere, isCapitalDistributionCategory } from '../lib/cashFlow';
@@ -559,31 +558,6 @@ function clearLocalStorageBusinessRules(): void {
   }
 }
 
-// ── UI Lab: Efficiency Drilldown Modal — hardcoded Payroll mock ────────────
-const PAYROLL_DRILL_MOCK: EfficiencyDrilldownData = {
-  categoryName: 'Payroll',
-  bestWindowLabel: 'Jan – Mar 2025',
-  todayWindowLabel: 'Feb – Apr 2026',
-  bestRows: [
-    { month: 'Jan', revenue: 38200, spend: 10700, pct: 28 },
-    { month: 'Feb', revenue: 36800, spend: 10300, pct: 28 },
-    { month: 'Mar', revenue: 37600, spend: 10500, pct: 28 },
-  ],
-  todayRows: [
-    { month: 'Feb', revenue: 33100, spend: 13600, pct: 41 },
-    { month: 'Mar', revenue: 35400, spend: 14500, pct: 41 },
-    { month: 'Apr', revenue: 34200, spend: 14000, pct: 41 },
-  ],
-  bestAvgRevenue: (38200 + 36800 + 37600) / 3,
-  bestAvgSpend:   (10700 + 10300 + 10500) / 3,
-  bestAvgPct:     28,
-  todayAvgRevenue: (33100 + 35400 + 34200) / 3,
-  todayAvgSpend:   (13600 + 14500 + 14000) / 3,
-  todayAvgPct:     41,
-  insightText:
-    'At your best, Payroll ran at 28% of revenue. Today it\'s 41% — about $4,500 more in spend.',
-  footerExtra: '+$4,500',
-};
 
 function DashboardSkeleton() {
   return (
@@ -647,8 +621,7 @@ export default function Dashboard() {
   const bigPictureFilterMenuRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const [trendsMaWindow, setTrendsMaWindow] = useState<TrendsMaWindow>(12);
-  const [showDrilldownMock, setShowDrilldownMock] = useState(true);
-  const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
+const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [importedDataSet, setImportedDataSet] = useState<DataSet | null>(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -3876,25 +3849,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* ── Section 12: Efficiency Drilldown Modal ─────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Efficiency Drilldown Modal</h3>
-                <p className="ui-lab-section-subtitle">Proof view — Payroll mock. Opens on load. Click × or backdrop to dismiss.</p>
-              </div>
-              {!showDrilldownMock && (
-                <button className="ui-lab-reopen-btn" onClick={() => setShowDrilldownMock(true)}>
-                  Reopen modal
-                </button>
-              )}
-            </div>
-
-            {showDrilldownMock && (
-              <EfficiencyDrilldownModal
-                data={PAYROLL_DRILL_MOCK}
-                onClose={() => setShowDrilldownMock(false)}
-              />
-            )}
 
           </div>
         )}
