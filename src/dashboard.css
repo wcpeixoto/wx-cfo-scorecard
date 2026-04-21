@@ -5675,11 +5675,11 @@ body {
 
 /* Mobile: constrain toggle buttons so they don't overflow at 375px */
 @media (max-width: 767px) {
-  /* Trends page — MA window selector (scoped to top-controls to avoid affecting card-header toggles) */
-  .top-controls .kpi-timeframe-toggle {
+  /* Trends page — MA window selector */
+  .kpi-timeframe-toggle {
     width: 100%;
   }
-  .top-controls .kpi-timeframe-toggle button {
+  .kpi-timeframe-toggle button {
     flex: 1;
     font-size: 0.75rem;
     padding: 6px 4px;
@@ -5694,19 +5694,6 @@ body {
   .forecast-scenario-toggle button {
     flex: 1 1 40%;
     text-align: center;
-  }
-
-  /* Card-header timeframe toggle — compact on mobile */
-  .card-head .kpi-timeframe-toggle {
-    font-size: 0.72rem;
-  }
-  .card-head .kpi-timeframe-toggle button {
-    padding: 5px 6px;
-    font-size: 0.72rem;
-  }
-  .card-head .kpi-timeframe-toggle .timeframe-trigger {
-    padding: 5px 8px;
-    font-size: 0.72rem;
   }
 
   /* Big Picture — categories donut shrinks to fit 309px card interior */
