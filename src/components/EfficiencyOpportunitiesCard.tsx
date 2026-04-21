@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { EfficiencyOpportunitiesResult, EfficiencyRow } from '../lib/kpis/efficiencyOpportunities';
-import { EfficiencyDrilldownModal } from './EfficiencyDrilldownModal';
+import { EfficiencyDrilldownDrawer } from './EfficiencyDrilldownDrawer';
 
 interface Props {
   result: EfficiencyOpportunitiesResult;
@@ -29,10 +29,13 @@ export function EfficiencyOpportunitiesCard({ result, variant = 'single' }: Prop
   return (
     <div className="ta-card eff-opp-card">
 
-      {/* Pattern B header — title + subtitle, no right controls */}
+      {/* Pattern B header — title + explanation + context line */}
       <div className="eff-opp-header">
         <h3 className="eff-opp-title">Efficiency opportunities</h3>
-        <p className="eff-opp-subtitle">{windowLabel}  ·  vs your best 3-month stretch in the last 24 months</p>
+        <p className="eff-opp-explanation">
+          You're spending more on these than you did before, for this level of revenue.
+        </p>
+        <p className="eff-opp-context">{windowLabel}  ·  vs your best 3-month stretch in the last 24 months</p>
       </div>
 
       {/* Headline strip — amount + label on one baseline row */}
@@ -66,8 +69,13 @@ export function EfficiencyOpportunitiesCard({ result, variant = 'single' }: Prop
             <span className="eff-row-cat-anchor">{row.bestPeriodLabel}</span>
           </div>
 
-          {/* Col 2 — Your best % — center, muted */}
-          <span className="eff-row-best-val">{row.bestPct}%</span>
+          {/* Col 2 — Your best % — center, muted, clickable */}
+          <span
+            className="eff-row-best-val eff-row-cat-name--clickable"
+            onClick={() => setSelectedRow(row)}
+          >
+            {row.bestPct}%
+          </span>
 
           {/* Col 3 — Today % — center, stronger */}
           <span className="eff-row-today-val">{row.todayPct}%</span>
@@ -91,7 +99,7 @@ export function EfficiencyOpportunitiesCard({ result, variant = 'single' }: Prop
       </p>
 
       {selectedRow && (
-        <EfficiencyDrilldownModal
+        <EfficiencyDrilldownDrawer
           row={selectedRow}
           onClose={() => setSelectedRow(null)}
         />

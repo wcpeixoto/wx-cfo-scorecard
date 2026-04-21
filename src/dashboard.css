@@ -4799,6 +4799,32 @@ body {
   line-height: 1.5;
 }
 
+/* Explanation line — plain-English "why" below the title */
+.eff-opp-explanation {
+  margin: 4px 0 0;
+  font-size: 14px;    /* text-theme-sm */
+  font-weight: 400;
+  color: #374151;     /* gray-700 — more readable than subtitle gray */
+  line-height: 1.5;
+}
+
+.dark .eff-opp-explanation {
+  color: #D1D5DB;     /* gray-300 in dark mode */
+}
+
+/* Context line — de-emphasized metadata below explanation */
+.eff-opp-context {
+  margin: 2px 0 0;
+  font-size: 12px;    /* text-theme-xs */
+  font-weight: 400;
+  color: #667085;     /* secondary text — intentionally lighter than explanation */
+  line-height: 1.5;
+}
+
+.dark .eff-opp-context {
+  color: #9CA3AF;     /* gray-400 in dark mode */
+}
+
 /* Headline strip — amount + label on one baseline row */
 .eff-headline-strip {
   display: flex;
@@ -5981,90 +6007,64 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Efficiency Drilldown Modal
-   Overlay + panel follow TailAdmin modal spec (rounded-3xl = 24px,
-   backdrop bg-gray-400/50 + blur-32px). All eff-drill-* classes are
-   scoped to this modal only.
+   Efficiency drilldown drawer
+   Desktop: fixed right-side panel, 480px wide, full viewport height,
+   slides in from the right. Mobile: full-width bottom sheet, ~85vh,
+   slides up from the bottom.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ─── Overlay ──────────────────────────────────────────────────────────── */
-.eff-drill-overlay {
+/* ─── Backdrop ─────────────────────────────────────────────────────────── */
+.eff-drawer-backdrop {
   position: fixed;
   inset: 0;
   z-index: 99999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /* Subtle overlay — keeps page context visible */
+  background: rgba(16, 24, 40, 0.25);
+}
+
+.dark .eff-drawer-backdrop {
+  background: rgba(0, 0, 0, 0.40);
+}
+
+/* ─── Drawer panel shell ───────────────────────────────────────────────── */
+.eff-drawer-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 480px;
+  max-width: 100vw;
+  background: #FFFFFF;
+  border-left: 1px solid #E4E7EC;
   overflow-y: auto;
-  padding: 16px;
-  /* TailAdmin: bg-gray-400/50 backdrop-blur-[32px] */
-  background: rgba(156, 163, 175, 0.5);
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
-}
-
-/* ─── Panel shell ──────────────────────────────────────────────────────── */
-.eff-drill-panel {
-  position: relative;
-  width: 100%;
-  max-width: 480px;
-  background: var(--bg-panel);
-  /* TailAdmin: rounded-3xl = 24px */
-  border-radius: 24px;
   padding: 24px;
-  /* keep panel on top of the overlay click-through layer */
   pointer-events: auto;
+  /* Slide in from right */
+  transform: translateX(0);
+  animation: eff-drawer-slide-in 0.22s ease-out;
 }
 
-/* ─── Header ───────────────────────────────────────────────────────────── */
-.eff-drill-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+.dark .eff-drawer-panel {
+  background: #1D2939;
+  border-left-color: #344054;
 }
 
-/* Pill — wraps title + KPI amount + label in one row */
-.eff-drill-kpi-line {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 16px;
-  background: var(--bg-muted);
-  border-radius: 8px;
-  padding: 8px 20px;
+@keyframes eff-drawer-slide-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
 }
 
-.eff-drill-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #101828;
-  line-height: 1.3;
+/* ─── Header area ──────────────────────────────────────────────────────── */
+.eff-drawer-header {
+  position: relative;
+  margin-bottom: 0;
 }
 
-/* Amount + label sub-group — tight gap so they read as one unit */
-.eff-drill-kpi-stat {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-}
-
-.eff-drill-kpi-amount {
-  font-size: 20px;
-  font-weight: 700;
-  color: #1D2939;
-  line-height: 1.2;
-}
-
-.eff-drill-kpi-label {
-  font-size: 14px;
-  font-weight: 400;
-  color: #667085;
-}
-
-/* ─── Close button ─────────────────────────────────────────────────────── */
-.eff-drill-close {
-  flex-shrink: 0;
+/* Close button — top-right corner, above the pill */
+.eff-drawer-close {
+  position: absolute;
+  top: 0;
+  right: 0;
   width: 28px;
   height: 28px;
   display: flex;
@@ -6080,13 +6080,80 @@ body {
   border-radius: 50%;
   transition: color 0.15s;
   font-family: inherit;
+  z-index: 1;
 }
 
-.eff-drill-close:hover {
+.eff-drawer-close:hover {
   color: #667085;
 }
 
-/* ─── Comparison table ─────────────────────────────────────────────────── */
+.dark .eff-drawer-close {
+  color: #667085;
+}
+
+.dark .eff-drawer-close:hover {
+  color: #9CA3AF;
+}
+
+/* KPI pill — full content width of drawer body */
+.eff-drawer-kpi-pill {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: #F2F4F7;
+  border-radius: 8px;
+  padding: 8px 20px;
+  /* Right padding allows room for the absolute-positioned close button */
+  padding-right: 40px;
+}
+
+.dark .eff-drawer-kpi-pill {
+  background: rgba(242, 244, 247, 0.06);
+}
+
+.eff-drawer-pill-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #101828;
+  line-height: 1.3;
+}
+
+.dark .eff-drawer-pill-title {
+  color: rgba(255, 255, 255, 0.90);
+}
+
+.eff-drawer-pill-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.eff-drawer-pill-amount {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1D2939;
+  line-height: 1.2;
+}
+
+.dark .eff-drawer-pill-amount {
+  color: rgba(255, 255, 255, 0.90);
+}
+
+.eff-drawer-pill-label {
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+}
+
+.dark .eff-drawer-pill-label {
+  color: #9CA3AF;
+}
+
+/* ─── Comparison table (shared eff-drill-* classes) ────────────────────── */
 .eff-drill-table-wrap {
   margin-top: 20px;
   overflow-x: auto;
@@ -6125,12 +6192,20 @@ body {
   letter-spacing: 0.04em;
 }
 
+.dark .eff-drill-group-name {
+  color: #9CA3AF;
+}
+
 .eff-drill-group-period {
   display: block;
   font-size: 12px;
   font-weight: 400;
   color: #98A2B3;
   margin-top: 2px;
+}
+
+.dark .eff-drill-group-period {
+  color: #6B7280;
 }
 
 /* Column header cells */
@@ -6145,6 +6220,11 @@ body {
   white-space: nowrap;
 }
 
+.dark .eff-drill-col-header-row .eff-drill-th {
+  color: #9CA3AF;
+  border-bottom-color: #344054;
+}
+
 .eff-drill-th-left  { text-align: left; }
 .eff-drill-th-right { text-align: right; }
 
@@ -6152,6 +6232,10 @@ body {
 .eff-drill-col-divider {
   border-right: 1px solid var(--line);
   padding-right: 12px !important;
+}
+
+.dark .eff-drill-col-divider {
+  border-right-color: #344054;
 }
 
 /* Left padding on col 5 cells (TODAY side) for visual gap after divider */
@@ -6169,24 +6253,41 @@ body {
   border-bottom: 1px solid #F2F4F7;
 }
 
+.dark .eff-drill-td {
+  color: rgba(255, 255, 255, 0.80);
+  border-bottom-color: #344054;
+}
+
 .eff-drill-td-month {
   color: #667085;
   text-align: left;
+}
+
+.dark .eff-drill-td-month {
+  color: #9CA3AF;
 }
 
 .eff-drill-td-right {
   text-align: right;
 }
 
-/* % spans — regular weight in data rows, bold reserved for Avg row (change 5) */
+/* % spans — regular weight in data rows, bold reserved for Avg row */
 .eff-drill-pct-best {
   font-weight: 400;
   color: #667085;
 }
 
+.dark .eff-drill-pct-best {
+  color: #9CA3AF;
+}
+
 .eff-drill-pct-today {
   font-weight: 400;
   color: #1D2939;
+}
+
+.dark .eff-drill-pct-today {
+  color: rgba(255, 255, 255, 0.80);
 }
 
 /* Average row — TailAdmin summary row: #F9FAFB bg, stronger top border */
@@ -6195,10 +6296,19 @@ body {
   border-top: 1px solid var(--line);
 }
 
+.dark .eff-drill-avg-row .eff-drill-td {
+  border-top-color: #344054;
+}
+
 .eff-drill-avg-row--summary .eff-drill-td {
   background: #F9FAFB;
   font-weight: 500;
   color: #1D2939;
+}
+
+.dark .eff-drill-avg-row--summary .eff-drill-td {
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.80);
 }
 
 /* Avg row % values — bold (overrides data-row weight) */
@@ -6214,15 +6324,33 @@ body {
   color: #101828;
 }
 
-/* ─── Mobile ───────────────────────────────────────────────────────────── */
+.dark .eff-drill-td-avg-label {
+  color: rgba(255, 255, 255, 0.90);
+}
+
+/* ─── Mobile — bottom sheet ────────────────────────────────────────────── */
 @media (max-width: 767px) {
-  .eff-drill-overlay {
-    align-items: flex-start;
-    padding: 48px 16px 16px;
+  .eff-drawer-panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 85vh;
+    border-left: none;
+    border-top: 1px solid #E4E7EC;
+    border-radius: 20px 20px 0 0;
+    animation: eff-drawer-slide-up 0.22s ease-out;
   }
 
-  .eff-drill-panel {
-    max-width: 100%;
+  .dark .eff-drawer-panel {
+    border-top-color: #344054;
+  }
+
+  @keyframes eff-drawer-slide-up {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
   }
 }
 

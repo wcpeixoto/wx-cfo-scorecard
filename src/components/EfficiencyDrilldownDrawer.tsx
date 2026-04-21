@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { formatCompact } from '../lib/utils/formatCompact';
 import type { EfficiencyRow } from '../lib/kpis/efficiencyOpportunities';
 
@@ -19,8 +20,17 @@ interface Props {
   onClose: () => void;
 }
 
-export function EfficiencyDrilldownModal({ row, onClose }: Props) {
-  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+export function EfficiencyDrilldownDrawer({ row, onClose }: Props) {
+  // Close on ESC key
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) onClose();
   };
 
@@ -35,27 +45,34 @@ export function EfficiencyDrilldownModal({ row, onClose }: Props) {
   const todayAvgPct = Math.round(avg(todayWindow.months.map((m) => m.ratio)) * 100);
 
   return (
-    <div className="eff-drill-overlay" onClick={handleOverlayClick}>
-      <div className="eff-drill-panel" role="dialog" aria-modal="true" aria-label={row.category}>
+    <div className="eff-drawer-backdrop" onClick={handleBackdropClick}>
+      <div
+        className="eff-drawer-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label={row.category}
+      >
 
-        {/* ── Header ─────────────────────────────────────────────────── */}
-        <div className="eff-drill-header">
-          <div className="eff-drill-kpi-line">
-            <h2 className="eff-drill-title">{row.category}</h2>
-            <span className="eff-drill-kpi-stat">
-              <span className="eff-drill-kpi-amount">{formatKpi(row.extraPerMonth)}/mo</span>
-              <span className="eff-drill-kpi-label">extra spend vs your best</span>
-            </span>
-          </div>
-          <button className="eff-drill-close" onClick={onClose} aria-label="Close modal">
+        {/* ── Header area ──────────────────────────────────────────────── */}
+        <div className="eff-drawer-header">
+          {/* Close button — top-right, outside the pill */}
+          <button className="eff-drawer-close" onClick={onClose} aria-label="Close">
             ×
           </button>
+
+          {/* KPI pill — full content width */}
+          <div className="eff-drawer-kpi-pill">
+            <h2 className="eff-drawer-pill-title">{row.category}</h2>
+            <span className="eff-drawer-pill-stat">
+              <span className="eff-drawer-pill-amount">{formatKpi(row.extraPerMonth)}/mo</span>
+              <span className="eff-drawer-pill-label">extra spend vs your best</span>
+            </span>
+          </div>
         </div>
 
-        {/* ── Comparison table ────────────────────────────────────────── */}
+        {/* ── Comparison table ─────────────────────────────────────────── */}
         <div className="eff-drill-table-wrap">
           <table className="eff-drill-table">
-            {/* colgroup — equidistant Revenue·Spend·% within each group */}
             <colgroup>
               <col className="eff-drill-col-month" />
               <col className="eff-drill-col-revenue" />
@@ -67,7 +84,6 @@ export function EfficiencyDrilldownModal({ row, onClose }: Props) {
               <col className="eff-drill-col-pct" />
             </colgroup>
             <thead>
-              {/* Group header row */}
               <tr>
                 <th className="eff-drill-group-th" colSpan={4}>
                   <span className="eff-drill-group-name">YOUR BEST</span>
@@ -78,7 +94,6 @@ export function EfficiencyDrilldownModal({ row, onClose }: Props) {
                   <span className="eff-drill-group-period">{todayWindow.label}</span>
                 </th>
               </tr>
-              {/* Column header row — month headers intentionally empty */}
               <tr className="eff-drill-col-header-row">
                 <th className="eff-drill-th"></th>
                 <th className="eff-drill-th eff-drill-th-right">Revenue</th>
@@ -111,7 +126,6 @@ export function EfficiencyDrilldownModal({ row, onClose }: Props) {
                 );
               })}
 
-              {/* Average row — TailAdmin summary row pattern */}
               <tr className="eff-drill-avg-row eff-drill-avg-row--summary">
                 <td className="eff-drill-td eff-drill-td-avg-label">Avg</td>
                 <td className="eff-drill-td eff-drill-td-right">{formatCompact(bestAvgRevenue)}</td>
