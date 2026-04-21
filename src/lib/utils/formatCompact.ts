@@ -8,3 +8,14 @@ export function formatCompact(n: number): string {
   if (abs < 100000) return `${sign}$${(abs / 1000).toFixed(1)}K`;
   return `${sign}$${Math.round(abs / 1000)}K`;
 }
+
+// Shared tooltip formatters — use these in all ApexCharts tooltip configs.
+// Import from this file; do not reimplement currency formatting inline.
+
+export function formatTooltipY(value: number): string {
+  return formatCompact(value);
+}
+
+export function formatTooltipX(value: string): string {
+  return value;
+}

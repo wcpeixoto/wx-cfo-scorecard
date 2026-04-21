@@ -1031,6 +1031,41 @@ Replace this section's content for each project that uses this base spec.
 
 ---
 
+## Tooltip Standard
+
+All ApexCharts tooltips in this project must follow this standard.
+
+### Approved pattern
+- `theme: 'light'` on every chart tooltip config
+- `y.formatter`: import `formatTooltipY` from
+  `src/lib/utils/formatCompact.ts`
+- `x.formatter`: use raw category string or import
+  `formatTooltipX` for passthrough
+- Visual styling: handled by the shared CSS block in
+  `dashboard.css` — do not add per-chart tooltip CSS
+  unless it intentionally overrides the standard
+- Per-chart overrides must include a comment explaining
+  why they differ
+
+### Forbidden patterns
+- `custom` HTML formatter — breaks visual consistency
+  and bypasses the shared CSS standard
+- Inline tooltip CSS that duplicates the shared block
+- Reimplementing currency formatting inline —
+  always import `formatTooltipY`
+
+### Per-chart exceptions (document here when added)
+- Top Expense Categories donut: marker hidden
+  (`.apexcharts-tooltip-marker { display: none }`)
+  — not meaningful on a pie/donut chart
+- OwnerDistributionsChart: uses `tooltip: { custom: ... }` to
+  render a Total row (Actual + Forecast = full year distribution).
+  This is a deliberate, documented exception to the no-custom-tooltip
+  rule. The custom renderer wrapper must include `.apexcharts-theme-light`
+  so global tooltip CSS applies.
+
+---
+
 # PART 6B — CARD COHERENCE RULE
 
 All numbers shown within a single card (badge, tooltip, subtitle, chart axes,
