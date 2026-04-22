@@ -5983,6 +5983,11 @@ body {
   gap: 12px;
 }
 
+/* Pill inside secondary card must not stretch to full card width */
+.today-secondary-card .today-severity-pill {
+  align-self: flex-start;
+}
+
 .today-secondary-headline {
   margin: 0;
   font-size: 16px;
