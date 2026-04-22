@@ -6522,3 +6522,207 @@ body {
 .ui-lab-reopen-btn:hover {
   background: var(--line);
 }
+
+/* ============================================================
+   What Needs Attention card (UI Lab mock)
+   ============================================================ */
+
+/* Card shell */
+.wna-card {
+  background: #ffffff;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+  padding: 24px 24px 4px 24px;
+  font-family: 'Outfit', sans-serif;
+}
+
+/* Header row */
+.wna-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.wna-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1D2939;
+  line-height: 1.3;
+}
+
+.wna-period {
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+  white-space: nowrap;
+}
+
+/* Stat row */
+.wna-row {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 20px 0;
+}
+
+/* Middle row divider */
+.wna-row--middle {
+  border-top: 1px solid #F2F4F7;
+  border-bottom: 1px solid #F2F4F7;
+}
+
+/* Left stack */
+.wna-row-left {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Line 1 — category label + ⓘ wrapper */
+.wna-label-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.wna-category {
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+}
+
+/* Category — refined: medium weight, slightly darker (matches Traffic Stats label hierarchy) */
+.wna-category--refined {
+  font-size: 16px;
+  font-weight: 500;
+  color: #344054;
+}
+
+/* ⓘ anchor + tooltip wrapper */
+.wna-info-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+}
+
+.wna-info-btn {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: 14px;
+  color: #98A2B3;
+  cursor: pointer;
+  line-height: 1;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+
+.wna-info-btn:hover {
+  color: #667085;
+}
+
+/* Line 2 — headline (red signal) */
+.wna-headline {
+  font-size: 26px;
+  font-weight: 600;
+  color: #D92D20;
+  margin-bottom: 4px;
+}
+
+
+
+/* Line 3 — detail */
+.wna-detail {
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+}
+
+/* Detail — sm: matches Traffic Stats "then last Week" text (12px) */
+.wna-detail--sm {
+  font-size: 13px;
+}
+
+/* Right — sparkline container */
+.wna-spark {
+  flex-shrink: 0;
+  width: 180px;
+  height: 56px;
+  margin-left: 16px;
+}
+
+
+/* ── Explanatory tooltip ────────────────────────────────── */
+.explain-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #E4E7EC;
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: rgba(16, 24, 40, 0.10) 0px 1px 3px,
+              rgba(16, 24, 40, 0.06) 0px 1px 2px;
+  max-width: 260px;
+  font-size: 13px;
+  font-weight: 400;
+  color: rgb(71, 84, 103);
+  font-family: 'Outfit', sans-serif;
+  line-height: 1.5;
+  z-index: 20;
+  white-space: normal;
+  pointer-events: none;
+}
+
+/* ── Dark mode ────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  .dark .wna-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: #1D2939;
+  }
+
+  .dark .wna-title {
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .dark .wna-period {
+    color: #98A2B3;
+  }
+
+  .dark .wna-row--middle {
+    border-top-color: #1D2939;
+    border-bottom-color: #1D2939;
+  }
+
+  .dark .wna-category {
+    color: #98A2B3;
+  }
+
+  .dark .wna-info-btn {
+    color: #667085;
+  }
+
+  .dark .wna-info-btn:hover {
+    color: #98A2B3;
+  }
+
+  .dark .wna-headline {
+    color: #F97066;
+  }
+
+  .dark .wna-detail {
+    color: #98A2B3;
+  }
+
+  .dark .explain-tooltip {
+    background: rgba(30, 41, 59, 0.96);
+    border-color: #374151;
+    color: rgba(255, 255, 255, 0.85);
+  }
+}

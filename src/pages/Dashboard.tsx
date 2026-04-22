@@ -18,6 +18,7 @@ import NetCashFlowChart from '../components/NetCashFlowChart';
 import TrajectoryPanel from '../components/TrajectoryPanel';
 import { TodayPage } from '../components/TodayPage';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
+import DigHereCardMock from '../components/DigHereCardMock';
 import { computeEfficiencyOpportunities } from '../lib/kpis/efficiencyOpportunities';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
@@ -3846,6 +3847,17 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               </div>
               <div className="ui-lab-two-col-grid">
                 <EfficiencyOpportunitiesCard result={efficiencyResult} />
+              </div>
+            </div>
+
+            {/* ── Section 12: Dig Here Card (new design mock) ───────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Dig Here Card — New Design</h3>
+                <p className="ui-lab-section-subtitle">YoY ratio-variance design — category label, ratio shift, change badge, dollar impact, sparkline. Static mock data.</p>
+              </div>
+              <div className="ui-lab-two-col-grid">
+                <DigHereCardMock updated refinedLabels />
               </div>
             </div>
 
