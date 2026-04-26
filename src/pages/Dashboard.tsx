@@ -9,6 +9,7 @@ import { useSidebar } from '../context/SidebarContext';
 import CashFlowForecastModule from '../components/CashFlowForecastModule';
 import LoadingScreen from '../components/LoadingScreen';
 import DigHereHighlights from '../components/DigHereHighlights';
+import CashTrendHero from '../components/CashTrendHero';
 import KpiCards from '../components/KpiCards';
 import TopCategoriesCard from '../components/TopCategoriesCard';
 import PeriodDropdown from '../components/PeriodDropdown';
@@ -24,6 +25,7 @@ import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
 import { isCapitalDistributionCategory } from '../lib/cashFlow';
 import { computeWhatNeedsAttention } from '../lib/kpis/digHere';
+import { computeCashTrend } from '../lib/kpis/cashTrend';
 import { computePriorYearActuals } from '../lib/kpis/priorYearActuals';
 import { runDataSanityChecks } from '../lib/dataSanity';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
@@ -1747,6 +1749,10 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     () => computeWhatNeedsAttention(filteredTxns),
     [filteredTxns]
   );
+  const cashTrendResult = useMemo(
+    () => computeCashTrend(model.monthlyRollups),
+    [model.monthlyRollups]
+  );
 
   const selectedKpiCards = useMemo<KpiCard[]>(() => {
     if (!selectedKpiComparison) return model.kpiCards;
@@ -2413,6 +2419,8 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 })
               }
             />
+
+            <CashTrendHero result={cashTrendResult} />
 
             <DigHereHighlights result={whatNeedsAttention} />
 

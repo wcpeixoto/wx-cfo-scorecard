@@ -6749,3 +6749,148 @@ body {
     color: rgba(255, 255, 255, 0.85);
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Cash Trend Hero — top of Big Picture signal hierarchy
+   ───────────────────────────────────────────────────────────────────────── */
+
+.cth-card {
+  --cth-accent: #667085;
+  background: #ffffff;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+  padding: 24px;
+  font-family: 'Outfit', sans-serif;
+}
+
+.cth-card--building  { --cth-accent: #12B76A; }
+.cth-card--treading  { --cth-accent: #F79009; }
+.cth-card--pressure  { --cth-accent: #DC6803; }
+.cth-card--burning   { --cth-accent: #F04438; }
+
+.cth-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.cth-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #667085;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.cth-info-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.cth-info-btn {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: 14px;
+  color: #98A2B3;
+  cursor: pointer;
+  line-height: 1;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+
+.cth-info-btn:hover {
+  color: #667085;
+}
+
+.cth-tooltip {
+  max-width: 320px;
+}
+
+.cth-headline {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--cth-accent);
+  line-height: 1.25;
+  margin-bottom: 8px;
+}
+
+.cth-metric-line {
+  font-size: 15px;
+  font-weight: 500;
+  color: #1D2939;
+  margin-bottom: 4px;
+}
+
+.cth-velocity-line {
+  font-size: 13px;
+  font-weight: 400;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.cth-velocity--improving { color: #12B76A; }
+.cth-velocity--softer    { color: var(--cth-accent); }
+.cth-velocity--stable    { color: #667085; }
+
+.cth-proof-line {
+  font-size: 13px;
+  font-weight: 400;
+  color: #667085;
+  margin-bottom: 6px;
+}
+
+.cth-target-line {
+  font-size: 13px;
+  font-weight: 400;
+  color: #667085;
+  margin-bottom: 16px;
+}
+
+.cth-target-sep {
+  color: #98A2B3;
+}
+
+.cth-gap {
+  font-weight: 500;
+}
+
+.cth-gap--positive { color: #12B76A; }
+.cth-gap--accent   { color: var(--cth-accent); }
+
+.cth-bars {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.cth-bars-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.cth-empty {
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+  padding: 8px 0 4px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .dark .cth-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  .dark .cth-title       { color: #98A2B3; }
+  .dark .cth-metric-line { color: rgba(255, 255, 255, 0.9); }
+  .dark .cth-proof-line,
+  .dark .cth-target-line { color: #98A2B3; }
+  .dark .cth-target-sep  { color: #667085; }
+  .dark .cth-info-btn    { color: #667085; }
+  .dark .cth-info-btn:hover { color: #98A2B3; }
+}

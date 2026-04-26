@@ -346,3 +346,27 @@ A good next step improves confidence or removes real friction:
 - Tightening a workflow that causes confusion
 
 A bad next step is broad refactoring without evidence it is needed.
+
+---
+
+## Key Learnings
+
+### Operating cash and owner distributions
+
+Operating cash excludes owner draws and capital distributions. This makes
+T6M margin appear higher than a P&L that includes draws. This is intentional
+— Cash Trend measures what the business produces, not what the owner takes.
+
+### Cash Trend engine verification
+
+Cash Trend engine verified against a 47-month backtest (Dec 2021–Mar 2026).
+Hysteresis fires 3× correctly across the dataset. Status distribution matches
+backtest predictions modulo operating-cash exclusions.
+
+### Diagnostic harness date construction
+
+`computeCashTrendForDate(rollups, new Date(y, m, 1))` — use the local-time
+constructor, not an ISO string (`new Date('YYYY-MM-DD')`). ISO strings parse
+as UTC midnight, which in US timezones resolves to the previous day via
+`getMonth()`, shifting the analysis window one month early and producing
+wrong results silently.

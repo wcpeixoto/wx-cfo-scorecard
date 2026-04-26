@@ -1083,6 +1083,22 @@ authorize custom tooltips on Cartesian charts (line, bar, area, column).
 
 ---
 
+## Project semantic colors — extension
+
+The TailAdmin base ships three warm semantic tones (Warning #F79009, Error #F04438).
+This project extends the palette with one additional deep-amber tone for the
+Cash Trend severity ramp (green → light amber → deep amber → red), which
+requires a distinguishable middle step between Treading Water and Burning Cash.
+
+| Purpose | Color | Used by |
+|---------|-------|---------|
+| Deep amber / pressure | #DC6803 | Cash Trend "Under Pressure" status accent |
+
+Do not reuse #DC6803 for unrelated UI. The token's purpose is the four-level
+severity ramp on the Cash Trend hero only.
+
+---
+
 # PART 6B — CARD COHERENCE RULE
 
 All numbers shown within a single card (badge, tooltip, subtitle, chart axes,
