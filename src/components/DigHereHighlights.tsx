@@ -87,14 +87,14 @@ export default function DigHereHighlights({ result }: Props) {
   }, [openTooltip]);
 
   const rows = result.rows.slice(0, MAX_ROWS);
-  const subtitle = result.currentMonth ? `Based on ${result.currentMonth}` : '';
+  const subtitle = result.currentMonth ? `${result.currentMonth} · vs your 6-month baseline` : '';
 
   return (
     <div className="wna-card" ref={cardRef}>
 
       {/* ── Header (stacked) ───────────────────────────────────────────── */}
       <div className="wna-header wna-header--stacked">
-        <span className="wna-title">What Needs Attention</span>
+        <span className="wna-title">Cost Spikes to Investigate</span>
         {subtitle ? <span className="wna-period">{subtitle}</span> : null}
       </div>
 
@@ -105,7 +105,7 @@ export default function DigHereHighlights({ result }: Props) {
         </div>
       ) : rows.length === 0 ? (
         <div className="wna-empty">
-          No categories flagged this month.
+          No cost spikes this month. Spending is in line with your 6-month baseline.
         </div>
       ) : (
         rows.map((row, i) => {
