@@ -1027,6 +1027,30 @@ ThemeTogglerTwo: `fixed bottom-6 right-6 z-50 hidden sm:block`.
 
 # PART 6 — PROJECT OVERLAY
 
+## CSS Architecture — Current Implementation Reality
+
+This project uses legacy custom CSS only. All styling lives in `src/dashboard.css`
+as flat utility-namespaced classes (.cth-*, .wna-*, .kpi-*). There is no Tailwind
+in this project — no config files, no PostCSS, no @apply, no Tailwind utility
+classes in JSX.
+
+Tailwind utility class references that appear anywhere in this document
+(e.g. text-lg, bg-brand-50, rounded-2xl) are descriptive shorthand for the
+design values to use — they are NOT literal class strings to paste into JSX.
+Translate every Tailwind reference into an appropriate project CSS class in
+dashboard.css using raw hex values from this document.
+
+Raw hex values are allowed in dashboard.css because it is the token
+implementation layer for this project. Components consume styles via class
+names only — never by referencing hex directly in TSX.
+
+Raw hex is also allowed in src/lib/ui/chartTokens.ts (see Addition 3 below).
+
+If and when this project migrates to Tailwind, this section will be revised.
+Until then, legacy CSS is the only sanctioned implementation path.
+
+---
+
 This section contains project-specific rules that override or extend the TailAdmin base.
 All rules in Parts 1–5 apply unless explicitly superseded here.
 
@@ -1091,6 +1115,29 @@ authorize custom tooltips on Cartesian charts (line, bar, area, column).
 
 ---
 
+## Chart Token File
+
+All hex color values used in ApexCharts configurations must be imported from
+src/lib/ui/chartTokens.ts. This is the single source of truth for chart colors.
+No chart component may re-type a hex value inline in its options object.
+
+If src/lib/ui/chartTokens.ts does not yet exist, it must be created in a
+separate, dedicated commit before any new chart component is written. Do not
+create it as part of a documentation patch.
+
+Example structure:
+  export const chartTokens = {
+    brand:      '#465FFF',
+    success:    '#12B76A',
+    error:      '#F04438',
+    warning:    '#F79009',
+    pressure:   '#DC6803',
+    gridBorder: '#EAECF0',
+    axisText:   '#667085',
+  } as const;
+
+---
+
 ## Project semantic colors — extension
 
 The TailAdmin base ships three warm semantic tones (Warning #F79009, Error #F04438).
@@ -1129,7 +1176,7 @@ Positive months: `#12B76A`. Negative months: `#F04438`.
 
 ### ApexCharts bar chart source
 Sourced from TailAdmin `chart-01.js` (Bar Chart 1) with these overrides:
-- `fontFamily`: `'Inter, sans-serif'` (not Outfit)
+- Cash Trend bar chart uses fontFamily: 'Outfit, sans-serif' to match the rest of the dashboard.
 - `distributed: true` (per-bar color — not in source)
 - `borderRadiusApplication: 'end'` (rounds top only — correct for zero-crossing data)
 - `colors`: dynamic array from `result.monthlyBars`
@@ -1139,8 +1186,9 @@ All other values (`columnWidth: '39%'`, `borderRadius: 5`,
 the TailAdmin source exactly.
 
 ### Font override
-This project uses **Inter** not Outfit. Set `fontFamily: 'Inter, sans-serif'`
-on every ApexCharts instance. Never use Outfit.
+Project font is Outfit. All ApexCharts instances must set
+fontFamily: 'Outfit, sans-serif'. Do not use Inter unless an explicit
+project-wide visual migration is approved.
 
 ### Operating cash definition
 Cash Trend's T6M metrics are computed from `computeMonthlyRollups('operating')`.
