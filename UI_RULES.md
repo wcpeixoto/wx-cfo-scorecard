@@ -88,6 +88,7 @@ Weights: 400 Regular · 500 Medium · 600 Semibold · 700 Bold
 | Success | #12B76A | #ECFDF3 |
 | Error | #F04438 | #FEF3F2 |
 | Warning | #F79009 | #FFFAEB |
+| Under Pressure (project) | #DC6803 | #FEF3E2 |
 | Info | #0BA5EC | #F0F9FF |
 
 ### Interaction States
@@ -350,6 +351,13 @@ All card-level status badges use `.card-status-badge` with variants:
 - `.is-warning` — amber (`#F79009` / `#FFFAEB`)
 - `.is-critical` — red (`#F04438` / `#FEF3F2`)
 - `.is-healthy` — green (`#12B76A` / `#ECFDF3`)
+
+### `.is-pressure` — Under Pressure (project overlay)
+- Background: `#FEF3E2`
+- Text: `#DC6803`
+- Dark bg: `rgba(220, 104, 3, 0.15)`
+- Dark text: `#FDB022`
+- Used exclusively on: CashTrendHero status badge when status = 'pressure'
 
 Badge spec: `font-size: 12px`, `font-weight: 500`, `padding: 4px 10px`,
 `border-radius: 999px`, `display: inline-flex`, `align-items: center`,
@@ -1096,6 +1104,65 @@ requires a distinguishable middle step between Treading Water and Burning Cash.
 
 Do not reuse #DC6803 for unrelated UI. The token's purpose is the four-level
 severity ramp on the Cash Trend hero only.
+
+---
+
+## Cash Trend Card
+
+### Status accent system
+Cash Trend uses a CSS custom property `--cth-accent` set per status modifier
+class on the card root. Child elements that need status color inherit via
+`color: var(--cth-accent)`. This avoids per-element status conditionals in JSX.
+
+| Modifier class | --cth-accent | Status |
+|----------------|--------------|--------|
+| `.cth-card--building` | `#12B76A` | Building Cash |
+| `.cth-card--treading` | `#F79009` | Treading Water |
+| `.cth-card--pressure` | `#DC6803` | Under Pressure |
+| `.cth-card--burning`  | `#F04438` | Burning Cash |
+
+### Bar chart — per-bar coloring
+Cash Trend uses `plotOptions.bar.distributed: true` to enable per-bar
+color in ApexCharts. This requires the `colors` array to be recomputed
+from `result.monthlyBars` on every render — do not memoize separately.
+Positive months: `#12B76A`. Negative months: `#F04438`.
+
+### ApexCharts bar chart source
+Sourced from TailAdmin `chart-01.js` (Bar Chart 1) with these overrides:
+- `fontFamily`: `'Inter, sans-serif'` (not Outfit)
+- `distributed: true` (per-bar color — not in source)
+- `borderRadiusApplication: 'end'` (rounds top only — correct for zero-crossing data)
+- `colors`: dynamic array from `result.monthlyBars`
+
+All other values (`columnWidth: '39%'`, `borderRadius: 5`,
+`stroke: { show: true, width: 4, colors: ['transparent'] }`) match
+the TailAdmin source exactly.
+
+### Font override
+This project uses **Inter** not Outfit. Set `fontFamily: 'Inter, sans-serif'`
+on every ApexCharts instance. Never use Outfit.
+
+### Operating cash definition
+Cash Trend's T6M metrics are computed from `computeMonthlyRollups('operating')`.
+This excludes: transfers, owner draws/distributions, capital distributions,
+loan principal. This makes T6M margin appear higher than a P&L that includes
+owner draws. This is intentional — Cash Trend measures what the business
+produces operationally, not what the owner takes.
+
+### Cash Trend diagnostic harness
+`computeCashTrendForDate(rollups, referenceDate)` — exported named function
+for backtesting against any month. Always use local-time date constructor
+`new Date(y, m, 1)` — never ISO string `new Date('YYYY-MM-DD')`, which
+parses as UTC midnight and shifts the window one month early in US timezones.
+
+### Cash Trend thresholds (verified against 47-month backtest)
+- Building Cash: T6M Margin ≥ 10% AND neg months ≤ 2
+- Burning Cash: T6M Margin ≤ -1.5% AND neg months ≥ 3
+- Under Pressure: margin between -1.5% and +5% AND neg months ≥ 3
+- Treading Water: everything else
+- Target margin: 10% (hardcoded — TODO: surface in workspace settings)
+- Hysteresis: stateless two-window comparison, 1.5pp buffer
+- Velocity: current T6M margin − prior T6M margin, ±2pp threshold
 
 ---
 

@@ -1,6 +1,102 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: April 21, 2026*
+*Last updated: April 26, 2026*
+
+---
+
+## What Changed Recently (April 26, 2026 — this session)
+
+### "Cost Spikes to Investigate" card — V1 shipped to Big Picture
+
+Built the full "Cost Spikes to Investigate" (formerly "What Needs Attention") signal
+end-to-end: new compute engine, Dashboard wiring, component rewrite, and production
+cleanup. Three separate diagnostic passes were run against live Supabase data (March
+2026 and December 2025 as reference months) before final commit.
+
+**Commits this session (in order):**
+```
+bb136de  feat(registry): add Insurance, Training & Education, Events & Community to fixed bucket
+3ec2c04  feat(dig-here): What Needs Attention compute engine, wire to Dashboard, update card component
+658c0b2  chore(ui): rename What Needs Attention to Cost Spikes to Investigate
+```
+
+**New file: `src/lib/kpis/digHere.ts`**
+
+Pure compute function. No React, no side effects.
+Public export: `computeWhatNeedsAttention(filteredTxns: Txn[]): WhatNeedsAttentionResult`
+Internal: `computeCore(filteredTxns, referenceDate)` — private, enables testing against any reference date.
+
+Algorithm:
+1. Derive `runtimeKey` (referenceDate month) and `currentCalendarMonthKey` (live `new Date()` month).
+   - `monthsWithData`: months strictly before `runtimeKey` — the analysis window.
+   - `availableMonthKeys`: all months in dataset except the live incomplete month. Used by the timing-artifact guard independent of referenceDate.
+2. Build `relevantMonths = Set([...baselineKeys, currentMonthKey, prevMonth, nextMonth])` — adjacent months included so their spend accumulates correctly for the timing-artifact guard.
+3. Per-category baseline + current spend (and ratio for variable categories).
+   - Uses `getCategoryMeta()` (silent lookup) not `getCategoryBucket()` (warns on miss). Collects unclassified names in a Set, emits one `console.warn` after the loop.
+4. Double gate: delta > 0 AND gate1 (fixed: `delta > $150`, variable: ratio move > 2pp) AND gate2 (`delta / expectedSpend > 20%`).
+5. Timing-artifact guard (fixed only): checks `availableMonthKeys.has(priorKey/nextKey)`. If an adjacent available month shows underspend ≥ 70% of the delta, suppress the row. Missing months are null (not $0).
+6. Sort by delta descending.
+
+**Tunable constants (V1 locked):**
+```ts
+BASELINE_MONTHS = 6          // analysis window
+MIN_BASELINE_MONTHS = 3      // minimum to produce any result
+MIN_CATEGORY_MONTHS = 2      // baseline months with spend to qualify
+MIN_VARIABLE_VALID_MONTHS = 2
+FIXED_DOLLAR_GATE = 150      // $150 absolute floor for fixed categories
+VARIABLE_RATIO_GATE = 0.02   // 2pp floor for variable categories
+RELATIVE_GATE = 0.20         // 20% relative overspend required
+TIMING_ARTIFACT_THRESHOLD = 0.70 // 70% compensation suppresses the row
+```
+
+**Two bugs found and fixed during diagnostics:**
+- `availableMonthKeys` bug: timing-artifact guard was checking `monthsWithData.has()` (bounded by referenceDate) rather than `availableMonthKeys.has()`. For a Dec 2025 diagnostic, Jan 2026 was excluded from `monthsWithData`, making `nextSpend` return null even when $17,400 in Payroll existed in Supabase for Jan 2026.
+- `relevantMonths` missing adjacent months: even after the above fix, `nextSpend` showed 0. Root cause: spend accumulation loop filtered on `relevantMonths.has(txn.month)`, but `relevantMonths` didn't include `nextMonthKey(currentMonthKey)`. Fix: expanded `relevantMonths` to include both adjacent months.
+
+**Two-surface architecture (important):**
+- Big Picture uses `whatNeedsAttention` (new engine).
+- Where to Focus uses `computeDigHereInsights` (unchanged — completely different shape: period-comparison movers table, not flagged-overspend card).
+- These are independent surfaces. Do not conflate.
+
+**Dashboard wiring:**
+```ts
+const whatNeedsAttention = useMemo(
+  () => computeWhatNeedsAttention(filteredTxns),
+  [filteredTxns]
+);
+// ...
+<DigHereHighlights result={whatNeedsAttention} />
+```
+Old `digHereHighlights` useMemo (~60 lines) removed. `computePriorityScore`, `includeExpenseForDigHere`, and related local types removed.
+
+**Component: `src/components/DigHereHighlights.tsx`** — full rewrite.
+- Accepts `{ result: WhatNeedsAttentionResult }`.
+- MAX_ROWS = 3.
+- ApexCharts area sparkline, vivid gradient (opacityFrom 0.55, stroke #FB5454), 180×56.
+- Interaction model: ⓘ tooltip only. No row clicks, no title clicks, no drilldown navigation.
+- Header stacked vertically: title "Cost Spikes to Investigate" over `${currentMonth} · vs your 6-month baseline`.
+- Zero rows: "No cost spikes this month. Spending is in line with your 6-month baseline."
+- noData: "Not enough history to calculate a baseline yet."
+- Outside-click tooltip dismiss via `useRef` + `mousedown` listener.
+
+**CSS additions to `src/dashboard.css`:**
+```css
+.wna-header--stacked { flex-direction: column; align-items: flex-start; }
+.wna-header--stacked .wna-period { margin-top: 4px; }
+.wna-empty { font-size: 14px; font-weight: 400; color: #667085; }
+```
+
+**categoryRegistry.ts additions:**
+Three missing categories added to the `fixed` bucket (discovered via `console.warn` during diagnostic):
+- `'Insurance'` — monthly premium, does not scale with revenue
+- `'Training & Education'` — irregular but not revenue-linked
+- `'Events & Community'` — episodic community spend, not revenue-driven
+
+**⚠️ Known discrepancy still open:**
+`efficiencyOpportunities.ts` has its own `SUPPRESSED_CATEGORIES` set (includes `'Rent or Lease'`).
+`categoryRegistry.ts` classifies `'Rent or Lease'` as `'fixed'`.
+Resolve in a future phase by migrating `efficiencyOpportunities.ts` to read from the registry.
+The discrepancy note is in `categoryRegistry.ts` as a code comment.
 
 ---
 
@@ -158,16 +254,16 @@ business owners, using CFO-style signal design and Nubank-level usability.
 
 **Last known commits (most recent first):**
 ```
-60252d6  fix(mobile): Settings Accounts and Rules card overflow at 393px
-2d06313  fix(mobile): Settings page tab overflow on narrow viewports
-879bce8  docs: update project context to Phase 5 — Today page V1 fully shipped
-d4cd2fe  feat(routing): Phase 5 — Today is now the landing page, Big Picture moves to /big-picture
-5b23cfd  feat(table): refine Total row, align fonts, drop 'Forecast' prefix from column headers
+658c0b2  chore(ui): rename What Needs Attention to Cost Spikes to Investigate
+3ec2c04  feat(dig-here): What Needs Attention compute engine, wire to Dashboard, update card component
+bb136de  feat(registry): add Insurance, Training & Education, Events & Community to fixed bucket
+16129b0  feat(registry): category registry — single source of truth for classification
+4557c1c  feat(ui-lab): What Needs Attention mock — final design with tooltip
 ```
 
 **Working tree:** clean
 **Active branch:** main
-**Last updated:** April 20, 2026
+**Last updated:** April 26, 2026
 **Today page V1:** SHIPPED
 **Phase 5 routing:** SHIPPED — Today is landing page, Big Picture at /big-picture
 **Deployment:** GitHub Pages via GitHub Actions — automatic on push to main
@@ -193,6 +289,9 @@ d4cd2fe  feat(routing): Phase 5 — Today is now the landing page, Big Picture m
 - `src/pages/Dashboard.tsx` — data wiring, state, route rendering, boot sequence
 - `src/App.tsx` — HashRouter + SidebarProvider wrapping Dashboard
 - `src/lib/kpis/compute.ts` — forecast engine (DO NOT TOUCH)
+- `src/lib/kpis/digHere.ts` — "Cost Spikes to Investigate" compute engine (V1 locked)
+- `src/lib/kpis/efficiencyOpportunities.ts` — Efficiency Opportunities compute (V1 locked)
+- `src/lib/data/categoryRegistry.ts` — single source of truth for expense category classification
 - `src/lib/cashFlow.ts` — operating cash rules (DO NOT TOUCH)
 - `src/lib/data/contract.ts` — TypeScript types (DO NOT TOUCH schema)
 - `src/lib/data/sharedPersistence.ts` — Supabase fetch layer (sensitive)
