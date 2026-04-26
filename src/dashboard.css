@@ -6558,6 +6558,25 @@ body {
   white-space: nowrap;
 }
 
+/* Header — stacked variant: subtitle below title, left-aligned */
+.wna-header--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.wna-header--stacked .wna-period {
+  margin-top: 4px;
+}
+
+/* No-data state */
+.wna-empty {
+  padding: 24px 0 28px;
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+  font-family: 'Outfit', sans-serif;
+}
+
 /* Stat row */
 .wna-row {
   position: relative;
@@ -6692,6 +6711,10 @@ body {
   }
 
   .dark .wna-period {
+    color: #98A2B3;
+  }
+
+  .dark .wna-empty {
     color: #98A2B3;
   }
 

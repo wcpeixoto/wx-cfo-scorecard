@@ -22,7 +22,8 @@ import DigHereCardMock from '../components/DigHereCardMock';
 import { computeEfficiencyOpportunities } from '../lib/kpis/efficiencyOpportunities';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
-import { includeExpenseForDigHere, isCapitalDistributionCategory } from '../lib/cashFlow';
+import { isCapitalDistributionCategory } from '../lib/cashFlow';
+import { computeWhatNeedsAttention } from '../lib/kpis/digHere';
 import { computePriorYearActuals } from '../lib/kpis/priorYearActuals';
 import { runDataSanityChecks } from '../lib/dataSanity';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
@@ -43,7 +44,6 @@ import {
   computeDigHereInsights,
   computeExpenseSlices,
   computeKpiComparisons,
-  computePriorityScore,
   computeMonthlyRollups,
   projectScenario,
   toMonthLabel,
@@ -202,7 +202,6 @@ const TRENDS_MA_OPTIONS: TrendsMaOption[] = [
   { value: 12, label: '12-Month Trend' },
   { value: 24, label: '24-Month Trend' },
 ];
-const HIGHLIGHT_MIN_ABS_DELTA = 25;
 type ForecastRangeValue = '30d' | '60d' | '90d' | '6m' | '1y' | '2y' | '3y';
 type ForecastRangeOption = { value: ForecastRangeValue; label: string; months: number };
 const FORECAST_RANGE_OPTIONS: ForecastRangeOption[] = [
@@ -217,15 +216,6 @@ const FORECAST_RANGE_OPTIONS: ForecastRangeOption[] = [
 ];
 
 const DEFAULT_FORECAST_EVENTS: ForecastEvent[] = [];
-
-type DigHereHighlight = {
-  category: string;
-  current: number;
-  previous: number;
-  delta: number;
-  deltaPercent: number | null;
-  priorityScore: number;
-};
 
 type DigHereFocusContext = 'category-shifts' | 'month-drilldown' | 'custom-period' | 'period-control' | null;
 type DigHereNavigationOptions = {
@@ -485,16 +475,6 @@ function compareMetric(current: number, previous: number): KpiMetricComparison {
     delta: round2(roundedCurrent - roundedPrevious),
     percentChange: Math.abs(roundedPrevious) <= EPSILON ? null : ((roundedCurrent - roundedPrevious) / Math.abs(roundedPrevious)) * 100,
   };
-}
-
-function inMonthRange(month: string, startMonth: string | null, endMonth: string | null): boolean {
-  if (!startMonth || !endMonth) return false;
-  return month >= startMonth && month <= endMonth;
-}
-
-function toDeltaPercent(current: number, previous: number): number | null {
-  if (Math.abs(previous) <= EPSILON) return null;
-  return ((current - previous) / Math.abs(previous)) * 100;
 }
 
 function getStoredAccountSettings(): AccountRecord[] {
@@ -1763,66 +1743,10 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     selectedDigHerePeriod,
   ]);
 
-  const digHereHighlights = useMemo<DigHereHighlight[]>(() => {
-    if (!selectedKpiComparison) return [];
-    if (!selectedKpiComparison.currentEndMonth || !selectedKpiComparison.currentStartMonth) return [];
-
-    const currentTotals = new Map<string, number>();
-    const previousTotals = new Map<string, number>();
-
-    filteredTxns.forEach((txn) => {
-      if (txn.type !== 'expense') return;
-      if (!includeExpenseForDigHere(txn.category, profitabilityCashFlowMode)) return;
-
-      if (
-        inMonthRange(
-          txn.month,
-          selectedKpiComparison.currentStartMonth,
-          selectedKpiComparison.currentEndMonth
-        )
-      ) {
-        currentTotals.set(txn.category, (currentTotals.get(txn.category) ?? 0) + txn.amount);
-      }
-
-      if (
-        inMonthRange(
-          txn.month,
-          selectedKpiComparison.previousStartMonth,
-          selectedKpiComparison.previousEndMonth
-        )
-      ) {
-        previousTotals.set(txn.category, (previousTotals.get(txn.category) ?? 0) + txn.amount);
-      }
-    });
-
-    const categories = new Set<string>([...currentTotals.keys(), ...previousTotals.keys()]);
-    const highlights = [...categories].map<DigHereHighlight>((category) => {
-      const current = currentTotals.get(category) ?? 0;
-      const previous = previousTotals.get(category) ?? 0;
-      const delta = current - previous;
-      const deltaPercent = toDeltaPercent(current, previous);
-      return {
-        category,
-        current,
-        previous,
-        delta,
-        deltaPercent,
-        priorityScore: computePriorityScore(delta, deltaPercent, previous, current),
-      };
-    });
-
-    return highlights
-      .filter((item) => Math.abs(item.delta) >= HIGHLIGHT_MIN_ABS_DELTA)
-      .sort((a, b) => {
-        const aNegativePriority = a.delta > EPSILON ? 1 : 0;
-        const bNegativePriority = b.delta > EPSILON ? 1 : 0;
-        if (aNegativePriority !== bNegativePriority) {
-          return bNegativePriority - aNegativePriority;
-        }
-        return b.priorityScore - a.priorityScore;
-      })
-      .slice(0, 5);
-  }, [filteredTxns, profitabilityCashFlowMode, selectedKpiComparison]);
+  const whatNeedsAttention = useMemo(
+    () => computeWhatNeedsAttention(filteredTxns),
+    [filteredTxns]
+  );
 
   const selectedKpiCards = useMemo<KpiCard[]>(() => {
     if (!selectedKpiComparison) return model.kpiCards;
@@ -2490,29 +2414,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               }
             />
 
-            <DigHereHighlights
-              items={digHereHighlights}
-              timeframeLabel={`${selectedKpiFrameLabel} comparison`}
-              onTitleClick={() =>
-                navigateToDigHere(
-                  selectedKpiComparison?.currentStartMonth && selectedKpiComparison?.currentEndMonth
-                    ? {
-                        startMonth: selectedKpiComparison.currentStartMonth,
-                        endMonth: selectedKpiComparison.currentEndMonth,
-                        focusContext: 'category-shifts',
-                      }
-                    : undefined
-                )
-              }
-              onItemClick={(item) =>
-                navigateToDigHere({
-                  category: item.category,
-                  startMonth: selectedKpiComparison?.currentStartMonth ?? null,
-                  endMonth: selectedKpiComparison?.currentEndMonth ?? null,
-                  focusContext: 'category-shifts',
-                })
-              }
-            />
+            <DigHereHighlights result={whatNeedsAttention} />
 
             <div className="two-col-grid">
               <EfficiencyOpportunitiesCard result={efficiencyResult} />

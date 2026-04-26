@@ -1,108 +1,174 @@
-type DigHereHighlightItem = {
-  category: string;
-  current: number;
-  previous: number;
-  delta: number;
-  deltaPercent: number | null;
+/**
+ * DigHereHighlights — "What Needs Attention" card
+ *
+ * Consumes WhatNeedsAttentionResult from computeWhatNeedsAttention.
+ * Matches the locked UI Lab mock (DigHereCardMock.tsx) visual design:
+ * refined category labels, vivid sparklines, inline ⓘ tooltip.
+ *
+ * Interaction model: the card is non-interactive except for the ⓘ icon
+ * which toggles an explanatory tooltip. No row or title click handlers.
+ */
+
+import { useEffect, useRef, useState } from 'react';
+import ReactApexChart from 'react-apexcharts';
+import type { ApexOptions } from 'apexcharts';
+import type {
+  WhatNeedsAttentionResult,
+  WhatNeedsAttentionRow,
+} from '../lib/kpis/digHere';
+import { formatCompact } from '../lib/utils/formatCompact';
+
+type Props = {
+  result: WhatNeedsAttentionResult;
 };
 
-type DigHereHighlightsProps = {
-  items: DigHereHighlightItem[];
-  timeframeLabel: string;
-  onTitleClick?: () => void;
-  onItemClick?: (item: DigHereHighlightItem) => void;
+const MAX_ROWS = 3;
+
+// Sparkline config — vivid variant (matches Traffic Stats spec rgba(251,84,84,0.55))
+const SPARK_OPTIONS: ApexOptions = {
+  chart: {
+    type: 'area',
+    sparkline: { enabled: true },
+    toolbar: { show: false },
+    fontFamily: 'Outfit, sans-serif',
+    background: 'transparent',
+  },
+  stroke: { curve: 'smooth', width: 1.5 },
+  fill: {
+    type: 'gradient',
+    gradient: {
+      shadeIntensity: 1,
+      opacityFrom: 0.55,
+      opacityTo: 0,
+      stops: [0, 100],
+    },
+  },
+  colors: ['#FB5454'],
+  tooltip: { enabled: false },
+  dataLabels: { enabled: false },
 };
 
-const EPSILON = 0.00001;
-
-function formatCurrency(value: number): string {
-  return value.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  });
+function formatSignedCompact(n: number): string {
+  const sign = n > 0 ? '+' : '';
+  return `${sign}${formatCompact(n)}`;
 }
 
-function formatDeltaPercent(value: number | null): string {
-  if (value === null || Number.isNaN(value)) return '—';
-  const sign = value > 0 ? '+' : '';
-  return `${sign}${Math.round(value)}%`;
+function formatRatioPct(ratio: number): string {
+  return `${Math.round(ratio * 100)}%`;
 }
 
-export default function DigHereHighlights({
-  items,
-  timeframeLabel,
-  onTitleClick,
-  onItemClick,
-}: DigHereHighlightsProps) {
-  const visibleItems = items.slice(0, 5);
+function buildTooltip(row: WhatNeedsAttentionRow): string {
+  if (row.bucket === 'fixed') {
+    return (
+      `${row.categoryName} typically runs ~${formatCompact(row.baselineAvgSpend)}/mo. ` +
+      `This month came in ${formatCompact(row.delta)} higher.`
+    );
+  }
+  return (
+    `${row.categoryName} typically runs at ${formatRatioPct(row.baselineRatio)} of revenue. ` +
+    `Based on this month's revenue, ~${formatCompact(row.expectedSpend)} would be expected. ` +
+    `You spent ${formatCompact(row.currentSpend)}.`
+  );
+}
+
+export default function DigHereHighlights({ result }: Props) {
+  const [openTooltip, setOpenTooltip] = useState<string | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openTooltip) return;
+    function handleOutside(e: MouseEvent) {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        setOpenTooltip(null);
+      }
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [openTooltip]);
+
+  const rows = result.rows.slice(0, MAX_ROWS);
+  const subtitle = result.currentMonth ? `Based on ${result.currentMonth}` : '';
 
   return (
-    <article className="card highlights-card">
-      <div className="card-head">
-        {onTitleClick ? (
-          <h3>
-            <button type="button" className="highlights-title-btn" onClick={onTitleClick}>
-              Dig Here Highlights
-            </button>
-          </h3>
-        ) : (
-          <h3>Dig Here Highlights</h3>
-        )}
-        <p className="subtle">{timeframeLabel}</p>
+    <div className="wna-card" ref={cardRef}>
+
+      {/* ── Header (stacked) ───────────────────────────────────────────── */}
+      <div className="wna-header wna-header--stacked">
+        <span className="wna-title">What Needs Attention</span>
+        {subtitle ? <span className="wna-period">{subtitle}</span> : null}
       </div>
 
-      {visibleItems.length === 0 ? (
-        <p className="empty-state">No material category shifts for this comparison window.</p>
+      {/* ── Body ───────────────────────────────────────────────────────── */}
+      {result.noData ? (
+        <div className="wna-empty">
+          Not enough history to calculate a baseline yet.
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="wna-empty">
+          No categories flagged this month.
+        </div>
       ) : (
-        <ul className="highlights-list">
-          {visibleItems.map((item) => {
-            const isIncrease = item.delta > EPSILON;
-            const isDecrease = item.delta < -EPSILON;
-            const isNew = Math.abs(item.previous) <= EPSILON && Math.abs(item.current) > EPSILON;
-            const toneClass = isIncrease ? 'is-up' : isDecrease ? 'is-down' : 'is-flat';
-            const arrow = isIncrease ? '▲' : isDecrease ? '▼' : '●';
-            const deltaText = `${isIncrease ? '+' : ''}${formatCurrency(item.delta)}`;
+        rows.map((row, i) => {
+          const headline = formatSignedCompact(row.delta);
+          const detail =
+            `${formatCompact(row.currentSpend)} this month vs ` +
+            `${formatCompact(row.expectedSpend)} expected`;
+          const isMiddle = i === 1 && rows.length >= 3;
+          const tooltip = buildTooltip(row);
 
-            const rowBody = (
-              <>
-                <div className="highlights-main">
-                  <p>
-                    <span>{item.category}</span>
-                    {isNew ? <span className="novelty-badge">New</span> : null}
-                  </p>
-                  <small>
-                    {formatCurrency(item.current)} vs {formatCurrency(item.previous)}
-                  </small>
-                </div>
-                <div className={`highlights-delta ${toneClass}`}>
-                  <strong>
-                    {arrow} {deltaText}
-                  </strong>
-                  <span>{formatDeltaPercent(item.deltaPercent)}</span>
-                </div>
-              </>
-            );
+          return (
+            <div
+              key={row.categoryName}
+              className={`wna-row${isMiddle ? ' wna-row--middle' : ''}`}
+            >
+              <div className="wna-row-left">
 
-            return (
-              <li key={item.category}>
-                {onItemClick ? (
-                  <button
-                    type="button"
-                    className="highlights-row-btn"
-                    onClick={() => onItemClick(item)}
-                    aria-label={`Open Dig Here for ${item.category}`}
-                  >
-                    {rowBody}
-                  </button>
-                ) : (
-                  <div className="highlights-row-static">{rowBody}</div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                <div className="wna-label-row">
+                  <span className="wna-category wna-category--refined">
+                    {row.categoryName}
+                  </span>
+                </div>
+
+                <div className="wna-headline">{headline}</div>
+
+                <div className="wna-detail wna-detail--sm">
+                  {detail}
+                  <span className="wna-info-wrap">
+                    <button
+                      type="button"
+                      className="wna-info-btn"
+                      aria-label={`Explain ${row.categoryName}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenTooltip(
+                          openTooltip === row.categoryName ? null : row.categoryName
+                        );
+                      }}
+                    >ⓘ</button>
+                    {openTooltip === row.categoryName && (
+                      <div className="explain-tooltip" role="tooltip">
+                        {tooltip}
+                      </div>
+                    )}
+                  </span>
+                </div>
+
+              </div>
+
+              <div className="wna-spark">
+                <ReactApexChart
+                  type="area"
+                  series={[{ data: row.sparklineData }]}
+                  options={SPARK_OPTIONS}
+                  width={180}
+                  height={56}
+                />
+              </div>
+            </div>
+          );
+        })
       )}
-    </article>
+
+    </div>
   );
 }
