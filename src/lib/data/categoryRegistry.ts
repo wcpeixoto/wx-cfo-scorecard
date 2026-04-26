@@ -123,6 +123,18 @@ export const CATEGORY_REGISTRY: Record<string, CategoryMeta> = {
     bucket: 'fixed',
     notes: 'semi-fixed overhead',
   },
+  'Insurance': {
+    bucket: 'fixed',
+    notes: 'monthly premium, does not scale with revenue',
+  },
+  'Training & Education': {
+    bucket: 'fixed',
+    notes: 'irregular but not revenue-linked — certifications and instructor courses',
+  },
+  'Events & Community': {
+    bucket: 'fixed',
+    notes: 'episodic community spend — not revenue-driven',
+  },
 
   // ── Variable ──────────────────────────────────────────────────────────────
 
