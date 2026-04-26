@@ -42,9 +42,11 @@ const VELOCITY_COPY: Record<VelocityTag, string> = {
   stable: 'Margin is stable vs the prior 6 months.',
 };
 
-const TOOLTIP_TEXT =
+const TOOLTIP_BASE =
   'T6M = the trailing six complete months. ' +
-  'Six months smooths out single-month timing — a big invoice, a slow week, a one-off bill. ' +
+  'Six months smooths out single-month timing — a big invoice, a slow week, a one-off bill.';
+
+const TOOLTIP_TARGET =
   'The 10% target is the margin needed to fund reserve building and reinvestment, not just to break even.';
 
 function formatSignedCompact(n: number): string {
@@ -192,7 +194,7 @@ export default function CashTrendHero({ result }: Props) {
         <div className="cth-header">
           <div className="cth-header-left">
             <h3 className="cth-title">Cash Trend</h3>
-            <p className="cth-subtitle">Last 6 complete months · vs 10% target</p>
+            <p className="cth-subtitle">Last 6 months · vs 10% target</p>
           </div>
         </div>
         <div className="cth-empty">
@@ -208,7 +210,7 @@ export default function CashTrendHero({ result }: Props) {
   const badge = BADGE_BY_STATUS[status];
 
   const metricLine = `${formatSignedCompact(result.t6mNetCash)} net cash · ${formatSignedPct(result.t6mMargin)} of revenue`;
-  const proofLine = `${result.negativeMonthCount} of ${result.monthlyBars.length} months were negative`;
+  const proofTargetLine = `${result.negativeMonthCount} of ${result.monthlyBars.length} months negative · Target: 10% margin`;
   const gapClass = gap >= 0 ? 'cth-gap--positive' : 'cth-gap--accent';
 
   return (
@@ -218,7 +220,7 @@ export default function CashTrendHero({ result }: Props) {
       <div className="cth-header">
         <div className="cth-header-left">
           <h3 className="cth-title">Cash Trend</h3>
-          <p className="cth-subtitle">Last 6 complete months · vs 10% target</p>
+          <p className="cth-subtitle">Last 6 months · vs 10% target</p>
         </div>
         <div className="cth-header-right">
           <span className={`card-status-badge ${badge.cls}`}>
@@ -236,7 +238,11 @@ export default function CashTrendHero({ result }: Props) {
             >ⓘ</button>
             {tooltipOpen && (
               <div className="explain-tooltip cth-tooltip" role="tooltip">
-                {TOOLTIP_TEXT}
+                <p className="cth-tooltip-para">{TOOLTIP_BASE}</p>
+                <p className="cth-tooltip-para">{TOOLTIP_TARGET}</p>
+                <p className={`cth-tooltip-para cth-tooltip-velocity cth-velocity--${velocityTag}`}>
+                  {velocityText}
+                </p>
               </div>
             )}
           </span>
@@ -248,14 +254,11 @@ export default function CashTrendHero({ result }: Props) {
         <div className="cth-metric-line">{metricLine}</div>
         <div className="cth-headline">{headline}</div>
 
-        <div className={`cth-velocity-line cth-velocity--${velocityTag}`}>
-          {velocityText}
-        </div>
-
-        <div className="cth-proof-line">{proofLine}</div>
-        <div className="cth-target-line">Target: 10% margin</div>
-        <div className={`cth-gap-line ${gapClass}`}>
-          Gap to target: {formatSignedCompact(gap)}
+        <div className="cth-context">
+          <div className="cth-proof-line">{proofTargetLine}</div>
+          <div className={`cth-gap-line ${gapClass}`}>
+            Gap to target: {formatSignedCompact(gap)}
+          </div>
         </div>
 
         <div className="cth-chart-wrap">

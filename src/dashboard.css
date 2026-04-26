@@ -6862,59 +6862,63 @@ body {
 
 /* Metric line — visually dominant */
 .cth-metric-line {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 600;
   color: #1D2939;
   line-height: 1.2;
   letter-spacing: -0.01em;
+  margin-bottom: 4px;
 }
 
 /* Status headline — secondary to metric, accent color */
 .cth-headline {
-  margin-top: 4px;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--cth-accent);
   line-height: 1.4;
+  margin-bottom: 12px;
 }
 
-/* Velocity line */
-.cth-velocity-line {
-  margin-top: 4px;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.4;
+/* Context block — proof + target + gap */
+.cth-context {
+  margin-bottom: 16px;
 }
 
-.cth-velocity--improving { color: #12B76A; }
-.cth-velocity--softer    { color: var(--cth-accent); }
-.cth-velocity--stable    { color: #667085; }
-
-/* Proof line */
+/* Proof + target line (merged, separated by ' · ') */
 .cth-proof-line {
-  margin-top: 12px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 400;
   color: #667085;
-}
-
-/* Target line */
-.cth-target-line {
-  margin-top: 4px;
-  font-size: 14px;
-  font-weight: 400;
-  color: #667085;
+  line-height: 1.4;
 }
 
 /* Gap line */
 .cth-gap-line {
   margin-top: 2px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
+  line-height: 1.4;
 }
 
 .cth-gap--positive { color: #12B76A; }
 .cth-gap--accent   { color: var(--cth-accent); }
+
+/* Tooltip body — multiple paragraphs (base, target, velocity) */
+.cth-tooltip-para {
+  margin: 0;
+}
+
+.cth-tooltip-para + .cth-tooltip-para {
+  margin-top: 8px;
+}
+
+.cth-tooltip-velocity {
+  font-weight: 500;
+}
+
+.cth-velocity--improving { color: #12B76A; }
+.cth-velocity--softer    { color: var(--cth-accent); }
+.cth-velocity--stable    { color: #667085; }
 
 /* Chart wrapper */
 .cth-chart-wrap {
@@ -6964,8 +6968,7 @@ body {
 .dark .cth-metric-line { color: rgba(255, 255, 255, 0.9); }
 
 .dark .cth-subtitle,
-.dark .cth-proof-line,
-.dark .cth-target-line { color: #98A2B3; }
+.dark .cth-proof-line { color: #98A2B3; }
 
 .dark .cth-velocity--stable { color: #98A2B3; }
 
