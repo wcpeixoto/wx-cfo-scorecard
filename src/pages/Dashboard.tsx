@@ -9,7 +9,7 @@ import { useSidebar } from '../context/SidebarContext';
 import CashFlowForecastModule from '../components/CashFlowForecastModule';
 import LoadingScreen from '../components/LoadingScreen';
 import DigHereHighlights from '../components/DigHereHighlights';
-import CashTrendHero from '../components/CashTrendHero';
+import CashTrendHero, { CashTrendPlaceholder } from '../components/CashTrendHero';
 import KpiCards from '../components/KpiCards';
 import TopCategoriesCard from '../components/TopCategoriesCard';
 import PeriodDropdown from '../components/PeriodDropdown';
@@ -2420,7 +2420,10 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               }
             />
 
-            <CashTrendHero result={cashTrendResult} />
+            <div className="two-col-grid">
+              <CashTrendHero result={cashTrendResult} />
+              <CashTrendPlaceholder />
+            </div>
 
             <DigHereHighlights result={whatNeedsAttention} />
 

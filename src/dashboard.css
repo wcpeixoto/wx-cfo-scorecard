@@ -6155,6 +6155,11 @@ body {
   background: #F2F4F7;
 }
 
+.card-status-badge.is-pressure {
+  color: #DC6803;
+  background: #FEF3E2;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Efficiency drilldown drawer
    Desktop: fixed right-side panel, 480px wide, full viewport height,
@@ -6751,7 +6756,9 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Cash Trend Hero — top of Big Picture signal hierarchy
+   Cash Trend Hero — Pattern B card on Big Picture signal hierarchy
+   Title + subtitle + right controls (status badge + ⓘ).
+   Status accent flows through child elements via --cth-accent custom property.
    ───────────────────────────────────────────────────────────────────────── */
 
 .cth-card {
@@ -6759,8 +6766,14 @@ body {
   background: #ffffff;
   border: 1px solid #E4E7EC;
   border-radius: 16px;
-  padding: 24px;
+  padding: 20px;
   font-family: 'Outfit', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 640px) {
+  .cth-card { padding: 24px; }
 }
 
 .cth-card--building  { --cth-accent: #12B76A; }
@@ -6768,21 +6781,41 @@ body {
 .cth-card--pressure  { --cth-accent: #DC6803; }
 .cth-card--burning   { --cth-accent: #F04438; }
 
+/* ─── Header (Pattern B) ─────────────────────────────────────────────── */
 .cth-header {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.cth-header-left {
+  min-width: 0;
 }
 
 .cth-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: #667085;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1D2939;
+  line-height: 1.3;
 }
 
+.cth-subtitle {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+}
+
+.cth-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* ⓘ button — quiet, no border at rest, hover circle */
 .cth-info-wrap {
   position: relative;
   display: inline-flex;
@@ -6795,41 +6828,61 @@ body {
   border: none;
   padding: 0;
   margin: 0;
-  font-size: 14px;
-  color: #98A2B3;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #667085;
   cursor: pointer;
   line-height: 1;
   font-family: inherit;
-  transition: color 0.15s;
+  border-radius: 50%;
+  transition: background-color 0.15s, color 0.15s;
 }
 
 .cth-info-btn:hover {
-  color: #667085;
+  background-color: #F2F4F7;
+  color: #475467;
 }
 
 .cth-tooltip {
   max-width: 320px;
+  right: 0;
+  left: auto;
 }
 
-.cth-headline {
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--cth-accent);
-  line-height: 1.25;
-  margin-bottom: 8px;
+/* ─── Body ───────────────────────────────────────────────────────────── */
+.cth-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
+/* Metric line — visually dominant */
 .cth-metric-line {
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 24px;
+  font-weight: 600;
   color: #1D2939;
-  margin-bottom: 4px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
+/* Status headline — secondary to metric, accent color */
+.cth-headline {
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--cth-accent);
+  line-height: 1.4;
+}
+
+/* Velocity line */
 .cth-velocity-line {
-  font-size: 13px;
+  margin-top: 4px;
+  font-size: 14px;
   font-weight: 400;
-  margin-bottom: 16px;
   line-height: 1.4;
 }
 
@@ -6837,43 +6890,43 @@ body {
 .cth-velocity--softer    { color: var(--cth-accent); }
 .cth-velocity--stable    { color: #667085; }
 
+/* Proof line */
 .cth-proof-line {
-  font-size: 13px;
+  margin-top: 12px;
+  font-size: 14px;
   font-weight: 400;
   color: #667085;
-  margin-bottom: 6px;
 }
 
+/* Target line */
 .cth-target-line {
-  font-size: 13px;
+  margin-top: 4px;
+  font-size: 14px;
   font-weight: 400;
   color: #667085;
-  margin-bottom: 16px;
 }
 
-.cth-target-sep {
-  color: #98A2B3;
-}
-
-.cth-gap {
+/* Gap line */
+.cth-gap-line {
+  margin-top: 2px;
+  font-size: 14px;
   font-weight: 500;
 }
 
 .cth-gap--positive { color: #12B76A; }
 .cth-gap--accent   { color: var(--cth-accent); }
 
-.cth-bars {
-  display: flex;
-  align-items: center;
-  margin-top: 4px;
+/* Chart wrapper */
+.cth-chart-wrap {
+  margin-top: 16px;
+  width: 100%;
 }
 
-.cth-bars-svg {
-  display: block;
-  max-width: 100%;
-  height: auto;
+.cth-chart-wrap .apexcharts-tooltip-title {
+  display: none;
 }
 
+/* No-data / empty state */
 .cth-empty {
   font-size: 14px;
   font-weight: 400;
@@ -6881,16 +6934,50 @@ body {
   padding: 8px 0 4px;
 }
 
-@media (prefers-color-scheme: dark) {
-  .dark .cth-card {
-    background: rgba(255, 255, 255, 0.03);
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-  .dark .cth-title       { color: #98A2B3; }
-  .dark .cth-metric-line { color: rgba(255, 255, 255, 0.9); }
-  .dark .cth-proof-line,
-  .dark .cth-target-line { color: #98A2B3; }
-  .dark .cth-target-sep  { color: #667085; }
-  .dark .cth-info-btn    { color: #667085; }
-  .dark .cth-info-btn:hover { color: #98A2B3; }
+/* ─── Placeholder companion card ─────────────────────────────────────── */
+.cth-placeholder {
+  background: #ffffff;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+  padding: 24px;
+  font-family: 'Outfit', sans-serif;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+.cth-placeholder-text {
+  font-size: 14px;
+  font-weight: 400;
+  color: #98A2B3;
+}
+
+/* ─── Dark mode ──────────────────────────────────────────────────────── */
+.dark .cth-card,
+.dark .cth-placeholder {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .cth-title,
+.dark .cth-metric-line { color: rgba(255, 255, 255, 0.9); }
+
+.dark .cth-subtitle,
+.dark .cth-proof-line,
+.dark .cth-target-line { color: #98A2B3; }
+
+.dark .cth-velocity--stable { color: #98A2B3; }
+
+.dark .cth-info-btn { color: #98A2B3; }
+.dark .cth-info-btn:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #D0D5DD;
+}
+
+.dark .card-status-badge.is-pressure {
+  color: #FDB022;
+  background: rgba(220, 104, 3, 0.15);
+}
+
+.dark .cth-placeholder-text { color: #667085; }
