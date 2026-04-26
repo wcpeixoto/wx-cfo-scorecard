@@ -197,6 +197,30 @@ Before writing any UI code, read `UI_RULES.md`.
 
 ---
 
+## Design System — Universal Reference
+
+The universal TailAdmin design system base and verification protocol are maintained
+in a shared repo at:
+  https://github.com/wcpeixoto/wx-design-system
+
+Files in that repo:
+- UI_RULES_TAIL_ADMIN.md — universal TailAdmin base (tokens, patterns, components,
+  decision rules). Use as-is on any TailAdmin project.
+- UI_VERIFICATION_RULES.md — universal verification protocol. Use as-is on any project.
+
+This project's design system is defined by three files working together:
+1. UI_RULES_TAIL_ADMIN.md — universal base (synced from wx-design-system repo)
+2. UI_RULES.md — project-specific overrides and extensions for this project
+3. UI_VERIFICATION_RULES.md — verification protocol (synced from wx-design-system repo)
+
+When base rules and project rules conflict, the project rules in UI_RULES.md win.
+
+Sync policy: UI_RULES_TAIL_ADMIN.md and UI_VERIFICATION_RULES.md are manually synced
+from wx-design-system. Pull updates before starting any new design phase. Do not
+auto-sync or overwrite local edits without reviewing the diff.
+
+---
+
 ## TailAdmin source reference
 
 The TailAdmin free React source is the authoritative reference for all
@@ -227,6 +251,18 @@ do not invent an equivalent.
   CSS classes in `src/dashboard.css`
 - When in doubt about any visual decision, read the TailAdmin source before
   asking or guessing
+
+---
+
+## TailAdmin Canonical Source
+
+When verifying any TailAdmin pattern, fetch the source component directly from:
+  https://github.com/TailAdmin/free-react-tailwind-admin-dashboard
+
+If that repo is unavailable, fall back to the local reference clone at:
+  ~/Code/_reference/tailadmin-react or ~/Code/_reference/tailadmin-react-main
+
+Always prefer the canonical repo — it is more current. The local clone is fallback only.
 
 ---
 
