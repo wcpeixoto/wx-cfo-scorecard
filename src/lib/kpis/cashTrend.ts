@@ -3,7 +3,7 @@
  *
  * Produces the "Cash Trend" hero card at the top of the Big Picture signal
  * hierarchy. Evaluates 6-month operating cash health using three inputs
- * together (margin, pattern, target gap) and applies stateless hysteresis to
+ * together (margin and pattern) and applies stateless hysteresis to
  * prevent month-to-month status whiplash near threshold boundaries.
  *
  * Inputs: monthlyRollups (already classified as operating cash — transfers,
@@ -35,17 +35,23 @@ export interface CashTrendResult {
   noData: boolean;
   status: CashTrendStatus;
   priorStatus: CashTrendStatus;
-  velocityTag: VelocityTag;
+  velocityTag: VelocityTag;     // retained for diagnostics; no longer rendered in the card
   t6mNetCash: number;
   t6mRevenue: number;
   t6mMargin: number;          // decimal, e.g. 0.113
   priorT6mMargin: number;     // decimal — prior window margin (for diagnostics)
   negativeMonthCount: number;
-  targetNetCash: number;
-  gap: number;
-  monthlyBars: CashTrendBar[]; // 6 entries, oldest → newest (or fewer if short history)
-  windowLabel: string;         // 'Nov 2025 – Apr 2026'
+  interpretation: string;       // status-driven plain-English line shown in the card body
+  monthlyBars: CashTrendBar[];  // retained on the result; not rendered by the card
+  windowLabel: string;          // 'Nov 2025 – Apr 2026'
 }
+
+const INTERPRETATION_BY_STATUS: Record<CashTrendStatus, string> = {
+  building: 'Strong cash generation across the last 6 months.',
+  treading: 'Cash is positive, but there is little room for error.',
+  pressure: 'Cash is positive, but the margin cannot absorb a bad month.',
+  burning:  'Cash is going out faster than it comes in.',
+};
 
 // ---------------------------------------------------------------------------
 // Tunable constants
@@ -53,9 +59,6 @@ export interface CashTrendResult {
 
 const WINDOW_MONTHS = 6;
 const MIN_WINDOW_MONTHS = 3; // require at least 3 complete months to render
-
-// TODO: surface in workspace settings
-const TARGET_MARGIN = 0.10;
 
 // Status thresholds
 const BUILDING_MARGIN = 0.10;
@@ -178,8 +181,7 @@ const EMPTY: CashTrendResult = {
   t6mMargin: 0,
   priorT6mMargin: 0,
   negativeMonthCount: 0,
-  targetNetCash: 0,
-  gap: 0,
+  interpretation: INTERPRETATION_BY_STATUS.treading,
   monthlyBars: [],
   windowLabel: '',
 };
@@ -239,9 +241,6 @@ function computeCore(
     velocityTag = 'stable';
   }
 
-  const targetNetCash = current.revenue * TARGET_MARGIN;
-  const gap = current.netCash - targetNetCash;
-
   const monthlyBars: CashTrendBar[] = currentWindow.map((r) => ({
     month: r.month,
     label: formatMonthLabel(r.month),
@@ -264,8 +263,7 @@ function computeCore(
     t6mMargin: current.margin,
     priorT6mMargin: priorMargin,
     negativeMonthCount: current.negativeMonthCount,
-    targetNetCash,
-    gap,
+    interpretation: INTERPRETATION_BY_STATUS[status],
     monthlyBars,
     windowLabel,
   };

@@ -6851,6 +6851,7 @@ body {
   max-width: 320px;
   right: 0;
   left: auto;
+  white-space: pre-line;
 }
 
 /* ─── Body ───────────────────────────────────────────────────────────── */
@@ -6867,67 +6868,24 @@ body {
   color: #1D2939;
   line-height: 1.2;
   letter-spacing: -0.01em;
-  margin-bottom: 4px;
 }
 
-/* Status headline — secondary to metric, accent color */
-.cth-headline {
-  font-size: 15px;
+/* Interpretation line — status-driven plain-English read, accent color */
+.cth-interpretation {
+  margin-top: 8px;
+  font-size: 16px;
   font-weight: 500;
   color: var(--cth-accent);
   line-height: 1.4;
-  margin-bottom: 12px;
 }
 
-/* Context block — proof + target + gap */
-.cth-context {
-  margin-bottom: 16px;
-}
-
-/* Proof + target line (merged, separated by ' · ') */
+/* Proof line */
 .cth-proof-line {
-  font-size: 13px;
+  margin-top: 12px;
+  font-size: 14px;
   font-weight: 400;
   color: #667085;
   line-height: 1.4;
-}
-
-/* Gap line */
-.cth-gap-line {
-  margin-top: 2px;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.4;
-}
-
-.cth-gap--positive { color: #12B76A; }
-.cth-gap--accent   { color: var(--cth-accent); }
-
-/* Tooltip body — multiple paragraphs (base, target, velocity) */
-.cth-tooltip-para {
-  margin: 0;
-}
-
-.cth-tooltip-para + .cth-tooltip-para {
-  margin-top: 8px;
-}
-
-.cth-tooltip-velocity {
-  font-weight: 500;
-}
-
-.cth-velocity--improving { color: #12B76A; }
-.cth-velocity--softer    { color: var(--cth-accent); }
-.cth-velocity--stable    { color: #667085; }
-
-/* Chart wrapper */
-.cth-chart-wrap {
-  margin-top: 16px;
-  width: 100%;
-}
-
-.cth-chart-wrap .apexcharts-tooltip-title {
-  display: none;
 }
 
 /* No-data / empty state */
@@ -6969,8 +6927,6 @@ body {
 
 .dark .cth-subtitle,
 .dark .cth-proof-line { color: #98A2B3; }
-
-.dark .cth-velocity--stable { color: #98A2B3; }
 
 .dark .cth-info-btn { color: #98A2B3; }
 .dark .cth-info-btn:hover {
