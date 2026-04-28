@@ -91,7 +91,6 @@ export default function CashTrendHero({ result }: Props) {
             <button
               type="button"
               className="db-tooltip-btn"
-              style={{ cursor: 'pointer' }}
               aria-label="Cash Trend explanation"
             >
               &#9432;

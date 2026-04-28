@@ -661,7 +661,7 @@ body {
   color: #6a7f98;
   background: #f7faff;
   font-size: 0.8rem;
-  cursor: help;
+  cursor: pointer;
   user-select: none;
   line-height: 1;
   padding: 0;
@@ -751,7 +751,7 @@ body {
   color: #6a7f98;
   background: #f7faff;
   font-size: 0.8rem;
-  cursor: help;
+  cursor: pointer;
   user-select: none;
   line-height: 1;
   padding: 0;
