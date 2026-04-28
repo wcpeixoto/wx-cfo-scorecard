@@ -71,8 +71,9 @@ export default function CashTrendHero({ result }: Props) {
   const { status } = result;
   const badge = BADGE_BY_STATUS[status];
 
-  const metricLine = `${formatSignedCompact(result.t6mNetCash)} net cash · ${formatSignedPct(result.t6mMargin)} margin`;
-  const proofLine = `${result.negativeMonthCount} of ${result.monthlyBars.length || 6} months were negative`;
+  const netCashFormatted = formatSignedCompact(result.t6mNetCash);
+  const marginFormatted = formatSignedPct(result.t6mMargin);
+  const totalMonths = result.monthlyBars.length || 6;
 
   return (
     <div className={`cth-card cth-card--${status}`}>
@@ -90,7 +91,7 @@ export default function CashTrendHero({ result }: Props) {
           <div className="db-tooltip-wrap">
             <button
               type="button"
-              className="db-tooltip-btn"
+              className="db-tooltip-btn cth-info-icon"
               aria-label="Cash Trend explanation"
             >
               &#9432;
@@ -108,9 +109,20 @@ export default function CashTrendHero({ result }: Props) {
 
       {/* ── Body ──────────────────────────────────────────────────────── */}
       <div className="cth-body">
-        <div className="cth-metric-line">{metricLine}</div>
-        <div className="cth-interpretation">{result.interpretation}</div>
-        <div className="cth-proof-line">{proofLine}</div>
+        <div className="cth-body-left">
+          <div className="cth-metric-primary">
+            <span className="cth-metric-amount">{netCashFormatted}</span>
+            <span className="cth-metric-noun">net cash</span>
+          </div>
+          <div className="cth-metric-secondary">
+            6-month cash margin: <span className="cth-metric-margin">{marginFormatted}</span>
+          </div>
+          <div className="cth-interpretation">{result.interpretation}</div>
+        </div>
+        <div className="cth-stat-block">
+          <div className="cth-stat-number">{result.negativeMonthCount} of {totalMonths}</div>
+          <div className="cth-stat-label">negative months</div>
+        </div>
       </div>
 
     </div>
