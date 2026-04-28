@@ -16,7 +16,6 @@ import PeriodDropdown from '../components/PeriodDropdown';
 import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
-import TrajectoryPanel from '../components/TrajectoryPanel';
 import { TodayPage } from '../components/TodayPage';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
 import DigHereCardMock from '../components/DigHereCardMock';
@@ -2405,7 +2404,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
           <>
             <KpiCards cards={selectedKpiCards} vsLabel={kpiVsLabel} />
             <p className="data-trust-note">Excludes transfers &amp; financing · operating cash flow only</p>
-            <TrajectoryPanel signals={model.trajectorySignals} />
             <NetCashFlowChart
               data={netCashFlowChartModel.trend}
               cashFlowMode={netCashFlowChartMode}
