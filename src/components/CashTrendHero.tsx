@@ -13,7 +13,6 @@
  * Interaction model: ⓘ tooltip only.
  */
 
-import { useEffect, useRef, useState } from 'react';
 import type {
   CashTrendResult,
   CashTrendStatus,
@@ -30,12 +29,6 @@ const BADGE_BY_STATUS: Record<CashTrendStatus, { label: string; cls: string }> =
   pressure: { label: 'Under Pressure', cls: 'is-pressure' },
   burning:  { label: 'Burning Cash',   cls: 'is-critical' },
 };
-
-const TOOLTIP_TEXT =
-  'T6M = the trailing six complete months. Six months smooths out single-month ' +
-  'timing — a big invoice, a slow week, a one-off bill — so you see the ' +
-  'underlying trajectory, not the noise.\n\n' +
-  'The current calendar month is excluded because it is incomplete.';
 
 function formatSignedCompact(n: number): string {
   if (n === 0) return '$0';
@@ -59,23 +52,9 @@ export function CashTrendPlaceholder() {
 }
 
 export default function CashTrendHero({ result }: Props) {
-  const [tooltipOpen, setTooltipOpen] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!tooltipOpen) return;
-    function handleOutside(e: MouseEvent) {
-      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
-        setTooltipOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
-  }, [tooltipOpen]);
-
   if (result.noData) {
     return (
-      <div className="cth-card cth-card--treading" ref={cardRef}>
+      <div className="cth-card cth-card--treading">
         <div className="cth-header">
           <div className="cth-header-left">
             <h3 className="cth-title">Cash Trend</h3>
@@ -96,7 +75,7 @@ export default function CashTrendHero({ result }: Props) {
   const proofLine = `${result.negativeMonthCount} of ${result.monthlyBars.length || 6} months were negative`;
 
   return (
-    <div className={`cth-card cth-card--${status}`} ref={cardRef}>
+    <div className={`cth-card cth-card--${status}`}>
 
       {/* ── Header (Pattern B) ────────────────────────────────────────── */}
       <div className="cth-header">
@@ -108,22 +87,23 @@ export default function CashTrendHero({ result }: Props) {
           <span className={`card-status-badge ${badge.cls}`}>
             {badge.label}
           </span>
-          <span className="cth-info-wrap">
+          <div className="db-tooltip-wrap">
             <button
               type="button"
-              className="cth-info-btn"
-              aria-label="Explain Cash Trend"
-              onClick={(e) => {
-                e.stopPropagation();
-                setTooltipOpen((v) => !v);
-              }}
-            >ⓘ</button>
-            {tooltipOpen && (
-              <div className="explain-tooltip cth-tooltip" role="tooltip">
-                {TOOLTIP_TEXT}
-              </div>
-            )}
-          </span>
+              className="db-tooltip-btn"
+              style={{ cursor: 'pointer' }}
+              aria-label="Cash Trend explanation"
+            >
+              &#9432;
+            </button>
+            <div role="tooltip" className="db-tooltip-panel is-wide">
+              <ul className="db-tooltip-list">
+                <li>Cash Trend shows whether the business is building cash or operating too close to the edge.</li>
+                <li>If this card shows pressure, look below for cost spikes and efficiency gaps.</li>
+                <li>Net cash shows how much cash the business accumulated in the last 6 complete months. Margin shows that cash as a percent of revenue over the same period.</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
 

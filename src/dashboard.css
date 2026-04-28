@@ -732,6 +732,107 @@ body {
   outline-offset: 2px;
 }
 
+/* ─── Global Blue-Tinted Tooltip System ─────────────────────────── */
+
+.db-tooltip-wrap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.db-tooltip-btn {
+  appearance: none;
+  border: 1px solid #d5e2f6;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  color: #6a7f98;
+  background: #f7faff;
+  font-size: 0.8rem;
+  cursor: help;
+  user-select: none;
+  line-height: 1;
+  padding: 0;
+}
+
+.db-tooltip-btn:focus-visible {
+  outline: 2px solid #6a8eef;
+  outline-offset: 2px;
+}
+
+.db-tooltip-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 320px;
+  border: 1px solid #d4def1;
+  border-radius: 14px;
+  background: linear-gradient(
+    145deg,
+    rgba(248, 251, 255, 0.98) 0%,
+    rgba(238, 244, 255, 0.96) 100%
+  );
+  box-shadow: 0 10px 22px rgba(24, 49, 89, 0.14);
+  color: #2f4a6b;
+  padding: 10px 12px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  display: none;
+  pointer-events: none;
+  z-index: 30;
+}
+
+/* Wide variant — for paragraph-length tooltip content */
+.db-tooltip-panel.is-wide {
+  min-width: 380px;
+  max-width: 420px;
+  white-space: normal;
+}
+
+.db-tooltip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.db-tooltip-list li {
+  margin: 0;
+  position: relative;
+  padding-left: 12px;
+  white-space: nowrap;
+}
+
+/* Wide variant overrides nowrap for paragraph items */
+.db-tooltip-panel.is-wide .db-tooltip-list li {
+  white-space: normal;
+}
+
+.db-tooltip-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.45em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #6d8fed;
+}
+
+.db-tooltip-list strong {
+  color: #1f3c80;
+  font-weight: 700;
+}
+
+/* Show on hover or keyboard focus */
+.db-tooltip-wrap:hover .db-tooltip-panel,
+.db-tooltip-wrap:focus-within .db-tooltip-panel {
+  display: block;
+}
+
 /* Trend explanation tooltip — positioned left-aligned, wraps body text */
 .trend-tooltip-panel {
   right: auto;
@@ -6815,45 +6916,6 @@ body {
   flex-shrink: 0;
 }
 
-/* ⓘ button — quiet, no border at rest, hover circle */
-.cth-info-wrap {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.cth-info-btn {
-  appearance: none;
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  color: #667085;
-  cursor: pointer;
-  line-height: 1;
-  font-family: inherit;
-  border-radius: 50%;
-  transition: background-color 0.15s, color 0.15s;
-}
-
-.cth-info-btn:hover {
-  background-color: #F2F4F7;
-  color: #475467;
-}
-
-.cth-tooltip {
-  max-width: 320px;
-  right: 0;
-  left: auto;
-  white-space: pre-line;
-}
-
 /* ─── Body ───────────────────────────────────────────────────────────── */
 .cth-body {
   display: flex;
@@ -6931,12 +6993,6 @@ body {
 
 .dark .cth-subtitle,
 .dark .cth-proof-line { color: #98A2B3; }
-
-.dark .cth-info-btn { color: #98A2B3; }
-.dark .cth-info-btn:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-  color: #D0D5DD;
-}
 
 .dark .card-status-badge.is-pressure {
   color: #FDB022;
