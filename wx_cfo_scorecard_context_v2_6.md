@@ -1,106 +1,78 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: April 26, 2026*
+*Last updated: April 27, 2026*
 
 ---
 
-## What Changed Recently (April 26, 2026 — this session)
+## What Changed Recently (April 27, 2026 — this session)
 
-### "Cost Spikes to Investigate" card — V1 shipped to Big Picture
+### Big Picture signal layer — major restructure
 
-Built the full "Cost Spikes to Investigate" (formerly "What Needs Attention") signal
-end-to-end: new compute engine, Dashboard wiring, component rewrite, and production
-cleanup. Three separate diagnostic passes were run against live Supabase data (March
-2026 and December 2025 as reference months) before final commit.
-
-**Commits this session (in order):**
+**Commits (in order):**
 ```
+d69fc02  feat(efficiency): drill-down drawer — static mock locked
+79448cd  feat(efficiency): drill-down wired to real data
+761fda0  fix(efficiency): month label fix
+c680075  fix(efficiency): donut tooltip polish
 bb136de  feat(registry): add Insurance, Training & Education, Events & Community to fixed bucket
-3ec2c04  feat(dig-here): What Needs Attention compute engine, wire to Dashboard, update card component
+3ec2c04  feat(dig-here): compute engine + Dashboard wiring + component rewrite
 658c0b2  chore(ui): rename What Needs Attention to Cost Spikes to Investigate
+31330e2  feat(cash-trend): hero card — T6M margin, status hysteresis, velocity, Big Picture wiring
+32627e2  fix: cash trend font regression — revert to Outfit
+08ff398  docs: UI_RULES — CSS architecture clarity, font correction, chartTokens pattern
+46e1ccf  docs: add wx-design-system and TailAdmin canonical source references to CLAUDE.md
+ba2c678  feat(cash-trend): drop target+gap, drop 6-bar chart, add status interpretation line
+8b22985  feat(big-picture): remove Trajectory card with noisy momentum signals
 ```
 
-**New file: `src/lib/kpis/digHere.ts`**
+### Efficiency Opportunities — drill-down drawer shipped
+The drill-down modal (full buy/month breakdown, mobile-responsive) shipped earlier in this session. The Efficiency Opportunities V1 is now complete. V2 (credible-best logic) is queued in P2.
 
-Pure compute function. No React, no side effects.
-Public export: `computeWhatNeedsAttention(filteredTxns: Txn[]): WhatNeedsAttentionResult`
-Internal: `computeCore(filteredTxns, referenceDate)` — private, enables testing against any reference date.
+### Cost Spikes to Investigate (formerly What Needs Attention)
+Renamed to reflect the card's actual scope. This card is a **category-variance detector only** — it is NOT a macro health signal. Do not bolt macro logic into it. Macro health is Cash Trend's job.
 
-Algorithm:
-1. Derive `runtimeKey` (referenceDate month) and `currentCalendarMonthKey` (live `new Date()` month).
-   - `monthsWithData`: months strictly before `runtimeKey` — the analysis window.
-   - `availableMonthKeys`: all months in dataset except the live incomplete month. Used by the timing-artifact guard independent of referenceDate.
-2. Build `relevantMonths = Set([...baselineKeys, currentMonthKey, prevMonth, nextMonth])` — adjacent months included so their spend accumulates correctly for the timing-artifact guard.
-3. Per-category baseline + current spend (and ratio for variable categories).
-   - Uses `getCategoryMeta()` (silent lookup) not `getCategoryBucket()` (warns on miss). Collects unclassified names in a Set, emits one `console.warn` after the loop.
-4. Double gate: delta > 0 AND gate1 (fixed: `delta > $150`, variable: ratio move > 2pp) AND gate2 (`delta / expectedSpend > 20%`).
-5. Timing-artifact guard (fixed only): checks `availableMonthKeys.has(priorKey/nextKey)`. If an adjacent available month shows underspend ≥ 70% of the delta, suppress the row. Missing months are null (not $0).
-6. Sort by delta descending.
+### Cash Trend card — fully shipped and simplified
+New card on Big Picture. Compute engine verified against 47-month backtest.
 
-**Tunable constants (V1 locked):**
-```ts
-BASELINE_MONTHS = 6          // analysis window
-MIN_BASELINE_MONTHS = 3      // minimum to produce any result
-MIN_CATEGORY_MONTHS = 2      // baseline months with spend to qualify
-MIN_VARIABLE_VALID_MONTHS = 2
-FIXED_DOLLAR_GATE = 150      // $150 absolute floor for fixed categories
-VARIABLE_RATIO_GATE = 0.02   // 2pp floor for variable categories
-RELATIVE_GATE = 0.20         // 20% relative overspend required
-TIMING_ARTIFACT_THRESHOLD = 0.70 // 70% compensation suppresses the row
-```
+**Final spec (locked):**
+- 4-state model: Building / Treading Water / Under Pressure / Burning Cash
+- Thresholds: Building ≥10% margin AND neg months ≤2 · Burning ≤-1.5% AND neg ≥3 · Pressure between -1.5% and +5% AND neg ≥3 · Treading: everything else
+- Hysteresis: stateless two-window comparison, 1.5pp buffer, no persistence layer
+- No target/gap language — conflicts with 25% target in `shared_workspace_settings`
+- No 6-bar chart — duplicates Monthly Net Cash Flow one card below
+- Interpretation strings (locked — do not change without re-running backtest):
+  - `building` → "Strong cash generation across the last 6 months."
+  - `treading` → "Cash is positive, but there is little room for error."
+  - `pressure` → "Cash is positive, but the margin cannot absorb a bad month."
+  - `burning` → "Cash is going out faster than it comes in."
+- `velocityTag` stays in result type — internal/diagnostic only, not rendered
+- `monthlyBars` stays in result type — unrendered, not removed to avoid type migration
+- Operating cash excludes owner draws — T6M margin appears higher than a P&L that includes draws. Intentional.
+- Diagnostic harness: `computeCashTrendForDate(rollups, new Date(y, m, 1))` — always local-time constructor, never ISO string
 
-**Two bugs found and fixed during diagnostics:**
-- `availableMonthKeys` bug: timing-artifact guard was checking `monthsWithData.has()` (bounded by referenceDate) rather than `availableMonthKeys.has()`. For a Dec 2025 diagnostic, Jan 2026 was excluded from `monthsWithData`, making `nextSpend` return null even when $17,400 in Payroll existed in Supabase for Jan 2026.
-- `relevantMonths` missing adjacent months: even after the above fix, `nextSpend` showed 0. Root cause: spend accumulation loop filtered on `relevantMonths.has(txn.month)`, but `relevantMonths` didn't include `nextMonthKey(currentMonthKey)`. Fix: expanded `relevantMonths` to include both adjacent months.
+### Trajectory card — killed
+All three signals removed from Big Picture:
+- **Last Month YoY**: dead. Single-month YoY is noise on a business with monthly variance.
+- **Momentum (Last 3 Months)**: dead. Math is broken — T3M/prior T3M produces explosive percentages when denominator is small or negative. Backtested: max +4,433%, 49% of months extreme, 36% contradicted Cash Trend.
+- **Annual Performance (T12M YoY)**: mathematically sound. Removed from Big Picture. Queued for Trends page (P2).
+- Orphaned infrastructure: Trajectory compute file + `model.trajectorySignals` + debug harness references in Dashboard.tsx intentionally orphaned. Do not delete until Annual Performance card is built on Trends.
 
-**Two-surface architecture (important):**
-- Big Picture uses `whatNeedsAttention` (new engine).
-- Where to Focus uses `computeDigHereInsights` (unchanged — completely different shape: period-comparison movers table, not flagged-overspend card).
-- These are independent surfaces. Do not conflate.
+### CSS architecture clarified
+- No Tailwind utilities in JSX. Custom CSS class system in `src/dashboard.css` only.
+- Tailwind references in UI_RULES.md are descriptive shorthand, not literal class strings.
+- Font: Outfit everywhere. Inter is not loaded. Do not use Inter.
+- All ApexCharts instances must set `fontFamily: 'Outfit, sans-serif'`.
+- All ApexCharts hex values must come from `src/lib/ui/chartTokens.ts` (not yet created — see P2).
 
-**Dashboard wiring:**
-```ts
-const whatNeedsAttention = useMemo(
-  () => computeWhatNeedsAttention(filteredTxns),
-  [filteredTxns]
-);
-// ...
-<DigHereHighlights result={whatNeedsAttention} />
-```
-Old `digHereHighlights` useMemo (~60 lines) removed. `computePriorityScore`, `includeExpenseForDigHere`, and related local types removed.
-
-**Component: `src/components/DigHereHighlights.tsx`** — full rewrite.
-- Accepts `{ result: WhatNeedsAttentionResult }`.
-- MAX_ROWS = 3.
-- ApexCharts area sparkline, vivid gradient (opacityFrom 0.55, stroke #FB5454), 180×56.
-- Interaction model: ⓘ tooltip only. No row clicks, no title clicks, no drilldown navigation.
-- Header stacked vertically: title "Cost Spikes to Investigate" over `${currentMonth} · vs your 6-month baseline`.
-- Zero rows: "No cost spikes this month. Spending is in line with your 6-month baseline."
-- noData: "Not enough history to calculate a baseline yet."
-- Outside-click tooltip dismiss via `useRef` + `mousedown` listener.
-
-**CSS additions to `src/dashboard.css`:**
-```css
-.wna-header--stacked { flex-direction: column; align-items: flex-start; }
-.wna-header--stacked .wna-period { margin-top: 4px; }
-.wna-empty { font-size: 14px; font-weight: 400; color: #667085; }
-```
-
-**categoryRegistry.ts additions:**
-Three missing categories added to the `fixed` bucket (discovered via `console.warn` during diagnostic):
-- `'Insurance'` — monthly premium, does not scale with revenue
-- `'Training & Education'` — irregular but not revenue-linked
-- `'Events & Community'` — episodic community spend, not revenue-driven
-
-**⚠️ Known discrepancy still open:**
-`efficiencyOpportunities.ts` has its own `SUPPRESSED_CATEGORIES` set (includes `'Rent or Lease'`).
-`categoryRegistry.ts` classifies `'Rent or Lease'` as `'fixed'`.
-Resolve in a future phase by migrating `efficiencyOpportunities.ts` to read from the registry.
-The discrepancy note is in `categoryRegistry.ts` as a code comment.
+### Backlog moved to Notion
+The project backlog now lives in Notion:
+**URL:** https://www.notion.so/084420fff00444de9413a542db3dddf0
+Properties: Name, Status (Now/Next/Later/Done), Priority (P1–P5), Why.
+At the end of any session where items change, update Notion directly via MCP — do not maintain a duplicate inline roadmap here.
 
 ---
 
-## What Changed Recently (April 21, 2026 — this session)
+## What Changed Recently (April 21, 2026)
 
 ### Efficiency Opportunities card — V1 shipped to Big Picture
 
@@ -108,14 +80,7 @@ Replaced the "Money Left on the Table" card on Big Picture with a new
 Efficiency Opportunities card that benchmarks each cost category against
 its own best-ever 3-month stretch in the last 24 months.
 
-**Why this replaces the previous card:**
-- Benchmarked against proven internal performance, not last month's swing
-- Ratio-based — survives revenue volatility
-- Only flags gaps vs the business's own history — survives intentional
-  investment periods
-- Produces a defensible dollar number per category
-
-**Commits today (in order):**
+**Commits:**
 ```
 84131c2  feat(ui-lab): refine bar colors, typography, column labels
 2948710  feat(ui-lab): finalize bar design — two-part green/red, soft colors, 130px track
@@ -126,7 +91,6 @@ e4ba5b1  feat(efficiency): add suppression list for non-actionable categories
 ```
 
 **Architecture:**
-
 New file: `src/lib/kpis/efficiencyOpportunities.ts`
 - Pure computation function, no React, no side effects
 - Signature: `computeEfficiencyOpportunities(model: DashboardModel, txns: Txn[]): EfficiencyOpportunitiesResult`
@@ -142,95 +106,49 @@ New file: `src/lib/kpis/efficiencyOpportunities.ts`
 3. `isCapitalDistributionCategory(txn.category)` — owner draws
 4. `SUPPRESSED_CATEGORIES.has(parentCategoryName)` — non-actionable fixed categories
 
-**Suppression list (verified verbatim against live Supabase data):**
+**Suppression list:**
 ```ts
 const SUPPRESSED_CATEGORIES = new Set<string>([
-  'Rent or Lease',         // fixed commitment, no near-term lever
-  'Depreciation',          // non-cash
-  'Amortization',          // not in current data — future-proof
-  'Taxes and Licenses',    // regulatory
-  'Interest Paid',         // debt service
-  'Loan',                  // debt service
+  'Rent or Lease',
+  'Depreciation',
+  'Amortization',
+  'Taxes and Licenses',
+  'Interest Paid',
+  'Loan',
 ]);
 ```
+Insurance intentionally not suppressed. Refunds & Allowances intentionally not suppressed.
 
-Insurance intentionally **not** suppressed — owner confirmed actionable
-over a longer horizon. Refunds & Allowances intentionally **not** suppressed
-— treated as a signal (lead quality, onboarding, billing clarity) rather
-than a direct cost to cut.
+V1 "best" definition: Absolute lowest 3-month average ratio. No credible-best logic yet (V2 queued).
 
-**Guards:**
-- Materiality: category's current 3-month average spend ≥ $100/mo
-- Window validity: ≥ 2 valid complete 3-month windows required
-- `todayRatio > 0` required to render bar
-- `console.debug` logs materiality threshold once per session
-
-**Unit discipline:**
-- All internal math in ratios (0.28, 0.43)
-- Display percents (28, 43) only at output boundary
-- `extraPerMonth = (todayRatio - bestRatio) * avgMonthlyRevenue`
-- `greenWidthPct = clamp((bestRatio / todayRatio) * 100, 0, 100)`
-
-**V1 "best" definition:**
-Absolute lowest 3-month average ratio among valid windows. No smoothing,
-no trimming, no credible-best logic. See P2 note below for V2 direction.
-
-**Result shape (single source of truth for the card):**
+**Result shape:**
 ```ts
 interface EfficiencyOpportunitiesResult {
-  windowLabel: string;          // "Jan – Mar 2026"
-  totalExtraPerMonth: number;   // sum of ALL qualifying rows
-  rows: EfficiencyRow[];        // top 4 by extraPerMonth
+  windowLabel: string;
+  totalExtraPerMonth: number;
+  rows: EfficiencyRow[];  // top 4 by extraPerMonth
 }
 ```
 
-**Card component: `src/components/EfficiencyOpportunitiesCard.tsx`**
-- Design locked at commit `2948710`
-- Accepts single `result` prop
-- `formatHeadline` / `formatExtra` helpers kept in component (presentation concern)
-- No CSS or structural changes during data-wiring phase
-
-**Wiring:**
-- `Dashboard.tsx` computes `efficiencyResult` via `useMemo(model, filteredTxns)`
-- Passed to both UI Lab and Big Picture instances
-
 ---
 
-## What Changed Recently (April 20, 2026 — this session)
-
-- **Settings mobile overflow fixed (Accounts + Rules)** — CSS-only fix in `src/dashboard.css`
-  - Root cause: `.settings-section-pane` is a CSS Grid item with default `min-width: auto`,
-    which allowed the 860px table's min-content to propagate up through the entire layout chain
-    (card → section → pane), making the document 950px wide on 393px viewports.
-  - Fix: `min-width: 0` on `.settings-section-pane` breaks the cascade. `overflow-x: auto`
-    on `.settings-table-wrap` then activates correctly — table scrolls within 263px wrapper.
-  - Secondary fixes: `min-width: 0` + `box-sizing` on `.account-setup-summary` and children;
-    `flex-wrap: wrap` on `.ta-card-body .card-head`; `.rules-row-control .cashflow-toggle`
-    expanded to full width with `flex: 1 1 0` buttons for "Suppress for full imports".
-  - All appended to existing `@media (max-width: 767px)` block at bottom of `dashboard.css`.
-  - No `overflow: hidden` used. Table scroll preserved and confirmed.
-
----
-
-### Previous session (April 20, 2026)
-- Settings page mobile overflow (tab toggle) fixed — `2d06313`
+## Earlier sessions (April 20, 2026)
+- Settings mobile overflow fixed (Accounts + Rules) — CSS-only
+- Settings page mobile overflow (tab toggle) fixed — 2d06313
 - Today page V1 fully shipped — all phases through 4.17b and Phase 5 routing
-- Phase 5 routing — Today is landing page (`#/`), Big Picture at `#/big-picture`
+- Phase 5 routing — Today is landing page (#/), Big Picture at #/big-picture
 
-### Earlier sessions (April 18, 2026)
+## Earlier sessions (April 18, 2026)
 - TailAdmin shell migration, mobile header rebuilt, Settings subnav shipped
 - Owner Distributions chart added to Big Picture
-- CLAUDE.md updated — TailAdmin source reference section
-- `priority_history` Supabase table designed (not yet created in Supabase)
+- priority_history Supabase table designed (not yet created in Supabase)
 
-### April 17, 2026
+## April 17, 2026
 - Settings page restructured — three sections: Data / Accounts / Rules
-- System Status card shipped — Healthy / Needs review / At risk
-- Duplicate warning suppression toggle in Rules
-- Non-cash inclusion acknowledgement per account
-- `shared_workspace_settings` table created — all business rules migrated from localStorage
-- CSV parser fixed — dynamic column map, `looksLikeTotalRow` scoped to fields 0 and 1
-- What-If decision cards overhauled — safety card, margin sign, goal-met state
+- System Status card shipped
+- shared_workspace_settings table created
+- CSV parser fixed — dynamic column map
+- What-If decision cards overhauled
 - max_rows confirmed at 10,000
 
 ---
@@ -254,16 +172,18 @@ business owners, using CFO-style signal design and Nubank-level usability.
 
 **Last known commits (most recent first):**
 ```
+8b22985  feat(big-picture): remove Trajectory card with noisy momentum signals
+ba2c678  feat(cash-trend): drop target+gap, drop 6-bar chart, add status interpretation line
+46e1ccf  docs: add wx-design-system and TailAdmin canonical source references to CLAUDE.md
+08ff398  docs: UI_RULES — CSS architecture clarity, font correction, chartTokens pattern
+32627e2  fix: cash trend font regression — revert to Outfit
+31330e2  feat(cash-trend): hero card — T6M margin, status hysteresis, velocity, Big Picture wiring
 658c0b2  chore(ui): rename What Needs Attention to Cost Spikes to Investigate
-3ec2c04  feat(dig-here): What Needs Attention compute engine, wire to Dashboard, update card component
-bb136de  feat(registry): add Insurance, Training & Education, Events & Community to fixed bucket
-16129b0  feat(registry): category registry — single source of truth for classification
-4557c1c  feat(ui-lab): What Needs Attention mock — final design with tooltip
 ```
 
-**Working tree:** clean
+**Working tree:** clean (stray .rtf untracked — leave alone)
 **Active branch:** main
-**Last updated:** April 26, 2026
+**Last updated:** April 27, 2026
 **Today page V1:** SHIPPED
 **Phase 5 routing:** SHIPPED — Today is landing page, Big Picture at /big-picture
 **Deployment:** GitHub Pages via GitHub Actions — automatic on push to main
@@ -279,6 +199,12 @@ bb136de  feat(registry): add Insurance, Training & Education, Events & Community
 - `src/components/HeroPriorityCard.tsx` — hero decision card, async AI prose swap
 - `src/components/SecondaryPriority.tsx` — compact supporting signal cards
 - `src/components/CoreConstraints.tsx` — always-on reserve + forward cash strip (Today only)
+- `src/components/CashTrendHero.tsx` — Cash Trend card, Big Picture (compute locked in cashTrend.ts)
+- `src/components/EfficiencyOpportunitiesCard.tsx` — Efficiency Opportunities, Big Picture
+- `src/lib/kpis/cashTrend.ts` — Cash Trend compute engine (LOCKED)
+- `src/lib/kpis/efficiencyOpportunities.ts` — Efficiency Opportunities compute
+- `src/lib/kpis/digHere.ts` — Cost Spikes to Investigate compute
+- `src/lib/data/categoryRegistry.ts` — single source of truth for category classification
 - `src/lib/priorities/types.ts` — Signal, RankedPriorities, PriorityHistoryRow types
 - `src/lib/priorities/signals.ts` — detectSignals(model, txns)
 - `src/lib/priorities/rank.ts` — rankPriorities(signals)
@@ -289,9 +215,6 @@ bb136de  feat(registry): add Insurance, Training & Education, Events & Community
 - `src/pages/Dashboard.tsx` — data wiring, state, route rendering, boot sequence
 - `src/App.tsx` — HashRouter + SidebarProvider wrapping Dashboard
 - `src/lib/kpis/compute.ts` — forecast engine (DO NOT TOUCH)
-- `src/lib/kpis/digHere.ts` — "Cost Spikes to Investigate" compute engine (V1 locked)
-- `src/lib/kpis/efficiencyOpportunities.ts` — Efficiency Opportunities compute (V1 locked)
-- `src/lib/data/categoryRegistry.ts` — single source of truth for expense category classification
 - `src/lib/cashFlow.ts` — operating cash rules (DO NOT TOUCH)
 - `src/lib/data/contract.ts` — TypeScript types (DO NOT TOUCH schema)
 - `src/lib/data/sharedPersistence.ts` — Supabase fetch layer (sensitive)
@@ -306,13 +229,41 @@ bb136de  feat(registry): add Insurance, Training & Education, Events & Community
 ```
 #/              → Today (landing page)
 #/today         → Today (alias, backward compatible)
-#/big-picture   → Big Picture (moved from /)
+#/big-picture   → Big Picture
 #/focus         → Where to Focus
 #/trends        → Trends
 #/forecast      → Forecast (What-If Scenarios)
 #/settings      → Settings
 #/ui-lab        → UI Lab (DEV only)
 ```
+
+---
+
+## Backlog
+
+The active backlog lives in Notion — do not maintain a duplicate here.
+**URL:** https://www.notion.so/084420fff00444de9413a542db3dddf0
+
+At the end of any session where backlog items change status, new items are confirmed,
+or decisions are locked, update Notion directly via the Notion MCP connector.
+Do not rewrite this section.
+
+**Sync rules:**
+- Update Notion records directly via MCP (status, priority, Why field)
+- Only sync items that actually changed
+- When a decision locks a constraint, capture it in the Why field of the relevant item
+- Do not update Big Picture layout review to Done until Cash Trend redesign and placeholder card decision are both explicitly closed
+
+**What triggers a sync:**
+- An item changes status
+- A new item is confirmed and ready for tracking
+- A decision is locked that changes the Why or sequencing of an existing item
+- A lower-priority item is promoted due to real blocking friction
+
+**What does not trigger a sync:**
+- Conversations about the backlog without a decision
+- Speculative or exploratory items not yet confirmed
+- Analysis or design reviews still in progress
 
 ---
 
@@ -769,60 +720,6 @@ required. The Today page returns to deterministic fallback copy immediately.
 
 This rollback must always be a one-function change. Do not architect the
 AI layer in a way that makes fallback require broader refactoring.
-
----
-
-## Queued Roadmap
-
-### Active queue (P1)
-- ~~Settings page mobile overflow fix~~ — done `60252d6`
-- Hero and secondary pill QA — verify all 8 signal states render correctly
-- General copy review — steady state, secondary cards, copy.ts templates, loading page
-- Projection Table polish — $ difference before %, spacing, full-year comparison
-- Big Picture layout review — confirm balance after card removals
-
-### P2 — Feature work
-- Efficiency Opportunities — credible-best logic (V2)
-  V1 defines "your best" as the absolute lowest 3-month average ratio.
-  This can produce misleading gaps when a category was dormant during
-  the best window (e.g., COGS = 0% for a 3-month stretch creates an
-  artificial baseline). V2 should require the best window to have
-  meaningful category activity. Candidate rule: best window's average
-  spend must be ≥ 25% of the category's 24-month median spend, or a
-  similar activity floor. Goal is to ensure "best" reflects a realistic
-  repeatable operating state, not a statistical artifact. Defer until
-  after remaining P1 items.
-
-- Efficiency Opportunities — "Your best" drill-down modal
-  Clicking a row (or the "Your best %" cell) opens a modal showing the
-  best 3-month window vs today with a monthly breakdown table (month,
-  revenue, category spend, %). Includes a one-line plain-English insight
-  summarizing the gap. Design spec to be locked before implementation,
-  same playbook as the card itself.
-
-- Secure server proxy (Supabase Edge Function or Cloudflare Worker)
-  Required before callAIProvider can be activated
-- Full AI cache read path — skip API call when recent priority_history row exists
-- Phase 5.1 — Renewal engine (system-driven ForecastEvent from contract data)
-- Next owner distribution card — timing and amount of next payout
-- Add Monthly Revenue and Expenses to Big Picture
-- Forecast baseline comparison — faded baseline when adjusting scenarios
-
-### P3 — Performance
-- Egress reduction and payload optimization (~4MB boot payload)
-- Startup performance — sequential Supabase requests on boot
-
-### P4 — Strategic
-- Crisis mode
-- Sustainability breakdown (4 cards)
-- Top Expense Categories redesign (dual timeframe)
-- Warning near 10,000 input lines limit
-- Settings enhancements (logo upload, naming)
-
-### P5 — Long term
-- QA layer / systematic testing
-- Decision UX layer (commit / not now / need help on hero card)
-- Owner Distributions explanatory footnote
 
 ---
 
