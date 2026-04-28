@@ -6868,21 +6868,21 @@ body {
   color: #1D2939;
   line-height: 1.2;
   letter-spacing: -0.01em;
+  margin-bottom: 8px;
 }
 
 /* Interpretation line — status-driven plain-English read, accent color */
 .cth-interpretation {
-  margin-top: 8px;
   font-size: 16px;
   font-weight: 500;
   color: var(--cth-accent);
   line-height: 1.4;
+  margin-bottom: 16px;
 }
 
 /* Proof line */
 .cth-proof-line {
-  margin-top: 12px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 400;
   color: #667085;
   line-height: 1.4;
@@ -6916,10 +6916,14 @@ body {
 }
 
 /* ─── Dark mode ──────────────────────────────────────────────────────── */
-.dark .cth-card,
+.dark .cth-card {
+  background: #1D2939;
+  border-color: #344054;
+}
+
 .dark .cth-placeholder {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: #1D2939;
+  border-color: #344054;
 }
 
 .dark .cth-title,
