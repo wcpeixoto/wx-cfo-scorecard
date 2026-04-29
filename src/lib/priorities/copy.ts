@@ -66,7 +66,7 @@ export function getFallbackCopy(
       const fundedPct = pct(signal.metricValue);
       const gap = fmt(signal.gapAmount);
       return {
-        headline: `Reserve is at ${fundedPct} — still short of target`,
+        headline: `Cash Reserve is at ${fundedPct} — still short of target`,
         why: worsened
           ? `Your reserve slipped to ${fundedPct} — the direction reversed since last time. Small surprises are manageable, but bigger ones would squeeze you.`
           : `You're at ${fundedPct} of your target. You have a cushion, but not the full buffer you'd want if something unexpected hit.`,

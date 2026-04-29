@@ -77,6 +77,9 @@ export function HeroPriorityCard({ signal }: HeroPriorityCardProps) {
   return (
     <article className="today-hero-card">
       <div className={isFading ? 'today-hero-body is-fading' : 'today-hero-body'}>
+        {/* Card label */}
+        <p className="today-hero-card-title">Top Financial Priority</p>
+
         {/* Header row: headline left, severity pill right */}
         <div className="hero-card-header">
           <h2 className="today-hero-headline">{prose.headline}</h2>
@@ -103,15 +106,6 @@ export function HeroPriorityCard({ signal }: HeroPriorityCardProps) {
           <p className="today-hero-label">Where you are now</p>
           <p className="today-hero-text">{prose.currentState}</p>
         </div>
-
-        {/* 6. Backup option */}
-        <div className="today-hero-section">
-          <p className="today-hero-label">If that's not possible</p>
-          <p className="today-hero-text">{prose.alternative}</p>
-        </div>
-
-        {/* 7. Quiet followup note */}
-        <p className="today-hero-followup">{prose.followupNote}</p>
       </div>
     </article>
   );
