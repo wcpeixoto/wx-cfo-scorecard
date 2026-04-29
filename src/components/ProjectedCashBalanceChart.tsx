@@ -24,6 +24,25 @@ function formatFullMonth(month: string): string {
   return `${MONTH_NAMES[idx] ?? m} ${year}`;
 }
 
+/** Bucket end date in "MMM D, YYYY" form for the tooltip header.
+ *  Week granularity: extract the end of the existing range tooltipLabel ("May 25 – May 31, 2026").
+ *  Month granularity: last day of the calendar month from YYYY-MM. */
+function formatBucketEndDate(d: TrendPoint, granularity: 'month' | 'week'): string {
+  if (granularity === 'week') {
+    const label = d.tooltipLabel ?? d.axisLabel ?? d.month;
+    // Range separator may be en dash, em dash, or hyphen; trim and take the right side
+    const parts = label.split(/\s[–—-]\s/);
+    return (parts.length >= 2 ? parts[parts.length - 1] : label).trim();
+  }
+  const [yearStr, mmStr] = d.month.split('-');
+  const year = parseInt(yearStr, 10);
+  const mm = parseInt(mmStr, 10);
+  if (!Number.isFinite(year) || !Number.isFinite(mm)) return d.month;
+  // new Date(year, mm, 0) = last day of month `mm` (mm is 1-indexed here)
+  const lastDay = new Date(year, mm, 0).getDate();
+  return `${MONTH_NAMES[mm - 1] ?? mmStr} ${lastDay}, ${year}`;
+}
+
 function formatCurrency(value: number): string {
   const abs = Math.abs(value);
   const sign = value < 0 ? '-' : '';
@@ -55,13 +74,10 @@ export default function ProjectedCashBalanceChart({
     [data, granularity]
   );
 
-  // Tooltip x-labels (rich labels for hover — full month or week range)
+  // Tooltip x-labels — bucket end date as "MMM D, YYYY" (e.g. "May 31, 2026").
+  // Single date, no range, no metric label — see tooltip block below.
   const tooltipLabels = useMemo(
-    () =>
-      data.map((d) => {
-        if (granularity === 'week') return d.tooltipLabel ?? d.axisLabel ?? d.month;
-        return formatFullMonth(d.month);
-      }),
+    () => data.map((d) => formatBucketEndDate(d, granularity)),
     [data, granularity]
   );
 
@@ -216,7 +232,11 @@ export default function ProjectedCashBalanceChart({
             return value;
           },
         },
-        y: { formatter: formatCurrency },
+        y: {
+          formatter: formatCurrency,
+          // Suppress the "Cash Balance:" series-name prefix on the value row
+          title: { formatter: () => '' },
+        },
         marker: { show: true },
       },
       annotations: {
