@@ -347,6 +347,12 @@ Every task must follow this sequence:
 1. Read `UI_RULES.md` before any UI code. For any new UI pattern,
    also check the TailAdmin source reference section in this file
    and look up the relevant pattern before writing anything.
+
+   For any prompt involving dashboard card design, card modification, or new card creation, also require:
+
+   - Read `UI_CARDS.md` in the project root before writing code.
+
+   This is in addition to the standard requirement to read `CLAUDE.md` and `UI_RULES.md`. `UI_CARDS.md` is the source of truth for dashboard card anatomy, fixed vs optional elements, TailAdmin card scale, spacing rhythm, and the CashTrendHero implementation contract.
 2. Run pre-flight: `git branch`, `git status --short`, `git log --oneline -3`
 3. If the target file was modified in the immediately prior phase or
    commit, read the **entire file** before touching anything and

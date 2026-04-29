@@ -20,6 +20,12 @@ Token drift and structure drift are equally harmful. Both are prevented here.
 > This file documents TailAdmin-native patterns only in Parts 1–5.
 > All project-specific overrides belong in Part 6 only.
 
+## Card design
+
+For reusable dashboard card anatomy, fixed and optional card elements, the TailAdmin typography scale for cards, the spacing rhythm rules, and the CashTrendHero implementation contract, see `UI_CARDS.md`.
+
+`UI_RULES.md` covers global design tokens, CSS conventions, and project-wide visual rules. `UI_CARDS.md` is the dedicated reference for building dashboard cards.
+
 ---
 
 # PART 1 — TOKENS
