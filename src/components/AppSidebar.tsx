@@ -15,7 +15,7 @@ const PRIMARY_ITEMS: SidebarItem[] = [
   { to: '/big-picture', label: 'Big Picture', icon: FiGrid },
   { to: '/focus', label: 'Where to Focus', icon: FiTarget },
   { to: '/trends', label: 'Trends', icon: FiTrendingUp },
-  { to: '/forecast', label: 'What-If Scenarios', icon: FiSliders },
+  { to: '/forecast', label: 'Forecast', icon: FiSliders },
   { to: '/settings', label: 'Settings', icon: FiSettings },
 ];
 
