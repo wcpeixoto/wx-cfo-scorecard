@@ -3258,7 +3258,7 @@ body {
 /* Grouped column headers */
 
 .table-card .projection-group-row th {
-  background: #F2F4F7;
+  background: #FFFFFF;
   color: #667085;
   font-size: 12px;
   font-weight: 600;
@@ -3269,6 +3269,8 @@ body {
 .projection-month-header {
   text-align: left !important;
   background: #FFFFFF !important;
+  vertical-align: bottom !important;
+  padding-bottom: 8px !important;
 }
 
 .table-card .projection-sub-row th {
@@ -3299,6 +3301,19 @@ body {
 /* Group start border — separates CASH IN / CASH OUT / NET / VS PRIOR / BALANCE */
 .proj-group-start {
   border-left: 2px solid #E4E7EC;
+}
+
+/* Title-case projection table headers — override .table-card th uppercase rule */
+.projection-table th {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Remove the first vertical divider only — between Month column and Cash In group.
+   Keeps the Cash In/Cash Out/Net dividers that follow. */
+.projection-table .proj-group-start:first-child,
+.projection-table tr > *:first-child + .proj-group-start {
+  border-left: none;
 }
 
 .projection-var-header {
