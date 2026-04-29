@@ -2748,6 +2748,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
             <article className="card table-card projection-table-card" ref={projectionTableRef}>
               <div className="projection-header">
                 <h3 className="projection-table-title">Projection Table</h3>
+                <div className="projection-table-actions">
                 <div className="projection-table-compare-wrap">
                   <span className="projection-table-compare-label">Compare</span>
                   <div className="projection-compare-toggle" role="group" aria-label="Compare years">
@@ -2815,6 +2816,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 >
                   Export CSV
                 </button>
+                </div>
               </div>
               <div className="projection-table-scroll">
                 {(() => {
