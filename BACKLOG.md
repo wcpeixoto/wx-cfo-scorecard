@@ -13,9 +13,7 @@ Format: `https://www.notion.so/{id-without-hyphens}`
 
 ## Now
 
-| Item | Priority | Notion ID | Why |
-|---|---|---|---|
-| Placeholder card (right of Cash Trend) — decide what goes here | P1 | `351ad9579339817c8f5ae2e2a337a1f2` | Cash Trend is live at 1/3 width. The 2/3-width placeholder still shows 'Coming soon.' Product decision, not a build task — pick the signal before writing any code. Decision unlocks Big Picture layout review. Candidates: Annual Performance compact card, target-vs-actual margin card, or other. |
+*Empty — no active Now items. Next session starts from Next P1s.*
 
 ---
 
@@ -23,9 +21,7 @@ Format: `https://www.notion.so/{id-without-hyphens}`
 
 | Item | Priority | Notion ID | Why |
 |---|---|---|---|
-| Hero and secondary pill QA | P1 | `34fad957933981ebb079d1abbc244412` | Verify all 8 signal states on Today page render correctly. Secondary pills must be right-aligned, not full width. |
-| Mobile layout pass — Today page | P1 | `34fad957933981178366ec239e54191e` | Today is the landing page. Must work cleanly on narrow screens. Not deprioritized. |
-| Projection Table polish | P1 | `34fad957933981e28170e9abc8f61e45` | $ difference before %, spacing and hierarchy, full-year comparison. |
+| Big Picture layout review — final pass | P1 | `34fad9579339817d9057c55981b28ec7` | Placeholder card decision deferred to Later. Do one layout pass to confirm Big Picture balance after all card removals and Cash Trend work. |
 | Phase 5.1 — Renewal engine | P2 | `34fad957933981ffb7d7fd00e590153f` | System-driven ForecastEvent objects from contract data. Next core feature after P1 complete. Drives forward-looking accuracy. |
 | chartTokens.ts — create the file | P2 | `34fad95793398134975fff2c765015d1` | UI_RULES.md requires all ApexCharts hex values from src/lib/ui/chartTokens.ts. File does not yet exist. Must be created in a dedicated commit before the next new chart component. Do not create it as part of any other task. |
 | Efficiency Opportunities — credible-best logic (V2) | P2 | `34fad957933981fa9f3ac95bcbe1ebca` | Ensure 'best' reflects a realistic repeatable state, not a statistical artifact. |
@@ -40,7 +36,8 @@ Format: `https://www.notion.so/{id-without-hyphens}`
 
 | Item | Priority | Notion ID | Why |
 |---|---|---|---|
-| Big Picture layout review — final pass | P1 | `34fad9579339817d9057c55981b28ec7` | Do not rearrange until placeholder card decision is made and closed. Then one layout pass to confirm balance. |
+| Placeholder card (right of Cash Trend) — decide what goes here | P3 | `351ad9579339817c8f5ae2e2a337a1f2` | Product decision deferred. Candidates: Annual Performance compact card, target-vs-actual margin card, or other. Unlocks Big Picture layout review when decided. |
+| Border radius audit — verify all cards use 16px system radius | P3 | `351ad9579339812b89eefb480069c802` | During Today top-row alignment work, noticed potential radius mismatch. Audit all card components, fix deviations, then lock the rule in UI_CARDS.md and CLAUDE.md. |
 | Startup performance — sequential Supabase requests | P3 | `34fad957933981d69028de98578440b2` | Boot makes sequential HTTP requests. Parallelizing would cut perceived load time meaningfully. |
 | Decision UX layer | P3 | `34fad9579339816fa375c5fa2e30b065` | Turns the dashboard from a read surface into an action surface. |
 | QA layer — systematic testing | P3 | `34fad957933981089bdfc5f55da524ba` | No automated tests exist. Deferred until core feature set stabilizes. |
@@ -62,6 +59,9 @@ Format: `https://www.notion.so/{id-without-hyphens}`
 |---|---|---|---|
 | Cash Trend — visual redesign to TailAdmin quality | P1 | `34fad957933981c78a09f7493c188761` | `57225d1` — Two-variant pattern. TailAdmin Churn Rate spec baseline. One card, one hero number. Content-driven height. |
 | Extract Cash Trend spec into UI_CARDS.md | P1 | `351ad957933981179ce3d33015435a24` | `6dc00ed` — Universal CFO Signal Card System + CashTrendHero contract. UI_RULES.md cross-link + CLAUDE.md updated. |
+| Hero and secondary pill QA | P1 | `34fad957933981ebb079d1abbc244412` | `aff4491` — Verified all 10 signal × severity states. Fixed: secondary pill right-aligned (flex-end), signal-specific labels (Reserve / Cash Flow / Expenses / Revenue / Owner Draws / On Track) typed against SignalType with severity fallback. Hero labels kept generic. |
+| Mobile layout pass — Today page | P1 | `34fad957933981178366ec239e54191e` | `4a17099` secondary card header row + breakpoints · `de755fa` remove header block, move reserve beside hero · `157ae64` state-based reserve pill + grid breakpoint · `8556b45` compact reserve layout narrow desktop · `5006787` hero title + softening copy removed + reserve label polish. |
+| Projection Table polish | P1 | `34fad957933981e28170e9abc8f61e45` | `4bafb93` Change column · `9ca27e8` header/divider polish · `c96e7c3` segmented Compare toggle · `4c991a6` header controls spacing. Also: Projected Cash Balance card aligned to TailAdmin: `14321ad` `5c8614d` `4b4d7b6` `ea0857f` `bcad92c`. Sidebar renamed Forecast: `e93c355`. |
 
 ---
 
@@ -71,6 +71,7 @@ Format: `https://www.notion.so/{id-without-hyphens}`
 - At session start: fetch Now items by ID. Do not rely on Notion search.
 - Sync both Notion and this file when: an item changes status, a new item is confirmed, a decision locks a constraint.
 - **Do not mark Big Picture layout review as Done until the placeholder card decision is also closed.**
+- Read `BACKLOG.md` at session start and use `notion-fetch` by ID for all backlog queries — never rely on `notion-search` for status lookups.
 
 ## Session-start fetch protocol
 
@@ -78,10 +79,8 @@ Fetch Now and top Next items directly by ID for reliable status reads:
 
 ```
 Now:
-https://www.notion.so/351ad9579339817c8f5ae2e2a337a1f2  ← Placeholder card decision (P1)
+(empty — start from Next P1s)
 
-Next P1s:
-https://www.notion.so/34fad957933981ebb079d1abbc244412  ← Hero and secondary pill QA
-https://www.notion.so/34fad957933981178366ec239e54191e  ← Mobile layout pass — Today page
-https://www.notion.so/34fad957933981e28170e9abc8f61e45  ← Projection Table polish
+Next P1:
+https://www.notion.so/34fad9579339817d9057c55981b28ec7  ← Big Picture layout review
 ```
