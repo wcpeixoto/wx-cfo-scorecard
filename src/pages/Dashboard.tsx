@@ -2854,7 +2854,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                         </tbody>
                         <tfoot>
                           <tr className="total-row">
-                            <td className="total-label">Total</td>
+                            <td className="total-label">Period total</td>
                             <td>{formatCurrency(totalForecastCI)}</td>
                             <td>{formatCurrency(totalForecastCO)}</td>
                             <td className={totalForecastNet < 0 ? 'is-negative' : undefined}>{formatCurrency(totalForecastNet)}</td>
@@ -2883,7 +2883,10 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                     return `${sign}${abs}%`;
                   };
 
-                  const varColCount = hasSingleYear ? 1 : 0;
+                  const fmtDiff = (val: number): string =>
+                    val > 0 ? `+${formatCurrency(val)}` : formatCurrency(val);
+
+                  const varColCount = hasSingleYear ? 2 : 0;
                   const cashInCols = 1 + sortedActiveDesc.length + varColCount;
                   const cashOutCols = 1 + sortedActiveDesc.length + varColCount;
                   const netCols = 1 + sortedActiveDesc.length + varColCount;
@@ -2901,14 +2904,17 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                           {/* Cash In subcolumns */}
                           <th className="projection-sub-forecast proj-group-start">{forecastYear}</th>
                           {sortedActiveDesc.map((y) => <th key={`ci-${y}`} className="projection-sub-actual">{y}</th>)}
+                          {hasSingleYear && <th className="projection-sub-actual">Change</th>}
                           {hasSingleYear && <th className="projection-sub-actual">%</th>}
                           {/* Cash Out subcolumns */}
                           <th className="projection-sub-forecast proj-group-start">{forecastYear}</th>
                           {sortedActiveDesc.map((y) => <th key={`co-${y}`} className="projection-sub-actual">{y}</th>)}
+                          {hasSingleYear && <th className="projection-sub-actual">Change</th>}
                           {hasSingleYear && <th className="projection-sub-actual">%</th>}
                           {/* Net subcolumns */}
                           <th className="projection-sub-forecast proj-group-start">{forecastYear}</th>
                           {sortedActiveDesc.map((y) => <th key={`n-${y}`} className="projection-sub-actual">{y}</th>)}
+                          {hasSingleYear && <th className="projection-sub-actual">Change</th>}
                           {hasSingleYear && <th className="projection-sub-actual">%</th>}
                         </tr>
                       </thead>
@@ -2931,6 +2937,12 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                               })}
                               {hasSingleYear && (() => {
                                 if (!ma1 || ma1.cashIn === 0) return <td className="projection-var-neutral">&mdash;</td>;
+                                const diff = row.cashIn - ma1.cashIn;
+                                const cls = diff > 0 ? 'projection-var-positive' : diff < 0 ? 'projection-var-negative' : 'projection-var-neutral';
+                                return <td className={cls}>{fmtDiff(diff)}</td>;
+                              })()}
+                              {hasSingleYear && (() => {
+                                if (!ma1 || ma1.cashIn === 0) return <td className="projection-var-neutral">&mdash;</td>;
                                 const varPct = ((row.cashIn - ma1.cashIn) / Math.abs(ma1.cashIn)) * 100;
                                 const colorClass = varPct > 0 ? 'projection-var-positive' : 'projection-var-negative';
                                 return <td className={colorClass}>{fmtVar(varPct)}</td>;
@@ -2942,6 +2954,13 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                                 const cls = ma.cashOut < 0 ? 'proj-actuals-negative' : 'proj-actuals-value';
                                 return <td key={`co-${year}-${row.month}`} className={cls}>{formatCurrency(ma.cashOut)}</td>;
                               })}
+                              {hasSingleYear && (() => {
+                                if (!ma1 || ma1.cashOut === 0) return <td className="projection-var-neutral">&mdash;</td>;
+                                const diff = row.cashOut - ma1.cashOut;
+                                // Cash Out: inverted — spending more than prior = bad (red), less = good (green)
+                                const cls = diff > 0 ? 'projection-var-cashout-positive' : diff < 0 ? 'projection-var-cashout-negative' : 'projection-var-neutral';
+                                return <td className={cls}>{fmtDiff(diff)}</td>;
+                              })()}
                               {hasSingleYear && (() => {
                                 if (!ma1 || ma1.cashOut === 0) return <td className="projection-var-neutral">&mdash;</td>;
                                 const varPct = ((row.cashOut - ma1.cashOut) / Math.abs(ma1.cashOut)) * 100;
@@ -2958,6 +2977,12 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                               })}
                               {hasSingleYear && (() => {
                                 if (!ma1 || ma1.net === 0) return <td className="projection-var-neutral">&mdash;</td>;
+                                const diff = row.netCashFlow - ma1.net;
+                                const cls = diff > 0 ? 'projection-var-positive' : diff < 0 ? 'projection-var-negative' : 'projection-var-neutral';
+                                return <td className={cls}>{fmtDiff(diff)}</td>;
+                              })()}
+                              {hasSingleYear && (() => {
+                                if (!ma1 || ma1.net === 0) return <td className="projection-var-neutral">&mdash;</td>;
                                 const varPct = ((row.netCashFlow - ma1.net) / Math.abs(ma1.net)) * 100;
                                 const colorClass = varPct > 0 ? 'projection-var-positive' : 'projection-var-negative';
                                 return <td className={colorClass}>{fmtVar(varPct)}</td>;
@@ -2968,7 +2993,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       </tbody>
                       <tfoot>
                         <tr className="total-row">
-                          <td className="total-label">Total</td>
+                          <td className="total-label">Period total</td>
                           {/* Cash In totals */}
                           <td className="proj-group-start proj-forecast-value">{formatCurrency(totalForecastCI)}</td>
                           {sortedActiveDesc.map((year) => {
@@ -2976,6 +3001,13 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                             const cls = tot.cashIn < 0 ? 'proj-actuals-negative' : 'proj-actuals-value';
                             return <td key={`tot-ci-${year}`} className={cls}>{formatCurrency(tot.cashIn)}</td>;
                           })}
+                          {hasSingleYear && (() => {
+                            const tot = totalActuals.get(sortedActiveDesc[0]) ?? { cashIn: 0, cashOut: 0, net: 0 };
+                            if (tot.cashIn === 0) return <td className="proj-actuals-value">&mdash;</td>;
+                            const diff = totalForecastCI - tot.cashIn;
+                            const cls = diff > 0 ? 'projection-var-positive' : diff < 0 ? 'projection-var-negative' : 'projection-var-neutral';
+                            return <td className={cls}>{fmtDiff(diff)}</td>;
+                          })()}
                           {hasSingleYear && (() => {
                             const tot = totalActuals.get(sortedActiveDesc[0]) ?? { cashIn: 0, cashOut: 0, net: 0 };
                             if (tot.cashIn === 0) return <td className="proj-actuals-value">&mdash;</td>;
@@ -2993,6 +3025,14 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                           {hasSingleYear && (() => {
                             const tot = totalActuals.get(sortedActiveDesc[0]) ?? { cashIn: 0, cashOut: 0, net: 0 };
                             if (tot.cashOut === 0) return <td className="proj-actuals-value">&mdash;</td>;
+                            const diff = totalForecastCO - tot.cashOut;
+                            // Cash Out: inverted — spending more than prior = bad (red), less = good (green)
+                            const cls = diff > 0 ? 'projection-var-cashout-positive' : diff < 0 ? 'projection-var-cashout-negative' : 'projection-var-neutral';
+                            return <td className={cls}>{fmtDiff(diff)}</td>;
+                          })()}
+                          {hasSingleYear && (() => {
+                            const tot = totalActuals.get(sortedActiveDesc[0]) ?? { cashIn: 0, cashOut: 0, net: 0 };
+                            if (tot.cashOut === 0) return <td className="proj-actuals-value">&mdash;</td>;
                             const pct = ((totalForecastCO - tot.cashOut) / Math.abs(tot.cashOut)) * 100;
                             // Cash Out: inverted — spending more than prior = bad (red), less = good (green)
                             const cls = pct > 0 ? 'projection-var-cashout-positive' : 'projection-var-cashout-negative';
@@ -3005,6 +3045,13 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                             const cls = tot.net < 0 ? 'proj-actuals-negative' : 'proj-actuals-value';
                             return <td key={`tot-n-${year}`} className={cls}>{formatCurrency(tot.net)}</td>;
                           })}
+                          {hasSingleYear && (() => {
+                            const tot = totalActuals.get(sortedActiveDesc[0]) ?? { cashIn: 0, cashOut: 0, net: 0 };
+                            if (tot.net === 0) return <td className="proj-actuals-value">&mdash;</td>;
+                            const diff = totalForecastNet - tot.net;
+                            const cls = diff > 0 ? 'projection-var-positive' : diff < 0 ? 'projection-var-negative' : 'projection-var-neutral';
+                            return <td className={cls}>{fmtDiff(diff)}</td>;
+                          })()}
                           {hasSingleYear && (() => {
                             const tot = totalActuals.get(sortedActiveDesc[0]) ?? { cashIn: 0, cashOut: 0, net: 0 };
                             if (tot.net === 0) return <td className="proj-actuals-value">&mdash;</td>;

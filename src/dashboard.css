@@ -3213,14 +3213,14 @@ body {
 
 .projection-sub-forecast {
   color: #101828 !important;
-  font-weight: 700 !important;
-  font-size: 16px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
 }
 
 .projection-sub-actual {
   color: #667085 !important;
-  font-weight: 400 !important;
-  font-size: 16px !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
 }
 
 /* Center-align all data cells except MONTH column in comparison mode */
