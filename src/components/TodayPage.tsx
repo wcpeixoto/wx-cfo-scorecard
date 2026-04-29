@@ -60,16 +60,13 @@ export function TodayPage({ model, txns, targetNetMargin }: TodayPageProps) {
 
   return (
     <div className="today-page">
-      <header className="top-bar glass-panel today-header">
-        <div className="top-bar-main">
-          <div className="top-bar-copy">
-            <h2>Today</h2>
-            <p className="top-bar-context">What to focus on right now</p>
-          </div>
-        </div>
-      </header>
-
-      <HeroPriorityCard signal={hero} />
+      <div className="today-top-grid">
+        <HeroPriorityCard signal={hero} />
+        <OperatingReserveCard
+          currentCashBalance={model.runway.currentCashBalance}
+          reserveTarget={model.runway.reserveTarget}
+        />
+      </div>
 
       {secondary.length > 0 && (
         <div className={secondaryClass}>
@@ -81,19 +78,13 @@ export function TodayPage({ model, txns, targetNetMargin }: TodayPageProps) {
 
       {/* Context section */}
       <div className="today-context-section">
-        <div className="today-context-grid">
-          <OperatingReserveCard
-            currentCashBalance={model.runway.currentCashBalance}
-            reserveTarget={model.runway.reserveTarget}
-          />
-          <OwnerDistributionsCard
-              transactions={txns}
-              distributionStatus={distributionStatus.status}
-              distributionTargetAmount={distributionStatus.targetAmount}
-              distributionActualAmount={distributionStatus.actualAmount}
-              targetNetMargin={targetNetMargin}
-            />
-        </div>
+        <OwnerDistributionsCard
+          transactions={txns}
+          distributionStatus={distributionStatus.status}
+          distributionTargetAmount={distributionStatus.targetAmount}
+          distributionActualAmount={distributionStatus.actualAmount}
+          targetNetMargin={targetNetMargin}
+        />
       </div>
     </div>
   );

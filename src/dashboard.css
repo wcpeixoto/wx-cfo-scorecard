@@ -5993,6 +5993,20 @@ body {
   margin-bottom: 0;
 }
 
+/* Top grid: Hero (2fr) + Operating Reserve (1fr) side by side on desktop */
+.today-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+  gap: 16px;
+  align-items: flex-start;
+}
+
+@media (max-width: 1023px) {
+  .today-top-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Severity pill — shared by hero and secondary */
 .today-severity-pill {
   display: inline-flex;
