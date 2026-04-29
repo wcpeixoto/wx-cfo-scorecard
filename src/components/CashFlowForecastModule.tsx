@@ -45,6 +45,24 @@ function generateEventMonths(startMonth: string, frequency: EventFrequency, fore
   return months;
 }
 
+// Forecast horizon segmented control split:
+// — primary segments rendered directly in the toggle track (compact, common ranges)
+// — overflow values rendered inside the More dropdown (longer ranges)
+const FORECAST_PRIMARY_VALUES: readonly string[] = ['30d', '60d', '90d'];
+const FORECAST_MORE_VALUES: readonly string[] = ['6m', '1y', '2y', '3y'];
+
+// Short labels for the segmented control (parent passes longer "Next ..." labels
+// which are still the canonical option labels — these are display-only).
+const FORECAST_RANGE_SHORT_LABELS: Record<string, string> = {
+  '30d': '30 Days',
+  '60d': '60 Days',
+  '90d': '90 Days',
+  '6m':  '6 Months',
+  '1y':  '1 Year',
+  '2y':  '2 Years',
+  '3y':  '3 Years',
+};
+
 // DECISION_WINDOW: number of forecast months used for profit and margin cards.
 // Cards 1 and 3 use forecast data, not trailing actuals.
 // Change this constant if the business logic needs to shift to actuals later.
@@ -343,6 +361,12 @@ export default function CashFlowForecastModule({
     }
   }, []);
 
+  // Forecast horizon "More" dropdown — primary range pills are 30/60/90 Days;
+  // longer ranges (6 Months / 1/2/3 Years) live behind a More popover so the
+  // segmented control stays compact while preserving every option.
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
   // Add Event modal state
   const [showAddModal, setShowAddModal] = useState(false);
   const [formMonth, setFormMonth] = useState('');
@@ -447,6 +471,18 @@ export default function CashFlowForecastModule({
     onAddEvent?.(events);
     setShowAddModal(false);
   }
+
+  // Close the More popover on outside click.
+  useEffect(() => {
+    if (!moreMenuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setMoreMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [moreMenuOpen]);
 
   const granularity: 'month' | 'week' = forecastRangeMonths < 6 ? 'week' : 'month';
   const startingCashBalance = Number.isFinite(currentCashBalance) ? currentCashBalance : 0;
@@ -754,25 +790,75 @@ export default function CashFlowForecastModule({
           );
         })()}
 
-        <div className="projected-cash-timeline">
-          <div className="projection-year-pills" role="radiogroup" aria-label="Select forecast horizon">
-            {forecastRangeOptions.map((option) => {
-              const isActive = forecastRangeValue === option.value;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={isActive}
-                  className={`projection-year-pill${isActive ? ' is-active' : ''}`}
-                  onClick={() => onForecastRangeChange(option.value)}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {(() => {
+          const moreSelected = FORECAST_MORE_VALUES.includes(forecastRangeValue);
+          const moreLabel = moreSelected
+            ? FORECAST_RANGE_SHORT_LABELS[forecastRangeValue] ?? forecastRangeValue
+            : 'More';
+          return (
+            <div className="projected-cash-timeline">
+              <div
+                className="forecast-scenario-toggle forecast-timeline-toggle"
+                role="radiogroup"
+                aria-label="Select forecast horizon"
+              >
+                {FORECAST_PRIMARY_VALUES.map((val) => {
+                  const opt = forecastRangeOptions.find((o) => o.value === val);
+                  if (!opt) return null;
+                  const isActive = forecastRangeValue === val;
+                  return (
+                    <button
+                      key={val}
+                      type="button"
+                      role="radio"
+                      aria-checked={isActive}
+                      className={isActive ? 'is-active' : ''}
+                      onClick={() => onForecastRangeChange(val)}
+                    >
+                      {FORECAST_RANGE_SHORT_LABELS[val] ?? opt.label}
+                    </button>
+                  );
+                })}
+                <div className="forecast-timeline-more timeframe-menu" ref={moreMenuRef}>
+                  <button
+                    type="button"
+                    className={`forecast-timeline-more-trigger${moreSelected ? ' is-active' : ''}`}
+                    aria-haspopup="menu"
+                    aria-expanded={moreMenuOpen}
+                    onClick={() => setMoreMenuOpen((c) => !c)}
+                  >
+                    {moreLabel} &#9662;
+                  </button>
+                  {moreMenuOpen && (
+                    <ul className="timeframe-list" role="menu" aria-label="More forecast horizons">
+                      {FORECAST_MORE_VALUES.map((val) => {
+                        const opt = forecastRangeOptions.find((o) => o.value === val);
+                        if (!opt) return null;
+                        const isActive = forecastRangeValue === val;
+                        return (
+                          <li key={val}>
+                            <button
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={isActive}
+                              className={isActive ? 'is-active' : ''}
+                              onClick={() => {
+                                onForecastRangeChange(val);
+                                setMoreMenuOpen(false);
+                              }}
+                            >
+                              {FORECAST_RANGE_SHORT_LABELS[val] ?? opt.label}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="projected-cash-chart-body">
           <ProjectedCashBalanceChart
