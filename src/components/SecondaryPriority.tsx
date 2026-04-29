@@ -31,11 +31,13 @@ export function SecondaryPriority({ signal }: SecondaryPriorityProps) {
 
   return (
     <article className="today-secondary-card">
-      <span className={`today-severity-pill is-${signal.severity}`}>
-        <span className="today-severity-dot" aria-hidden="true" />
-        {signalLabel[signal.type] ?? severityLabel(signal.severity)}
-      </span>
-      <h3 className="today-secondary-headline">{copy.headline}</h3>
+      <div className="today-secondary-header">
+        <h3 className="today-secondary-headline">{copy.headline}</h3>
+        <span className={`today-severity-pill is-${signal.severity}`}>
+          <span className="today-severity-dot" aria-hidden="true" />
+          {signalLabel[signal.type] ?? severityLabel(signal.severity)}
+        </span>
+      </div>
       <p className="today-secondary-line">{supportingLine}</p>
     </article>
   );
