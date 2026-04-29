@@ -3,10 +3,10 @@
 
 const EPSILON = 0.00001;
 
-/** Threshold below which the reserve is considered "getting tight".
- *  At this point the owner is within 25% of the reserve floor —
- *  close enough to warrant attention but not yet critical. */
-const RESERVE_TIGHT_THRESHOLD = 0.75;
+/** Threshold below which the reserve is considered "below target" (warning).
+ *  Below 50% funded is critical. 50–100% is warning. 100%+ is healthy.
+ *  Mirrors the reserve_critical threshold in signals.ts (RESERVE_CRITICAL_THRESHOLD = 0.50). */
+const RESERVE_TIGHT_THRESHOLD = 0.50;
 
 function formatCurrency(value: number): string {
   return value.toLocaleString(undefined, {
@@ -36,9 +36,9 @@ function reserveToneClassName(percent: number | null): string {
 
 function getReserveBadgeState(percentFunded: number | null): { label: string; className: string } {
   if (percentFunded === null) return { label: '—', className: 'card-status-badge is-neutral' };
-  if (percentFunded >= 1.0) return { label: '✓ On track', className: 'card-status-badge is-healthy' };
-  if (percentFunded >= RESERVE_TIGHT_THRESHOLD) return { label: '↓ Getting tight', className: 'card-status-badge is-warning' };
-  return { label: '↓ Below reserve', className: 'card-status-badge is-critical' };
+  if (percentFunded >= 1.0) return { label: '✓ Fully funded', className: 'card-status-badge is-healthy' };
+  if (percentFunded >= RESERVE_TIGHT_THRESHOLD) return { label: '↓ Below target', className: 'card-status-badge is-warning' };
+  return { label: '↓ Critical', className: 'card-status-badge is-critical' };
 }
 
 function computeCoverageWeeks(currentCashBalance: number, reserveTarget: number): number {

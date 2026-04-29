@@ -1839,6 +1839,7 @@ body {
   align-self: start;
   min-height: auto;
   padding: 20px 24px;
+  border-radius: 16px;
 }
 
 .reserve-header {
@@ -5996,14 +5997,30 @@ body {
 /* Top grid: Hero (2fr) + Operating Reserve (1fr) side by side on desktop */
 .today-top-grid {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 2fr) minmax(360px, 1fr);
   gap: 16px;
-  align-items: flex-start;
+  align-items: stretch;
 }
 
-@media (max-width: 1023px) {
+.today-top-grid > * {
+  height: 100%;
+}
+
+/* Reserve card has align-self: start by default — neutralize it inside top grid */
+.today-top-grid .reserve-card {
+  align-self: stretch;
+}
+
+@media (max-width: 1199px) {
   .today-top-grid {
     grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+  .today-top-grid > * {
+    height: auto;
+  }
+  .today-top-grid .reserve-card {
+    align-self: auto;
   }
 }
 
