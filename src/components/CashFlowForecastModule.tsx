@@ -753,13 +753,17 @@ export default function CashFlowForecastModule({
       <section className="card forecast-chart-shell">
 
         {(() => {
-          // Net Change is the main KPI for the selected timeline.
-          // Computed once and rendered in the card header top-right.
+          // Single header IIFE — Net Change context lives in the left heading column;
+          // the segmented timeline control sits on the right.
           const hasSeries = displaySeries.length > 0;
           const finalBalance = hasSeries ? displaySeries[displaySeries.length - 1].net : startingCashBalance;
           const netChange = finalBalance - startingCashBalance;
           const netSign = netChange > 0 ? '+' : netChange < 0 ? '−' : '';
           const netColor = netChange > 0 ? 'is-positive' : netChange < 0 ? 'is-negative' : '';
+          const moreSelected = FORECAST_MORE_VALUES.includes(forecastRangeValue);
+          const moreLabel = moreSelected
+            ? FORECAST_RANGE_SHORT_LABELS[forecastRangeValue] ?? forecastRangeValue
+            : 'More';
           return (
             <div className="projected-cash-header">
               <div className="projected-cash-heading">
@@ -777,83 +781,74 @@ export default function CashFlowForecastModule({
                 {monthlyRangeLabel && (
                   <p className="projected-cash-date-range">{monthlyRangeLabel}</p>
                 )}
+                {hasSeries && (
+                  <p className="projected-cash-net-change">
+                    <span className={`projected-cash-net-change-value ${netColor}`}>
+                      {netSign}{formatCurrencyCompact(Math.abs(netChange))}
+                    </span>
+                    <span className="projected-cash-net-change-label">Net Change</span>
+                  </p>
+                )}
               </div>
-              {hasSeries && (
-                <div className="projected-cash-kpi">
-                  <span className={`projected-cash-kpi-value ${netColor}`}>
-                    {netSign}{formatCurrencyCompact(Math.abs(netChange))}
-                  </span>
-                  <span className="projected-cash-kpi-label">Net Change</span>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {(() => {
-          const moreSelected = FORECAST_MORE_VALUES.includes(forecastRangeValue);
-          const moreLabel = moreSelected
-            ? FORECAST_RANGE_SHORT_LABELS[forecastRangeValue] ?? forecastRangeValue
-            : 'More';
-          return (
-            <div className="projected-cash-timeline">
-              <div
-                className="forecast-scenario-toggle forecast-timeline-toggle"
-                role="radiogroup"
-                aria-label="Select forecast horizon"
-              >
-                {FORECAST_PRIMARY_VALUES.map((val) => {
-                  const opt = forecastRangeOptions.find((o) => o.value === val);
-                  if (!opt) return null;
-                  const isActive = forecastRangeValue === val;
-                  return (
+              <div className="projected-cash-timeline">
+                <div
+                  className="forecast-scenario-toggle forecast-timeline-toggle"
+                  role="radiogroup"
+                  aria-label="Select forecast horizon"
+                >
+                  {FORECAST_PRIMARY_VALUES.map((val) => {
+                    const opt = forecastRangeOptions.find((o) => o.value === val);
+                    if (!opt) return null;
+                    const isActive = forecastRangeValue === val;
+                    return (
+                      <button
+                        key={val}
+                        type="button"
+                        role="radio"
+                        aria-checked={isActive}
+                        className={isActive ? 'is-active' : ''}
+                        onClick={() => onForecastRangeChange(val)}
+                      >
+                        {FORECAST_RANGE_SHORT_LABELS[val] ?? opt.label}
+                      </button>
+                    );
+                  })}
+                  <div className="forecast-timeline-more timeframe-menu" ref={moreMenuRef}>
                     <button
-                      key={val}
                       type="button"
-                      role="radio"
-                      aria-checked={isActive}
-                      className={isActive ? 'is-active' : ''}
-                      onClick={() => onForecastRangeChange(val)}
+                      className={`forecast-timeline-more-trigger${moreSelected ? ' is-active' : ''}`}
+                      aria-haspopup="menu"
+                      aria-expanded={moreMenuOpen}
+                      onClick={() => setMoreMenuOpen((c) => !c)}
                     >
-                      {FORECAST_RANGE_SHORT_LABELS[val] ?? opt.label}
+                      {moreLabel} &#9662;
                     </button>
-                  );
-                })}
-                <div className="forecast-timeline-more timeframe-menu" ref={moreMenuRef}>
-                  <button
-                    type="button"
-                    className={`forecast-timeline-more-trigger${moreSelected ? ' is-active' : ''}`}
-                    aria-haspopup="menu"
-                    aria-expanded={moreMenuOpen}
-                    onClick={() => setMoreMenuOpen((c) => !c)}
-                  >
-                    {moreLabel} &#9662;
-                  </button>
-                  {moreMenuOpen && (
-                    <ul className="timeframe-list" role="menu" aria-label="More forecast horizons">
-                      {FORECAST_MORE_VALUES.map((val) => {
-                        const opt = forecastRangeOptions.find((o) => o.value === val);
-                        if (!opt) return null;
-                        const isActive = forecastRangeValue === val;
-                        return (
-                          <li key={val}>
-                            <button
-                              type="button"
-                              role="menuitemradio"
-                              aria-checked={isActive}
-                              className={isActive ? 'is-active' : ''}
-                              onClick={() => {
-                                onForecastRangeChange(val);
-                                setMoreMenuOpen(false);
-                              }}
-                            >
-                              {FORECAST_RANGE_SHORT_LABELS[val] ?? opt.label}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
+                    {moreMenuOpen && (
+                      <ul className="timeframe-list" role="menu" aria-label="More forecast horizons">
+                        {FORECAST_MORE_VALUES.map((val) => {
+                          const opt = forecastRangeOptions.find((o) => o.value === val);
+                          if (!opt) return null;
+                          const isActive = forecastRangeValue === val;
+                          return (
+                            <li key={val}>
+                              <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={isActive}
+                                className={isActive ? 'is-active' : ''}
+                                onClick={() => {
+                                  onForecastRangeChange(val);
+                                  setMoreMenuOpen(false);
+                                }}
+                              >
+                                {FORECAST_RANGE_SHORT_LABELS[val] ?? opt.label}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

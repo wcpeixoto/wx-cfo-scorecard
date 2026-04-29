@@ -1432,52 +1432,44 @@ body {
   letter-spacing: 0.01em;
 }
 
-.projected-cash-kpi {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  text-align: right;
-  flex-shrink: 0;
-  line-height: 1;
+/* Net Change context — compact inline value + label, sits under the date range */
+.projected-cash-net-change {
+  margin: 2px 0 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  line-height: 18px;
 }
 
-.projected-cash-kpi-value {
-  font-size: 24px;
+.projected-cash-net-change-value {
+  font-size: 14px;
   font-weight: 600;
-  line-height: 32px;
   color: #101828;
   letter-spacing: -0.01em;
 }
 
-.projected-cash-kpi-value.is-positive {
+.projected-cash-net-change-value.is-positive {
   color: #12B76A;
 }
 
-.projected-cash-kpi-value.is-negative {
+.projected-cash-net-change-value.is-negative {
   color: #F04438;
 }
 
-.projected-cash-kpi-label {
-  margin-top: 2px;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 20px;
+.projected-cash-net-change-label {
+  font-size: 13px;
+  font-weight: 500;
   color: #667085;
+  letter-spacing: 0.01em;
 }
 
-/* Centered segmented control above the chart */
+/* Timeline control — now a header right-side child, no centering */
 .projected-cash-timeline {
   display: flex;
-  justify-content: center;
-  margin-top: 12px;
+  flex-shrink: 0;
 }
 
-.projected-cash-timeline .projection-year-pills {
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-/* Chart body — give it breathing room from the timeline above */
+/* Chart body — breathing room from the header */
 .projected-cash-chart-body {
   margin-top: 16px;
 }
@@ -1491,17 +1483,10 @@ body {
     align-items: flex-start;
     gap: 12px;
   }
-  .projected-cash-kpi {
-    align-items: flex-start;
-    text-align: left;
-  }
   .projected-cash-timeline {
-    /* Allow horizontal scroll if pill row exceeds card width */
+    /* Allow horizontal scroll if segmented control exceeds card width */
+    width: 100%;
     overflow-x: auto;
-    justify-content: flex-start;
-  }
-  .projected-cash-timeline .projection-year-pills {
-    flex-wrap: nowrap;
   }
 }
 
