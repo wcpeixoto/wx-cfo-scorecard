@@ -1,6 +1,68 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: April 27, 2026*
+*Last updated: April 28, 2026*
+
+---
+
+## What Changed Recently (April 28, 2026 — this session)
+
+### Cash Trend card — visual redesign + inline-stat variant shipped
+
+**Commits (in order):**
+```
+25a0b9d  style(cash-trend): TailAdmin Pattern B visual redesign
+cec2ca5  style(tooltip): global blue-tinted tooltip system + Cash Trend ⓘ migration and copy
+2a8bf38  style(tooltip): change ⓘ cursor to pointer on both tooltip triggers
+dd8ee23  style(cash-trend): polish TailAdmin card anatomy
+57225d1  feat(cash-trend): inline-stat card variant + Big Picture 1/3 layout
+1824b79  fix(cash-trend): unify margin vocabulary across variants
+465a980  chore(cash-trend): remove stale margin vocabulary comment
+6dc00ed  docs: add Universal CFO Signal Card System (UI_CARDS.md)
+fddf900  docs: add BACKLOG.md — snapshot of Notion backlog as of 2026-04-28
+```
+
+### Cash Trend — inline-stat variant (`negativeMonthsAsSubtitle` prop)
+
+`CashTrendHero` now accepts a `negativeMonthsAsSubtitle?: boolean` prop that activates a narrow-width variant:
+
+| Concern | Default variant | Inline-stat variant |
+|---|---|---|
+| Subtitle | "Last 6 complete months" | "N of the last 6 months were negative" |
+| ⓘ icon position | header-right, beside badge | inline next to title |
+| Mini-stat block | visible | hidden |
+| Interpretation color | `var(--cth-accent)` | `#344054` neutral |
+| Interpretation top margin | `16px` | `32px` |
+| CSS modifier | — | `.cth-card--inline-stat` |
+
+**Big Picture page:** uses inline-stat variant at 1/3 width via `.cash-trend-row` grid (`minmax(0,1fr) / minmax(0,2fr)`), paired with `CashTrendPlaceholder` at 2/3. Collapses to single column at ≤767px.
+
+**UI Lab page:** Section 13 — three-col grid (`ui-lab-three-col-grid`) shows default + inline-stat + placeholder side by side for reference.
+
+### Margin vocabulary unified
+
+Secondary metric line: both variants now render **"6-month cumulative profit margin"** (was: default used "6-month cash margin"). "Cash margin" and "profit margin" are different concepts to a small business owner — canonical phrase is locked as "cumulative profit margin."
+
+No "cash margin" user-facing string remains in `src/`. One CSS comment updated to match.
+
+### UI_CARDS.md — new card design source of truth
+
+`UI_CARDS.md` added to repo root. Contains:
+- Universal CFO Signal Card anatomy (fixed vs optional elements)
+- TailAdmin card typography scale
+- Spacing rhythm rules
+- Full CashTrendHero implementation contract (both variants, dark mode, empty state, formatting rules)
+
+**Required reading for all card work.** `CLAUDE.md` updated to mandate reading `UI_CARDS.md` for any card design, modification, or new card creation. `UI_RULES.md` updated with cross-link section at top.
+
+### Tooltip system — global blue-tinted system established
+
+All card tooltips now use `.db-tooltip-wrap` / `.db-tooltip-btn` / `.db-tooltip-panel` with `.is-wide` modifier. Global system — do not redefine tooltip styling per card.
+
+### CSS layout additions
+
+`.cash-trend-row` — `1fr / 2fr` grid for Cash Trend + placeholder on Big Picture.
+`.ui-lab-three-col-grid` — equal 3-column grid for UI Lab comparison mocks.
+`.cth-title-row` — flex row for inline title + ⓘ in narrow variant.
 
 ---
 
