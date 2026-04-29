@@ -731,78 +731,72 @@ export default function CashFlowForecastModule({
 
       <section className="card forecast-chart-shell">
 
-        <div className="forecast-chart-topbar">
-          <div className="forecast-chart-heading">
-            <h3 className="forecast-chart-title">Projected Cash Balance</h3>
-            <div className="forecast-info-help">
-              <button type="button" className="forecast-info-icon" aria-label="How this forecast works">&#9432;</button>
-              <div role="tooltip" className="forecast-info-panel">
-                <p className="forecast-info-title">How this forecast works</p>
-                <p className="forecast-info-body">Projected cash balance is based on recent operating cash trends, seasonal patterns from prior years, and the scenario assumptions shown below.</p>
-                <p className="forecast-info-important"><strong>Important:</strong> This forecast is directional, not exact. Use the sliders if this year is tracking differently than usual.</p>
-              </div>
-            </div>
-          </div>
-          <div className="forecast-chart-actions">
-            <div className="chart-control-row">
-              <div className="timeframe-menu" ref={horizonMenuRef}>
-                <button
-                  type="button"
-                  className="timeframe-trigger"
-                  onClick={() => setHorizonMenuOpen((c) => !c)}
-                  aria-haspopup="menu"
-                  aria-expanded={horizonMenuOpen}
-                >
-                  {currentHorizonLabel} &#9662;
-                </button>
-                {horizonMenuOpen && (
-                  <ul className="timeframe-list" role="menu" aria-label="Select forecast horizon">
-                    {forecastRangeOptions.map((option) => (
-                      <li key={option.value}>
-                        <button
-                          type="button"
-                          role="menuitemradio"
-                          aria-checked={forecastRangeValue === option.value}
-                          className={forecastRangeValue === option.value ? 'is-active' : ''}
-                          onClick={() => { onForecastRangeChange(option.value); setHorizonMenuOpen(false); }}
-                        >
-                          {option.label}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-            <div className="chart-head-meta">
-              <p className="subtle chart-range-label">{monthlyRangeLabel}</p>
-            </div>
-          </div>
-        </div>
-
-        {displaySeries.length > 0 && (() => {
-          const initialBalance = startingCashBalance;
-          const finalBalance = displaySeries[displaySeries.length - 1].net;
+        {(() => {
+          // Net Change is the main KPI for the selected timeline.
+          // Computed once and rendered in the card header top-right.
+          const hasSeries = displaySeries.length > 0;
+          const finalBalance = hasSeries ? displaySeries[displaySeries.length - 1].net : startingCashBalance;
           const netChange = finalBalance - startingCashBalance;
           const netSign = netChange > 0 ? '+' : netChange < 0 ? '−' : '';
           const netColor = netChange > 0 ? 'is-positive' : netChange < 0 ? 'is-negative' : '';
           return (
-            <div className="cash-summary-strip">
-              <div className="cash-summary-item">
-                <span className="cash-summary-label">Initial Balance</span>
-                <span className="cash-summary-value">{formatCurrencyCompact(initialBalance)}</span>
+            <div className="forecast-chart-topbar projected-cash-header">
+              <div className="forecast-chart-heading">
+                <h3 className="forecast-chart-title">Projected Cash Balance</h3>
+                <div className="forecast-info-help">
+                  <button type="button" className="forecast-info-icon" aria-label="How this forecast works">&#9432;</button>
+                  <div role="tooltip" className="forecast-info-panel">
+                    <p className="forecast-info-title">How this forecast works</p>
+                    <p className="forecast-info-body">Projected cash balance is based on recent operating cash trends, seasonal patterns from prior years, and the scenario assumptions shown below.</p>
+                    <p className="forecast-info-important"><strong>Important:</strong> This forecast is directional, not exact. Use the sliders if this year is tracking differently than usual.</p>
+                  </div>
+                </div>
               </div>
-              <div className="cash-summary-item">
-                <span className="cash-summary-label">Net Change</span>
-                <span className={`cash-summary-value ${netColor}`}>{netSign}{formatCurrencyCompact(Math.abs(netChange))}</span>
-              </div>
-              <div className="cash-summary-item">
-                <span className="cash-summary-label">Final Balance</span>
-                <span className="cash-summary-value cash-summary-value--final">{formatCurrencyCompact(finalBalance)}</span>
-              </div>
+              {hasSeries && (
+                <div className="projected-cash-kpi">
+                  <span className={`projected-cash-kpi-value ${netColor}`}>
+                    {netSign}{formatCurrencyCompact(Math.abs(netChange))}
+                  </span>
+                  <span className="projected-cash-kpi-label">Net Change</span>
+                </div>
+              )}
             </div>
           );
         })()}
+
+        <div className="projected-cash-controls">
+          <div className="timeframe-menu" ref={horizonMenuRef}>
+            <button
+              type="button"
+              className="timeframe-trigger"
+              onClick={() => setHorizonMenuOpen((c) => !c)}
+              aria-haspopup="menu"
+              aria-expanded={horizonMenuOpen}
+            >
+              {currentHorizonLabel} &#9662;
+            </button>
+            {horizonMenuOpen && (
+              <ul className="timeframe-list" role="menu" aria-label="Select forecast horizon">
+                {forecastRangeOptions.map((option) => (
+                  <li key={option.value}>
+                    <button
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={forecastRangeValue === option.value}
+                      className={forecastRangeValue === option.value ? 'is-active' : ''}
+                      onClick={() => { onForecastRangeChange(option.value); setHorizonMenuOpen(false); }}
+                    >
+                      {option.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {monthlyRangeLabel && (
+            <p className="projected-cash-range-label">{monthlyRangeLabel}</p>
+          )}
+        </div>
 
         <ProjectedCashBalanceChart
           data={displaySeries}

@@ -1376,6 +1376,74 @@ body {
   gap: 4px;
 }
 
+/* ── Projected Cash Balance — header KPI + centered timeline control ── */
+.projected-cash-header {
+  align-items: center;
+}
+
+.projected-cash-kpi {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.projected-cash-kpi-value {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 32px;
+  color: #101828;
+  letter-spacing: -0.01em;
+}
+
+.projected-cash-kpi-value.is-positive {
+  color: #12B76A;
+}
+
+.projected-cash-kpi-value.is-negative {
+  color: #F04438;
+}
+
+.projected-cash-kpi-label {
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  color: #667085;
+}
+
+.projected-cash-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.projected-cash-range-label {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  color: #667085;
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 767px) {
+  .projected-cash-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .projected-cash-kpi {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
 .forecast-chart-shell .card-head {
   display: none;
 }
