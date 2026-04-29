@@ -2804,6 +2804,19 @@ body {
   gap: 14px;
 }
 
+/* Cash Trend row — card 1/3, placeholder 2/3 */
+.cash-trend-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 14px;
+}
+
+@media (max-width: 767px) {
+  .cash-trend-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .preview-card .hero-number,
 .hero-number {
   margin: 4px 0 14px;
@@ -4964,6 +4977,19 @@ body {
   }
 }
 
+/* UI Lab — 3-column full-width preview grid */
+.ui-lab-three-col-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 767px) {
+  .ui-lab-three-col-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Efficiency Opportunities Card ───────────────────────────────────── */
 
 /* Card header */
@@ -6867,14 +6893,10 @@ body {
   background: #ffffff;
   border: 1px solid #E4E7EC;
   border-radius: 16px;
-  padding: 20px 24px;
+  padding: 24px;
   font-family: 'Outfit', sans-serif;
   display: flex;
   flex-direction: column;
-}
-
-@media (min-width: 640px) {
-  .cth-card { padding: 22px 28px; }
 }
 
 .cth-card--building  { --cth-accent: #12B76A; }
@@ -6888,11 +6910,17 @@ body {
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .cth-header-left {
   min-width: 0;
+}
+
+.cth-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .cth-title {
@@ -6900,10 +6928,12 @@ body {
   font-weight: 600;
   color: #1D2939;
   line-height: 1.3;
+  margin: 0;
 }
 
 .cth-subtitle {
   margin-top: 4px;
+  margin-bottom: 0;
   font-size: 14px;
   font-weight: 400;
   color: #667085;
@@ -6966,29 +6996,30 @@ body {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  line-height: 1.1;
 }
 
 .cth-metric-amount {
-  font-size: 30px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 32px;
   color: #1D2939;
   letter-spacing: -0.01em;
 }
 
 .cth-metric-noun {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 500;
+  line-height: 20px;
   color: #475467;
 }
 
 /* Secondary metric line — six-month cash margin context */
 .cth-metric-secondary {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
   color: #667085;
   margin-top: 4px;
-  line-height: 1.4;
+  line-height: 18px;
 }
 
 .cth-metric-margin {
@@ -6998,11 +7029,17 @@ body {
 
 /* Interpretation line — status-driven plain-English read, accent color */
 .cth-interpretation {
-  margin-top: 14px;
+  margin-top: 16px;
   font-size: 14px;
   font-weight: 500;
   color: var(--cth-accent);
-  line-height: 1.4;
+  line-height: 20px;
+}
+
+/* Middle-card variant — extra breathing room above the interpretation line */
+.cth-card--inline-stat .cth-interpretation {
+  margin-top: 32px;
+  color: #344054;
 }
 
 /* Right-side mini-stat container */
@@ -7011,32 +7048,33 @@ body {
   text-align: center;
   background: #F9FAFB;
   border: 1px solid #E4E7EC;
-  border-radius: 12px;
-  padding: 10px 14px;
-  min-width: 96px;
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-width: auto;
 }
 
 .cth-stat-number {
   font-size: 18px;
   font-weight: 600;
   color: #344054;
-  line-height: 1.1;
+  line-height: 28px;
 }
 
 .cth-stat-label {
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   color: #667085;
   margin-top: 2px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  line-height: 1.3;
+  line-height: 16px;
 }
 
 @media (max-width: 639px) {
   .cth-body {
     flex-direction: column;
     align-items: stretch;
+    justify-content: flex-start;
   }
   .cth-stat-block {
     margin-top: 12px;

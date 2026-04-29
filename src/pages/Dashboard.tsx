@@ -2418,8 +2418,8 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               }
             />
 
-            <div className="two-col-grid">
-              <CashTrendHero result={cashTrendResult} />
+            <div className="cash-trend-row">
+              <CashTrendHero result={cashTrendResult} negativeMonthsAsSubtitle />
               <CashTrendPlaceholder />
             </div>
 
@@ -3769,6 +3769,19 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               </div>
               <div className="ui-lab-two-col-grid">
                 <DigHereCardMock updated refinedLabels />
+              </div>
+            </div>
+
+            {/* ── Section 13: Cash Trend Hero Card ─────────────────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Cash Trend Hero Card</h3>
+                <p className="ui-lab-section-subtitle">Pattern B macro signal card — 1/3 width, status badge, dominant metric, mini-stat block. Status-driven accent via CSS custom property.</p>
+              </div>
+              <div className="ui-lab-three-col-grid">
+                <CashTrendHero result={cashTrendResult} />
+                <CashTrendHero result={cashTrendResult} negativeMonthsAsSubtitle />
+                <CashTrendPlaceholder />
               </div>
             </div>
 

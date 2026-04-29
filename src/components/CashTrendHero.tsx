@@ -21,6 +21,7 @@ import { formatCompact } from '../lib/utils/formatCompact';
 
 type Props = {
   result: CashTrendResult;
+  negativeMonthsAsSubtitle?: boolean;
 };
 
 const BADGE_BY_STATUS: Record<CashTrendStatus, { label: string; cls: string }> = {
@@ -51,7 +52,7 @@ export function CashTrendPlaceholder() {
   );
 }
 
-export default function CashTrendHero({ result }: Props) {
+export default function CashTrendHero({ result, negativeMonthsAsSubtitle = false }: Props) {
   if (result.noData) {
     return (
       <div className="cth-card cth-card--treading">
@@ -75,35 +76,46 @@ export default function CashTrendHero({ result }: Props) {
   const marginFormatted = formatSignedPct(result.t6mMargin);
   const totalMonths = result.monthlyBars.length || 6;
 
+  const infoTooltip = (
+    <div className="db-tooltip-wrap">
+      <button
+        type="button"
+        className="db-tooltip-btn cth-info-icon"
+        aria-label="Cash Trend explanation"
+      >
+        &#9432;
+      </button>
+      <div role="tooltip" className="db-tooltip-panel is-wide">
+        <ul className="db-tooltip-list">
+          <li>Cash Trend shows whether the business is building cash or operating too close to the edge.</li>
+          <li>If this card shows pressure, look below for cost spikes and efficiency gaps.</li>
+          <li>Net cash shows how much cash the business accumulated in the last 6 complete months. Margin shows that cash as a percent of revenue over the same period.</li>
+        </ul>
+      </div>
+    </div>
+  );
+
   return (
-    <div className={`cth-card cth-card--${status}`}>
+    <div className={`cth-card cth-card--${status}${negativeMonthsAsSubtitle ? ' cth-card--inline-stat' : ''}`}>
 
       {/* ── Header (Pattern B) ────────────────────────────────────────── */}
       <div className="cth-header">
         <div className="cth-header-left">
-          <h3 className="cth-title">Cash Trend</h3>
-          <p className="cth-subtitle">Last 6 complete months</p>
+          <div className="cth-title-row">
+            <h3 className="cth-title">Cash Trend</h3>
+            {negativeMonthsAsSubtitle && infoTooltip}
+          </div>
+          <p className="cth-subtitle">
+            {negativeMonthsAsSubtitle
+              ? `${result.negativeMonthCount} of the last ${totalMonths} months were negative`
+              : 'Last 6 complete months'}
+          </p>
         </div>
         <div className="cth-header-right">
           <span className={`card-status-badge ${badge.cls}`}>
             {badge.label}
           </span>
-          <div className="db-tooltip-wrap">
-            <button
-              type="button"
-              className="db-tooltip-btn cth-info-icon"
-              aria-label="Cash Trend explanation"
-            >
-              &#9432;
-            </button>
-            <div role="tooltip" className="db-tooltip-panel is-wide">
-              <ul className="db-tooltip-list">
-                <li>Cash Trend shows whether the business is building cash or operating too close to the edge.</li>
-                <li>If this card shows pressure, look below for cost spikes and efficiency gaps.</li>
-                <li>Net cash shows how much cash the business accumulated in the last 6 complete months. Margin shows that cash as a percent of revenue over the same period.</li>
-              </ul>
-            </div>
-          </div>
+          {!negativeMonthsAsSubtitle && infoTooltip}
         </div>
       </div>
 
@@ -115,14 +127,16 @@ export default function CashTrendHero({ result }: Props) {
             <span className="cth-metric-noun">net cash</span>
           </div>
           <div className="cth-metric-secondary">
-            6-month cash margin: <span className="cth-metric-margin">{marginFormatted}</span>
+            {negativeMonthsAsSubtitle ? '6-month cumulative profit margin' : '6-month cash margin'}: <span className="cth-metric-margin">{marginFormatted}</span>
           </div>
           <div className="cth-interpretation">{result.interpretation}</div>
         </div>
-        <div className="cth-stat-block">
-          <div className="cth-stat-number">{result.negativeMonthCount} of {totalMonths}</div>
-          <div className="cth-stat-label">negative months</div>
-        </div>
+        {!negativeMonthsAsSubtitle && (
+          <div className="cth-stat-block">
+            <div className="cth-stat-number">{result.negativeMonthCount} of {totalMonths}</div>
+            <div className="cth-stat-label">negative months</div>
+          </div>
+        )}
       </div>
 
     </div>
