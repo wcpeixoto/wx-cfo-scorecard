@@ -127,7 +127,7 @@ export default function CashTrendHero({ result, negativeMonthsAsSubtitle = false
             <span className="cth-metric-noun">net cash</span>
           </div>
           <div className="cth-metric-secondary">
-            {negativeMonthsAsSubtitle ? '6-month cumulative profit margin' : '6-month cash margin'}: <span className="cth-metric-margin">{marginFormatted}</span>
+            6-month cumulative profit margin: <span className="cth-metric-margin">{marginFormatted}</span>
           </div>
           <div className="cth-interpretation">{result.interpretation}</div>
         </div>
