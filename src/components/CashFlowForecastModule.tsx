@@ -343,9 +343,6 @@ export default function CashFlowForecastModule({
     }
   }, []);
 
-  const [horizonMenuOpen, setHorizonMenuOpen] = useState(false);
-  const horizonMenuRef = useRef<HTMLDivElement>(null);
-
   // Add Event modal state
   const [showAddModal, setShowAddModal] = useState(false);
   const [formMonth, setFormMonth] = useState('');
@@ -451,18 +448,6 @@ export default function CashFlowForecastModule({
     setShowAddModal(false);
   }
 
-  useEffect(() => {
-    if (!horizonMenuOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (horizonMenuRef.current && !horizonMenuRef.current.contains(e.target as Node)) {
-        setHorizonMenuOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [horizonMenuOpen]);
-
-  const currentHorizonLabel = forecastRangeOptions.find((o) => o.value === forecastRangeValue)?.label ?? forecastRangeValue;
   const granularity: 'month' | 'week' = forecastRangeMonths < 6 ? 'week' : 'month';
   const startingCashBalance = Number.isFinite(currentCashBalance) ? currentCashBalance : 0;
 
@@ -740,17 +725,22 @@ export default function CashFlowForecastModule({
           const netSign = netChange > 0 ? '+' : netChange < 0 ? '−' : '';
           const netColor = netChange > 0 ? 'is-positive' : netChange < 0 ? 'is-negative' : '';
           return (
-            <div className="forecast-chart-topbar projected-cash-header">
-              <div className="forecast-chart-heading">
-                <h3 className="forecast-chart-title">Projected Cash Balance</h3>
-                <div className="forecast-info-help">
-                  <button type="button" className="forecast-info-icon" aria-label="How this forecast works">&#9432;</button>
-                  <div role="tooltip" className="forecast-info-panel">
-                    <p className="forecast-info-title">How this forecast works</p>
-                    <p className="forecast-info-body">Projected cash balance is based on recent operating cash trends, seasonal patterns from prior years, and the scenario assumptions shown below.</p>
-                    <p className="forecast-info-important"><strong>Important:</strong> This forecast is directional, not exact. Use the sliders if this year is tracking differently than usual.</p>
+            <div className="projected-cash-header">
+              <div className="projected-cash-heading">
+                <div className="projected-cash-title-row">
+                  <h3 className="forecast-chart-title">Projected Cash Balance</h3>
+                  <div className="forecast-info-help">
+                    <button type="button" className="forecast-info-icon" aria-label="How this forecast works">&#9432;</button>
+                    <div role="tooltip" className="forecast-info-panel">
+                      <p className="forecast-info-title">How this forecast works</p>
+                      <p className="forecast-info-body">Projected cash balance is based on recent operating cash trends, seasonal patterns from prior years, and the scenario assumptions shown below.</p>
+                      <p className="forecast-info-important"><strong>Important:</strong> This forecast is directional, not exact. Use the sliders if this year is tracking differently than usual.</p>
+                    </div>
                   </div>
                 </div>
+                {monthlyRangeLabel && (
+                  <p className="projected-cash-date-range">{monthlyRangeLabel}</p>
+                )}
               </div>
               {hasSeries && (
                 <div className="projected-cash-kpi">
@@ -764,45 +754,33 @@ export default function CashFlowForecastModule({
           );
         })()}
 
-        <div className="projected-cash-controls">
-          <div className="timeframe-menu" ref={horizonMenuRef}>
-            <button
-              type="button"
-              className="timeframe-trigger"
-              onClick={() => setHorizonMenuOpen((c) => !c)}
-              aria-haspopup="menu"
-              aria-expanded={horizonMenuOpen}
-            >
-              {currentHorizonLabel} &#9662;
-            </button>
-            {horizonMenuOpen && (
-              <ul className="timeframe-list" role="menu" aria-label="Select forecast horizon">
-                {forecastRangeOptions.map((option) => (
-                  <li key={option.value}>
-                    <button
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={forecastRangeValue === option.value}
-                      className={forecastRangeValue === option.value ? 'is-active' : ''}
-                      onClick={() => { onForecastRangeChange(option.value); setHorizonMenuOpen(false); }}
-                    >
-                      {option.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+        <div className="projected-cash-timeline">
+          <div className="projection-year-pills" role="radiogroup" aria-label="Select forecast horizon">
+            {forecastRangeOptions.map((option) => {
+              const isActive = forecastRangeValue === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={isActive}
+                  className={`projection-year-pill${isActive ? ' is-active' : ''}`}
+                  onClick={() => onForecastRangeChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
           </div>
-          {monthlyRangeLabel && (
-            <p className="projected-cash-range-label">{monthlyRangeLabel}</p>
-          )}
         </div>
 
-        <ProjectedCashBalanceChart
-          data={displaySeries}
-          granularity={granularity}
-          knownEvents={forecastEvents}
-        />
+        <div className="projected-cash-chart-body">
+          <ProjectedCashBalanceChart
+            data={displaySeries}
+            granularity={granularity}
+            knownEvents={forecastEvents}
+          />
+        </div>
 
         <div className="forecast-control-stack" aria-label="What-if controls">
           <div className="forecast-slider-grid forecast-slider-grid--main">

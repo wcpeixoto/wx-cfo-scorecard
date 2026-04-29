@@ -1376,9 +1376,44 @@ body {
   gap: 4px;
 }
 
-/* ── Projected Cash Balance — header KPI + centered timeline control ── */
+/* ── Projected Cash Balance — TailAdmin-aligned analytics card ── */
+
+/* Card shell — 24px padding + 16px radius per UI_CARDS card system */
+.forecast-chart-shell {
+  padding: 24px;
+  border-radius: 16px;
+}
+
+/* Header: title/date left, KPI right */
 .projected-cash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin: 0;
+}
+
+.projected-cash-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.projected-cash-title-row {
+  display: flex;
+  flex-direction: row;
   align-items: center;
+  gap: 6px;
+}
+
+.projected-cash-date-range {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  color: #667085;
+  letter-spacing: 0.01em;
 }
 
 .projected-cash-kpi {
@@ -1414,33 +1449,43 @@ body {
   color: #667085;
 }
 
-.projected-cash-controls {
+/* Centered segmented control above the chart */
+.projected-cash-timeline {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  margin: 4px 0 8px;
+  justify-content: center;
+  margin-top: 12px;
 }
 
-.projected-cash-range-label {
-  margin: 0;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 18px;
-  color: #667085;
-  letter-spacing: 0.01em;
+.projected-cash-timeline .projection-year-pills {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Chart body — give it breathing room from the timeline above */
+.projected-cash-chart-body {
+  margin-top: 16px;
 }
 
 @media (max-width: 767px) {
+  .forecast-chart-shell {
+    padding: 16px;
+  }
   .projected-cash-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 12px;
   }
   .projected-cash-kpi {
     align-items: flex-start;
     text-align: left;
+  }
+  .projected-cash-timeline {
+    /* Allow horizontal scroll if pill row exceeds card width */
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+  .projected-cash-timeline .projection-year-pills {
+    flex-wrap: nowrap;
   }
 }
 
