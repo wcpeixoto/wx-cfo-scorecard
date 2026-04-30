@@ -5112,7 +5112,7 @@ body {
 .ta-page-header { margin-bottom: 24px; }
 .ta-page-title { font-size: 24px; font-weight: 600; color: #101828; }
 .ta-page-subtitle { font-size: 14px; color: #667085; margin-top: 4px; }
-.ta-section { margin-bottom: 32px; }
+.ta-section { margin-bottom: 24px; }
 .ta-section-header { margin-bottom: 12px; }
 .ta-section-title { font-size: 18px; font-weight: 600; color: #101828; }
 .ta-section-body { display: flex; flex-direction: column; gap: 16px; }
@@ -6270,7 +6270,7 @@ body {
 .today-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
 }
 
 .today-header {
@@ -6580,7 +6580,6 @@ body {
 
 /* Today context section */
 .today-context-section {
-  margin-top: 24px;
 }
 
 .today-context-grid {
