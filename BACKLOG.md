@@ -1,7 +1,7 @@
 # Wx CFO Scorecard — Backlog
 
 Source of truth: [Notion database](https://www.notion.so/084420fff00444de9413a542db3dddf0)
-Last synced: 2026-04-29
+Last synced: 2026-04-30
 
 ## How to use this file at session start
 
@@ -29,6 +29,8 @@ Format: `https://www.notion.so/{id-without-hyphens}`
 | Top Expense Categories redesign — dual timeframe | P2 | `34fad9579339811c8a08c88f9dd2564e` | |
 | Add Monthly Revenue and Expenses to Big Picture | P2 | `34fad95793398186958fef3808c44587` | Big Picture shows net cash but not the components driving it. Revenue and expense trend lines add meaningful context. |
 | Owner Distributions explanatory footnote | P2 | `34fad957933981179964ceac6ecb9579` | |
+| Cash Trend chart — timeline toggle | P2 | `352ad957933981f39269f7b5dffcf4fa` | Add a segmented timeline control to the Cash Trend chart (Big Picture). Spec and class system already in place. |
+| Audit and normalize dashboard grid gaps and section spacing | P2 | `352ad9579339815aa98ef17a60ff3905` | Systematic spacing audit across all pages now that the segmented toggle system is locked. Confirm all grids use the responsive gap pattern from UI_RULES.md. |
 
 ---
 
@@ -62,6 +64,8 @@ Format: `https://www.notion.so/{id-without-hyphens}`
 | Hero and secondary pill QA | P1 | `34fad957933981ebb079d1abbc244412` | `aff4491` — Verified all 10 signal × severity states. Fixed: secondary pill right-aligned (flex-end), signal-specific labels (Reserve / Cash Flow / Expenses / Revenue / Owner Draws / On Track) typed against SignalType with severity fallback. Hero labels kept generic. |
 | Mobile layout pass — Today page | P1 | `34fad957933981178366ec239e54191e` | `4a17099` secondary card header row + breakpoints · `de755fa` remove header block, move reserve beside hero · `157ae64` state-based reserve pill + grid breakpoint · `8556b45` compact reserve layout narrow desktop · `5006787` hero title + softening copy removed + reserve label polish. |
 | Projection Table polish | P1 | `34fad957933981e28170e9abc8f61e45` | `4bafb93` Change column · `9ca27e8` header/divider polish · `c96e7c3` segmented Compare toggle · `4c991a6` header controls spacing. Also: Projected Cash Balance card aligned to TailAdmin: `14321ad` `5c8614d` `4b4d7b6` `ea0857f` `bcad92c`. Sidebar renamed Forecast: `e93c355`. |
+| Document standard segmented toggle pattern | P2 | `352ad95793398177b12de79e6a7fffa8` | `14f1d78` / `64d79d6` / `65f39aa` — Spec locked in UI_RULES.md Part 6. Three rounds: initial draft → geometry corrected (rounded-lg/rounded-md) → dimensions corrected (40px/36px/px-3 py-2/weight 500). |
+| Standardize toggle menus to Settings segmented pattern | P2 | `352ad95793398154b6b9d7e873e69e54` | `3566cc6` — 8 toggles migrated across Dashboard.tsx, CashFlowForecastModule.tsx, TrendLineChart.tsx, NetCashFlowChart.tsx. Dead CSS deleted (~2.4 kB). |
 
 ---
 
@@ -83,4 +87,8 @@ Now:
 
 Next P1:
 https://www.notion.so/34fad9579339817d9057c55981b28ec7  ← Big Picture layout review
+
+Next P2 (new this session):
+https://www.notion.so/352ad957933981f39269f7b5dffcf4fa  ← Cash Trend chart timeline toggle
+https://www.notion.so/352ad9579339815aa98ef17a60ff3905  ← Audit and normalize dashboard grid gaps and section spacing
 ```

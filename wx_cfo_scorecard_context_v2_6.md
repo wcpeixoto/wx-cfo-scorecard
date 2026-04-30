@@ -4,7 +4,72 @@
 
 ---
 
-## What Changed Recently (April 30, 2026 — this session)
+## What Changed Recently (April 30, 2026 — afternoon session)
+
+### Segmented toggle standardization — fully shipped
+
+Audited every toggle control in the app. Identified 8 instances using 6
+deprecated, one-off CSS class sets. Replaced all 8 with a single shared
+`.segmented-toggle` / `.segmented-toggle-btn` / `is-active` system.
+Locked the spec in `UI_RULES.md` Part 6.
+
+**Commits (in order):**
+- `14f1d78` — Initial segmented toggle spec added to UI_RULES.md (Part 6)
+- `64d79d6` — Spec corrected: rounded-full → rounded-lg/rounded-md (geometry from TailAdmin ChartTab)
+- `65f39aa` — Spec corrected again: dimensions from TailAdmin Analytics card (40px/36px/px-3 py-2/weight 500 both states)
+- `3566cc6` — Implementation: all 8 toggles migrated; dead CSS deleted (~2.4 kB)
+
+**Toggles replaced (8 total):**
+1. Big Picture — timeframe (6M/12M/YTD/More ▾)
+2. Big Picture — MA window (12W/24W/52W)
+3. Net Cash Flow chart — Operating/Total toggle
+4. Cash Trend chart — Total/Operating toggle
+5. Forecast horizon — 30d/60d/90d/More ▾
+6. Forecast scenario — Base/Best/Worst/Custom (4-button, wrap modifier)
+7. Settings Data tab — method toggle (×2 instances)
+
+**Architecture decisions:**
+- Settings JSX left untouched — `.settings-subnav*` paired in the same CSS
+  rule block as `.segmented-toggle*`. Visual no-op; structural unification.
+- More ▾ triggers (Big Picture + Forecast) get `.segmented-toggle-btn` for
+  visual styling plus their existing dropdown class for positioning behavior.
+- `.segmented-toggle--wrap` modifier added for 4-button scenario toggle:
+  `width:100%; flex-wrap:wrap; height:auto` — mobile-safe without breaking
+  2- and 3-button tracks.
+
+**Dead CSS deleted:**
+`.cashflow-toggle*`, `.kpi-timeframe-toggle*`, `.forecast-scenario-toggle*`,
+`.forecast-timeline-toggle*`, `.forecast-view-toggle*`, `.dig-here-period-toggle*`
+
+**Spec locked in `UI_RULES.md` Part 6 — Segmented toggle (standard pattern):**
+| Property | Value |
+|---|---|
+| Track background | `#F2F4F7` |
+| Track radius | `8px` (rounded-lg) |
+| Track height | `40px` |
+| Track padding | `2px` |
+| Segment radius | `6px` (rounded-md) |
+| Segment height | `36px` |
+| Segment padding | `8px 12px` (py-2 px-3) |
+| Font size | `14px` |
+| Font weight | `500` (both states) |
+| Active bg | `#FFFFFF` |
+| Active color | `#101828` |
+| Active shadow | `0px 1px 2px 0px rgba(16,24,40,0.05)` |
+| Inactive color | `#667085` |
+| Transition | `all 150ms ease` |
+
+**Lesson learned — measure, don't describe:** Initial spec was written from
+verbal description (rounded-full, weight 600 active). Two correction rounds
+were needed before dimensions matched actual production CSS. For future specs:
+inspect computed CSS values directly; never describe from visual impression.
+
+**Working tree:** clean.
+**Active branch:** main.
+
+---
+
+## What Changed Recently (April 30, 2026 — morning session)
 
 ### Card system + spacing normalization — fully shipped
 
@@ -47,7 +112,6 @@ align-items declared explicitly on every card grid.
   in original card audit).
 - Documentation refactor — separate reusable TailAdmin base from Wx CFO
   overlay for portability across projects.
-- Segmented toggle documentation and implementation pass.
 
 **Working tree:** clean (stray .rtf only).
 **Active branch:** main.
