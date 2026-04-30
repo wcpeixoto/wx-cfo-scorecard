@@ -1663,6 +1663,13 @@ If the answer is uncertain, default to CONTENT-DRIVEN. Stretching a card that sh
 |-----|--------|--------|---------------|--------|
 | `today-top-grid` | HeroPriorityCard | OperatingReserveCard | EQUAL-HEIGHT PAIRED | Hero = narrative, Reserve = proof. Designed as one unit. |
 | `cash-trend-row` | Cash Trend signal card | Monthly Net Cash Flow chart | CONTENT-DRIVEN | Chart earns its height. Signal card hugs content. |
+| `two-col-grid` | Big Picture card pairs | Big Picture card pairs | EQUAL-HEIGHT PAIRED | Paired story/evidence cards on Big Picture. Both cards are real data cards designed to be read together. |
+| `trend-charts-pair` | Revenue Trend chart | Expense Trend chart | EQUAL-HEIGHT PAIRED | Two sibling chart cards on Trends page. Equal height is correct — both are charts of the same type. |
+| `forecast-decision-grid` | Decision cards (×3) | Decision cards (×3) | EQUAL-HEIGHT PAIRED | Three sibling forecast decision cards. Equal height maintains visual alignment of the decision row. |
+| `kpi-grid` | KPI tiles (×4) | KPI tiles (×4) | CONTENT-DRIVEN | Four independent KPI tiles. No narrative pairing. Height driven by content. |
+| `today-context-grid` | Context cards | Context cards | CONTENT-DRIVEN | Independent context cards on Today page. No pairing. |
+| `trajectory-grid` | Runway tiles (×3) | Runway tiles (×3) | CONTENT-DRIVEN | Three independent runway tiles. No pairing. |
+| `main-zone` | Page sections | Page sections | CONTENT-DRIVEN | Top-level page wrapper. Sections stack vertically. No height pairing. |
 
 New card pairings must be classified here before implementation.
 

@@ -304,7 +304,8 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 24px;
 }
 
 .top-bar {
@@ -885,7 +886,8 @@ body {
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 16px;
+  align-items: flex-start;
 }
 
 .kpi-card {
@@ -1020,6 +1022,9 @@ body {
   flex-direction: column;
 }
 
+/* SPACING EXCEPTION: gap 24px inside card body — intentional.
+   Donut + legend is a structural layout pair, not a normal card body row.
+   Standard card-body max (12px) does not apply here. */
 .top-categories-layout {
   flex: 1;
   display: flex;
@@ -1128,7 +1133,8 @@ body {
 
 .forecast-cockpit {
   display: grid;
-  gap: 10px;
+  gap: 16px;
+  align-items: flex-start;
 }
 
 .forecast-toolbar {
@@ -1498,7 +1504,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -1583,6 +1589,7 @@ body {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+  align-items: stretch;
 }
 
 .forecast-decision-card {
@@ -1668,7 +1675,7 @@ body {
 .forecast-slider-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px 20px;
+  gap: 16px 20px;
 }
 
 .forecast-slider-grid--main {
@@ -1839,7 +1846,8 @@ body {
 .trajectory-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 16px;
+  align-items: flex-start;
 }
 
 .trajectory-item {
@@ -2431,6 +2439,8 @@ body {
   margin: 0;
 }
 
+/* SPACING EXCEPTION: gap 6px intentional — tight title + info icon pair.
+   Below the 8px grid floor. Approved exception: title+icon is a single visual unit. */
 .chart-title-row {
   display: flex;
   align-items: center;
@@ -2478,7 +2488,7 @@ body {
 .chart-control-row {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
   min-height: 32px;
@@ -2920,14 +2930,15 @@ body {
 .two-col-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
+  align-items: stretch;
 }
 
 /* Cash Trend row — card 1/3, placeholder 2/3 */
 .cash-trend-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-  gap: 14px;
+  gap: 16px;
   align-items: flex-start;
 }
 
@@ -3003,7 +3014,7 @@ body {
 .donut-layout {
   display: grid;
   grid-template-columns: 180px 1fr;
-  gap: 18px;
+  gap: 20px;
   align-items: center;
 }
 
@@ -3069,7 +3080,7 @@ body {
 .stack-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
+  gap: 24px;
 }
 
 .movers-list {
@@ -4138,7 +4149,7 @@ body {
 
 .forecast-events-section {
   margin-top: 1.5rem;
-  padding-top: 1.75rem;
+  padding-top: 1.5rem;
   padding-bottom: 0.75rem;
   border-top: 1px solid var(--line);
 }
@@ -5202,6 +5213,7 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 24px;
+  align-items: flex-start;
 }
 
 @media (max-width: 767px) {
@@ -5214,7 +5226,8 @@ body {
 .ui-lab-three-col-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+  gap: 16px;
+  align-items: flex-start;
 }
 
 @media (max-width: 767px) {
@@ -6538,6 +6551,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+  align-items: flex-start;
 }
 
 @media (max-width: 767px) {
