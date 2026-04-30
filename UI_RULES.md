@@ -809,6 +809,10 @@ track [flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5 dark:bg-gray-900]
 Track: `bg-gray-100 rounded-lg (8px)`, no border. Pill: `rounded-md (6px)`.
 Always in header-right column or above chart. Never below chart.
 
+> **Project note:** Pattern E is the TailAdmin-native ChartTab. For new toggle work in this project,
+> use the standard segmented toggle defined in Part 6 instead. Pattern E is documented here for
+> reference and for understanding existing components — it is not the approved pattern for new work.
+
 ---
 
 ## Pattern F — Radial / Gauge Card
@@ -1030,6 +1034,7 @@ exception section in Part 6 for the full policy.
 9. **Modal state via raw useState.** Use `useModal()`.
 10. **Shadow added to card or panel without justification.** Pattern F is the only valid exception.
 11. **`rounded-md` or `rounded-sm` on cards.** Cards are always `rounded-2xl`.
+12. **Toggle pattern other than the standard segmented control.** For new toggle work, use the pattern defined in Part 6 — Segmented toggle. The ChartTab (Pattern E) and outlined button-group toggles are deprecated for new work and scheduled for replacement in an upcoming implementation pass. They are currently in production and must not be disturbed until that pass runs — but they must not be replicated in any new component.
 
 ---
 
@@ -1178,6 +1183,58 @@ Raw hex is also allowed in src/lib/ui/chartTokens.ts (see Addition 3 below).
 
 If and when this project migrates to Tailwind, this section will be revised.
 Until then, legacy CSS is the only sanctioned implementation path.
+
+---
+
+## Segmented toggle (standard pattern)
+
+A horizontal segmented control for switching between mutually exclusive view modes within a card or page section.
+
+### When to use
+
+Use whenever the user must choose exactly one of 2–5 options that are views of the same data:
+- Timeframe selectors (Last 6 months / Last 12 months / All time)
+- View mode selectors (Operating / Total)
+- Section selectors (Data / Accounts / Rules)
+
+### When not to use
+
+- Multi-select filters — use checkboxes or a multi-select dropdown
+- More than 5 options — use a dropdown
+- A single on/off control — use a Switch (Part 3 — Switch / Toggle)
+- Navigation between pages — use the sidebar
+
+### Visual spec
+
+| Element | Token | Value |
+|---------|-------|-------|
+| Track background | `bg-gray-100` | #F2F4F7 |
+| Track border radius | `rounded-full` | 999px |
+| Track internal padding | `p-0.5` | 2px |
+| Active segment background | `bg-white` | #FFFFFF |
+| Active segment text | `text-gray-900` / `font-medium` | #101828 |
+| Active segment shadow | `shadow-theme-xs` | subtle lift |
+| Active segment border radius | `rounded-full` | 999px |
+| Inactive segment background | none | — |
+| Inactive segment text | `text-gray-500` / `font-medium` | #667085 |
+| Inactive segment hover text | `text-gray-700` | #344054 |
+| Segment padding | `px-4 py-2` | equal on all segments |
+| Font size | `text-theme-sm` | 14px |
+| Layout | single row, horizontal, no wrapping | — |
+
+No border on the track. No shadow on the track. Shadow on the active pill only.
+
+### Reference implementation
+
+The canonical example is the Settings page (`#/settings`) Data / Accounts / Rules control. All new segmented toggles must match this visual treatment exactly.
+
+### Deprecated patterns
+
+The following patterns exist in the codebase and are scheduled for replacement. Do not use them in new work:
+
+- **Chart-style blue pill** — e.g. Operating / Total toggle on Monthly Net Cash Flow. Heavy blue active state, more visually prominent than the standard. Scheduled for replacement.
+- **Outlined button-group toggle** — e.g. This Month / Last Month / Last 3 Months / More on Big Picture. Outlined border per segment, different background treatment. Scheduled for replacement.
+- Any toggle that uses a different visual treatment from the Settings segmented control.
 
 ---
 
