@@ -138,15 +138,115 @@ Every component requires dark variants.
 
 ## Spacing
 
-| Role | Value |
-|------|-------|
-| Page content wrapper | p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6 |
-| Card padding (standard) | p-5 sm:p-6 |
-| Card padding (compact KPI) | p-5 md:p-6 |
-| Chart card (no bottom pad) | px-5 pt-5 sm:px-6 sm:pt-6 |
-| Table card | px-4 pb-3 pt-4 sm:px-6 |
-| Section gap | gap-6 or gap-8 |
-| Grid gap | gap-4 md:gap-6 |
+### Allowed values
+
+Only these pixel values are permitted for gap, padding, and margin.
+Values outside this set are off-grid and must not be used.
+
+| px | Tailwind | Typical use |
+|----|----------|-------------|
+| 2px | gap-0.5 / p-0.5 | Toggle track internal only |
+| 4px | gap-1 | Inline metadata, dot-to-label |
+| 8px | gap-2 | Tight inline pairs |
+| 12px | gap-3 / py-3 | Inner element rows, table cell vertical |
+| 16px | gap-4 / p-4 | Grid gap mobile, table card top padding |
+| 20px | gap-5 / p-5 | Card padding mobile, header internal gap |
+| 24px | gap-6 / p-6 | Grid gap desktop, card padding desktop, header→body margin |
+| 32px | gap-8 / py-8 | Section gap generous, sidebar logo vertical |
+| 44px | pb-11 | Gauge card bottom only (chart overflow) — exception |
+
+Any value not in this table is off-grid. Flag in code review.
+
+---
+
+### Page and layout level
+
+**Page content wrapper** *(TailAdmin observed)*
+`p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6` — 16px mobile, 24px desktop.
+
+**Page grid** *(TailAdmin observed)*
+`grid grid-cols-12 gap-4 md:gap-6` — 16px mobile, 24px desktop.
+`align-items` is not declared — browser default `normal` (stretch) applies.
+
+**Vertical rhythm between sections** *(TailAdmin observed)*
+TailAdmin uses `space-y-6` (24px) between sibling blocks inside a column.
+This project uses `margin-top` instead — functionally equivalent.
+Either is acceptable. Do not mix both on the same page or section level.
+Never use `gap` on a parent grid for vertical rhythm between sections —
+`gap` on a grid interacts with child height; `space-y-*` and `margin-top` do not.
+
+---
+
+### Card padding
+
+*(TailAdmin observed — confirmed via DevTools)*
+
+| Card type | Class | Mobile | Desktop |
+|-----------|-------|--------|---------|
+| Standard card | `p-5 sm:p-6` | 20px | 24px |
+| Chart card (no bottom pad) | `px-5 pt-5 sm:px-6 sm:pt-6` | 20px sides/top | 24px sides/top |
+| Table card root | `pt-4` only | 16px top, 0 sides | 16px top, 0 sides |
+| Table card inner header | `px-6` | 24px sides | 24px sides |
+
+Table card uses intentionally asymmetric padding — `pt-4` on root,
+horizontal padding pushed into the inner header child. This is TailAdmin-native.
+Do not normalize it to uniform padding.
+
+---
+
+### Card internal spacing
+
+*(TailAdmin observed)*
+
+| Element | Class | Value |
+|---------|-------|-------|
+| Header → body margin | `mb-6` on header row | 24px |
+| Header internal gap | `gap-5` | 20px |
+| Inner element rows | `gap-3` | 12px |
+| Sub-list vertical rhythm | `space-y-5` | 20px |
+| Table cell vertical | `py-3` | 12px |
+
+---
+
+### Grid gap
+
+*(TailAdmin observed — confirmed via DevTools)*
+
+Standard: `gap-4 md:gap-6` — 16px mobile, 24px desktop.
+Apply to every grid that holds cards. Never use a fixed gap without a responsive variant.
+
+Exception: rows with 3+ columns may keep `gap-4` at desktop to prevent overcrowding.
+
+---
+
+### align-items on grids
+
+TailAdmin never declares `align-items` on grid containers — it relies on the
+browser default `normal` (which resolves to stretch in a grid context).
+
+**Wx CFO rule:** Every grid or flex row that holds cards must declare
+`align-items` explicitly. Do not rely on the browser default.
+
+| Intent | Rule |
+|--------|------|
+| Cards hug their own content | `align-items: flex-start` |
+| Cards match each other's height | `align-items: stretch` |
+
+See `UI_CARDS.md` — Card Height & Pairing Behavior for classification criteria.
+
+TailAdmin relies on default stretch. Wx CFO does not.
+
+---
+
+### What not to do
+
+- Do not use off-grid values (14px, 18px, 28px) — these are drift, not decisions
+- Do not use `gap` on a parent grid for vertical rhythm — use `space-y-*` or `margin-top`
+- Do not mix `space-y-*` and `margin-top` at the same page or section level
+- Do not leave `align-items` undeclared on any grid or flex row that holds cards
+- Do not normalize table card padding to uniform — the asymmetric pattern is intentional
+- Do not use `gap-6` or larger inside a card body — that is a section-level value
+- Do not use the same gap value for outer grid and inner nested grid
 
 ---
 
