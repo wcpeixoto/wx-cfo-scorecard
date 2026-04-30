@@ -1139,7 +1139,7 @@ body {
 
 .forecast-cockpit {
   display: grid;
-  gap: 16px;
+  gap: 24px;
   align-items: flex-start;
 }
 
@@ -5113,7 +5113,7 @@ body {
 .ta-page-title { font-size: 24px; font-weight: 600; color: #101828; }
 .ta-page-subtitle { font-size: 14px; color: #667085; margin-top: 4px; }
 .ta-section { margin-bottom: 24px; }
-.ta-section-header { margin-bottom: 12px; }
+.ta-section-header { margin-bottom: 16px; }
 .ta-section-title { font-size: 18px; font-weight: 600; color: #101828; }
 .ta-section-body { display: flex; flex-direction: column; gap: 16px; }
 .ta-card { background: #FFFFFF; border: 1px solid #E4E7EC; border-radius: 16px; padding: 24px; }
@@ -5578,7 +5578,7 @@ body {
 
 .app-main-column .main-zone {
   width: min(1420px, 100% - 48px);
-  margin: 16px auto 24px;
+  margin: 24px auto 24px;
   padding: 0;
 }
 
