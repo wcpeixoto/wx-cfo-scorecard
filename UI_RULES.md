@@ -1209,20 +1209,22 @@ Use whenever the user must choose exactly one of 2–5 options that are views of
 | Element | Token | Value |
 |---------|-------|-------|
 | Track background | `bg-gray-100` | #F2F4F7 |
-| Track border radius | `rounded-full` | 999px |
+| Track border radius | `rounded-lg` | 8px |
 | Track internal padding | `p-0.5` | 2px |
 | Active segment background | `bg-white` | #FFFFFF |
-| Active segment text | `text-gray-900` / `font-medium` | #101828 |
+| Active segment text | `text-gray-900` / `font-semibold` | #101828, weight 600 |
 | Active segment shadow | `shadow-theme-xs` | subtle lift |
-| Active segment border radius | `rounded-full` | 999px |
+| Active segment border radius | `rounded-md` | 6px |
 | Inactive segment background | none | — |
-| Inactive segment text | `text-gray-500` / `font-medium` | #667085 |
+| Inactive segment text | `text-gray-500` / `font-medium` | #667085, weight 500 |
 | Inactive segment hover text | `text-gray-700` | #344054 |
 | Segment padding | `px-4 py-2` | equal on all segments |
 | Font size | `text-theme-sm` | 14px |
 | Layout | single row, horizontal, no wrapping | — |
 
 No border on the track. No shadow on the track. Shadow on the active pill only.
+
+This matches the TailAdmin ChartTab geometry. Part 6 codifies it as the Wx CFO standard for all segmented toggles.
 
 ### Reference implementation
 
