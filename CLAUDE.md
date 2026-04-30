@@ -427,6 +427,8 @@ Documentation files that must stay in sync with the Claude project:
 - `UI_CARDS.md`
 - `CLAUDE.md`
 - `wx_cfo_scorecard_context_v2_6.md`
+- UI_Verification_Rules.md
+
 
 Checklist before closing any session that touched doc files:
 □ Re-upload changed .md files to the Claude project (claude.ai → project → files)
