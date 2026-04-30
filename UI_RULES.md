@@ -212,10 +212,34 @@ Do not normalize it to uniform padding.
 
 *(TailAdmin observed — confirmed via DevTools)*
 
-Standard: `gap-4 md:gap-6` — 16px mobile, 24px desktop.
-Apply to every grid that holds cards. Never use a fixed gap without a responsive variant.
+**Card grid standard: `gap-4 md:gap-6`** — 16px mobile, 24px desktop.
 
-Exception: rows with 3+ columns may keep `gap-4` at desktop to prevent overcrowding.
+This responsive pattern is mandatory for every grid that holds cards. A fixed
+`gap: 16px` without a desktop breakpoint is not acceptable — it applies mobile
+sizing at every viewport width and produces gaps that are too tight on desktop.
+
+**TailAdmin uses equal horizontal and vertical gaps.** Do not split row-gap and
+column-gap to different values on card grids. The single `gap-*` value applies
+to both axes uniformly.
+
+**Two distinct gap categories — do not confuse them:**
+
+| Category | Value | Use |
+|----------|-------|-----|
+| Card grids (cards as children) | `gap-4 md:gap-6` (16→24px) | Required for any grid holding card components |
+| Dense internal layouts (form rows, toolbars, button groups, tile clusters) | `gap-2`, `gap-3`, or fixed `gap-4` | Internal mechanics — do not need responsive expansion |
+
+A card grid is any grid whose direct children are card-level components
+(`.card`, `.kpi-card`, `.cth-card`, `.today-secondary-card`, etc.).
+A dense internal layout is everything else — form input rows, toolbar control
+strips, button groups, summary tile clusters, etc.
+
+**Exception:** rows with 3+ card columns may keep `gap-4` at desktop to prevent
+overcrowding when card content is text-heavy. Document the exception in code
+with a comment when used.
+
+**Verification:** every card grid must compute to 24px gap at desktop width.
+Test with DevTools at viewport ≥768px before considering a grid layout complete.
 
 ---
 
