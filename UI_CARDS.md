@@ -1584,3 +1584,94 @@ For CashTrendHero, the story is:
 > But the cumulative margin is too thin to absorb a bad month.
 
 The UI should make that story obvious, compact, and calm.
+
+---
+
+## Card Height & Pairing Behavior
+
+This section governs how cards behave in height when placed alongside other cards in a grid or flex row.
+These rules exist because two categories of card pairings require opposite height strategies. Applying the wrong strategy produces either a card that stretches to an unnatural height, or a paired unit that looks disconnected.
+
+**Height behavior must be decided at the row/layout level first. Do not start by forcing individual cards with `height`, `min-height`, or `height: 100%`.**
+
+---
+
+### The two pairing categories
+
+#### CONTENT-DRIVEN
+
+The card's height is determined by its own content. It does not stretch to match a neighbor.
+Use when the card is a compact signal, KPI, or summary sitting beside a larger chart or unrelated card.
+
+```css
+/* Parent row */
+.row-class {
+  align-items: flex-start;
+}
+
+/* Card itself — only if inspection shows forced height exists */
+.card-class {
+  height: auto;
+  min-height: 0;
+}
+```
+
+Rule: never force a compact signal card to match the height of a chart card. The chart earns its height. The signal card hugs its content.
+
+---
+
+#### EQUAL-HEIGHT PAIRED
+
+Both cards stretch to match each other because they are intentionally paired as one narrative unit — one card is the claim, the other is the evidence.
+Use when two real data cards are designed to be read together as a single story.
+
+```css
+/* Parent row */
+.row-class {
+  align-items: stretch;
+}
+
+/* Children */
+.row-class > * {
+  height: 100%;
+}
+```
+
+Rule: when using equal-height pairing, the internal layout of each card must be verified. Stretching will expose empty space if the card's inner content is not designed to fill height.
+
+---
+
+### Classification criteria
+
+Before assigning a category, answer these two questions:
+
+1. **Are both cards real data cards intentionally designed to be read as a pair?**
+   YES → EQUAL-HEIGHT PAIRED
+   NO → CONTENT-DRIVEN
+
+2. **Is one card a chart and the other a compact signal or summary?**
+   YES → CONTENT-DRIVEN, always. Never equalize.
+   NO → evaluate question 1.
+
+If the answer is uncertain, default to CONTENT-DRIVEN. Stretching a card that should not stretch is usually more visually damaging than letting a paired card sit at its natural height.
+
+---
+
+### Known classified pairings
+
+| Row | Card A | Card B | Classification | Reason |
+|-----|--------|--------|---------------|--------|
+| `today-top-grid` | HeroPriorityCard | OperatingReserveCard | EQUAL-HEIGHT PAIRED | Hero = narrative, Reserve = proof. Designed as one unit. |
+| `cash-trend-row` | Cash Trend signal card | Monthly Net Cash Flow chart | CONTENT-DRIVEN | Chart earns its height. Signal card hugs content. |
+
+New card pairings must be classified here before implementation.
+
+---
+
+### What not to do
+
+- Do not apply `height: 100%` to all grid children as a default.
+- Do not use `min-height` on cards to approximate a desired height.
+- Do not equalize height between a placeholder card and a real data card.
+- Do not let a placeholder drive the height of a real card.
+- Do not assume equal-height is the safe default. Content-driven is the safe default.

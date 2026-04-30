@@ -17,7 +17,8 @@ When two documents conflict, follow this order:
 
 1. `wx_cfo_scorecard_context_v2_6.md` — system behavior, data, architecture
 2. `UI_RULES.md` — all visual decisions
-3. `CLAUDE.md` — execution rules and workflow discipline
+3. `UI_CARDS.md` — card anatomy, height behavior, pairing classification
+4. `CLAUDE.md` — execution rules and workflow discipline
 
 If a rule appears in two places and they disagree, the higher document wins.
 Update the lower document to match — do not leave contradictions in place.
@@ -32,7 +33,8 @@ Before doing any work, read these files in order:
    data layer, forecast engine, locked parameters, and queued roadmap.
    **Today page V1 is shipped** (Phase 4.10d–f complete).
 2. `UI_RULES.md` — visual standard reference, must be read before any UI work
-3. This file (`CLAUDE.md`) — project rules, stack, and working discipline
+3. `UI_CARDS.md` — card anatomy, height behavior, pairing classification
+4. This file (`CLAUDE.md`) — project rules, stack, and working discipline
 
 For any UI work, also check the TailAdmin source at:
 `code/Code Supporting Docs/free-react-tailwind-admin-dashboard-main/`
@@ -412,3 +414,25 @@ constructor, not an ISO string (`new Date('YYYY-MM-DD')`). ISO strings parse
 as UTC midnight, which in US timezones resolves to the previous day via
 `getMonth()`, shifting the analysis window one month early and producing
 wrong results silently.
+
+---
+
+## Session close discipline
+
+Any session that commits a change to a documentation file in the repo root
+must re-upload that file to the Claude project before closing.
+
+Documentation files that must stay in sync with the Claude project:
+- `UI_RULES.md`
+- `UI_CARDS.md`
+- `CLAUDE.md`
+- `wx_cfo_scorecard_context_v2_6.md`
+
+Checklist before closing any session that touched doc files:
+□ Re-upload changed .md files to the Claude project (claude.ai → project → files)
+□ Confirm Claude project files match repo state
+□ Do not close the session until the upload is confirmed
+
+Why this exists: Claude project files are snapshots, not live repo files.
+Every commit that changes a doc file makes the Claude project stale.
+Stale project files cause Claude to read outdated specs and produce wrong guidance.
