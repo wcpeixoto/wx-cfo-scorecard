@@ -295,17 +295,17 @@ export default function NetCashFlowChart({
           <p className="subtle chart-head-subtitle">{subtitle}</p>
         </div>
         <div className="chart-head-middle" role="group" aria-label="Cash Flow mode selector">
-          <div className="cashflow-toggle">
+          <div className="segmented-toggle">
             <button
               type="button"
-              className={cashFlowMode === 'operating' ? 'is-active' : ''}
+              className={`segmented-toggle-btn${cashFlowMode === 'operating' ? ' is-active' : ''}`}
               onClick={() => onCashFlowModeChange?.('operating')}
             >
               Operating
             </button>
             <button
               type="button"
-              className={cashFlowMode === 'total' ? 'is-active' : ''}
+              className={`segmented-toggle-btn${cashFlowMode === 'total' ? ' is-active' : ''}`}
               onClick={() => onCashFlowModeChange?.('total')}
             >
               Total

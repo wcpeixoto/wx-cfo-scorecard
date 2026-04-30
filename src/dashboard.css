@@ -465,7 +465,7 @@ body {
   }
 }
 
-.top-controls-timeframe .kpi-timeframe-toggle {
+.top-controls-timeframe .segmented-toggle {
   flex-wrap: nowrap;
 }
 
@@ -482,35 +482,6 @@ body {
   justify-items: end;
 }
 
-.dig-here-period-toggle {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  background: #edf3ff;
-  border: 1px solid #d5e2f6;
-  border-radius: 12px;
-  padding: 3px;
-}
-
-.dig-here-period-toggle button {
-  border: none;
-  background: transparent;
-  color: #4e6076;
-  border-radius: 9px;
-  padding: 7px 10px;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.78rem;
-  min-width: 50px;
-}
-
-.dig-here-period-toggle button.is-active {
-  background: #ffffff;
-  color: #1d3f84;
-  font-weight: 700;
-  box-shadow: 0 2px 10px rgba(31, 58, 107, 0.1);
-}
-
 .top-controls input {
   width: 100%;
   border: 1px solid #d4dff1;
@@ -521,64 +492,10 @@ body {
   font: inherit;
 }
 
-.kpi-timeframe-toggle {
-  display: inline-flex;
-  flex-wrap: nowrap;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 6px;
-  background: #edf3ff;
-  border: 1px solid #d5e2f6;
-  border-radius: 12px;
-  padding: 5px;
-}
-
-.kpi-timeframe-toggle button {
-  border: none;
-  background: transparent;
-  color: #4e6076;
-  border-radius: 9px;
-  height: 36px;
-  padding: 8px 14px;
-  cursor: pointer;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.2px;
-  min-width: 0;
-  flex: 0 0 auto;
-}
-
-.kpi-timeframe-toggle button.is-active {
-  background: #ffffff;
-  color: #1d3f84;
-  font-weight: 700;
-  box-shadow: 0 2px 10px rgba(31, 58, 107, 0.1);
-}
-
-.kpi-timeframe-toggle .timeframe-trigger {
-  height: 36px;
-  min-height: 36px;
-  min-width: 0;
-  flex: 0 0 auto;
-  border-radius: 9px;
-  background: transparent;
-  border: none;
-  color: #4e6076;
-  padding: 8px 14px;
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.2px;
-}
-
-.kpi-timeframe-toggle .timeframe-trigger.is-active {
-  background: #ffffff;
-  color: #1d3f84;
-  font-weight: 700;
-  box-shadow: 0 2px 10px rgba(31, 58, 107, 0.1);
-}
-
-.kpi-timeframe-toggle .timeframe-list {
+/* Big Picture timeframe — More ▾ dropdown panel anchors below the
+   segmented track. The trigger button itself uses .segmented-toggle-btn
+   for visual styling; this rule positions the popover. */
+.segmented-toggle .timeframe-list {
   top: calc(100% + 8px);
 }
 
@@ -607,48 +524,6 @@ body {
   padding: 0 10px;
   font: inherit;
   color: #2a415f;
-}
-
-.cashflow-toggle-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.chart-cashflow-toggle-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.cashflow-toggle {
-  display: inline-flex;
-  background: #edf3ff;
-  border: 1px solid #d5e2f6;
-  border-radius: 12px;
-  padding: 3px;
-  gap: 4px;
-}
-
-.cashflow-toggle button {
-  border: none;
-  background: transparent;
-  color: #4e6076;
-  border-radius: 9px;
-  padding: 7px 10px;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.78rem;
-  white-space: nowrap;
-}
-
-.cashflow-toggle button.is-active {
-  background: #ffffff;
-  color: #1d3f84;
-  font-weight: 700;
-  box-shadow: 0 2px 10px rgba(31, 58, 107, 0.1);
 }
 
 .cashflow-tooltip {
@@ -1158,53 +1033,15 @@ body {
   flex-wrap: wrap;
 }
 
-.forecast-view-toggle,
-.forecast-scenario-toggle,
-.forecast-timeline-toggle {
-  display: inline-flex;
-  flex-wrap: nowrap;
-  width: fit-content;
-  gap: 6px;
-  border: 1px solid #d5e2f6;
-  border-radius: 12px;
-  padding: 5px;
-  background: #edf3ff;
-}
-
-.forecast-view-toggle button,
-.forecast-scenario-toggle button,
-.forecast-timeline-toggle button {
-  border: none;
-  border-radius: 9px;
-  background: transparent;
-  color: #4e6076;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.2px;
-  height: 36px;
-  padding: 8px 14px;
-  cursor: pointer;
-  flex: 0 0 auto;
-}
-
-.forecast-view-toggle button.is-active,
-.forecast-scenario-toggle button.is-active,
-.forecast-timeline-toggle button.is-active {
-  background: #ffffff;
-  color: #1d3f84;
-  font-weight: 700;
-  box-shadow: 0 2px 10px rgba(31, 58, 107, 0.1);
-}
-
-/* More dropdown — wrapper sits inline within the segmented track,
-   the popover anchors below the trigger via shared .timeframe-list styles. */
-.forecast-timeline-toggle .forecast-timeline-more {
+/* Forecast horizon toggle — More ▾ dropdown wrapper. The trigger button
+   uses .segmented-toggle-btn for visual styling; this rule positions the
+   wrapper inline within the segmented track. */
+.segmented-toggle .forecast-timeline-more {
   position: relative;
   display: inline-flex;
   flex: 0 0 auto;
 }
-.forecast-timeline-toggle .forecast-timeline-more-trigger {
+.forecast-timeline-more-trigger {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -5951,7 +5788,14 @@ body {
   margin-bottom: 24px;
 }
 
-/* Segmented control track — matches TailAdmin ChartTab */
+/* Segmented toggle — Wx CFO standard pattern.
+   Dimensions match the TailAdmin Analytics card
+   Monthly/Quarterly/Annually toggle. Do not deviate.
+   See UI_RULES.md Part 6 — Segmented toggle (standard pattern).
+   .settings-subnav is the original Settings page consumer; .segmented-toggle
+   is the shared class used by every other replaced toggle. Visual rules
+   are identical — keep them paired in this block. */
+.segmented-toggle,
 .settings-subnav {
   display: inline-flex;
   align-items: center;
@@ -5959,18 +5803,19 @@ body {
   background: #F2F4F7;
   border-radius: 8px;
   padding: 2px;
-  min-height: 44px;
-  /* no border on track — matches TailAdmin ChartTab */
+  height: 40px;
+  /* no border on track — matches TailAdmin Analytics card */
 }
 
-/* Button base */
+/* Button base — 36px tall, 12px horizontal padding, weight 500 */
+.segmented-toggle-btn,
 .settings-subnav-btn {
   border: none;
   background: transparent;
   color: #667085;
   border-radius: 6px;
-  min-height: 38px;
-  padding: 0 18px;
+  height: 36px;
+  padding: 8px 12px;
   font: inherit;
   font-size: 14px;
   font-weight: 500;
@@ -5978,15 +5823,16 @@ body {
   transition: all 150ms ease;
   white-space: nowrap;
 }
+.segmented-toggle-btn:hover,
 .settings-subnav-btn:hover {
   color: #344054;
 }
 
-/* Active button — matches TailAdmin ChartTab active state */
+/* Active button — weight stays 500 (matches TailAdmin Analytics card) */
+.segmented-toggle-btn.is-active,
 .settings-subnav-btn.is-active {
   background: #FFFFFF;
   color: #101828;
-  font-weight: 600;
   box-shadow: 0px 1px 2px 0px rgba(16, 24, 40, 0.05);
 }
 
@@ -6174,22 +6020,24 @@ body {
 /* Mobile: constrain toggle buttons so they don't overflow at 375px */
 @media (max-width: 767px) {
   /* Trends page — MA window selector */
-  .kpi-timeframe-toggle {
+  .kpi-timeframe-control .segmented-toggle {
     width: 100%;
   }
-  .kpi-timeframe-toggle button {
+  .kpi-timeframe-control .segmented-toggle-btn {
     flex: 1;
     font-size: 0.75rem;
     padding: 6px 4px;
     text-align: center;
   }
 
-  /* What-If page — scenario selector (4 buttons, wrap to 2×2) */
-  .forecast-scenario-toggle {
+  /* Segmented toggle wrap modifier — used by 4-button toggles
+     that should wrap to 2×2 on narrow viewports (Forecast scenario). */
+  .segmented-toggle--wrap {
     width: 100%;
     flex-wrap: wrap;
+    height: auto;
   }
-  .forecast-scenario-toggle button {
+  .segmented-toggle--wrap .segmented-toggle-btn {
     flex: 1 1 40%;
     text-align: center;
   }
@@ -6202,10 +6050,12 @@ body {
     gap: 8px;
   }
 
-  /* Settings page — segmented toggle fills viewport width */
+  /* Segmented toggle — fills viewport width on mobile (covers both shared classes) */
+  .segmented-toggle,
   .settings-subnav {
     width: 100%;
   }
+  .segmented-toggle-btn,
   .settings-subnav-btn {
     flex: 1;
     min-width: 0;
@@ -6251,13 +6101,13 @@ body {
     flex-wrap: wrap;
   }
 
-  /* Settings — Rules tab: cashflow-toggle expands to fill the control area */
-  .rules-row-control .cashflow-toggle {
+  /* Settings — Rules tab: segmented toggle expands to fill the control area */
+  .rules-row-control .segmented-toggle {
     display: flex;
     width: 100%;
     max-width: 100%;
   }
-  .rules-row-control .cashflow-toggle button {
+  .rules-row-control .segmented-toggle-btn {
     flex: 1 1 0;
     min-width: 0;
     white-space: normal;

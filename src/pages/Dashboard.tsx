@@ -2260,12 +2260,12 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
             <div className="top-controls top-controls-timeframe">
               {activeTab === 'where-to-focus' ? null : activeTab === 'trends' ? (
                 <div className="kpi-timeframe-control">
-                  <div className="kpi-timeframe-toggle" role="group" aria-label="Moving average window selector">
+                  <div className="segmented-toggle" role="group" aria-label="Moving average window selector">
                     {TRENDS_MA_OPTIONS.map((option) => (
                       <button
                         key={option.value}
                         type="button"
-                        className={trendsMaWindow === option.value ? 'is-active' : ''}
+                        className={`segmented-toggle-btn${trendsMaWindow === option.value ? ' is-active' : ''}`}
                         onClick={() => setTrendsMaWindow(option.value)}
                       >
                         {option.label}
@@ -2275,12 +2275,12 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 </div>
               ) : (
                 <div className="kpi-timeframe-control">
-                  <div className="kpi-timeframe-toggle" role="group" aria-label="KPI timeframe selector">
+                  <div className="segmented-toggle" role="group" aria-label="KPI timeframe selector">
                     {BIG_PICTURE_VISIBLE_FRAME_OPTIONS.map((option) => (
                       <button
                         key={option.value}
                         type="button"
-                        className={kpiTimeframe === option.value ? 'is-active' : ''}
+                        className={`segmented-toggle-btn${kpiTimeframe === option.value ? ' is-active' : ''}`}
                         onClick={() => {
                           setKpiTimeframe(option.value);
                           setIsBigPictureFilterOpen(false);
@@ -2292,7 +2292,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                     <div className="timeframe-menu" ref={bigPictureFilterMenuRef}>
                       <button
                         type="button"
-                        className="timeframe-trigger"
+                        className="segmented-toggle-btn timeframe-trigger"
                         onClick={() => setIsBigPictureFilterOpen((current) => !current)}
                         aria-haspopup="menu"
                         aria-expanded={isBigPictureFilterOpen}
@@ -2665,7 +2665,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 </p>
               </div>
               <div className="top-controls top-controls-timeframe">
-                <div className="forecast-scenario-toggle" role="group" aria-label="Forecast scenario">
+                <div className="segmented-toggle segmented-toggle--wrap" role="group" aria-label="Forecast scenario">
                   {(
                     [
                       { key: 'base' as ForecastScenarioKey, label: 'Base Case' },
@@ -2677,7 +2677,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                     <button
                       key={option.key}
                       type="button"
-                      className={selectedScenarioKey === option.key ? 'is-active' : ''}
+                      className={`segmented-toggle-btn${selectedScenarioKey === option.key ? ' is-active' : ''}`}
                       onClick={() => setSelectedScenarioKey(option.key)}
                     >
                       {option.label}
@@ -3588,17 +3588,17 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                             </span>
                           </div>
                           <div className="rules-row-control rules-row-control--col">
-                            <div className="cashflow-toggle">
+                            <div className="segmented-toggle">
                               <button
                                 type="button"
-                                className={businessRules.safetyReserveMethod === 'monthly' ? 'is-active' : ''}
+                                className={`segmented-toggle-btn${businessRules.safetyReserveMethod === 'monthly' ? ' is-active' : ''}`}
                                 onClick={() => updateBusinessRules({ safetyReserveMethod: 'monthly' })}
                               >
                                 1 month of expenses
                               </button>
                               <button
                                 type="button"
-                                className={businessRules.safetyReserveMethod === 'fixed' ? 'is-active' : ''}
+                                className={`segmented-toggle-btn${businessRules.safetyReserveMethod === 'fixed' ? ' is-active' : ''}`}
                                 onClick={() => updateBusinessRules({ safetyReserveMethod: 'fixed' })}
                               >
                                 Fixed amount
@@ -3646,17 +3646,17 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                             </span>
                           </div>
                           <div className="rules-row-control">
-                            <div className="cashflow-toggle">
+                            <div className="segmented-toggle">
                               <button
                                 type="button"
-                                className={!businessRules.suppressDuplicateWarnings ? 'is-active' : ''}
+                                className={`segmented-toggle-btn${!businessRules.suppressDuplicateWarnings ? ' is-active' : ''}`}
                                 onClick={() => updateBusinessRules({ suppressDuplicateWarnings: false })}
                               >
                                 Show duplicate warnings
                               </button>
                               <button
                                 type="button"
-                                className={businessRules.suppressDuplicateWarnings ? 'is-active' : ''}
+                                className={`segmented-toggle-btn${businessRules.suppressDuplicateWarnings ? ' is-active' : ''}`}
                                 onClick={() => updateBusinessRules({ suppressDuplicateWarnings: true })}
                               >
                                 Suppress for full imports

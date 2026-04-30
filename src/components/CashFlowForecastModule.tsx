@@ -792,7 +792,7 @@ export default function CashFlowForecastModule({
               </div>
               <div className="projected-cash-timeline">
                 <div
-                  className="forecast-scenario-toggle forecast-timeline-toggle"
+                  className="segmented-toggle"
                   role="radiogroup"
                   aria-label="Select forecast horizon"
                 >
@@ -806,7 +806,7 @@ export default function CashFlowForecastModule({
                         type="button"
                         role="radio"
                         aria-checked={isActive}
-                        className={isActive ? 'is-active' : ''}
+                        className={`segmented-toggle-btn${isActive ? ' is-active' : ''}`}
                         onClick={() => onForecastRangeChange(val)}
                       >
                         {FORECAST_RANGE_SHORT_LABELS[val] ?? opt.label}
@@ -816,7 +816,7 @@ export default function CashFlowForecastModule({
                   <div className="forecast-timeline-more timeframe-menu" ref={moreMenuRef}>
                     <button
                       type="button"
-                      className={`forecast-timeline-more-trigger${moreSelected ? ' is-active' : ''}`}
+                      className={`segmented-toggle-btn forecast-timeline-more-trigger${moreSelected ? ' is-active' : ''}`}
                       aria-haspopup="menu"
                       aria-expanded={moreMenuOpen}
                       onClick={() => setMoreMenuOpen((c) => !c)}
