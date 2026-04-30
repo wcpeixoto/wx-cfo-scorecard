@@ -358,7 +358,7 @@ export default function NetCashFlowChart({
           </div>
         </div>
       </div>
-      <div style={{ padding: '0 8px 8px' }}>
+      <div className="net-cash-flow-chart-body">
         <ReactApexChart options={options} series={series} type="line" height={310} />
       </div>
     </article>

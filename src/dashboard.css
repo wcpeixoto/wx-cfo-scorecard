@@ -858,9 +858,9 @@ body {
 .card {
   background: var(--bg-panel);
   border: 1px solid var(--line);
-  border-radius: 24px;
+  border-radius: 16px;
   box-shadow: var(--shadow-card);
-  padding: 16px;
+  padding: 24px;
 }
 
 .card-head {
@@ -2419,6 +2419,10 @@ body {
   overflow: hidden;
 }
 
+.net-cash-flow-chart-body {
+  padding: 0 8px 8px;
+}
+
 .chart-head {
   align-items: flex-start;
 }
@@ -2924,6 +2928,7 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 14px;
+  align-items: flex-start;
 }
 
 @media (max-width: 767px) {
@@ -6388,6 +6393,7 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
+  align-items: stretch;
 }
 
 .today-secondary-row.is-pair {
