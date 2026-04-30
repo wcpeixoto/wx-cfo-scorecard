@@ -1777,7 +1777,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
       metricToCard('income', 'Revenue', selectedKpiComparison.revenue),
       metricToCard('expense', 'Expenses', selectedKpiComparison.expenses),
       metricToCard('net', 'Net Cash Flow', selectedKpiComparison.netCashFlow),
-      metricToCard('savingsRate', 'Savings Rate', selectedKpiComparison.savingsRate),
+      metricToCard('savingsRate', 'Profit Margin', selectedKpiComparison.savingsRate),
     ];
   }, [selectedKpiComparison, model.kpiCards]);
 
@@ -2634,7 +2634,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                     <th>Revenue</th>
                     <th>Expenses</th>
                     <th>Net Cash Flow</th>
-                    <th>Savings Rate</th>
+                    <th>Profit Margin</th>
                     <th>Txns</th>
                   </tr>
                 </thead>
