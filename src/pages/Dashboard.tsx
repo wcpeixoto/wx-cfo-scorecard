@@ -3835,6 +3835,24 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               </div>
             </div>
 
+            {/* ── Section 14: Cash Trend + Monthly Net Cash Flow ─────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Cash Trend + Monthly Net Cash Flow</h3>
+                <p className="ui-lab-section-subtitle">Asymmetric row — Cash Trend hero (1/3) left, Monthly Net Cash Flow chart (2/3) right. Live data.</p>
+              </div>
+              <div className="ui-lab-one-two-grid">
+                <CashTrendHero result={cashTrendResult} negativeMonthsAsSubtitle />
+                <NetCashFlowChart
+                  data={netCashFlowChartModel.trend}
+                  cashFlowMode={netCashFlowChartMode}
+                  timeframe={netChartTimeframe}
+                  onCashFlowModeChange={setNetCashFlowChartMode}
+                  onTimeframeChange={setNetChartTimeframe}
+                />
+              </div>
+            </div>
+
 
           </div>
         )}

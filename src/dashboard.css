@@ -5218,6 +5218,20 @@ body {
   }
 }
 
+/* UI Lab — 1/3 + 2/3 asymmetric grid */
+.ui-lab-one-two-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 767px) {
+  .ui-lab-one-two-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Efficiency Opportunities Card ───────────────────────────────────── */
 
 /* Card header */
