@@ -890,6 +890,12 @@ body {
   align-items: flex-start;
 }
 
+@media (min-width: 768px) {
+  .kpi-grid {
+    gap: 24px;
+  }
+}
+
 .kpi-card {
   background: var(--bg-panel);
   border: 1px solid var(--line);
@@ -1590,6 +1596,12 @@ body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   align-items: stretch;
+}
+
+@media (min-width: 768px) {
+  .forecast-decision-grid {
+    gap: 24px;
+  }
 }
 
 .forecast-decision-card {
@@ -2934,12 +2946,24 @@ body {
   align-items: stretch;
 }
 
+@media (min-width: 768px) {
+  .two-col-grid {
+    gap: 24px;
+  }
+}
+
 /* Cash Trend row — card 1/3, placeholder 2/3 */
 .cash-trend-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 16px;
   align-items: flex-start;
+}
+
+@media (min-width: 768px) {
+  .cash-trend-row {
+    gap: 24px;
+  }
 }
 
 @media (max-width: 767px) {
@@ -6261,6 +6285,12 @@ body {
   align-items: stretch;
 }
 
+@media (min-width: 768px) {
+  .today-top-grid {
+    gap: 24px;
+  }
+}
+
 .today-top-grid > * {
   height: 100%;
 }
@@ -6407,6 +6437,12 @@ body {
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-items: stretch;
+}
+
+@media (min-width: 768px) {
+  .today-secondary-row {
+    gap: 24px;
+  }
 }
 
 .today-secondary-row.is-pair {
