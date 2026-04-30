@@ -1,6 +1,56 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: April 28, 2026*
+*Last updated: April 30, 2026*
+
+---
+
+## What Changed Recently (April 30, 2026 — this session)
+
+### Card system + spacing normalization — fully shipped
+
+Multi-commit pass to align the entire dashboard with the documented
+TailAdmin spacing standard. Card padding/radius normalized. Grid gaps
+made responsive. Page wrapper rhythm corrected across all routes.
+align-items declared explicitly on every card grid.
+
+**Commits landed:**
+- `94e0740` — UI Lab one-two grid utility
+- `cecb4f4` — .card base normalization (radius 24→16, padding 16→24)
+- `59acb02` — UI_CARDS card height + pairing rules; CLAUDE hierarchy update
+- `4278d9d` — UI_Verification_Rules tracked in repo
+- `05424db` — session close discipline added to CLAUDE.md
+- `ada3df7` — Spacing section expanded in UI_RULES.md
+- `17175c5` — grid gap normalization + align-items declarations
+- `acba8a7` — responsive md:gap-6 added to six card grids
+- `5f47cc1` — Grid gap subsection tightened in UI_RULES.md
+- `a522c43` — main-zone top gap, forecast cockpit, Settings heading rhythm
+- (two additional commits) — Today page wrapper gap + Settings section rhythm;
+  empty .today-context-section rule removed
+
+**Documentation files updated:**
+- `UI_CARDS.md` — Card Height & Pairing Behavior section added; Known
+  Classified Pairings table expanded to 9 entries
+- `UI_RULES.md` — Spacing section expanded from 7 lines to full spec:
+  allowed values table, page/layout rules, card padding, card internal
+  spacing, grid gap (mandatory responsive pattern), align-items rules,
+  what not to do
+- `UI_Verification_Rules.md` — added to repo, now tracked
+- `CLAUDE.md` — source of truth hierarchy expanded to 4 entries;
+  session close discipline section added; UI_Verification_Rules added
+  to sync list
+
+**Deferred to backlog (Notion — Later / P3):**
+- Settings page full layout normalization. The .ta-page / .ta-section /
+  .ta-card legacy structure should be rebuilt with standard .card and
+  .stack-grid patterns before any further spacing fixes are attempted.
+- Efficiency/DigHere component follow-up audit (component files not read
+  in original card audit).
+- Documentation refactor — separate reusable TailAdmin base from Wx CFO
+  overlay for portability across projects.
+- Segmented toggle documentation and implementation pass.
+
+**Working tree:** clean (stray .rtf only).
+**Active branch:** main.
 
 ---
 
