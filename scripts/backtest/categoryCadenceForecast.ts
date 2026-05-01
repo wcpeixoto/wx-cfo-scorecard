@@ -16,6 +16,16 @@ export type CategoryCadence = 'STABLE' | 'PERIODIC' | 'EVENT';
 // STABLE → trailing 3-month average per category.
 // PERIODIC → same calendar month one year ago.
 // EVENT → same calendar month one year ago (until Known Events lands).
+//
+// Per-category projection overrides (applied before the cadence dispatch):
+//   Business Income:Sales → trailing 12-month average
+//     Sales is recurring revenue with high month-to-month variance.
+//     YoY (the EVENT default) overweights the lumpiest months; a
+//     trailing-12 average smooths to the underlying run-rate. Validated
+//     in the harness sweep — F outperformed YoY (current), 3-mo, 6-mo,
+//     YoY-blend, and a 50/50 blend of trailing-12 and YoY on
+//     worstSingleMonthMiss and per-as-of wins-vs-engine, while keeping
+//     safetyLineHitRate at 100%.
 
 const STABLE_PARENTS = new Set<string>([
   'Payroll',
@@ -182,6 +192,27 @@ function trailing3MonthAvg(
   return sum / 3;
 }
 
+/** Trailing 12-month average for a category, ending at the month before
+ *  asOfMonth. If fewer than 12 of the trailing months have data, divides
+ *  by the number that do — so categories with thin history degrade
+ *  gracefully instead of being silently halved. */
+function trailing12MonthAvg(
+  catMonths: Map<string, number>,
+  asOfMonth: string
+): number {
+  let sum = 0;
+  let count = 0;
+  for (let k = 1; k <= 12; k += 1) {
+    const m = addMonths(asOfMonth, -k);
+    const v = catMonths.get(m);
+    if (v !== undefined) {
+      sum += v;
+      count += 1;
+    }
+  }
+  return count > 0 ? sum / count : 0;
+}
+
 /** Category-cadence forecast: each operating-cash category projects on its
  *  own cadence (STABLE → trailing-3 average; PERIODIC/EVENT → same month last
  *  year). Categories whose cashFlow.ts contributions are zero (transfers,
@@ -205,6 +236,13 @@ export function categoryCadenceForecast(
     for (const [category, monthMap] of netByCategory) {
       const cls = classifications.get(category);
       if (!cls) continue;
+      // Per-category override: Business Income:Sales uses a trailing
+      // 12-month average instead of the EVENT-default same-month-last-year.
+      // See top-of-file note for the rationale and harness validation.
+      if (category === 'Business Income:Sales') {
+        monthlyDelta += trailing12MonthAvg(monthMap, startMonth);
+        continue;
+      }
       if (cls.cadence === 'STABLE') {
         monthlyDelta += trailing3MonthAvg(monthMap, startMonth);
       } else {
