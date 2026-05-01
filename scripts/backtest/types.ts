@@ -7,6 +7,12 @@ export type ForecastSeries = {
   asOfDate: string; // YYYY-MM-DD
   startingCash: number;
   points: SeriesPoint[];
+  /** Length of the active seasonal weighting in the engine at this as-of
+   *  date. Set by walkForward.forecastAsOf; absent on naive-baseline
+   *  series. 0 means the engine used its momentum fallback (no
+   *  seasonality). Used by the runner to detect tier mismatches when an
+   *  EngineParameterOverrides.yearWeights override is in play. */
+  seasonalityWeightingLength?: number;
 };
 
 export type TruthSeries = {
@@ -86,4 +92,26 @@ export type RegressionBreach = {
 export type RegressionCheckResult = {
   breaches: RegressionBreach[];
   passed: boolean;
+};
+
+export type RunnerAsOfRun = {
+  asOfDate: string;
+  engineForecast: ForecastSeries;
+  naiveYoYForecast: ForecastSeries;
+  t12mAverageForecast: ForecastSeries;
+  truth: TruthSeries;
+  engineMetrics: BacktestMetrics;
+  naiveYoYMetrics: BacktestMetrics;
+  t12mMetrics: BacktestMetrics;
+};
+
+export type EngineOverrideTierMismatch = {
+  parameter: string; // override field name (e.g. 'yearWeights')
+  asOfDate: string;
+};
+
+export type RunnerResult = {
+  perAsOf: RunnerAsOfRun[];
+  aggregate: AggregateMetrics;
+  engineOverrideTierMismatches: EngineOverrideTierMismatch[];
 };

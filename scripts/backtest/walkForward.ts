@@ -1,5 +1,5 @@
 import type { Txn, ScenarioInput } from '../../src/lib/data/contract';
-import { computeDashboardModel, projectScenario } from '../../src/lib/kpis/compute';
+import { computeDashboardModel, projectScenario, type EngineParameterOverrides } from '../../src/lib/kpis/compute';
 import { forecastCashInContribution, forecastCashOutContribution } from '../../src/lib/cashFlow';
 import type { Anchor, ForecastSeries } from './types';
 
@@ -61,7 +61,8 @@ function monthOf(asOfDate: string): string {
 export function forecastAsOf(
   asOfDate: string,
   txns: Txn[],
-  anchors: Anchor[]
+  anchors: Anchor[],
+  overrides?: EngineParameterOverrides
 ): ForecastSeries {
   const filtered = txns.filter((t) => t.date < asOfDate);
   const startingCash = reconstructStartingCash(asOfDate, txns, anchors);
@@ -77,7 +78,8 @@ export function forecastAsOf(
     model,
     { ...BASE_SCENARIO, months: HORIZON_MONTHS },
     startingCash,
-    []
+    [],
+    overrides
   );
 
   return {
@@ -87,5 +89,10 @@ export function forecastAsOf(
       month: p.month,
       endingCashBalance: p.endingCashBalance,
     })),
+    // Length of the active seasonal weighting at this as-of date. 0 means
+    // the engine fell back to its momentum model (no seasonality). Used by
+    // the runner to detect when a yearWeights override is silently ignored
+    // because the active tier's natural weighting has a different length.
+    seasonalityWeightingLength: result.seasonality.weighting.length,
   };
 }

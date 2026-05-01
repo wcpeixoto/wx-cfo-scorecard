@@ -1,11 +1,8 @@
 import { loadFixture, loadAnchors, getFixturePath } from './loadFixture';
-import { forecastAsOf } from './walkForward';
-import { realizedBalance } from './realizedBalance';
-import { computeMetrics } from './metrics';
-import { naiveYoYBaseline, t12mAverageBaseline } from './baselines';
 import { BASELINE_PATH, buildBaselineFile, readBaseline, writeBaseline } from './baselineFile';
 import { checkRegressions } from './regressionCheck';
-import type { AggregateMetrics, AsOfRun, BaselineComparison, RegressionCheckResult } from './types';
+import { runHarness } from './runner';
+import type { AggregateMetrics, RegressionCheckResult, RunnerAsOfRun } from './types';
 
 const HARNESS_VERSION = 'phase-2';
 
@@ -50,44 +47,7 @@ function padLeft(s: string, width: number): string {
   return ' '.repeat(width - s.length) + s;
 }
 
-function compareBaseline(runs: AsOfRun[], pick: (r: AsOfRun) => number): BaselineComparison {
-  let wins = 0;
-  let losses = 0;
-  let tied = 0;
-  for (const r of runs) {
-    const engine = r.metrics.worstSingleMonthMiss;
-    const baseline = pick(r);
-    if (engine < baseline) wins += 1;
-    else if (engine > baseline) losses += 1;
-    else tied += 1;
-  }
-  return { wins, losses, tied };
-}
-
-function aggregate(runs: AsOfRun[]): AggregateMetrics {
-  const validMape = (key: 'mape30' | 'mape60' | 'mape90'): number => {
-    const vals = runs.map((r) => r.metrics[key]).filter((v) => Number.isFinite(v));
-    if (vals.length === 0) return Number.NaN;
-    return vals.reduce((s, v) => s + v, 0) / vals.length;
-  };
-  const directionalAccuracy =
-    runs.reduce((s, r) => s + r.metrics.directionalAccuracy, 0) / runs.length;
-  const safetyLineHitRate = runs.filter((r) => r.metrics.safetyLineHit).length / runs.length;
-  const worstSingleMonthMiss =
-    runs.reduce((s, r) => s + r.metrics.worstSingleMonthMiss, 0) / runs.length;
-  return {
-    directionalAccuracy,
-    mape30: validMape('mape30'),
-    mape60: validMape('mape60'),
-    mape90: validMape('mape90'),
-    safetyLineHitRate,
-    worstSingleMonthMiss,
-    engineVsNaiveYoY: compareBaseline(runs, (r) => r.naiveYoYMetrics.worstSingleMonthMiss),
-    engineVsT12M: compareBaseline(runs, (r) => r.t12mAvgMetrics.worstSingleMonthMiss),
-  };
-}
-
-function printPerRunTable(runs: AsOfRun[]): void {
+function printPerRunTable(runs: RunnerAsOfRun[]): void {
   const headers = [
     pad('as-of', 12),
     padLeft('dirAcc', 7),
@@ -102,7 +62,7 @@ function printPerRunTable(runs: AsOfRun[]): void {
   console.log(headers.join('  '));
   console.log('-'.repeat(headers.join('  ').length));
   for (const run of runs) {
-    const m = run.metrics;
+    const m = run.engineMetrics;
     console.log(
       [
         pad(run.asOfDate, 12),
@@ -120,7 +80,7 @@ function printPerRunTable(runs: AsOfRun[]): void {
   console.log('');
 }
 
-function printBaselineTable(runs: AsOfRun[]): void {
+function printBaselineTable(runs: RunnerAsOfRun[]): void {
   const headers = [
     pad('as-of', 12),
     padLeft('engine miss', 14),
@@ -133,9 +93,9 @@ function printBaselineTable(runs: AsOfRun[]): void {
   console.log(headers.join('  '));
   console.log('-'.repeat(headers.join('  ').length));
   for (const r of runs) {
-    const e = r.metrics.worstSingleMonthMiss;
+    const e = r.engineMetrics.worstSingleMonthMiss;
     const y = r.naiveYoYMetrics.worstSingleMonthMiss;
-    const t = r.t12mAvgMetrics.worstSingleMonthMiss;
+    const t = r.t12mMetrics.worstSingleMonthMiss;
     console.log(
       [
         pad(r.asOfDate, 12),
@@ -227,36 +187,16 @@ function main(): void {
   console.log(`Mode: ${updateBaseline ? '--update-baseline' : 'check'}${allowRegression ? ' --allow-regression' : ''}`);
   console.log('');
 
-  const runs: AsOfRun[] = [];
-  for (const asOfDate of AS_OF_DATES) {
-    const forecast = forecastAsOf(asOfDate, txns, anchors.anchors);
-    const truth = realizedBalance(asOfDate, HORIZON_MONTHS, txns, anchors.anchors);
+  const result = runHarness({
+    transactions: txns,
+    anchors: anchors.anchors,
+    asOfDates: AS_OF_DATES,
+    horizonMonths: HORIZON_MONTHS,
+  });
 
-    if (Math.abs(forecast.startingCash - truth.startingCash) > 0.01) {
-      throw new Error(
-        `Starting-cash reconciliation failed at ${asOfDate}: forecast=${forecast.startingCash} truth=${truth.startingCash}. This indicates a harness bug.`
-      );
-    }
-
-    const naiveYoY = naiveYoYBaseline(asOfDate, txns, anchors.anchors);
-    const t12mAvg = t12mAverageBaseline(asOfDate, txns, anchors.anchors);
-
-    runs.push({
-      asOfDate,
-      forecast,
-      truth,
-      metrics: computeMetrics(forecast, truth),
-      naiveYoY,
-      naiveYoYMetrics: computeMetrics(naiveYoY, truth),
-      t12mAvg,
-      t12mAvgMetrics: computeMetrics(t12mAvg, truth),
-    });
-  }
-
-  printPerRunTable(runs);
-  printBaselineTable(runs);
-  const agg = aggregate(runs);
-  printAggregate(agg);
+  printPerRunTable(result.perAsOf);
+  printBaselineTable(result.perAsOf);
+  printAggregate(result.aggregate);
 
   if (updateBaseline) {
     const file = buildBaselineFile({
@@ -265,7 +205,7 @@ function main(): void {
       anchorsLoaded: anchors.anchors.length,
       asOfDateCount: AS_OF_DATES.length,
       harnessVersion: HARNESS_VERSION,
-      aggregate: agg,
+      aggregate: result.aggregate,
     });
     writeBaseline(BASELINE_PATH, file);
     console.log(`BASELINE WRITTEN: ${BASELINE_PATH}`);
@@ -283,10 +223,10 @@ function main(): void {
     return;
   }
 
-  const result = checkRegressions(agg, baseline);
-  printRegressionResult(result, allowRegression);
+  const check = checkRegressions(result.aggregate, baseline);
+  printRegressionResult(check, allowRegression);
 
-  if (!result.passed && !allowRegression) {
+  if (!check.passed && !allowRegression) {
     process.exit(1);
     return;
   }
