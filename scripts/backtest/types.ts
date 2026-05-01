@@ -41,4 +41,49 @@ export type AsOfRun = {
   forecast: ForecastSeries;
   truth: TruthSeries;
   metrics: BacktestMetrics;
+  naiveYoY: ForecastSeries;
+  naiveYoYMetrics: BacktestMetrics;
+  t12mAvg: ForecastSeries;
+  t12mAvgMetrics: BacktestMetrics;
+};
+
+export type BaselineComparison = {
+  wins: number; // engine's worstSingleMonthMiss strictly smaller than baseline's
+  losses: number; // engine strictly larger
+  tied: number;
+};
+
+export type AggregateMetrics = {
+  directionalAccuracy: number;
+  mape30: number;
+  mape60: number;
+  mape90: number;
+  safetyLineHitRate: number;
+  worstSingleMonthMiss: number; // average across runs
+  engineVsNaiveYoY: BaselineComparison;
+  engineVsT12M: BaselineComparison;
+};
+
+export type BaselineFile = {
+  writtenAt: string; // ISO timestamp
+  fixturePath: string;
+  fixtureRowCount: number;
+  anchorsLoaded: number;
+  asOfDateCount: number;
+  harnessVersion: string;
+  aggregate: AggregateMetrics;
+};
+
+export type RegressionBreach = {
+  metric: string;
+  baseline: number;
+  current: number;
+  threshold: number; // numeric threshold (delta or ratio)
+  delta: number; // current - baseline (signed)
+  description: string; // human-readable rule
+};
+
+export type RegressionCheckResult = {
+  breaches: RegressionBreach[];
+  passed: boolean;
 };

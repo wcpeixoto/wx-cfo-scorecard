@@ -23,11 +23,30 @@ copied — so the harness measures the engine that ships.
 ## How to run
 
 ```bash
+# Default: load baseline.json, run engine + baselines, hard-fail on
+# any regression breach.
 npx tsx scripts/backtest/runBacktest.ts
+
+# Write a fresh baseline.json from the current run; skip the regression
+# check. Use this on intentional fixture refreshes or after the locked
+# engine is changed deliberately.
+npx tsx scripts/backtest/runBacktest.ts --update-baseline
+
+# Run the regression check but exit 0 even if thresholds are breached.
+# The breach table still prints prominently.
+npx tsx scripts/backtest/runBacktest.ts --allow-regression
 ```
 
 `tsx` is invoked via `npx`; no install or `package.json` change is
 needed (Phase 3 will add a script).
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | Run completed; either `--update-baseline` succeeded, the regression check passed, or `--allow-regression` suppressed the failure. |
+| 1 | Regression check failed: at least one locked threshold was breached and `--allow-regression` was not set. |
+| 2 | `baseline.json` is missing. Run with `--update-baseline` to create it. |
 
 ## What each metric means
 
@@ -39,6 +58,54 @@ needed (Phase 3 will add a script).
 | `endpointError` | Forecast month 12 ending balance minus actual month 12 ending balance, in dollars. Long-horizon drift. |
 | `safetyLineHit` | True when the forecast's reserve breach over the horizon agrees with reality (both breached, or both didn't). Reported per run; aggregate is the share of runs that agreed. |
 | `worstSingleMonthMiss` | Largest absolute dollar error across the 12-month horizon. The "worst case" the forecast missed by. |
+
+## Naive baselines (informational)
+
+Each as-of run is also evaluated against two naive baselines:
+
+- **Naive YoY** — projects each horizon month as the same calendar
+  month one year earlier. "Same month, last year."
+- **T12M average** — flat monthly delta equal to the trailing-12-month
+  average operating-cash net.
+
+The harness reports per-run wins/losses (engine has a strictly smaller
+worst-single-month miss than the baseline at the same as-of date) and
+an aggregate count. **In Phase 2 this is informational only** — it
+never causes a non-zero exit. Phase 3 may promote "must beat both
+baselines" to a hard-fail rule.
+
+## baseline.json and locked thresholds
+
+`backtest-results/baseline.json` is the canonical reference for what
+the harness expects. It captures the aggregate metrics from a known-
+good run plus enough metadata (fixture path, row count, anchor count,
+harness version) to make staleness obvious.
+
+The default run reads `baseline.json` and applies four locked
+thresholds. Any breach exits 1.
+
+| Metric | Rule |
+|---|---|
+| `directionalAccuracy` | fail if **drops by more than 5 percentage points** vs baseline |
+| `mape90` | fail if **grows by more than 3 percentage points** vs baseline |
+| `worstSingleMonthMiss` | fail if **grows by more than 25%** vs baseline |
+| `safetyLineHitRate` | fail if **drops by more than 5 percentage points** vs baseline |
+
+Thresholds are defined in a single named constants block at the top of
+`scripts/backtest/regressionCheck.ts` — tune them there.
+
+### When to update `baseline.json`
+
+- After an intentional fixture refresh (the metrics will shift).
+- After a deliberate change to the locked engine that has been
+  reviewed and expected to move metrics.
+- **Never** to silence an unexpected regression — investigate the
+  regression first. The baseline exists so unexpected drift is loud,
+  not so it can be hidden.
+
+To update: `npx tsx scripts/backtest/runBacktest.ts --update-baseline`,
+then commit the resulting `backtest-results/baseline.json` in its own
+dedicated commit (separate from any code change).
 
 ## Anchors and what's reliable without them
 
