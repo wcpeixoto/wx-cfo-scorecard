@@ -1,96 +1,99 @@
-# Backtest fixtures
+# Backtest Fixture Procedure
 
-This directory holds **frozen** inputs for the backtest harness. The
-harness is a regression test — its outputs only mean something if the
-inputs don't shift between runs. Never refresh casually.
+The harness requires two frozen files in this directory:
 
-## Files
+```
+backtest-results/fixtures/transactions-snapshot.jsonl   ← required
+backtest-results/fixtures/historical-anchors.json       ← optional but recommended
+```
 
-### `transactions-snapshot.csv` (required)
+---
 
-A CSV snapshot of the production `shared_imported_transactions` table at a point in time.
-The harness loads it via `scripts/backtest/loadFixture.ts`.
+## 1. Transaction snapshot (`transactions-snapshot.jsonl`)
 
-**Required columns** (header row, exact names, case-insensitive):
-- `date` — `YYYY-MM-DD`
-- `amount` — absolute dollar amount (always positive)
-- `rawAmount` — signed dollar amount (negative = expense / outflow)
-- `category` — full category string, including `parent:child` if present
+The fixture is a JSONL file — one `Txn` JSON object per line, in the same
+shape that the production app reads from `shared_imported_transactions.txn`.
 
-**Strongly recommended columns** (the harness uses them when present):
-- `id`, `month` (`YYYY-MM`), `type` (`income` | `expense`), `payee`,
-  `memo`, `account`, `transferAccount`, `tags` (pipe-separated),
-  `balance`
+### Export via psql
 
-If `month` is missing the harness derives it from `date`. If `type` is
-missing it derives it from `rawAmount`'s sign.
+```bash
+psql "$DATABASE_URL" \
+  -t -A \
+  -c "SELECT txn
+      FROM shared_imported_transactions
+      WHERE workspace_id = 'default'
+      ORDER BY imported_at_iso ASC, fingerprint ASC" \
+  > backtest-results/fixtures/transactions-snapshot.jsonl
+```
 
-### `historical-anchors.json` (optional but strongly recommended)
+Replace `'default'` with your actual `VITE_SHARED_WORKSPACE_ID` if it differs.
+`-t -A` suppresses headers and alignment so each output line is a bare JSON object.
 
-A small JSON file giving the harness known operating-cash balances at
-specific historical dates. Without this, the harness zero-anchors
-starting cash and only trajectory-shape metrics are trustworthy.
+### Export via Supabase MCP (if you have it connected)
+
+Run this SQL through `execute_sql` and write the `txn` value from each row to
+a file, one JSON object per line:
+
+```sql
+SELECT txn
+FROM shared_imported_transactions
+WHERE workspace_id = 'default'
+ORDER BY imported_at_iso ASC, fingerprint ASC;
+```
+
+### Verify
+
+After export, sanity-check the file:
+
+```bash
+# Should print the count of transactions
+wc -l backtest-results/fixtures/transactions-snapshot.jsonl
+
+# Should parse cleanly (exits 0 if valid JSONL)
+node -e "
+  const fs = require('fs');
+  const lines = fs.readFileSync('backtest-results/fixtures/transactions-snapshot.jsonl','utf8')
+    .split('\n').filter(l => l.trim());
+  lines.forEach((l, i) => { try { JSON.parse(l); } catch(e) { throw new Error('Line '+(i+1)+': '+e); } });
+  console.log('OK —', lines.length, 'transactions');
+"
+```
+
+---
+
+## 2. Historical anchors (`historical-anchors.json`) — optional
+
+Anchors provide real starting cash balances at specific dates, enabling the
+harness to measure absolute dollar accuracy (lowest-balance error, endpoint
+error, safety-line hit rate). Without anchors, the harness still runs but
+zero-anchors each as-of date — trajectory metrics are reliable, absolute
+metrics are not.
+
+### Format
 
 ```json
 {
   "anchors": [
-    { "asOfDate": "2022-01-01", "operatingCashBalance": 0 },
-    { "asOfDate": "2023-01-01", "operatingCashBalance": 0 },
-    { "asOfDate": "2024-01-01", "operatingCashBalance": 0 },
-    { "asOfDate": "2025-01-01", "operatingCashBalance": 0 }
+    { "asOfDate": "2024-01-01", "operatingCashBalance": 142500.00 },
+    { "asOfDate": "2025-01-01", "operatingCashBalance": 198300.00 }
   ]
 }
 ```
 
-- `asOfDate` is a `YYYY-MM-DD` string; the harness uses lexicographic
-  comparison.
-- `operatingCashBalance` should be the **operating-cash** balance —
-  i.e. exclude financing accounts, owner-distribution effects,
-  uncategorized activity, and pure transfers. The simplest anchor is
-  the sum of cash-account balances minus any owner-draw outflow that
-  has already been excluded by `cashFlow.ts`.
-- Multiple anchors are allowed; the harness uses the closest preceding
-  anchor for each as-of date and walks operating-cash net forward.
+`asOfDate` must be `YYYY-MM-DD`. `operatingCashBalance` is the operating-cash
+balance on that date — the bank balance **excluding** owner draws, financing
+draws, transfers, and uncategorized items. Use the closest business-day
+actual if the exact date falls on a weekend.
 
-## Why frozen?
+The harness picks the closest preceding anchor for each as-of date and walks
+operating-cash deltas forward from there.
 
-Phase 2 will introduce baselines and regression thresholds keyed off
-specific metric values. If the fixture shifts, those baselines are no
-longer comparable. Treat fixture refreshes like model retraining — done
-intentionally, with an explicit baseline reset.
+---
 
-## How to refresh `transactions-snapshot.csv`
+## When to refresh
 
-1. Pull the full table via Supabase SQL Editor (NOT Table Editor —
-   Table Editor's CSV export silently truncates at 1,000 rows):
-```sql
-   SELECT * FROM shared_imported_transactions
-   ORDER BY date ASC, id ASC;
-```
-   Click "Download CSV" on the result. Verify the row count matches
-   the dashboard's transaction count (System Status → Last import
-   summary). If the row count is short, the export truncated — do
-   not save the partial file.
-2. Save the file to this directory as `transactions-snapshot.csv`
-   (overwrite the previous one).
-3. Run `npx tsx scripts/backtest/runBacktest.ts` and verify the harness
-   loads cleanly and all 15 as-of runs produce metrics.
-4. Commit the new fixture in its own commit with a message that
-   explains *why* it was refreshed (e.g. recategorization, data
-   correction, quarterly cadence).
-5. Once Phase 2 lands, refreshing the fixture will require updating
-   the baseline file in the same commit — do not do this lightly.
-
-## How to refresh `historical-anchors.json`
-
-Anchors are only refreshed when:
-- A new historical period crosses a year boundary and a known balance
-  is available, or
-- A discovered data correction changes a previously-trusted balance.
-
-Edit the file directly. Commit with a brief explanation.
-
-## When the fixture is missing
-
-The harness exits with a clear error message pointing back to this
-README. Phase 1 does not auto-generate fixtures.
+- After any material data correction or recategorization.
+- Quarterly, to keep the regression baseline current.
+- **Never silently mid-phase** — refreshing changes the metrics, which defeats
+  the regression-detection purpose that Phase 2 will build on. Record the
+  refresh date in a commit message.
