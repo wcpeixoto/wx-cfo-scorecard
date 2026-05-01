@@ -1,29 +1,14 @@
-export type SeriesPoint = {
-  month: string; // YYYY-MM
-  endingCashBalance: number;
-};
-
-export type ForecastSeries = {
-  asOfDate: string; // YYYY-MM-DD
-  startingCash: number;
-  points: SeriesPoint[];
-  /** Length of the active seasonal weighting in the engine at this as-of
-   *  date. Set by walkForward.forecastAsOf; absent on naive-baseline
-   *  series. 0 means the engine used its momentum fallback (no
-   *  seasonality). Used by the runner to detect tier mismatches when an
-   *  EngineParameterOverrides.yearWeights override is in play. */
-  seasonalityWeightingLength?: number;
-};
+// Shared forecast types and the starting-cash anchor helper now live in
+// src/lib/kpis/forecastShared so production code can depend on them without
+// reaching into scripts/. We re-export the harness-facing names here so
+// existing imports (`from './types'`) keep working unchanged.
+export type { SeriesPoint, ForecastSeries, Anchor } from '../../src/lib/kpis/forecastShared';
+import type { SeriesPoint } from '../../src/lib/kpis/forecastShared';
 
 export type TruthSeries = {
   asOfDate: string; // YYYY-MM-DD
   startingCash: number;
   points: SeriesPoint[];
-};
-
-export type Anchor = {
-  asOfDate: string; // YYYY-MM-DD
-  operatingCashBalance: number;
 };
 
 export type AnchorsFile = {

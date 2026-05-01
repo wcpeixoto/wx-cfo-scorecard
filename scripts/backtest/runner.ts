@@ -4,7 +4,7 @@ import { forecastAsOf } from './walkForward';
 import { realizedBalance } from './realizedBalance';
 import { computeMetrics } from './metrics';
 import { naiveYoYBaseline, t12mAverageBaseline } from './baselines';
-import { categoryCadenceForecast } from './categoryCadenceForecast';
+import { categoryCadenceForecast } from '../../src/lib/kpis/categoryCadence';
 import type {
   AggregateMetrics,
   Anchor,

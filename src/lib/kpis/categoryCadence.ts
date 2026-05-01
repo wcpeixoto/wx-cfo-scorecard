@@ -1,11 +1,10 @@
-import type { Txn } from '../../src/lib/data/contract';
+import type { Txn } from '../data/contract';
 import {
   forecastCashInContribution,
   forecastCashOutContribution,
   parentCategoryName,
-} from '../../src/lib/cashFlow';
-import { reconstructStartingCash } from './walkForward';
-import type { Anchor, ForecastSeries } from './types';
+} from '../cashFlow';
+import { reconstructStartingCash, type Anchor, type ForecastSeries } from './forecastShared';
 
 const HORIZON_MONTHS = 12;
 

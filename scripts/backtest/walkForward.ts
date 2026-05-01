@@ -1,7 +1,13 @@
 import type { Txn, ScenarioInput } from '../../src/lib/data/contract';
 import { computeDashboardModel, projectScenario, type EngineParameterOverrides } from '../../src/lib/kpis/compute';
-import { forecastCashInContribution, forecastCashOutContribution } from '../../src/lib/cashFlow';
 import type { Anchor, ForecastSeries } from './types';
+// reconstructStartingCash now lives in src/lib/kpis/forecastShared so
+// production code can depend on the same helper without reaching into
+// scripts/. Imported and re-exported here so existing harness consumers
+// (baselines.ts, realizedBalance.ts) keep their `from './walkForward'`
+// imports unchanged.
+import { reconstructStartingCash } from '../../src/lib/kpis/forecastShared';
+export { reconstructStartingCash };
 
 const BASE_SCENARIO: ScenarioInput = {
   scenarioKey: 'base',
@@ -13,45 +19,6 @@ const BASE_SCENARIO: ScenarioInput = {
 };
 
 const HORIZON_MONTHS = 12;
-
-/** Operating-cash net for a single transaction (cash-in minus cash-out, signed). */
-function operatingCashNet(txn: Txn): number {
-  return forecastCashInContribution(txn) - forecastCashOutContribution(txn);
-}
-
-/** Find the closest anchor with date <= asOfDate (ISO YYYY-MM-DD lexicographic). */
-function closestPrecedingAnchor(asOfDate: string, anchors: Anchor[]): Anchor | null {
-  let best: Anchor | null = null;
-  for (const a of anchors) {
-    if (a.asOfDate <= asOfDate) {
-      if (!best || a.asOfDate > best.asOfDate) best = a;
-    }
-  }
-  return best;
-}
-
-/** Reconstruct starting operating-cash balance at as-of date `D`.
- *  - With anchor: anchor.balance + sum(operating-cash net) for txns where anchor.date <= txn.date < D
- *  - Without anchor: sum(operating-cash net) for all txns where txn.date < D (zero-anchored)
- *  This function is shared by forecastAsOf and realizedBalance to guarantee
- *  month-zero reconciliation.
- */
-export function reconstructStartingCash(
-  asOfDate: string,
-  txns: Txn[],
-  anchors: Anchor[]
-): number {
-  const anchor = closestPrecedingAnchor(asOfDate, anchors);
-  const lowerBound = anchor?.asOfDate ?? null;
-  const base = anchor?.operatingCashBalance ?? 0;
-  let net = 0;
-  for (const t of txns) {
-    if (t.date >= asOfDate) continue;
-    if (lowerBound !== null && t.date < lowerBound) continue;
-    net += operatingCashNet(t);
-  }
-  return base + net;
-}
 
 /** Convert YYYY-MM-DD as-of date to YYYY-MM month string. */
 function monthOf(asOfDate: string): string {
