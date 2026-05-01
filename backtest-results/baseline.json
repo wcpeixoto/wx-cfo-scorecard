@@ -1,0 +1,26 @@
+{
+  "writtenAt": "2026-05-01T17:47:41.525Z",
+  "fixturePath": "/sessions/eloquent-loving-sagan/mnt/wx-cfo-scorecard/backtest-results/fixtures/transactions-snapshot.jsonl",
+  "fixtureRowCount": 4851,
+  "anchorsLoaded": 4,
+  "asOfDateCount": 15,
+  "harnessVersion": "phase-2",
+  "aggregate": {
+    "directionalAccuracy": 0.4277777777777778,
+    "mape30": 0.1732246974755731,
+    "mape60": 0.21145276847773925,
+    "mape90": 0.1844731183916398,
+    "safetyLineHitRate": 1,
+    "worstSingleMonthMiss": 30816.691333333318,
+    "engineVsNaiveYoY": {
+      "wins": 3,
+      "losses": 12,
+      "tied": 0
+    },
+    "engineVsT12M": {
+      "wins": 1,
+      "losses": 14,
+      "tied": 0
+    }
+  }
+}
