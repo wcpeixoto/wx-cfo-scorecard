@@ -86,8 +86,10 @@ function printBaselineTable(runs: RunnerAsOfRun[]): void {
     padLeft('engine miss', 14),
     padLeft('YoY miss', 14),
     padLeft('T12M miss', 14),
+    padLeft('CC miss', 14),
     padLeft('beats YoY', 11),
     padLeft('beats T12M', 12),
+    padLeft('beats CC', 11),
   ];
   console.log('NAIVE BASELINE COMPARISON (worst single-month miss; informational, no hard-fail)');
   console.log(headers.join('  '));
@@ -96,14 +98,17 @@ function printBaselineTable(runs: RunnerAsOfRun[]): void {
     const e = r.engineMetrics.worstSingleMonthMiss;
     const y = r.naiveYoYMetrics.worstSingleMonthMiss;
     const t = r.t12mMetrics.worstSingleMonthMiss;
+    const c = r.categoryCadenceMetrics.worstSingleMonthMiss;
     console.log(
       [
         pad(r.asOfDate, 12),
         padLeft(fmtCurrency(e), 14),
         padLeft(fmtCurrency(y), 14),
         padLeft(fmtCurrency(t), 14),
+        padLeft(fmtCurrency(c), 14),
         padLeft(e < y ? 'yes' : e > y ? 'no' : 'tie', 11),
         padLeft(e < t ? 'yes' : e > t ? 'no' : 'tie', 12),
+        padLeft(e < c ? 'yes' : e > c ? 'no' : 'tie', 11),
       ].join('  ')
     );
   }
@@ -123,6 +128,10 @@ function printAggregate(agg: AggregateMetrics): void {
     `${agg.engineVsNaiveYoY.wins}/${agg.engineVsNaiveYoY.losses}/${agg.engineVsNaiveYoY.tied}`);
   console.log('  Engine vs T12M-average (worst-miss wins/losses/tied): ' +
     `${agg.engineVsT12M.wins}/${agg.engineVsT12M.losses}/${agg.engineVsT12M.tied}`);
+  if (agg.engineVsCategoryCadence) {
+    console.log('  Engine vs category-cadence (worst-miss wins/losses/tied): ' +
+      `${agg.engineVsCategoryCadence.wins}/${agg.engineVsCategoryCadence.losses}/${agg.engineVsCategoryCadence.tied}`);
+  }
   console.log('');
 }
 
