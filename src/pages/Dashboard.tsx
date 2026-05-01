@@ -49,6 +49,7 @@ import {
   projectScenario,
   toMonthLabel,
 } from '../lib/kpis/compute';
+import { projectCategoryCadenceScenario } from '../lib/kpis/categoryCadence';
 import type {
   AccountRecord,
   AccountType,
@@ -611,6 +612,10 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [storedImportedTransactionCount, setStoredImportedTransactionCount] = useState(0);
   const [accountRecords, setAccountRecords] = useState<AccountRecord[]>(getStoredAccountSettings);
   const [selectedScenarioKey, setSelectedScenarioKey] = useState<ForecastScenarioKey>('base');
+  // Stage 3 production wiring: opt-in switch between the locked engine and the
+  // category-cadence comparator. Session-only — defaults to 'engine' on every
+  // page load.
+  const [forecastModel, setForecastModel] = useState<'engine' | 'category-cadence'>('engine');
   const [customScenarioInput, setCustomScenarioInput] = useState<ScenarioInput>(DEFAULT_CUSTOM_SCENARIO);
   const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('lastMonth');
   const [netCashFlowChartMode, setNetCashFlowChartMode] = useState<CashFlowMode>('operating');
@@ -1543,22 +1548,32 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const forecastProjection = useMemo(
     () => {
       const fcT0 = performance.now();
-      const result = projectScenario(
-        model,
-        {
-          ...scenarioInput,
-          months: Math.max(scenarioInput.months, forecastRangeMonths),
-        },
-        forecastCurrentCashBalance,
-        forecastEvents
-      );
+      const scenarioWithMonths = {
+        ...scenarioInput,
+        months: Math.max(scenarioInput.months, forecastRangeMonths),
+      };
+      const result =
+        forecastModel === 'category-cadence'
+          ? projectCategoryCadenceScenario(
+              model,
+              scenarioWithMonths,
+              filteredTxns,
+              forecastCurrentCashBalance,
+              forecastEvents
+            )
+          : projectScenario(
+              model,
+              scenarioWithMonths,
+              forecastCurrentCashBalance,
+              forecastEvents
+            );
       if (import.meta.env.DEV && !bootPhaseLoggedRef.current.forecast && model.monthlyRollups.length > 0) {
         bootPhaseLoggedRef.current.forecast = true;
         console.log('[BOOT] Forecast compute:', Math.round(performance.now() - fcT0), 'ms');
       }
       return result;
     },
-    [forecastCurrentCashBalance, forecastEvents, forecastRangeMonths, model, scenarioInput]
+    [filteredTxns, forecastCurrentCashBalance, forecastEvents, forecastModel, forecastRangeMonths, model, scenarioInput]
   );
   const scenarioProjection = useMemo(() => forecastProjection.points, [forecastProjection.points]);
   const forecastSeasonality = useMemo(() => forecastProjection.seasonality, [forecastProjection.seasonality]);
@@ -2683,6 +2698,22 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       {option.label}
                     </button>
                   ))}
+                </div>
+                <div className="segmented-toggle" role="group" aria-label="Forecast model">
+                  <button
+                    type="button"
+                    className={`segmented-toggle-btn${forecastModel === 'engine' ? ' is-active' : ''}`}
+                    onClick={() => setForecastModel('engine')}
+                  >
+                    Engine
+                  </button>
+                  <button
+                    type="button"
+                    className={`segmented-toggle-btn${forecastModel === 'category-cadence' ? ' is-active' : ''}`}
+                    onClick={() => setForecastModel('category-cadence')}
+                  >
+                    Category-Cadence
+                  </button>
                 </div>
                 <button
                   type="button"
