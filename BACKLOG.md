@@ -91,5 +91,4 @@ https://www.notion.so/34fad9579339817d9057c55981b28ec7  ← Big Picture layout r
 Next P2 (new this session):
 https://www.notion.so/352ad957933981f39269f7b5dffcf4fa  ← Cash Trend chart timeline toggle
 https://www.notion.so/352ad9579339815aa98ef17a60ff3905  ← Audit and normalize dashboard grid gaps and section spacing
-353ad957-9339-815a-8f84-f52775db42a5  ← Stage 4 — Qualitative testing
 ```
