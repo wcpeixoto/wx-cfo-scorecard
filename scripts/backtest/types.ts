@@ -68,6 +68,10 @@ export type AggregateMetrics = {
   worstSingleMonthMiss: number; // average across runs
   engineVsNaiveYoY: BaselineComparison;
   engineVsT12M: BaselineComparison;
+  /** Per-as-of wins/losses on worstSingleMonthMiss vs the category-cadence
+   *  comparator. Optional so baseline.json's existing schema is unchanged
+   *  (baselineFile.ts does not serialize this field). */
+  engineVsCategoryCadence?: BaselineComparison;
 };
 
 export type BaselineFile = {
@@ -99,10 +103,12 @@ export type RunnerAsOfRun = {
   engineForecast: ForecastSeries;
   naiveYoYForecast: ForecastSeries;
   t12mAverageForecast: ForecastSeries;
+  categoryCadenceForecast: ForecastSeries;
   truth: TruthSeries;
   engineMetrics: BacktestMetrics;
   naiveYoYMetrics: BacktestMetrics;
   t12mMetrics: BacktestMetrics;
+  categoryCadenceMetrics: BacktestMetrics;
 };
 
 export type EngineOverrideTierMismatch = {

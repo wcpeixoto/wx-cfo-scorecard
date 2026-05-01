@@ -4,6 +4,7 @@ import { forecastAsOf } from './walkForward';
 import { realizedBalance } from './realizedBalance';
 import { computeMetrics } from './metrics';
 import { naiveYoYBaseline, t12mAverageBaseline } from './baselines';
+import { categoryCadenceForecast } from './categoryCadenceForecast';
 import type {
   AggregateMetrics,
   Anchor,
@@ -55,6 +56,7 @@ function aggregate(runs: RunnerAsOfRun[]): AggregateMetrics {
     worstSingleMonthMiss,
     engineVsNaiveYoY: compareBaseline(runs, (r) => r.naiveYoYMetrics.worstSingleMonthMiss),
     engineVsT12M: compareBaseline(runs, (r) => r.t12mMetrics.worstSingleMonthMiss),
+    engineVsCategoryCadence: compareBaseline(runs, (r) => r.categoryCadenceMetrics.worstSingleMonthMiss),
   };
 }
 
@@ -94,16 +96,19 @@ export function runHarness(opts: RunnerOptions): RunnerResult {
 
     const naiveYoYForecast = naiveYoYBaseline(asOfDate, transactions, anchors);
     const t12mAverageForecast = t12mAverageBaseline(asOfDate, transactions, anchors);
+    const categoryCadenceForecastSeries = categoryCadenceForecast(asOfDate, transactions, anchors);
 
     perAsOf.push({
       asOfDate,
       engineForecast,
       naiveYoYForecast,
       t12mAverageForecast,
+      categoryCadenceForecast: categoryCadenceForecastSeries,
       truth,
       engineMetrics: computeMetrics(engineForecast, truth),
       naiveYoYMetrics: computeMetrics(naiveYoYForecast, truth),
       t12mMetrics: computeMetrics(t12mAverageForecast, truth),
+      categoryCadenceMetrics: computeMetrics(categoryCadenceForecastSeries, truth),
     });
   }
 
