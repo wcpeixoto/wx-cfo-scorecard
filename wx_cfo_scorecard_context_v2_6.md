@@ -1,6 +1,140 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: April 30, 2026*
+*Last updated: May 1, 2026*
+
+---
+
+## What Changed Recently (May 1, 2026)
+
+### Forecast Backtest Harness (Phases 1–2 complete)
+
+Permanent diagnostic harness in `scripts/backtest/`. Walks the locked
+forecast engine through 15 historical as-of dates (Jan 2025 – Mar 2026)
+and measures forecast quality against a truth series built from the
+same operating-cash rules in `src/lib/cashFlow.ts`.
+
+Three comparators run alongside the engine on every harness run:
+- naive YoY (same-month-last-year)
+- T12M-average (flat trailing-12-month delta)
+- category-cadence (per-category cadence-aware projection)
+
+The locked `backtest-results/baseline.json` captures canonical
+aggregate metrics: directionalAccuracy 42.8%, mape90 18.4%,
+safetyLineHitRate 100%, worstSingleMonthMiss $30,817. Four hard-fail
+regression thresholds protect those numbers from silent drift on
+future engine changes.
+
+CLI flags: `--update-baseline` writes a fresh baseline; `--allow-regression`
+suppresses non-zero exit on threshold breaches. Exit codes: 0 pass /
+1 regression / 2 missing baseline.
+
+Harness fixture: 4,851-transaction snapshot stored as JSONL at
+`backtest-results/fixtures/transactions-snapshot.jsonl`. Historical
+operating-cash anchors for 2022-01-01 / 2023-01-01 / 2024-01-01 /
+2025-01-01 in `backtest-results/fixtures/historical-anchors.json`
+let the harness reconstruct absolute starting balances at every
+as-of date so level-dependent metrics are reliable.
+
+Run with: `npx tsx scripts/backtest/runBacktest.ts`.
+
+### Engine override seam (commit `7b7d0e5`)
+
+`src/lib/kpis/compute.ts` gained an optional `EngineParameterOverrides`
+argument on `projectScenario`. When undefined (the default for every
+production caller), behavior is byte-for-byte identical to before.
+Used only by `scripts/backtest/parameterSweep.ts` for diagnostic
+parameter sensitivity analysis. Production behavior is unchanged.
+
+### Diagnostic finding: locked engine loses to baselines
+
+Per-as-of wins/losses on worstSingleMonthMiss across the 15 as-of dates:
+- Engine vs naive YoY: 3/12 (engine loses 12 of 15)
+- Engine vs T12M-average: 1/14
+- Engine vs category-cadence: 6/9
+
+The parameter sweep (23 variants across all nine locked engine
+parameters) showed no single tweak closes the gap. The architecture is
+the issue, not the parameter values.
+
+### Category-cadence forecast comparator (production-promoted)
+
+`src/lib/kpis/categoryCadence.ts` exports two functions:
+- `categoryCadenceForecast(asOfDate, txns, anchors)` — pure function,
+  used by the harness.
+- `projectCategoryCadenceScenario(model, input, txns, startingCashBalance, events)`
+  — production-facing adapter that mirrors `projectScenario`'s output
+  shape (`ForecastProjectionResult`) so call sites can swap function
+  names with one extra argument (txns, the 3rd required arg).
+
+Each operating-cash category projects on its own cadence:
+- **STABLE** (Payroll, Rent, Utilities, Cleaning, Software Subscriptions,
+  Marketing, Office Expenses, Repairs and Maintenance, Bank Service
+  Charges, Merchant Fees) → trailing 3-month average.
+- **PERIODIC** (Taxes and Licenses, Insurance, Legal/Accounting/Prof
+  Services, Training & Education, Events & Community, Misc. Expense)
+  → same-month-last-year.
+- **EVENT** (COGS, Customer Refunds, Depreciation, Interest Paid)
+  → same-month-last-year.
+
+Special case: `Business Income:Sales` uses a trailing-12-month average.
+Validated in the harness against five alternative rules (3-mo, 6-mo,
+12-mo, 2-yr-YoY-average, 50/50 trailing-12 + 2-yr-YoY blend).
+Trailing-12 won on worstSingleMonthMiss (lowest of all tested rules)
+and per-as-of wins-vs-engine (9 of 15) while keeping safetyLineHitRate
+at 100%.
+
+Hybrid classification: hard-coded core list with full-string overrides
+for split-cadence parents (e.g. `Business Income:Sales` = EVENT,
+`Business Income:Other Income` = STABLE), plus a statistical fallback
+(months-active ratio + CV) for unanticipated categories.
+
+### Stage 3: production toggle on What-If page
+
+`src/pages/Dashboard.tsx` gained a segmented toggle in the What-If
+header (Engine / Category-Cadence). Engine remains the default;
+category-cadence is opt-in.
+
+State is component-local React `useState` only — no localStorage, no
+Supabase, no URL param, no context. Session-only by design: the toggle
+resets to Engine on every full page reload.
+
+Single call-site swap. The forecast-page `projectScenario` call is the
+only conditional invocation; the engine path is untouched. Downstream
+consumers (chart, decision cards, reserve gauge) consume only
+`ForecastProjectionResult.points` and `.seasonality` and need no
+changes — both functions return the same type.
+
+### Forecast architecture status
+
+- Engine: still locked, still default in production.
+- Category-cadence: production-visible, opt-in, NOT default.
+- Known Events overlay: not started; remains in backlog.
+- The forecast model toggle is the safety valve — Engine is always
+  one click away.
+
+### Commits (May 1, 2026, in order)
+
+```
+fb31ef4  feat(backtest): Phase 1 forecast backtest harness with optional anchors
+de36b70  docs(backtest): correct fixture refresh procedure
+3271b97  refactor(backtest): JSONL fixture format, drop CSV translation layer
+d295b27  chore(backtest): commit transactions snapshot fixture (4,851 rows)
+8367cc8  chore(backtest): commit historical anchors for level-dependent metrics
+2d6314b  feat(backtest): Phase 2 — baseline tracking, regression check, naive comparison
+61526dd  chore(backtest): lock canonical baseline metrics (Phase 2 follow-up)
+7b7d0e5  chore(forecast): add diagnostic-safe parameter override seam to engine
+f18480e  refactor(backtest): extract harness loop into pure callable runner
+a48ea76  diag(backtest): add parameter sensitivity sweep over engine overrides
+28e3f46  feat(backtest): add category-cadence comparator (data layer)
+0727411  feat(backtest): apply trailing-12 rule to Sales in category-cadence comparator
+2198620  feat(backtest): display category-cadence comparator in harness output
+0a79843  refactor(forecast): promote category-cadence comparator to src/lib/kpis/
+2baaac9  feat(forecast): add Stage 2 production adapter for category-cadence
+0cb00f2  feat(forecast): wire category-cadence into What-If as opt-in toggle
+```
+
+(`de36b70` was a docs-only correction inserted between Phase 1 and the
+JSONL refactor. The other 15 are the substantive commits.)
 
 ---
 
@@ -390,7 +524,11 @@ ba2c678  feat(cash-trend): drop target+gap, drop 6-bar chart, add status interpr
 - `src/context/SidebarContext.tsx` — sidebar collapse/mobile state
 - `src/pages/Dashboard.tsx` — data wiring, state, route rendering, boot sequence
 - `src/App.tsx` — HashRouter + SidebarProvider wrapping Dashboard
-- `src/lib/kpis/compute.ts` — forecast engine (DO NOT TOUCH)
+- `src/lib/kpis/compute.ts` — forecast engine (DO NOT TOUCH; diagnostic override seam exists, production callers do not use it)
+- `src/lib/kpis/categoryCadence.ts` — category-cadence forecast (pure function + production adapter; opt-in on What-If)
+- `src/lib/kpis/forecastShared.ts` — shared forecast types (`Anchor`, `ForecastSeries`, `SeriesPoint`) and starting-cash anchor helper (`reconstructStartingCash`); used by both production and harness
+- `scripts/backtest/` — diagnostic harness directory (runner, fixtures, comparators, regression check)
+- `backtest-results/` — frozen fixture (transactions JSONL + historical anchors) and locked `baseline.json`
 - `src/lib/cashFlow.ts` — operating cash rules (DO NOT TOUCH)
 - `src/lib/data/contract.ts` — TypeScript types (DO NOT TOUCH schema)
 - `src/lib/data/sharedPersistence.ts` — Supabase fetch layer (sensitive)
@@ -796,6 +934,19 @@ Index cap max:             2.00
 
 Reconciliation: 0.00% variance confirmed. Engine is auditable and locked.
 
+**Override seam (May 1, 2026):** the engine is still locked for
+production behavior, but `compute.ts` now exposes
+`EngineParameterOverrides` for diagnostic use only. Production callers
+do not pass overrides; their absence is byte-for-byte identical to the
+pre-seam engine. The seam exists only for the harness's parameter
+sensitivity sweep.
+
+**Sweep finding (May 1, 2026):** these parameter values were tested via
+the parameter sweep harness across 22 variants. No single tweak closed
+the gap against naive baselines. The engine remains as-is pending a
+decision on patch vs replace; in the meantime, the category-cadence
+comparator is available as an opt-in alternative on the What-If page.
+
 ---
 
 ## Operating Cash Rules (LOCKED — never regress)
@@ -964,12 +1115,16 @@ Suggest commit message only — never git add, never commit
 | businessRules localStorage | Legacy only — all reads/writes now go through shared_workspace_settings |
 | Claude API key | Required for Today page AI prose layer — must be in env vars, never in repo |
 | AI cost | ~$0.006–0.010 per AI call (1500 tokens in / 500 out). Design for prompt caching from day one — same data inputs = cached = 90% cheaper |
+| Forecast model toggle | Session-only by design. The What-If toggle resets to Engine on every page reload — no localStorage, no Supabase, no URL param, no context. Persistence is intentionally not implemented at this stage. |
+| Category-cadence — Known Events | Comparator does not yet handle Known Events. Adapter accepts the `events` argument for shape parity with `projectScenario` but ignores it. Known Events overlay has not started. |
 
 ---
 
 ## Locked Files — Do Not Modify Without Explicit Instruction
 
-- `src/lib/kpis/compute.ts`
+- `src/lib/kpis/compute.ts` (engine remains locked; the `EngineParameterOverrides` seam added May 1, 2026 is the only sanctioned modification path, used only for diagnostic parameter sweeps)
+- `src/lib/kpis/categoryCadence.ts` (category-cadence forecast — Stage 4+ work to extend it should follow the staged-promotion pattern; ad-hoc rewrites disturb the harness regression check)
+- `src/lib/kpis/forecastShared.ts` (shared types and starting-cash anchor; both production and harness depend on this — touching it requires re-running the harness)
 - `src/lib/cashFlow.ts`
 - `src/lib/data/contract.ts`
 - `src/lib/data/sharedPersistence.ts`
