@@ -8,7 +8,7 @@ inputs don't shift between runs. Never refresh casually.
 
 ### `transactions-snapshot.csv` (required)
 
-A CSV snapshot of the production `transactions` table at a point in time.
+A CSV snapshot of the production `shared_imported_transactions` table at a point in time.
 The harness loads it via `scripts/backtest/loadFixture.ts`.
 
 **Required columns** (header row, exact names, case-insensitive):
@@ -61,9 +61,16 @@ intentionally, with an explicit baseline reset.
 
 ## How to refresh `transactions-snapshot.csv`
 
-1. In Supabase Dashboard → Table Editor → `transactions`, export the
-   full table as CSV. Confirm the row count matches the dashboard's
-   System Status total.
+1. Pull the full table via Supabase SQL Editor (NOT Table Editor —
+   Table Editor's CSV export silently truncates at 1,000 rows):
+```sql
+   SELECT * FROM shared_imported_transactions
+   ORDER BY date ASC, id ASC;
+```
+   Click "Download CSV" on the result. Verify the row count matches
+   the dashboard's transaction count (System Status → Last import
+   summary). If the row count is short, the export truncated — do
+   not save the partial file.
 2. Save the file to this directory as `transactions-snapshot.csv`
    (overwrite the previous one).
 3. Run `npx tsx scripts/backtest/runBacktest.ts` and verify the harness
