@@ -1,4 +1,12 @@
-import type { Txn } from '../data/contract';
+import type {
+  DashboardModel,
+  ForecastEvent,
+  ForecastProjectionResult,
+  ForecastSeasonalityMeta,
+  ScenarioInput,
+  ScenarioPoint,
+  Txn,
+} from '../data/contract';
 import {
   forecastCashInContribution,
   forecastCashOutContribution,
@@ -255,4 +263,88 @@ export function categoryCadenceForecast(
   }
 
   return { asOfDate, startingCash, points };
+}
+
+// ─── Stage 2 adapter ─────────────────────────────────────────────────────────
+// Production-facing wrapper that mirrors projectScenario's output shape so
+// call sites can swap the function name without rewriting the surrounding
+// code.
+//
+// Stage 2 adapter: signature differs from projectScenario by
+// one required argument — txns — because the category-cadence
+// comparator builds its forecast directly from transactions
+// rather than from the precomputed rollups in DashboardModel.
+// Stage 3 call sites must pass filteredTxns explicitly.
+
+const EMPTY_SEASONALITY: ForecastSeasonalityMeta = {
+  mode: 'fallback',
+  confidence: 'none',
+  completeYearsUsed: [],
+  partialYearsExcluded: [],
+  weighting: [],
+  capMin: 0,
+  capMax: 0,
+  divergenceThresholdPct: 0,
+  warning: null,
+};
+
+/** Production-facing adapter for the category-cadence forecast. Mirrors
+ *  projectScenario's argument order and return shape so call sites can swap
+ *  function names with one extra argument (txns). The comparator caps the
+ *  projection horizon at 12 months; if input.months is larger, the result
+ *  is still 12 points. */
+export function projectCategoryCadenceScenario(
+  model: DashboardModel,
+  input: ScenarioInput,
+  txns: Txn[],
+  startingCashBalance = 0,
+  // STAGE 2: events are accepted for signature compatibility
+  // with projectScenario but not yet applied. Known Events
+  // overlay is planned for a future stage.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  events: ForecastEvent[] = []
+): ForecastProjectionResult {
+  if (model.forecastCashRollups.length === 0 || !model.latestMonth) {
+    return { points: [], seasonality: EMPTY_SEASONALITY };
+  }
+
+  // Project starting at the month *after* the model's last complete month,
+  // matching projectScenario's output alignment. The comparator's
+  // `categoryCadenceForecast` treats `monthOf(asOfDate)` as horizon month 1,
+  // so an as-of date in the next month yields the same first projected
+  // month as projectScenario.
+  const startMonth = addMonths(model.latestMonth, 1);
+  const asOfDate = `${startMonth}-01`;
+
+  // Production has no historical anchor file; pass [] and let the comparator
+  // zero-anchor its internal starting cash. We then overwrite endingCashBalance
+  // with the explicit startingCashBalance argument so absolute levels track
+  // production's current-cash convention rather than the harness's
+  // reconciliation anchor.
+  const series: ForecastSeries = categoryCadenceForecast(asOfDate, txns, []);
+
+  const requestedMonths = Math.max(0, Math.min(input.months, series.points.length));
+  const points: ScenarioPoint[] = [];
+  let prevBalance = startingCashBalance;
+  for (let i = 0; i < requestedMonths; i += 1) {
+    const cur = series.points[i];
+    // Re-anchor onto the production-supplied starting cash. The comparator's
+    // internal series uses its own zero-anchored starting cash; we walk the
+    // monthly deltas it produced and re-apply them to startingCashBalance.
+    const internalPrev = i === 0 ? series.startingCash : series.points[i - 1].endingCashBalance;
+    const monthlyDelta = cur.endingCashBalance - internalPrev;
+    const endingCashBalance = prevBalance + monthlyDelta;
+    points.push({
+      month: cur.month,
+      operatingCashIn: 0,
+      operatingCashOut: 0,
+      cashIn: 0,
+      cashOut: 0,
+      netCashFlow: monthlyDelta,
+      endingCashBalance,
+    });
+    prevBalance = endingCashBalance;
+  }
+
+  return { points, seasonality: EMPTY_SEASONALITY };
 }
