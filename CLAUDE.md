@@ -25,6 +25,41 @@ Update the lower document to match — do not leave contradictions in place.
 
 ---
 
+## Backlog management
+
+Notion is the sole source of truth for backlog state.
+
+- Backlog database: Wx CFO Scorecard — Backlog
+  https://www.notion.so/084420fff00444de9413a542db3dddf0
+- Data source ID: bc0648c6-c8df-4496-84ba-4c1b860ae51d
+- Schema: Name (title), Status (Now / Next / Later / Done),
+  Priority (P1–P5), Why (text)
+
+There is no BACKLOG.md. If a prior conversation, memory summary,
+or handoff document references BACKLOG.md — reading it at session
+start, fetching IDs from it, syncing card IDs into it — that
+reference is stale. Flag it before acting.
+
+When backlog state changes (status moves, new items confirmed,
+decisions that lock a constraint), sync directly to Notion via
+the MCP connector. Update only items that actually changed; do
+not rewrite the whole backlog. When a decision locks a constraint
+(threshold, copy string, architectural boundary), capture it in
+the Why field of the relevant item.
+
+What triggers a sync:
+- An item changes status (Now / Next / Later / Done)
+- A new item is confirmed and ready for tracking
+- A decision is locked that changes the Why or sequencing
+- A lower-priority item is promoted due to real blocking friction
+
+What does not trigger a sync:
+- Conversations about the backlog without a decision
+- Speculative or exploratory items not yet confirmed
+- Analysis, backtests, or design reviews still in progress
+
+---
+
 ## Required reading on session start
 
 Before doing any work, read these files in order:
