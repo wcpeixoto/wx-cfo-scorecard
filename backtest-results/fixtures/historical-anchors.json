@@ -1,0 +1,8 @@
+{
+  "anchors": [
+    { "asOfDate": "2022-01-01", "operatingCashBalance": 29492.83 },
+    { "asOfDate": "2023-01-01", "operatingCashBalance": 20107.12 },
+    { "asOfDate": "2024-01-01", "operatingCashBalance": 46556.73 },
+    { "asOfDate": "2025-01-01", "operatingCashBalance": 33947.93 }
+  ]
+}
