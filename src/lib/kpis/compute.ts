@@ -1924,10 +1924,29 @@ function averageCompleteYearMonthlyValue(
   return round2(Math.max(average(annualMonthlyAverages), 0));
 }
 
+// ─── Diagnostic-only parameter override seam ────────────────────────────────
+// When `overrides` is omitted or every field is undefined, every read site
+// below falls through to the same locked literal in use today. Production
+// callers do not pass overrides and remain bit-identical. This seam exists
+// purely to support diagnostic sweeps that vary one parameter at a time
+// against the real engine.
+export type EngineParameterOverrides = Partial<{
+  cashInTrailingWeight: number;
+  cashInHistoricalWeight: number;
+  outlierTrimFloor: number;
+  cashOutTrailingWeight: number;
+  cashOutHistoricalWeight: number;
+  yearWeights: [number, number, number, number];
+  winsorizationThreshold: number;
+  indexCapMin: number;
+  indexCapMax: number;
+}>;
+
 function deriveForecastBaseline(
   forecastCashRollups: ForecastCashRollup[],
   seasonalityBuild?: SeasonalIndicesBuild,
-  rollupsByYear?: Map<number, Map<number, ForecastCashRollup>>
+  rollupsByYear?: Map<number, Map<number, ForecastCashRollup>>,
+  overrides?: EngineParameterOverrides
 ): ForecastBaseline | null {
   if (forecastCashRollups.length === 0) return null;
 
@@ -1937,7 +1956,7 @@ function deriveForecastBaseline(
   const recentCashInValues = recentMonths.map((month) => month.cashIn);
   const trailingCashIn = round2(Math.max(average(recentCashInValues), 0));
   const trailingCashInMedian = Math.max(median(recentCashInValues), 0);
-  const trailingCashInTrimFloor = trailingCashInMedian * 0.6;
+  const trailingCashInTrimFloor = trailingCashInMedian * (overrides?.outlierTrimFloor ?? 0.6);
   const trimmedTrailingCashIn = round2(
     Math.max(
       average(
@@ -1956,11 +1975,15 @@ function deriveForecastBaseline(
     rollupsByYear && completeYearsUsed.length > 0
       ? averageCompleteYearMonthlyValue(completeYearsUsed, rollupsByYear, (rollup) => rollup.cashOut)
       : null;
+  const cashInTrailingWeight = overrides?.cashInTrailingWeight ?? 0.3;
+  const cashInHistoricalWeight = overrides?.cashInHistoricalWeight ?? 0.7;
+  const cashOutTrailingWeight = overrides?.cashOutTrailingWeight ?? 0.6;
+  const cashOutHistoricalWeight = overrides?.cashOutHistoricalWeight ?? 0.4;
   const baselineCashIn = round2(
-    Math.max(historicalCashIn === null ? trimmedTrailingCashIn : trimmedTrailingCashIn * 0.3 + historicalCashIn * 0.7, 0)
+    Math.max(historicalCashIn === null ? trimmedTrailingCashIn : trimmedTrailingCashIn * cashInTrailingWeight + historicalCashIn * cashInHistoricalWeight, 0)
   );
   const baselineCashOut = round2(
-    Math.max(historicalCashOut === null ? trailingCashOut : trailingCashOut * 0.6 + historicalCashOut * 0.4, 0)
+    Math.max(historicalCashOut === null ? trailingCashOut : trailingCashOut * cashOutTrailingWeight + historicalCashOut * cashOutHistoricalWeight, 0)
   );
   const priorCashIn = round2(Math.max(average(priorMonths.map((month) => month.cashIn)), 0));
   const priorCashOut = round2(Math.max(average(priorMonths.map((month) => month.cashOut)), 0));
@@ -2099,7 +2122,8 @@ function buildSeasonalIndexByMonth(
   rollupsByYear: Map<number, Map<number, ForecastCashRollup>>,
   pickValue: (rollup: ForecastCashRollup) => number,
   capMin: number,
-  capMax: number
+  capMax: number,
+  winsorizationThreshold: number = 0.3
 ): number[] | null {
   const usableYears = years
     .map((year, index) => {
@@ -2124,8 +2148,8 @@ function buildSeasonalIndexByMonth(
       return entry.averageValue > EPSILON ? value / entry.averageValue : 1;
     });
     const medianRatio = median(ratios);
-    const lowerBound = medianRatio * 0.7;
-    const upperBound = medianRatio * 1.3;
+    const lowerBound = medianRatio * (1 - winsorizationThreshold);
+    const upperBound = medianRatio * (1 + winsorizationThreshold);
     const winsorized = ratios.map((ratio) => clamp(ratio, lowerBound, upperBound));
     indices[monthNumber] = round2(clamp(weightedAverage(winsorized, usableWeights), capMin, capMax));
   }
@@ -2133,7 +2157,10 @@ function buildSeasonalIndexByMonth(
   return indices;
 }
 
-function buildForecastSeasonality(forecastCashRollups: ForecastCashRollup[]): SeasonalIndicesBuild {
+function buildForecastSeasonality(
+  forecastCashRollups: ForecastCashRollup[],
+  overrides?: EngineParameterOverrides
+): SeasonalIndicesBuild {
   const { completeYears, partialYears, rollupsByYear } = collectForecastYears(forecastCashRollups);
   const tier = getForecastSeasonalityTier(completeYears.length);
 
@@ -2145,22 +2172,35 @@ function buildForecastSeasonality(forecastCashRollups: ForecastCashRollup[]): Se
     };
   }
 
-  const completeYearsUsed = completeYears.slice(-tier.weighting.length).reverse();
+  // Apply yearWeights override only when the active tier's natural weighting
+  // is the same length (4 — strong-confidence tier). Other tiers keep their
+  // locked shape.
+  const effectiveWeighting =
+    overrides?.yearWeights && tier.weighting.length === overrides.yearWeights.length
+      ? overrides.yearWeights
+      : tier.weighting;
+  const effectiveCapMin = overrides?.indexCapMin ?? tier.capMin;
+  const effectiveCapMax = overrides?.indexCapMax ?? tier.capMax;
+  const effectiveWinsorThreshold = overrides?.winsorizationThreshold ?? 0.3;
+
+  const completeYearsUsed = completeYears.slice(-effectiveWeighting.length).reverse();
   const cashInByMonth = buildSeasonalIndexByMonth(
     completeYearsUsed,
-    tier.weighting,
+    effectiveWeighting,
     rollupsByYear,
     (rollup) => rollup.cashIn,
-    tier.capMin,
-    tier.capMax
+    effectiveCapMin,
+    effectiveCapMax,
+    effectiveWinsorThreshold
   );
   const cashOutByMonth = buildSeasonalIndexByMonth(
     completeYearsUsed,
-    tier.weighting,
+    effectiveWeighting,
     rollupsByYear,
     (rollup) => rollup.cashOut,
-    tier.capMin,
-    tier.capMax
+    effectiveCapMin,
+    effectiveCapMax,
+    effectiveWinsorThreshold
   );
 
   if (!cashInByMonth || !cashOutByMonth) {
@@ -2226,15 +2266,21 @@ function buildForecastDivergenceWarning(
   };
 }
 
-export function projectScenario(model: DashboardModel, input: ScenarioInput, startingCashBalance = 0, events: ForecastEvent[] = []): ForecastProjectionResult {
+export function projectScenario(
+  model: DashboardModel,
+  input: ScenarioInput,
+  startingCashBalance = 0,
+  events: ForecastEvent[] = [],
+  overrides?: EngineParameterOverrides
+): ForecastProjectionResult {
   const emptySeasonality = createSeasonalityMeta(getForecastSeasonalityTier(0), [], []);
   if (model.forecastCashRollups.length === 0) {
     return { points: [], seasonality: emptySeasonality };
   }
 
-  const seasonalityBuild = buildForecastSeasonality(model.forecastCashRollups);
+  const seasonalityBuild = buildForecastSeasonality(model.forecastCashRollups, overrides);
   const { rollupsByYear } = collectForecastYears(model.forecastCashRollups);
-  const baseline = deriveForecastBaseline(model.forecastCashRollups, seasonalityBuild, rollupsByYear);
+  const baseline = deriveForecastBaseline(model.forecastCashRollups, seasonalityBuild, rollupsByYear, overrides);
   if (!baseline) return { points: [], seasonality: emptySeasonality };
 
   const latestForecastMonth = model.forecastCashRollups[model.forecastCashRollups.length - 1]?.month;
