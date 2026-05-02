@@ -519,6 +519,97 @@ declared "shipped."
   must communicate the 12-month confidence boundary if longer horizons
   are exposed.
 
+### May 2, 2026 — Reality Forecast locked as main/default
+
+Current locked product decision following the Conservative Floor
+diagnostic and a revenue-seasonality sanity check.
+
+**Reality Forecast = Conservative Floor** is now the main/default forecast
+for the product. It replaces any prior framing of Split Conservative as
+"Expected" or Conservative Floor as "Downside."
+
+Composition (unchanged from diagnostic):
+- cash-in  = min(Engine operatingCashIn, Cadence operatingCashIn)
+- cash-out = max(Engine operatingCashOut, Cadence operatingCashOut)
+- net      = cash-in − cash-out
+
+Why Reality Forecast is the default:
+1. Matches current business reality. 2026 YTD P&L is negative; Split
+   was projecting too optimistically over 1y for an operator who needs
+   a planning view, not a neutral best-estimate.
+2. Best retrospective performance at longer horizons:
+   90d avg abs net error $6,512; 1y avg abs net error $6,686.
+3. Intentionally cautious by construction. Floor under-projected
+   actuals in 4/5 retrospective 1y windows. It is framed as a
+   planning forecast, not a perfectly neutral prediction.
+4. Revenue-seasonality sanity check passed. Reality does not crush
+   recurring November / promo-season strength:
+   - Historical November avg cash-in: ~$41.9K
+   - Engine November: ~$41.8K
+   - Cadence November: ~$40.9K
+   - Reality November: ~$40.9K
+   Recurring seasonal revenue is learned well enough from history.
+
+Reality Forecast is a cash-flow planning forecast, not a P&L net-income
+forecast; the P&L screenshot is used as a business-reality smell test,
+not as a direct accounting match.
+
+Locked product framing:
+
+| Role | Model | User-facing? |
+|---|---|---|
+| Main/default forecast | Reality Forecast (= Conservative Floor) | Yes — default |
+| Advanced alternate posture | Recovery Forecast (= Split Conservative) | Settings/Advanced only |
+| Diagnostic comparator | Engine | No — internal/diagnostic |
+| Diagnostic comparator | Category-Cadence | No — internal/diagnostic |
+
+Retired language (do not use going forward):
+- "Expected" for Split Conservative
+- "Downside" as the main user-facing label for Conservative Floor / Reality
+- "Expected vs Downside" as a Forecast-page choice
+
+Product behavior direction:
+- Forecast page eventually has no model toggle.
+- Forecast page shows Reality Forecast by default.
+- Forecast-page controls remain scenario controls only:
+  Base Case / Best Case / Worst Case / Custom Case.
+- Forecast posture belongs in Settings (or Advanced Settings).
+- Default Settings posture = Reality Forecast.
+- Recovery Forecast ships as an advanced Settings option, not as a
+  visible Forecast-page control.
+- Engine and Category-Cadence are not exposed as normal user-facing
+  choices.
+
+Known Events policy:
+Known Events policy is unresolved for Reality/Recovery composed
+forecasts. The Add Cash Event feature exists and Engine has event
+handling, but Cadence does not consistently apply events and Phase 2
+intentionally excluded events from Split Conservative. Resolving event
+handling consistently for both composed models (Reality and Recovery)
+is deferred to a later policy phase.
+
+Distinction to preserve when that policy work happens:
+- Recurring seasonal patterns (e.g. November promo lift) should be
+  learned from history, not entered as Cash Events.
+- Manual Cash Events are reserved for unusual, changed, or one-off
+  future events that history will not capture.
+
+Implementation sequence (locked):
+1. Pure Conservative Floor module (`src/lib/kpis/conservativeFloor.ts`),
+   no UI surface.
+2. Settings-based forecast posture, in sub-phases:
+   - 2a — schema + persistence (touches locked files
+     `src/lib/data/contract.ts` and `src/lib/data/sharedPersistence.ts`;
+     approved in principle, each prompt must still justify)
+   - 2b — Settings UI control + copy
+   - 2c — Forecast page consumes posture and removes the model toggle
+   - 2d — audit Today and any other forecast-dependent surfaces for
+     posture consistency
+
+Temporary 4th Forecast-page toggle (Path A) is rejected. The Forecast
+page should reach its final shape (no model toggle) as quickly as the
+Settings work allows.
+
 ---
 
 ## What Changed Recently (April 30, 2026 — afternoon session)

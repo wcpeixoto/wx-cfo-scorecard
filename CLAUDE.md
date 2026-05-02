@@ -457,12 +457,16 @@ wrong results silently.
 
 ### Forecast model roles
 
-Split Conservative is the calibrated expected-case hybrid, not "the
-conservative forecast." Conservative Floor is the deliberately pessimistic
-downside/stress view. Engine and Category-Cadence remain diagnostic
-comparators. Do not promote a single primary/default forecast without first
-checking `wx_cfo_scorecard_context_v2_6.md` for the latest Expected/Downside
-product decision and policy constraints.
+Reality Forecast (= Conservative Floor) is the main/default forecast for
+the product. Recovery Forecast (= Split Conservative) is an advanced
+Settings-only alternate posture. Engine and Category-Cadence are
+diagnostic comparators, not user-facing choices. Default Settings
+posture is Reality Forecast. The Forecast page consumes the selected
+posture and exposes only scenario controls (Base/Best/Worst/Custom);
+no model toggle.
+
+See "May 2, 2026 — Reality Forecast locked as main/default" in
+wx_cfo_scorecard_context_v2_6.md for full context and rationale.
 
 ---
 
