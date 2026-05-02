@@ -74,6 +74,10 @@ type SharedWorkspaceSettingRow = {
   safety_reserve_amount: number;
   suppress_duplicate_warnings: boolean;
   acknowledged_noncash_accounts: string[];
+  // Optional in the row type because it is absent from PostgREST
+  // responses before the Supabase migration adds the column. The
+  // row mapper defaults missing/null/unexpected values to 'reality'.
+  forecast_posture?: string | null;
 };
 
 export type WorkspaceSettings = {
@@ -82,6 +86,7 @@ export type WorkspaceSettings = {
   safetyReserveAmount: number;
   suppressDuplicateWarnings: boolean;
   acknowledgedNoncashAccounts: string[];
+  forecastPosture: 'reality' | 'recovery';
 };
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
@@ -90,6 +95,7 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   safetyReserveAmount: 0,
   suppressDuplicateWarnings: false,
   acknowledgedNoncashAccounts: [],
+  forecastPosture: 'reality',
 };
 
 function isConfigured(): boolean {
@@ -404,6 +410,13 @@ function fromSharedWorkspaceSettingRow(row: SharedWorkspaceSettingRow): Workspac
     acknowledgedNoncashAccounts: Array.isArray(row.acknowledged_noncash_accounts)
       ? row.acknowledged_noncash_accounts.filter((id): id is string => typeof id === 'string')
       : [],
+    // Defensive: handles three pre/post-migration cases — column missing
+    // (undefined), column null, or column with unexpected value. All fall
+    // through to the locked product default of 'reality'.
+    forecastPosture:
+      row.forecast_posture === 'reality' || row.forecast_posture === 'recovery'
+        ? row.forecast_posture
+        : 'reality',
   };
 }
 
@@ -415,6 +428,11 @@ function toSharedWorkspaceSettingRow(settings: WorkspaceSettings): SharedWorkspa
     safety_reserve_amount: settings.safetyReserveAmount,
     suppress_duplicate_warnings: settings.suppressDuplicateWarnings,
     acknowledged_noncash_accounts: settings.acknowledgedNoncashAccounts,
+    // Note: writing forecast_posture before the Supabase migration adds
+    // the column will fail at the DB layer. The write path is only
+    // exercised by user action in Settings UI (sub-phase 2b), so this
+    // is not a real risk in practice.
+    forecast_posture: settings.forecastPosture,
   };
 }
 
