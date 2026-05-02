@@ -25,14 +25,19 @@ export type CategoryCadence = 'STABLE' | 'PERIODIC' | 'EVENT';
 // EVENT → same calendar month one year ago (until Known Events lands).
 //
 // Per-category projection overrides (applied before the cadence dispatch):
-//   Business Income:Sales → trailing 12-month average
-//     Sales is recurring revenue with high month-to-month variance.
-//     YoY (the EVENT default) overweights the lumpiest months; a
-//     trailing-12 average smooths to the underlying run-rate. Validated
-//     in the harness sweep — F outperformed YoY (current), 3-mo, 6-mo,
-//     YoY-blend, and a 50/50 blend of trailing-12 and YoY on
-//     worstSingleMonthMiss and per-as-of wins-vs-engine, while keeping
-//     safetyLineHitRate at 100%.
+//   Business Income:Sales → 50/50 blend of trailing-12 + 2-yr-YoY-average
+//     Sales is recurring revenue with high month-to-month variance and a
+//     consistent July strength signal across 2022–2025. The previous rule
+//     (trailing-12 alone) erased all monthly shape — projecting May=Jun=Jul
+//     — including the year-after-year July spike. Pure same-month-last-year
+//     stakes the projection on a single noisy year; pure 2-yr-YoY captures
+//     the full seasonal shape but commits 100% to two-year-old data. The
+//     50/50 blend (trailing-12 run-rate + average of the same calendar
+//     month from the prior two years, computed component-wise) keeps July
+//     strength and non-flat shape visible while damping single-year noise.
+//     2-yr-YoY-average degrades gracefully when one prior year is missing
+//     by averaging the available prior-year months instead of treating
+//     missing history as zero.
 
 const STABLE_PARENTS = new Set<string>([
   'Payroll',
@@ -220,6 +225,26 @@ function trailing12MonthAvg(
   return count > 0 ? sum / count : 0;
 }
 
+/** Average of the same calendar month from the prior 1 and 2 years.
+ *  Missing prior-year months are dropped from the average rather than
+ *  treated as zero — matches trailing12MonthAvg's graceful-degradation
+ *  semantics. If both prior years are missing, returns 0 (no signal). */
+function twoYearYoYAvg(
+  catMonths: Map<string, number>,
+  horizonMonth: string
+): number {
+  let sum = 0;
+  let count = 0;
+  for (const lookback of [-12, -24]) {
+    const v = catMonths.get(addMonths(horizonMonth, lookback));
+    if (v !== undefined) {
+      sum += v;
+      count += 1;
+    }
+  }
+  return count > 0 ? sum / count : 0;
+}
+
 /** Category-cadence forecast: each operating-cash category projects on its
  *  own cadence (STABLE → trailing-3 average; PERIODIC/EVENT → same month last
  *  year). Categories whose cashFlow.ts contributions are zero (transfers,
@@ -243,11 +268,24 @@ export function categoryCadenceForecast(
     for (const [category, monthMap] of netByCategory) {
       const cls = classifications.get(category);
       if (!cls) continue;
-      // Per-category override: Business Income:Sales uses a trailing
-      // 12-month average instead of the EVENT-default same-month-last-year.
-      // See top-of-file note for the rationale and harness validation.
+      // Per-category override: Business Income:Sales uses a 50/50 blend of
+      // a trailing-12 run-rate and a 2-year YoY average (component-wise).
+      // Trailing-12 alone erases all monthly shape; 2-yr-YoY alone overcommits
+      // to two-year-old data. The blend restores July strength and seasonal
+      // shape while damping single-year noise. See top-of-file note.
+      //
+      // Cutoff safety (Sales only): both component lookups query strictly
+      // months before startMonth — trailing-12 walks back from startMonth-1,
+      // 2-yr-YoY queries horizonMonth-12 and horizonMonth-24 (both before
+      // startMonth for every horizon month). No future-dated txn can affect
+      // the Sales projection. This claim is scoped to Sales — classifyCategories
+      // runs over the full txns array and the statistical fallback (months-
+      // active ratio + CV) can shift if future-dated rows are present, so a
+      // global cutoff-safety claim for non-hard-coded categories is not made.
       if (category === 'Business Income:Sales') {
-        monthlyDelta += trailing12MonthAvg(monthMap, startMonth);
+        const trailingComponent = trailing12MonthAvg(monthMap, startMonth);
+        const yoyComponent = twoYearYoYAvg(monthMap, horizonMonth);
+        monthlyDelta += 0.5 * trailingComponent + 0.5 * yoyComponent;
         continue;
       }
       if (cls.cadence === 'STABLE') {
