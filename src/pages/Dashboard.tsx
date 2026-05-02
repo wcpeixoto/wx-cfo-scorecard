@@ -50,6 +50,7 @@ import {
   toMonthLabel,
 } from '../lib/kpis/compute';
 import { projectCategoryCadenceScenario } from '../lib/kpis/categoryCadence';
+import { composeSplitConservative } from '../lib/kpis/splitConservative';
 import type {
   AccountRecord,
   AccountType,
@@ -612,10 +613,10 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [storedImportedTransactionCount, setStoredImportedTransactionCount] = useState(0);
   const [accountRecords, setAccountRecords] = useState<AccountRecord[]>(getStoredAccountSettings);
   const [selectedScenarioKey, setSelectedScenarioKey] = useState<ForecastScenarioKey>('base');
-  // Stage 3 production wiring: opt-in switch between the locked engine and the
-  // category-cadence comparator. Session-only — defaults to 'engine' on every
-  // page load.
-  const [forecastModel, setForecastModel] = useState<'engine' | 'category-cadence'>('engine');
+  // Stage 3 production wiring: opt-in switch between the locked engine,
+  // category-cadence comparator, and split-conservative composition.
+  // Session-only — defaults to 'engine' on every page load.
+  const [forecastModel, setForecastModel] = useState<'engine' | 'category-cadence' | 'split-conservative'>('engine');
   const [customScenarioInput, setCustomScenarioInput] = useState<ScenarioInput>(DEFAULT_CUSTOM_SCENARIO);
   const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('lastMonth');
   const [netCashFlowChartMode, setNetCashFlowChartMode] = useState<CashFlowMode>('operating');
@@ -1552,21 +1553,43 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
         ...scenarioInput,
         months: Math.max(scenarioInput.months, forecastRangeMonths),
       };
-      const result =
-        forecastModel === 'category-cadence'
-          ? projectCategoryCadenceScenario(
-              model,
-              scenarioWithMonths,
-              filteredTxns,
-              forecastCurrentCashBalance,
-              forecastEvents
-            )
-          : projectScenario(
-              model,
-              scenarioWithMonths,
-              forecastCurrentCashBalance,
-              forecastEvents
-            );
+      // Performance rule: only compute both Engine and Cadence projections when
+      // split-conservative is selected. Engine and Cadence arms each run a single
+      // projection call. Split Conservative arm runs both with events=[] (Known
+      // Events intentionally excluded in Phase 2 — see composeSplitConservative
+      // policy notes for rationale).
+      let result;
+      if (forecastModel === 'category-cadence') {
+        result = projectCategoryCadenceScenario(
+          model,
+          scenarioWithMonths,
+          filteredTxns,
+          forecastCurrentCashBalance,
+          forecastEvents
+        );
+      } else if (forecastModel === 'split-conservative') {
+        const engineProj = projectScenario(
+          model,
+          scenarioWithMonths,
+          forecastCurrentCashBalance,
+          []
+        );
+        const cadenceProj = projectCategoryCadenceScenario(
+          model,
+          scenarioWithMonths,
+          filteredTxns,
+          forecastCurrentCashBalance,
+          []
+        );
+        result = composeSplitConservative(engineProj, cadenceProj, forecastCurrentCashBalance);
+      } else {
+        result = projectScenario(
+          model,
+          scenarioWithMonths,
+          forecastCurrentCashBalance,
+          forecastEvents
+        );
+      }
       if (import.meta.env.DEV && !bootPhaseLoggedRef.current.forecast && model.monthlyRollups.length > 0) {
         bootPhaseLoggedRef.current.forecast = true;
         console.log('[BOOT] Forecast compute:', Math.round(performance.now() - fcT0), 'ms');
@@ -2706,6 +2729,13 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                     onClick={() => setForecastModel('engine')}
                   >
                     Engine
+                  </button>
+                  <button
+                    type="button"
+                    className={`segmented-toggle-btn${forecastModel === 'split-conservative' ? ' is-active' : ''}`}
+                    onClick={() => setForecastModel('split-conservative')}
+                  >
+                    Split Conservative
                   </button>
                   <button
                     type="button"
