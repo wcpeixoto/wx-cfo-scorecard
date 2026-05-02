@@ -161,10 +161,15 @@ create table shared_workspace_settings (
 |---|---|
 | `src/pages/Dashboard.tsx` | Data wiring, state, tab routing, boot sequence |
 | `src/lib/kpis/compute.ts` | Forecast engine — **DO NOT TOUCH** |
+| `src/lib/kpis/categoryCadence.ts` | Category-Cadence forecast comparator and production adapter — sensitive |
+| `src/lib/kpis/forecastShared.ts` | Shared forecast series/anchor types used by production and backtests — sensitive |
+| `src/lib/kpis/splitConservative.ts` | Split Conservative composition helper |
 | `src/lib/cashFlow.ts` | Operating cash rules — **DO NOT TOUCH** |
 | `src/lib/data/contract.ts` | TypeScript types — **DO NOT TOUCH schema** |
 | `src/lib/data/sharedPersistence.ts` | Supabase fetch layer — sensitive |
 | `src/lib/charts/movingAverage.ts` | EMA function |
+| `scripts/backtest/conservativeFloorDiagnostic.ts` | Repeatable Conservative Floor diagnostic |
+| `backtest-results/conservativeFloorReport.md` | Generated Conservative Floor diagnostic report |
 | `src/components/CashFlowForecastModule.tsx` | Forecast UI + Known Events |
 | `src/components/TrendLineChart.tsx` | Custom SVG chart (shared) |
 | `src/components/LoadingScreen.tsx` | Branded boot loading screen |
@@ -450,14 +455,23 @@ as UTC midnight, which in US timezones resolves to the previous day via
 `getMonth()`, shifting the analysis window one month early and producing
 wrong results silently.
 
+### Forecast model roles
+
+Split Conservative is the calibrated expected-case hybrid, not "the
+conservative forecast." Conservative Floor is the deliberately pessimistic
+downside/stress view. Engine and Category-Cadence remain diagnostic
+comparators. Do not promote a single primary/default forecast without first
+checking `wx_cfo_scorecard_context_v2_6.md` for the latest Expected/Downside
+product decision and policy constraints.
+
 ---
 
 ## Session close discipline
 
 Any session that commits a change to a documentation file in the repo root
-must re-upload that file to the Claude project before closing.
+must re-upload that file to the Codex/Claude project snapshot before closing.
 
-Documentation files that must stay in sync with the Claude project:
+Documentation files that must stay in sync with the Codex/Claude project:
 - `UI_RULES.md`
 - `UI_CARDS.md`
 - `CLAUDE.md`
@@ -466,10 +480,11 @@ Documentation files that must stay in sync with the Claude project:
 
 
 Checklist before closing any session that touched doc files:
-□ Re-upload changed .md files to the Claude project (claude.ai → project → files)
-□ Confirm Claude project files match repo state
+□ Re-upload changed .md files to the Codex/Claude project (project → files)
+□ Confirm project files match repo state
 □ Do not close the session until the upload is confirmed
 
-Why this exists: Claude project files are snapshots, not live repo files.
-Every commit that changes a doc file makes the Claude project stale.
-Stale project files cause Claude to read outdated specs and produce wrong guidance.
+Why this exists: project files are snapshots, not live repo files.
+Every commit that changes a doc file makes the project snapshot stale.
+Stale project files cause future agents to read outdated specs and produce
+wrong guidance.
