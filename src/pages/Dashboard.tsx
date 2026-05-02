@@ -2725,17 +2725,17 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 <div className="segmented-toggle" role="group" aria-label="Forecast model">
                   <button
                     type="button"
-                    className={`segmented-toggle-btn${forecastModel === 'engine' ? ' is-active' : ''}`}
-                    onClick={() => setForecastModel('engine')}
-                  >
-                    Engine
-                  </button>
-                  <button
-                    type="button"
                     className={`segmented-toggle-btn${forecastModel === 'split-conservative' ? ' is-active' : ''}`}
                     onClick={() => setForecastModel('split-conservative')}
                   >
                     Split Conservative
+                  </button>
+                  <button
+                    type="button"
+                    className={`segmented-toggle-btn${forecastModel === 'engine' ? ' is-active' : ''}`}
+                    onClick={() => setForecastModel('engine')}
+                  >
+                    Engine
                   </button>
                   <button
                     type="button"
@@ -3751,117 +3751,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               <span className="ui-lab-dev-badge">Dev only</span>
             </div>
 
-            {/* ── Section 1: KPI Cards ─────────────────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">KPI Cards</h3>
-                <p className="ui-lab-section-subtitle">Metric tiles with value, label, delta, and trend indicator</p>
-              </div>
-              <div className="ui-lab-placeholder">
-                <span className="ui-lab-placeholder-label">Patterns go here</span>
-              </div>
-            </div>
-
-            {/* ── Section 2: Chart Cards ───────────────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Chart Cards</h3>
-                <p className="ui-lab-section-subtitle">Chart container with title, subtitle, toolbar placeholder, and chart area</p>
-              </div>
-              <div className="ui-lab-placeholder">
-                <span className="ui-lab-placeholder-label">Patterns go here</span>
-              </div>
-            </div>
-
-            {/* ── Section 3: Status Cards ──────────────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Status Cards</h3>
-                <p className="ui-lab-section-subtitle">System status, health indicators, and alert states</p>
-              </div>
-              <div className="ui-lab-placeholder">
-                <span className="ui-lab-placeholder-label">Patterns go here</span>
-              </div>
-            </div>
-
-            {/* ── Section 4: Section Headers ───────────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Section Headers</h3>
-                <p className="ui-lab-section-subtitle">Page titles, section titles, and subtitles with optional controls</p>
-              </div>
-              <div className="ui-lab-placeholder">
-                <span className="ui-lab-placeholder-label">Patterns go here</span>
-              </div>
-            </div>
-
-            {/* ── Section 5: Insight Banners ───────────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Insight Banners</h3>
-                <p className="ui-lab-section-subtitle">Callout blocks for top-level interpretive sentences</p>
-              </div>
-              <div className="ui-lab-placeholder">
-                <span className="ui-lab-placeholder-label">Patterns go here</span>
-              </div>
-            </div>
-
-            {/* ── Section 6: Tables ────────────────────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Tables</h3>
-                <p className="ui-lab-section-subtitle">Data rows, column headers, and sortable list patterns</p>
-              </div>
-              <div className="ui-lab-placeholder">
-                <span className="ui-lab-placeholder-label">Patterns go here</span>
-              </div>
-            </div>
-
-            {/* ── Section 7: Segmented Toggles ─────────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Segmented Toggles</h3>
-                <p className="ui-lab-section-subtitle">Period selectors, view switchers, and option groups</p>
-              </div>
-              <div className="ui-lab-placeholder">
-                <span className="ui-lab-placeholder-label">Patterns go here</span>
-              </div>
-            </div>
-
-            {/* ── Section 8: Badges and Pills ──────────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Badges and Pills</h3>
-                <p className="ui-lab-section-subtitle">Status labels, category tags, and count indicators</p>
-              </div>
-              <div className="ui-lab-placeholder">
-                <span className="ui-lab-placeholder-label">Patterns go here</span>
-              </div>
-            </div>
-
-            {/* ── Section 9: Empty States ───────────────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Empty States</h3>
-                <p className="ui-lab-section-subtitle">Zero-data and loading placeholder patterns</p>
-              </div>
-              <div className="ui-lab-placeholder">
-                <span className="ui-lab-placeholder-label">Patterns go here</span>
-              </div>
-            </div>
-
-            {/* ── Section 10: Dark Mode Readiness ──────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Dark Mode Readiness</h3>
-                <p className="ui-lab-section-subtitle">Placeholder space to validate dark variants — built alongside light, not retrofitted later</p>
-              </div>
-              <div className="ui-lab-placeholder">
-                <span className="ui-lab-placeholder-label">Patterns go here</span>
-              </div>
-            </div>
-
-            {/* ── Section 11: Efficiency Opportunities Card ─────────────── */}
+            {/* ── Efficiency Opportunities Card ────────────────────────── */}
             <div className="ui-lab-section">
               <div className="ui-lab-section-head">
                 <h3 className="ui-lab-section-title">Efficiency Opportunities Card</h3>
@@ -3872,7 +3762,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               </div>
             </div>
 
-            {/* ── Section 12: Dig Here Card (new design mock) ───────────── */}
+            {/* ── Dig Here Card (new design mock) ──────────────────────── */}
             <div className="ui-lab-section">
               <div className="ui-lab-section-head">
                 <h3 className="ui-lab-section-title">Dig Here Card — New Design</h3>
@@ -3883,7 +3773,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               </div>
             </div>
 
-            {/* ── Section 13: Cash Trend Hero Card ─────────────────────── */}
+            {/* ── Cash Trend Hero Card ─────────────────────────────────── */}
             <div className="ui-lab-section">
               <div className="ui-lab-section-head">
                 <h3 className="ui-lab-section-title">Cash Trend Hero Card</h3>
@@ -3896,7 +3786,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               </div>
             </div>
 
-            {/* ── Section 14: Cash Trend + Monthly Net Cash Flow ─────────── */}
+            {/* ── Cash Trend + Monthly Net Cash Flow ───────────────────── */}
             <div className="ui-lab-section">
               <div className="ui-lab-section-head">
                 <h3 className="ui-lab-section-title">Cash Trend + Monthly Net Cash Flow</h3>

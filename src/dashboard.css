@@ -5053,22 +5053,6 @@ body {
   color: #98A2B3;
 }
 
-.ui-lab-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 80px;
-  border-radius: 8px;
-  border: 1.5px dashed #D0D5DD;
-  background: #F9FAFB;
-}
-
-.ui-lab-placeholder-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: #98A2B3;
-}
-
 /* UI Lab — 2-column half-width preview grid */
 .ui-lab-two-col-grid {
   display: grid;
