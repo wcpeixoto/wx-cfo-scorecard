@@ -50,7 +50,8 @@ parameter sensitivity analysis. Production behavior is unchanged.
 Per-as-of wins/losses on worstSingleMonthMiss across the 15 as-of dates:
 - Engine vs naive YoY: 3/12 (engine loses 12 of 15)
 - Engine vs T12M-average: 1/14
-- Engine vs category-cadence: 6/9
+- Engine vs category-cadence: 7/8 after the Sales-rule swap in `4a97cbd`
+  (was 6/9 under the previous trailing-12 Sales rule)
 
 The parameter sweep (23 variants across all nine locked engine
 parameters) showed no single tweak closes the gap. The architecture is
@@ -76,12 +77,32 @@ Each operating-cash category projects on its own cadence:
 - **EVENT** (COGS, Customer Refunds, Depreciation, Interest Paid)
   → same-month-last-year.
 
-Special case: `Business Income:Sales` uses a trailing-12-month average.
-Validated in the harness against five alternative rules (3-mo, 6-mo,
-12-mo, 2-yr-YoY-average, 50/50 trailing-12 + 2-yr-YoY blend).
-Trailing-12 won on worstSingleMonthMiss (lowest of all tested rules)
-and per-as-of wins-vs-engine (9 of 15) while keeping safetyLineHitRate
-at 100%.
+Special case: `Business Income:Sales` now uses a 50/50 component-wise
+blend of trailing-12 run-rate and 2-year YoY average (`4a97cbd`). The
+previous trailing-12-only rule had a flatness problem: it projected
+May=Jun=Jul and erased all monthly shape, including the consistent July
+strength visible in 2022–2025 Sales history. The 50/50 rule keeps
+non-flat summer shape and July strength visible without overcommitting
+to pure same-month-last-year or pure 2-yr-YoY volatility.
+
+Sales-rule decision notes:
+- Refresh source: Quicken CSV exports through 2026-05-08. `Business
+  Income:Sales` matched exactly across No Transfers, Transfers inside
+  the report, and Transfers outside the report; transfer handling does
+  not affect Sales totals.
+- Refreshed April 2026 Sales closed at $39,329, replacing the stale
+  frozen-fixture MTD value of $22,991 through 2026-04-21.
+- Production verification for as-of 2026-05-01 matched the diagnostic
+  exactly: May $37,300 / Jun $35,445 / Jul $44,195.
+- `worstSingleMonthMiss` is not decisive for this Sales-specific rule;
+  treat it as one signal alongside operator-facing shape, historical
+  seasonality, and trust/volatility.
+- Sales projection lookups are cutoff-safe: both trailing-12 and
+  2-yr-YoY components query months strictly before `startMonth`.
+  This is a Sales-scoped statement only. `classifyCategories(txns)`
+  still runs over the full transaction array; future-dated rows could
+  influence statistical fallback classification for non-hard-coded
+  categories, which remains a separate audit item.
 
 Hybrid classification: hard-coded core list with full-string overrides
 for split-cadence parents (e.g. `Business Income:Sales` = EVENT,
@@ -131,6 +152,7 @@ a48ea76  diag(backtest): add parameter sensitivity sweep over engine overrides
 0a79843  refactor(forecast): promote category-cadence comparator to src/lib/kpis/
 2baaac9  feat(forecast): add Stage 2 production adapter for category-cadence
 0cb00f2  feat(forecast): wire category-cadence into What-If as opt-in toggle
+4a97cbd  fix(forecast): blend Sales seasonality with trailing run-rate
 ```
 
 (`de36b70` was a docs-only correction inserted between Phase 1 and the
