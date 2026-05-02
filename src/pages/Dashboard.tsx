@@ -3688,7 +3688,38 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                           </div>
                         </div>
 
-                        {/* Rule 3 — Cash flow timing (placeholder) */}
+                        {/* Rule 3 — Forecast style */}
+                        {/* Persisted in 2a; consumed by Forecast page in sub-phase 2c.
+                            Until 2c ships, toggling here saves the value but has no
+                            visible effect on the Forecast page. */}
+                        <div className="rules-row">
+                          <div className="rules-row-info">
+                            <span className="rules-row-label">Forecast style</span>
+                            <span className="rules-row-sub">
+                              How forecasts plan ahead. Reality plans for tougher conditions — it is the safer default. Recovery assumes things go closer to plan.
+                            </span>
+                          </div>
+                          <div className="rules-row-control">
+                            <div className="segmented-toggle">
+                              <button
+                                type="button"
+                                className={`segmented-toggle-btn${businessRules.forecastPosture === 'reality' ? ' is-active' : ''}`}
+                                onClick={() => updateBusinessRules({ forecastPosture: 'reality' })}
+                              >
+                                Reality
+                              </button>
+                              <button
+                                type="button"
+                                className={`segmented-toggle-btn${businessRules.forecastPosture === 'recovery' ? ' is-active' : ''}`}
+                                onClick={() => updateBusinessRules({ forecastPosture: 'recovery' })}
+                              >
+                                Recovery
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Rule 4 — Cash flow timing (placeholder) */}
                         <div className="rules-row rules-row--coming-soon">
                           <div className="rules-row-info">
                             <span className="rules-row-label">Cash flow timing</span>
@@ -3696,7 +3727,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                           </div>
                         </div>
 
-                        {/* Rule 4 — Duplicate warnings */}
+                        {/* Rule 5 — Duplicate warnings */}
                         <div className="rules-row">
                           <div className="rules-row-info">
                             <span className="rules-row-label">Duplicate warnings</span>
