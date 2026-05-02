@@ -160,6 +160,44 @@ JSONL refactor. The other 15 are the substantive commits.)
 
 ---
 
+### May 2, 2026 — Forecast model selection + two correctness fixes
+
+**Production commits:**
+- `30ad734` fix(forecast): apply scenario sliders to Category-Cadence projection
+  (Revenue Growth and Expense Change sliders were silently inert on Cadence view)
+
+**Model selection settled via backtesting:**
+
+Split Conservative (Engine cash-in + Cadence cash-out) is the leading
+primary forecast candidate.
+
+| Horizon | Split Conservative abs net error | Read |
+|---|---:|---|
+| 30d | $7,885 | Best model; beats Cadence and Engine |
+| 90d | $6,872 | Effectively tied with Cadence ($6,782) and h50/50 ($6,758); best signed bias (+$84) |
+| 1y | $9,840 | Best model; beats Cadence by 37%, Engine by 62% |
+
+Mechanism: Engine under-projects expenses (aggregate baseline
+under-weights recent expense growth); Cadence over-projects revenue
+at 30d (Sales 50/50 lifts cash-in vs Engine's seasonal baseline).
+Split Conservative uses the stronger side of each: Engine for
+cash-in (more conservative), Cadence for cash-out (more accurate).
+
+Two guardrails (not base model tuning problems):
+1. Federal Tax: exclude old S-corp/C-corp history from training.
+   Treat future tax as known/planned events (Stage 5 overlay).
+2. Promo/event calendar: Black Friday etc = known events, not
+   base-model signals.
+
+Caveat: n=5 windows, 1y partially realized. Out-of-sample
+re-validation as more realized months close is needed before
+production commitment.
+
+Next step: read-only inspection of Split Conservative implementation
+scope — can cash-in and cash-out be composed from two models cleanly?
+
+---
+
 ## What Changed Recently (April 30, 2026 — afternoon session)
 
 ### Segmented toggle standardization — fully shipped
