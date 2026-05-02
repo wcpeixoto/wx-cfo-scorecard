@@ -340,6 +340,185 @@ Implications:
 - Conservative Floor is not implemented in production yet. It remains a
   diagnostic/proposed downside view until explicitly built.
 
+### May 2, 2026 — Current horizon diagnostic: Expected vs Downside across 30d–3y
+
+Read-only diagnostic at `Temp/currentHorizonDiagnostic.ts`. Computes
+Expected Case (Split Conservative) and Downside Case (Conservative Floor)
+directly from production wrapper outputs (`projectScenario` +
+`projectCategoryCadenceScenario`). No production code introduced.
+
+Basis: full fixture (4,851 rows). Latest closed month: `2026-04`.
+First forecast month: `2026-05`.
+
+**Cadence horizon caveat for 2y/3y:** Category-Cadence is capped at 12
+months in production (`HORIZON_MONTHS = 12` in `categoryCadence.ts`).
+For 2y (24 months) and 3y (36 months), the diagnostic extrapolates
+Cadence by repeating the period-12 pattern from months 1–12. STABLE
+categories repeat exactly (trailing-3 average is constant). PERIODIC/EVENT
+and Sales components in months 13+ look up prior-year months that fall
+outside the current training data, so the Sales cash-in contribution
+drops to 0 in those months. This makes the Conservative Floor at 2y/3y
+extra-pessimistic on cash-in. Treat 2y/3y as directional only, not
+calibrated.
+
+**Cumulative net change by horizon:**
+
+| Horizon | Months | Expected (Split) | Downside (Floor) | Difference | Product read |
+|---|---:|---:|---:|---:|---|
+| 30d | 1 | +$1,194 | +$1,194 | $0 | Identical — Engine is both lower-in and higher-out for May |
+| 60d | 2 | −$2,924 | −$2,924 | $0 | Identical — same pattern holds for June |
+| 90d | 3 | +$15,880 | +$1,257 | $14,623 | First material divergence — July flips Engine to higher-in/higher-out |
+| 6m | 6 | +$20,969 | −$4,051 | $25,021 | Floor crosses below zero |
+| 1y | 12 | +$43,033 | −$5,422 | $48,455 | **Main planning signal** — Expected strongly positive, Downside negative |
+| 2y* | 24 | +$86,066 | −$10,844 | $96,910 | Directional only — Cadence extrapolated; Floor extra-pessimistic on cash-in |
+| 3y* | 36 | +$129,099 | −$16,266 | $145,365 | Directional only — same caveat as 2y |
+
+`*` = Cadence months 13–36 are period-12 extrapolations, not native model
+output. Sales cash-in falls to 0 in those months by construction.
+
+**Compact text chart (cumulative net, $K):**
+
+```
+                  Expected (Split Conservative)            Downside (Conservative Floor)
+                  ──────────────────────────────────────  ──────────────────────────────────────
+30d   (1mo)    $1K  ▏                                $1K  ▏
+60d   (2mo)   -$3K  ▏                               -$3K  ▏
+90d   (3mo)   $16K  ████▏                            $1K  ▏
+6m    (6mo)   $21K  █████▏                          -$4K  ▏
+1y   (12mo)   $43K  ███████████▏                    -$5K  ▏
+2y*  (24mo)   $86K  ██████████████████████▏        -$11K  ▎
+3y*  (36mo)  $129K  █████████████████████████████▏ -$16K  ▍
+                  ──────────────────────────────────────  ──────────────────────────────────────
+                  (1 block ≈ $4K, positive only)         (small negative — magnitude shown above)
+```
+
+The visual gap is what matters: Expected fans out positive while Downside
+hugs the zero line and turns negative from 6m onward. The 1y row is the
+operational planning signal.
+
+**Notes captured:**
+- 30d and 60d: Expected and Downside are mathematically identical when
+  Engine is simultaneously the lower cash-in model and the higher cash-out
+  model. This holds for May and June 2026.
+- 90d: first material divergence ($14.6K). Driven primarily by July, where
+  Engine flips to higher-cash-in *and* higher-cash-out, so Floor takes
+  Cadence cash-in (lower) and Engine cash-out (higher) — doubly conservative.
+- 1y: Expected +$43K vs Downside −$5K. This is the main planning signal
+  and the horizon at which the two-view framing earns its keep.
+- 2y/3y: lower-confidence, directional only. Cadence is extrapolated beyond
+  its validated 12-month horizon; the Floor is over-pessimistic on cash-in
+  in years 2 and 3 because Sales lookback misses.
+- Forecast posture (Expected vs Downside) belongs in **Settings**, not as a
+  permanent toggle on the Forecast page. The two views answer different
+  questions for the operator and switching between them mid-analysis adds
+  cognitive load without analytical value.
+- Default posture should be **Downside / Cautious**. Expected is an
+  optional, user-selected posture surfaced in Settings.
+- Temporary Forecast-page testing exposure (e.g., a dev-only toggle or
+  query param) is acceptable during build-out but must not become
+  permanent product UX.
+
+### May 2, 2026 — Drafted implementation plan (NOT EXECUTED)
+
+The following plan is captured for reference. **No production code has
+been written. No defaults have changed. No Settings UI exists yet.**
+Each phase requires explicit go-ahead before implementation begins.
+
+**Phase A — Conservative Floor production helper (pure function only)**
+
+Add `src/lib/kpis/conservativeFloor.ts`, mirroring the shape of
+`splitConservative.ts`:
+
+```ts
+export function composeConservativeFloor(
+  engine: ForecastProjectionResult,
+  cadence: ForecastProjectionResult,
+  startingCashBalance: number,
+): ForecastProjectionResult
+```
+
+Composition rule (per month, after month-alignment check):
+- `operatingCashIn  = min(engine.operatingCashIn,  cadence.operatingCashIn)`
+- `operatingCashOut = max(engine.operatingCashOut, cadence.operatingCashOut)`
+- `cashIn`/`cashOut` mirror operating values (no AR/AP carry — same policy
+  as Split Conservative)
+- `netCashFlow` and `endingCashBalance` recomputed from composed values
+- Inherit Engine seasonality metadata (same policy as Split)
+
+Constraints:
+- Pure function. No transactions argument. No date argument.
+- Throws on month-count mismatch or month-string mismatch (same guards as
+  Split).
+- No Known Events overlay in this phase (Phase 3 policy decision applies).
+- Cadence's 12-month cap is a known limitation. The helper does not
+  extrapolate; if Cadence has fewer points than Engine, the result has
+  `min(engine.points.length, cadence.points.length)` points. Caller
+  responsibility to handle horizons beyond Cadence's reach.
+
+Verification before merge:
+- `npx tsc --noEmit` clean
+- `npm run build` green
+- Backtest regression unchanged: `directionalAccuracy 42.8%`, `mape90 18.4%`,
+  `safetyLineHitRate 100%`, `worstSingleMonthMiss $30,817`
+- Composition correctness validated against `Temp/currentHorizonDiagnostic.ts`
+  output for the 12-month horizon (must match within rounding).
+
+**Phase B — Settings forecast posture control**
+
+Add a posture field to `shared_workspace_settings`:
+
+```sql
+alter table shared_workspace_settings
+  add column forecast_posture text not null default 'downside';
+-- allowed values: 'downside' | 'expected'
+```
+
+Default `'downside'` aligns with Cautious-as-default product decision.
+
+Surface in Settings → Rules section as a single segmented toggle:
+- Label: "Forecast posture"
+- Options: "Cautious (Downside)" | "Best estimate (Expected)"
+- Help text: brief explanation that Cautious uses the lower of two model
+  views month by month, Best estimate uses the calibrated hybrid.
+
+Persistence path mirrors `target_net_margin` etc. — load via
+`getSharedWorkspaceSettings()`, save via `saveSharedWorkspaceSettings()`,
+upsert pattern, defaults if row absent.
+
+No migration of existing data needed (single workspace, single row).
+
+**Phase C — Forecast page consumes selected posture**
+
+Replace the current session-only Engine/Split/Cadence toggle behavior
+with posture-driven model selection:
+- `posture === 'downside'` → `composeConservativeFloor(engine, cadence, ...)`
+- `posture === 'expected'` → `composeSplitConservative(engine, cadence, ...)`
+
+Both Engine and Cadence still need to be computed first (they are the
+inputs to both composed models). The selected output feeds the existing
+chart, decision cards, and reserve gauge — no downstream consumer changes,
+all consume `ForecastProjectionResult.points` and `.seasonality`.
+
+The visible Engine/Split/Cadence toggle on the Forecast page is removed
+in this phase. The page renders only the composed view selected in
+Settings.
+
+**Phase D — Optional temporary testing exposure (only if needed)**
+
+If side-by-side comparison is required during build-out, expose a
+dev-only toggle or query parameter (`?compare=1`) that renders both
+composed views simultaneously for visual comparison. Must not be reachable
+from normal navigation. Removed before any production milestone is
+declared "shipped."
+
+**Open questions deferred to Phase 3:**
+- Carry policy (AR/AP days) for both composed models — currently dropped.
+- Known Events overlay — currently excluded; needs symmetric application
+  policy across both Engine and Cadence inputs.
+- Cadence 2y/3y handling — production helper does not extrapolate; UI
+  must communicate the 12-month confidence boundary if longer horizons
+  are exposed.
+
 ---
 
 ## What Changed Recently (April 30, 2026 — afternoon session)
