@@ -245,14 +245,35 @@ function twoYearYoYAvg(
   return count > 0 ? sum / count : 0;
 }
 
+/** Already-clamped scenario ratios applied per-category by sign. Inflows
+ *  (positive contribution) scale by (1 + revenueRatio); outflows (negative
+ *  contribution) scale by (1 + expenseRatio). Mirrors the Engine's
+ *  projectScenario intent: revenueGrowth affects cash-in only, expenseChange
+ *  affects cash-out only. Sign-based dispatch (rather than a hard-coded
+ *  category list) ensures future income/expense lines are scaled correctly. */
+export type CategoryCadenceScenario = {
+  revenueRatio: number;
+  expenseRatio: number;
+};
+
+function applyScenarioScale(contribution: number, scenario?: CategoryCadenceScenario): number {
+  if (!scenario) return contribution;
+  if (contribution > 0) return contribution * (1 + scenario.revenueRatio);
+  if (contribution < 0) return contribution * (1 + scenario.expenseRatio);
+  return contribution;
+}
+
 /** Category-cadence forecast: each operating-cash category projects on its
  *  own cadence (STABLE → trailing-3 average; PERIODIC/EVENT → same month last
  *  year). Categories whose cashFlow.ts contributions are zero (transfers,
- *  loans, owner distributions, uncategorized) drop out automatically. */
+ *  loans, owner distributions, uncategorized) drop out automatically.
+ *  Optional `scenario` applies revenue/expense multipliers per category by
+ *  sign of contribution; omit it (or pass undefined) for unstressed output. */
 export function categoryCadenceForecast(
   asOfDate: string,
   txns: Txn[],
-  anchors: Anchor[]
+  anchors: Anchor[],
+  scenario?: CategoryCadenceScenario
 ): ForecastSeries {
   const startingCash = reconstructStartingCash(asOfDate, txns, anchors);
   const startMonth = asOfDate.slice(0, 7);
@@ -268,6 +289,7 @@ export function categoryCadenceForecast(
     for (const [category, monthMap] of netByCategory) {
       const cls = classifications.get(category);
       if (!cls) continue;
+      let contribution = 0;
       // Per-category override: Business Income:Sales uses a 50/50 blend of
       // a trailing-12 run-rate and a 2-year YoY average (component-wise).
       // Trailing-12 alone erases all monthly shape; 2-yr-YoY alone overcommits
@@ -285,16 +307,15 @@ export function categoryCadenceForecast(
       if (category === 'Business Income:Sales') {
         const trailingComponent = trailing12MonthAvg(monthMap, startMonth);
         const yoyComponent = twoYearYoYAvg(monthMap, horizonMonth);
-        monthlyDelta += 0.5 * trailingComponent + 0.5 * yoyComponent;
-        continue;
-      }
-      if (cls.cadence === 'STABLE') {
-        monthlyDelta += trailing3MonthAvg(monthMap, startMonth);
+        contribution = 0.5 * trailingComponent + 0.5 * yoyComponent;
+      } else if (cls.cadence === 'STABLE') {
+        contribution = trailing3MonthAvg(monthMap, startMonth);
       } else {
         // PERIODIC or EVENT: same calendar month one year before this
         // horizon month. Absent → 0.
-        monthlyDelta += monthMap.get(yoyMonth) ?? 0;
+        contribution = monthMap.get(yoyMonth) ?? 0;
       }
+      monthlyDelta += applyScenarioScale(contribution, scenario);
     }
     runningBalance += monthlyDelta;
     points.push({ month: horizonMonth, endingCashBalance: runningBalance });
@@ -359,7 +380,17 @@ export function projectCategoryCadenceScenario(
   // with the explicit startingCashBalance argument so absolute levels track
   // production's current-cash convention rather than the harness's
   // reconciliation anchor.
-  const series: ForecastSeries = categoryCadenceForecast(asOfDate, txns, []);
+  //
+  // Scenario sliders (revenueGrowthPct / expenseChangePct) are clamped to
+  // match Engine's projectScenario bounds, then applied per-category by sign
+  // of contribution inside categoryCadenceForecast. Inflows scale with
+  // revenueGrowth, outflows with expenseChange; zero-valued sliders pass
+  // through as identity scaling.
+  const revenueRatio = Math.max(-0.6, Math.min(0.6, input.revenueGrowthPct / 100));
+  const expenseRatio = Math.max(-0.5, Math.min(0.5, input.expenseChangePct / 100));
+  const scenario =
+    revenueRatio !== 0 || expenseRatio !== 0 ? { revenueRatio, expenseRatio } : undefined;
+  const series: ForecastSeries = categoryCadenceForecast(asOfDate, txns, [], scenario);
 
   const requestedMonths = Math.max(0, Math.min(input.months, series.points.length));
   const points: ScenarioPoint[] = [];
