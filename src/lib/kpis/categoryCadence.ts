@@ -280,12 +280,16 @@ export function categoryCadenceForecast(
   const netByCategory = buildCategoryNetByMonth(txns);
   const { classifications } = classifyCategories(txns);
 
-  const points: { month: string; endingCashBalance: number }[] = [];
+  const points: { month: string; endingCashBalance: number; cashIn: number; cashOut: number }[] = [];
   let runningBalance = startingCash;
   for (let i = 1; i <= HORIZON_MONTHS; i += 1) {
     const horizonMonth = addMonths(startMonth, i - 1);
     const yoyMonth = addMonths(horizonMonth, -12);
-    let monthlyDelta = 0;
+    // Accumulate inflows and outflows separately so callers can compose
+    // asymmetric hybrids (e.g. Split Conservative = Engine cash-in +
+    // Cadence cash-out). Net behavior is identical: monthlyDelta = in - out.
+    let monthlyCashIn = 0;
+    let monthlyCashOut = 0;
     for (const [category, monthMap] of netByCategory) {
       const cls = classifications.get(category);
       if (!cls) continue;
@@ -315,10 +319,13 @@ export function categoryCadenceForecast(
         // horizon month. Absent → 0.
         contribution = monthMap.get(yoyMonth) ?? 0;
       }
-      monthlyDelta += applyScenarioScale(contribution, scenario);
+      const scaled = applyScenarioScale(contribution, scenario);
+      if (scaled > 0) monthlyCashIn += scaled;
+      else if (scaled < 0) monthlyCashOut += (-scaled);
     }
+    const monthlyDelta = monthlyCashIn - monthlyCashOut;
     runningBalance += monthlyDelta;
-    points.push({ month: horizonMonth, endingCashBalance: runningBalance });
+    points.push({ month: horizonMonth, endingCashBalance: runningBalance, cashIn: monthlyCashIn, cashOut: monthlyCashOut });
   }
 
   return { asOfDate, startingCash, points };
@@ -403,13 +410,18 @@ export function projectCategoryCadenceScenario(
     const internalPrev = i === 0 ? series.startingCash : series.points[i - 1].endingCashBalance;
     const monthlyDelta = cur.endingCashBalance - internalPrev;
     const endingCashBalance = prevBalance + monthlyDelta;
+    // Category-Cadence has no AR/AP carry layer in this phase, so
+    // operating* and cashIn/cashOut fields are intentionally equal.
+    // Engine retains its own separate carry semantics.
+    const pCashIn = cur.cashIn ?? 0;
+    const pCashOut = cur.cashOut ?? 0;
     points.push({
       month: cur.month,
-      operatingCashIn: 0,
-      operatingCashOut: 0,
-      cashIn: 0,
-      cashOut: 0,
-      netCashFlow: monthlyDelta,
+      operatingCashIn: pCashIn,
+      operatingCashOut: pCashOut,
+      cashIn: pCashIn,
+      cashOut: pCashOut,
+      netCashFlow: pCashIn - pCashOut,
       endingCashBalance,
     });
     prevBalance = endingCashBalance;

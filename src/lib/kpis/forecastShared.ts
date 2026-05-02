@@ -4,6 +4,13 @@ import { forecastCashInContribution, forecastCashOutContribution } from '../cash
 export type SeriesPoint = {
   month: string; // YYYY-MM
   endingCashBalance: number;
+  /** Gross operating cash inflow projected for this month.
+   *  Optional — populated by categoryCadenceForecast; absent on legacy
+   *  callers (backtest runner etc.) that read only endingCashBalance. */
+  cashIn?: number;
+  /** Gross operating cash outflow projected for this month (unsigned).
+   *  Optional — same population contract as cashIn above. */
+  cashOut?: number;
 };
 
 export type ForecastSeries = {
