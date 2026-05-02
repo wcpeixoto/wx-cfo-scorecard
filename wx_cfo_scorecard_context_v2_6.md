@@ -196,6 +196,75 @@ production commitment.
 Next step: read-only inspection of Split Conservative implementation
 scope — can cash-in and cash-out be composed from two models cleanly?
 
+### May 2, 2026 — Native Split Conservative validation after Cadence component exposure
+
+Commit `721b254` exposed native Cadence `operatingCashIn` /
+`operatingCashOut` on `ScenarioPoint`. Native validation re-ran the
+Split Conservative comparison using production wrapper outputs
+instead of the prior per-category diagnostic proxy.
+
+**Ranking unchanged:**
+
+| Horizon | Native winner | Split Conservative |
+|---|---|---|
+| 30d | Split Conservative | abs net error $7,823 — leads |
+| 90d | h50_50 (by $123 abs error) | +$101 signed bias — best of any model |
+| 1y | Split Conservative | abs net error $9,728 — leads |
+
+**Old proxy artifact:** `Refunds & Allowances` at as-of 2025-05-01.
+Production wrapper uses `classifyCategories(allTxns)` → PERIODIC.
+Diagnostic used per-category `classifyCategories(catTxns)` → STABLE
+(activeRatio inflated to 100% by execution pattern). Production
+classification is the more defensible one. Total impact: $559 over
+12 months at a single as-of date (<0.15% of projected cashOut).
+Removing 2025-05-01 from aggregates does not change any winner;
+1y Split Conservative abs error actually improves to $4,149.
+
+**Conclusion preserved:** Split Conservative leads 30d and 1y; 90d
+within noise of h50_50 with best signed bias. Native production
+wrapper outputs are now the correct basis for Phase 2.
+
+**Phase 2 cleared** — implement as third selectable model alongside
+Engine and Cadence, not as default flip. Persistence not required
+for initial ship (session-only, matching current toggle pattern).
+
+**Diagnostic disposition:** `splitConservativeDiagnostic.ts` retained
+untracked under `Temp/`. Known limitation: per-category
+`classifyCategories(catTxns)` execution pattern artificially inflates
+`activeRatio` to 100%. Do not use as ground truth for component-level
+Cadence values going forward — use production wrapper outputs.
+
+### May 2, 2026 — Phase 2 Split Conservative selectable model shipped
+
+Commit `24e0717` added Split Conservative as a third selectable model
+on the What-If forecast page. The model toggle now offers:
+Engine / Split Conservative / Category-Cadence.
+
+Engine remains the default and the toggle remains session-only. No
+localStorage, Supabase, URL parameter, routing, or Today-page wiring was
+added. Engine and Category-Cadence remain selectable comparators.
+
+Implementation shape:
+- `src/lib/kpis/splitConservative.ts` exports
+  `composeSplitConservative(engine, cadence, startingCashBalance)`.
+- Composition is month-aligned and pure: Engine `operatingCashIn` +
+  Cadence `operatingCashOut`, then recompute net and rolling balance.
+- Split Conservative intentionally excludes Known Events in Phase 2 by
+  passing `[]` to both component projections.
+- No AR/AP carry is applied in the merge; `cashIn` equals
+  `operatingCashIn` and `cashOut` equals `operatingCashOut`.
+- Engine seasonality metadata is inherited for now. Carry, events, and
+  seasonality policy remain Phase 3 decisions.
+
+Verification reported clean before ship:
+- `npx tsc --noEmit` clean
+- `npm run build` green
+- Backtest regression passed with locked metrics unchanged:
+  directionalAccuracy 42.8%, mape90 18.4%, safetyLineHitRate 100%,
+  worstSingleMonthMiss $30,817
+- Composition correctness validated for as-of 2026-02-01 across 12
+  months
+
 ---
 
 ## What Changed Recently (April 30, 2026 — afternoon session)
