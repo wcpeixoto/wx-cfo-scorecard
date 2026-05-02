@@ -265,6 +265,81 @@ Verification reported clean before ship:
 - Composition correctness validated for as-of 2026-02-01 across 12
   months
 
+### May 2, 2026 — Conservative Floor diagnostic reframes product direction
+
+After Phase 2, a current/as-of forecast check showed Split Conservative
+is not always the lowest-net forecast. Split Conservative combines
+Engine cash-in with Cadence cash-out; when Engine cash-out is higher
+than Cadence cash-out, Split can be less conservative than Engine.
+
+This resolved the apparent contradiction between the retrospective
+backtest and the current forecast:
+- Retrospective tests ask which model would have been closest to later
+  realized outcomes across historical as-of dates.
+- Current/as-of forecasts ask which model gives the lowest projected net
+  from today.
+- Split Conservative remains a strong best-estimate candidate, but it is
+  not a guaranteed conservative planning floor.
+
+Diagnostic model introduced for analysis only:
+`Conservative Floor = min(Engine cash-in, Cadence cash-in) −
+max(Engine cash-out, Cadence cash-out)`.
+
+Retrospective diagnostic, Federal Tax excluded from projection/truth:
+
+| Horizon | Engine abs err | Cadence abs err | Split abs err | h50_50 abs err | Floor abs err | Best abs accuracy | Most conservative |
+|---|---:|---:|---:|---:|---:|---|---|
+| 30d | $12,493 | $8,625 | $7,823 | $8,892 | $8,238 | Split | Floor |
+| 90d | $11,740 | $6,800 | $6,890 | $6,767 | $6,512 | Floor | Floor |
+| 1y | $26,199 | $15,527 | $9,728 | $18,750 | $6,686 | Floor | Floor |
+
+Floor signed bias:
+- 30d: +$4,409, under-projected 2/5 windows
+- 90d: -$3,386, under-projected 3/5 windows
+- 1y: -$4,291, under-projected 4/5 windows
+
+Current forecast diagnostic, full fixture / production-like basis
+(fixture through 2026-04-21, first forecast month 2026-05):
+
+| Horizon | Model | Cash In | Cash Out | Net Change |
+|---|---|---:|---:|---:|
+| 30d | Engine | $35,924 | $31,685 | $4,239 |
+| 30d | Cadence | $36,620 | $34,730 | $1,890 |
+| 30d | Split | $35,924 | $34,730 | $1,194 |
+| 30d | h50_50 | $36,272 | $33,207 | $3,064 |
+| 30d | Floor | $35,924 | $34,730 | $1,194 |
+| 90d | Engine | $117,923 | $105,252 | $12,671 |
+| 90d | Cadence | $114,898 | $102,044 | $12,855 |
+| 90d | Split | $117,923 | $102,044 | $15,880 |
+| 90d | h50_50 | $116,411 | $103,648 | $12,763 |
+| 90d | Floor | $111,067 | $109,809 | $1,257 |
+| 1y | Engine | $465,056 | $435,941 | $29,115 |
+| 1y | Cadence | $467,236 | $422,023 | $45,213 |
+| 1y | Split | $465,056 | $422,023 | $43,033 |
+| 1y | h50_50 | $466,146 | $428,982 | $37,164 |
+| 1y | Floor | $449,411 | $454,833 | -$5,422 |
+
+Product framing locked from this diagnostic:
+
+| Role | Model | Read |
+|---|---|---|
+| Expected / best-estimate operating forecast | Split Conservative | Best 30d accuracy, strong 90d signed bias, reasonable 1y calibration |
+| Downside / stress planning floor | Conservative Floor | Best 90d/1y retrospective absolute error, but pessimistic by construction and under-projects 1y net in 4/5 windows |
+| Conservative comparator | Engine | Current 90d/1y net is lower than Split; legacy safety benchmark |
+| Full-model comparator | Category-Cadence | Best expense model and important comparator |
+
+Implications:
+- Do not promote Split Conservative as "the conservative forecast."
+- Do not choose a single primary model yet.
+- Product direction becomes a two-model forecast concept:
+  Expected Case = Split Conservative; Downside Case = Conservative Floor.
+- Engine and Category-Cadence remain comparators.
+- Phase 3 policy decisions (carry, Known Events, seasonality metadata)
+  now apply to both composed models: Split Conservative and Conservative
+  Floor.
+- Conservative Floor is not implemented in production yet. It remains a
+  diagnostic/proposed downside view until explicitly built.
+
 ---
 
 ## What Changed Recently (April 30, 2026 — afternoon session)
