@@ -9,6 +9,8 @@ export interface CoreConstraints {
 export function getCoreConstraints(model: DashboardModel): CoreConstraints {
   const { percentFunded, reserveTarget, currentCashBalance } = model.runway;
 
+  // Forecast posture intentionally not applied here yet.
+  // Today posture-awareness is deferred to sub-phase 2c.2.
   const projected = model.cashFlowForecastSeries.filter(e => e.status === 'projected');
 
   let forwardCashBalance = currentCashBalance;

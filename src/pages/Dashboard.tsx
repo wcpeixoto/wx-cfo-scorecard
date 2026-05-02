@@ -51,6 +51,7 @@ import {
 } from '../lib/kpis/compute';
 import { projectCategoryCadenceScenario } from '../lib/kpis/categoryCadence';
 import { composeSplitConservative } from '../lib/kpis/splitConservative';
+import { composeConservativeFloor } from '../lib/kpis/conservativeFloor';
 import type {
   AccountRecord,
   AccountType,
@@ -66,6 +67,7 @@ import type {
   KpiTimeframeComparison,
   MoverGrouping,
   ScenarioInput,
+  ScenarioPoint,
   TransactionImportSummary,
   TrendPoint,
   Txn,
@@ -616,7 +618,9 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   // Stage 3 production wiring: opt-in switch between the locked engine,
   // category-cadence comparator, and split-conservative composition.
   // Session-only — defaults to 'engine' on every page load.
-  const [forecastModel, setForecastModel] = useState<'engine' | 'category-cadence' | 'split-conservative'>('engine');
+  // Forecast composer is selected by businessRules.forecastPosture
+  // (Settings → Forecast style). Reality → Conservative Floor;
+  // Recovery → Split Conservative. See sub-phase 2c.1.
   const [customScenarioInput, setCustomScenarioInput] = useState<ScenarioInput>(DEFAULT_CUSTOM_SCENARIO);
   const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('lastMonth');
   const [netCashFlowChartMode, setNetCashFlowChartMode] = useState<CashFlowMode>('operating');
@@ -1553,42 +1557,87 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
         ...scenarioInput,
         months: Math.max(scenarioInput.months, forecastRangeMonths),
       };
-      // Performance rule: only compute both Engine and Cadence projections when
-      // split-conservative is selected. Engine and Cadence arms each run a single
-      // projection call. Split Conservative arm runs both with events=[] (Known
-      // Events intentionally excluded in Phase 2 — see composeSplitConservative
-      // policy notes for rationale).
-      let result;
-      if (forecastModel === 'category-cadence') {
-        result = projectCategoryCadenceScenario(
-          model,
-          scenarioWithMonths,
-          filteredTxns,
-          forecastCurrentCashBalance,
-          forecastEvents
-        );
-      } else if (forecastModel === 'split-conservative') {
-        const engineProj = projectScenario(
-          model,
-          scenarioWithMonths,
-          forecastCurrentCashBalance,
-          []
-        );
-        const cadenceProj = projectCategoryCadenceScenario(
-          model,
-          scenarioWithMonths,
-          filteredTxns,
-          forecastCurrentCashBalance,
-          []
-        );
-        result = composeSplitConservative(engineProj, cadenceProj, forecastCurrentCashBalance);
-      } else {
-        result = projectScenario(
-          model,
-          scenarioWithMonths,
-          forecastCurrentCashBalance,
-          forecastEvents
-        );
+      // Both Engine and Cadence projections are computed as composer inputs.
+      // Known Events are intentionally excluded from composer inputs (events=[])
+      // — see composeSplitConservative / composeConservativeFloor policy notes
+      // for the symmetric one-sided-event rationale.
+      //
+      // Cadence is hardcoded to a 12-month horizon (HORIZON_MONTHS in
+      // categoryCadence.ts); composers throw on length mismatch by design
+      // ("Caller responsibility to handle horizons beyond Cadence's reach").
+      // Compose at 12 months and, for selectors longer than 12 months,
+      // extend at the caller layer (see below). Composer files are unchanged.
+      const COMPOSER_MONTHS_CAP = 12;
+      const composerInput = {
+        ...scenarioWithMonths,
+        months: Math.min(scenarioWithMonths.months, COMPOSER_MONTHS_CAP),
+      };
+      const engineProj = projectScenario(
+        model,
+        composerInput,
+        forecastCurrentCashBalance,
+        []
+      );
+      const cadenceProj = projectCategoryCadenceScenario(
+        model,
+        composerInput,
+        filteredTxns,
+        forecastCurrentCashBalance,
+        []
+      );
+      // Reality (default) → Conservative Floor; Recovery → Split Conservative.
+      // Defensive fallback: any unexpected posture value routes to Reality.
+      const composed =
+        businessRules.forecastPosture === 'recovery'
+          ? composeSplitConservative(engineProj, cadenceProj, forecastCurrentCashBalance)
+          : composeConservativeFloor(engineProj, cadenceProj, forecastCurrentCashBalance);
+
+      // 2Y/3Y horizons extend the 12-month composed historical-pattern
+      // forecast by repeating the monthly pattern (flat, month-of-year
+      // aligned) and walking the running balance forward. Composer
+      // inputs remain capped at 12 months because Cadence does not
+      // extrapolate beyond its window. This is the caller-layer
+      // extension policy locked in 2c.1.
+      const requestedMonths = scenarioWithMonths.months;
+      let result = composed;
+      if (requestedMonths > composed.points.length && composed.points.length > 0) {
+        // Build month-of-year lookup ("01"–"12") from composed Year 1.
+        const sourceByMonthOfYear = new Map<string, ScenarioPoint>();
+        for (const p of composed.points) {
+          const moy = p.month.slice(5, 7);
+          if (!sourceByMonthOfYear.has(moy)) sourceByMonthOfYear.set(moy, p);
+        }
+        const firstMonth = composed.points[0].month;
+        const extended: ScenarioPoint[] = [];
+        let prevBalance = forecastCurrentCashBalance;
+        for (let i = 0; i < requestedMonths; i += 1) {
+          if (i < composed.points.length) {
+            const p = composed.points[i];
+            extended.push(p);
+            prevBalance = p.endingCashBalance;
+            continue;
+          }
+          const monthToken = addMonthsToToken(firstMonth, i) ?? composed.points[i % composed.points.length].month;
+          const sourceMoy = monthToken.slice(5, 7);
+          const source = sourceByMonthOfYear.get(sourceMoy);
+          if (!source) {
+            // Defensive: should not happen because Year 1 always covers all 12 month-of-year keys
+            // when composed.points.length === 12. Skip extension if it does.
+            break;
+          }
+          const endingCashBalance = prevBalance + source.netCashFlow;
+          extended.push({
+            month: monthToken,
+            operatingCashIn: source.operatingCashIn,
+            operatingCashOut: source.operatingCashOut,
+            cashIn: source.cashIn,
+            cashOut: source.cashOut,
+            netCashFlow: source.netCashFlow,
+            endingCashBalance,
+          });
+          prevBalance = endingCashBalance;
+        }
+        result = { points: extended, seasonality: composed.seasonality };
       }
       if (import.meta.env.DEV && !bootPhaseLoggedRef.current.forecast && model.monthlyRollups.length > 0) {
         bootPhaseLoggedRef.current.forecast = true;
@@ -1596,7 +1645,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
       }
       return result;
     },
-    [filteredTxns, forecastCurrentCashBalance, forecastEvents, forecastModel, forecastRangeMonths, model, scenarioInput]
+    [filteredTxns, forecastCurrentCashBalance, businessRules.forecastPosture, forecastRangeMonths, model, scenarioInput]
   );
   const scenarioProjection = useMemo(() => forecastProjection.points, [forecastProjection.points]);
   const forecastSeasonality = useMemo(() => forecastProjection.seasonality, [forecastProjection.seasonality]);
@@ -2721,29 +2770,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       {option.label}
                     </button>
                   ))}
-                </div>
-                <div className="segmented-toggle" role="group" aria-label="Forecast model">
-                  <button
-                    type="button"
-                    className={`segmented-toggle-btn${forecastModel === 'split-conservative' ? ' is-active' : ''}`}
-                    onClick={() => setForecastModel('split-conservative')}
-                  >
-                    Split Conservative
-                  </button>
-                  <button
-                    type="button"
-                    className={`segmented-toggle-btn${forecastModel === 'engine' ? ' is-active' : ''}`}
-                    onClick={() => setForecastModel('engine')}
-                  >
-                    Engine
-                  </button>
-                  <button
-                    type="button"
-                    className={`segmented-toggle-btn${forecastModel === 'category-cadence' ? ' is-active' : ''}`}
-                    onClick={() => setForecastModel('category-cadence')}
-                  >
-                    Category-Cadence
-                  </button>
                 </div>
                 <button
                   type="button"

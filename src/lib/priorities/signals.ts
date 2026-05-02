@@ -71,6 +71,8 @@ export function detectSignals(
   }
 
   // ── 2. Forward cash flow ─────────────────────────────────────────────────────
+  // Forecast posture intentionally not applied here yet.
+  // Today posture-awareness is deferred to sub-phase 2c.2.
   const projected = model.cashFlowForecastSeries.filter(e => e.status === 'projected');
 
   if (projected.length > 0) {
