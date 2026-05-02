@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { ForecastEvent, TrendPoint } from '../lib/data/contract';
+import { niceTicks, formatTickLabel } from '../lib/charts/niceTicks';
 
 type ProjectedCashBalanceChartProps = {
   data: TrendPoint[];
@@ -124,16 +125,18 @@ export default function ProjectedCashBalanceChart({
     return points;
   }, [knownEvents, data, categories, values]);
 
+  // Y-axis snapped to nice round ticks via the shared niceTicks helper.
+  // Range covers the initial balance plus the full projected balance series
+  // so the chart fits the data without padding tricks; the helper applies
+  // a hybrid local/zero-based axis — see niceTicks.ts.
   const initialBalance = data.length > 0 ? data[0].net : 0;
-  const useZeroBaseline = initialBalance <= 50000;
-
-  const yAxisMin = useZeroBaseline ? 0 : undefined;
-  const yAxisMax = useZeroBaseline
-    ? (() => {
-        const maxVal = Math.max(...data.map(d => d.net));
-        return Math.ceil((maxVal * 1.15) / 1000) * 1000;
-      })()
-    : undefined;
+  const dataMin = data.length > 0 ? Math.min(initialBalance, ...values) : 0;
+  const dataMax = data.length > 0 ? Math.max(initialBalance, ...values) : 0;
+  const { min: yAxisMin, max: yAxisMax, ticks: yAxisTicks } = useMemo(
+    () => niceTicks(dataMin, dataMax),
+    [dataMin, dataMax],
+  );
+  const yAxisTickAmount = Math.max(1, yAxisTicks.length - 1);
 
   const options = useMemo<ApexOptions>(
     () => ({
@@ -209,8 +212,10 @@ export default function ProjectedCashBalanceChart({
       yaxis: {
         min: yAxisMin,
         max: yAxisMax,
+        tickAmount: yAxisTickAmount,
+        forceNiceScale: false,
         labels: {
-          formatter: formatCurrency,
+          formatter: formatTickLabel,
           offsetX: -4,
           style: {
             fontSize: '11px',
@@ -244,7 +249,7 @@ export default function ProjectedCashBalanceChart({
       },
       legend: { show: false },
     }),
-    [categories, tooltipLabels, labelStep, eventAnnotationPoints, height, yAxisMin, yAxisMax]
+    [categories, tooltipLabels, labelStep, eventAnnotationPoints, height, yAxisMin, yAxisMax, yAxisTickAmount]
   );
 
   const series = useMemo(
