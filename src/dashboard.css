@@ -6646,7 +6646,7 @@ body {
 
 /* ─── Comparison table (shared eff-drill-* classes) ────────────────────── */
 .eff-drill-table-wrap {
-  margin-top: 20px;
+  margin-top: 32px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -6705,8 +6705,8 @@ body {
   font-size: 12px;
   font-weight: 500;
   color: #667085;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  text-transform: none;
+  letter-spacing: 0;
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
@@ -6784,7 +6784,7 @@ body {
 /* Average row — TailAdmin summary row: #F9FAFB bg, stronger top border */
 .eff-drill-avg-row .eff-drill-td {
   border-bottom: none;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid #D0D5DD;
 }
 
 .dark .eff-drill-avg-row .eff-drill-td {
