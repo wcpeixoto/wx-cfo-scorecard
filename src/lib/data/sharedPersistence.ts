@@ -1,4 +1,4 @@
-import type { AccountRecord, ImportedTransactionRecord, TransactionImportSummary } from './contract';
+import type { AccountRecord, ForecastEvent, ImportedTransactionRecord, TransactionImportSummary } from './contract';
 import type { SignalType, PriorityHistoryRow } from '../priorities/types';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
@@ -9,6 +9,7 @@ const IMPORT_BATCHES_TABLE = 'shared_import_batches';
 const ACCOUNT_SETTINGS_TABLE = 'shared_account_settings';
 const WORKSPACE_SETTINGS_TABLE = 'shared_workspace_settings';
 const PRIORITY_HISTORY_TABLE = 'priority_history';
+const FORECAST_EVENTS_TABLE = 'forecast_events';
 
 // TRANSACTION_FETCH_COLUMNS: explicit select list to minimize Supabase egress.
 // Only the `txn` jsonb payload is used by any downstream consumer on the read
@@ -63,6 +64,21 @@ type SharedAccountSettingRow = {
   include_in_cash_forecast: boolean;
   active: boolean;
   is_user_configured: boolean;
+  updated_at: string;
+};
+
+type SharedForecastEventRow = {
+  workspace_id: string;
+  id: string;
+  month: string;
+  type: string;
+  title: string;
+  note: string | null;
+  status: string;
+  impact_mode: string;
+  cash_in_impact: number;
+  cash_out_impact: number;
+  enabled: boolean;
   updated_at: string;
 };
 
@@ -254,6 +270,38 @@ function fromSharedAccountSettingRow(row: SharedAccountSettingRow): AccountRecor
   };
 }
 
+function toSharedForecastEventRow(event: ForecastEvent): SharedForecastEventRow {
+  return {
+    workspace_id: WORKSPACE_ID,
+    id: event.id,
+    month: event.month,
+    type: event.type,
+    title: event.title,
+    note: event.note ?? null,
+    status: event.status,
+    impact_mode: event.impactMode,
+    cash_in_impact: event.cashInImpact,
+    cash_out_impact: event.cashOutImpact,
+    enabled: event.enabled,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function fromSharedForecastEventRow(row: SharedForecastEventRow): ForecastEvent {
+  return {
+    id: row.id,
+    month: row.month,
+    type: row.type as ForecastEvent['type'],
+    title: row.title,
+    note: row.note ?? undefined,
+    status: row.status as ForecastEvent['status'],
+    impactMode: row.impact_mode as ForecastEvent['impactMode'],
+    cashInImpact: typeof row.cash_in_impact === 'number' ? row.cash_in_impact : 0,
+    cashOutImpact: typeof row.cash_out_impact === 'number' ? row.cash_out_impact : 0,
+    enabled: row.enabled === true,
+  };
+}
+
 export function isSharedPersistenceConfigured(): boolean {
   return isConfigured();
 }
@@ -394,6 +442,54 @@ export async function saveSharedAccountSettings(records: AccountRecord[]): Promi
   const currentIds = records.map((r) => `"${r.id}"`).join(',');
   await request<unknown>(
     withWorkspaceFilter(`${ACCOUNT_SETTINGS_TABLE}?id=not.in.(${currentIds})`),
+    {
+      method: 'DELETE',
+      headers: { Prefer: 'return=minimal' },
+    }
+  );
+}
+
+export async function getSharedForecastEvents(): Promise<ForecastEvent[] | null> {
+  if (!isConfigured()) return null;
+
+  try {
+    const rows = await request<SharedForecastEventRow[]>(
+      withWorkspaceFilter(`${FORECAST_EVENTS_TABLE}?select=*&order=month.asc,id.asc`)
+    );
+    return (rows ?? []).map(fromSharedForecastEventRow);
+  } catch (err) {
+    // Table may not yet exist — return null so caller falls back to defaults.
+    console.warn('[forecast-events] Read failed (table may not exist yet):', err);
+    return null;
+  }
+}
+
+export async function saveSharedForecastEvents(events: ForecastEvent[]): Promise<void> {
+  if (!isConfigured()) return;
+
+  if (events.length === 0) {
+    // Only delete when explicitly clearing — never as part of a save-then-insert.
+    await request<unknown>(withWorkspaceFilter(`${FORECAST_EVENTS_TABLE}?id=neq.__none__`), {
+      method: 'DELETE',
+      headers: { Prefer: 'return=minimal' },
+    });
+    return;
+  }
+
+  // Upsert: atomic per-row, avoids the DELETE+INSERT gap where remote can be left empty.
+  await request<unknown>(`${FORECAST_EVENTS_TABLE}?on_conflict=workspace_id,id`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal,resolution=merge-duplicates',
+    },
+    body: JSON.stringify(events.map(toSharedForecastEventRow)),
+  });
+
+  // Remove stale rows that are no longer in the local event set.
+  const currentIds = events.map((e) => `"${e.id}"`).join(',');
+  await request<unknown>(
+    withWorkspaceFilter(`${FORECAST_EVENTS_TABLE}?id=not.in.(${currentIds})`),
     {
       method: 'DELETE',
       headers: { Prefer: 'return=minimal' },

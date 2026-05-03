@@ -149,3 +149,27 @@ $$;
 -- alter table public.shared_imported_transactions enable row level security;
 -- alter table public.shared_import_batches enable row level security;
 -- alter table public.shared_account_settings enable row level security;
+
+-- Forecast events: per-row collection keyed by (workspace_id, id),
+-- mirrors shared_account_settings shape. Upserted on save with stale
+-- rows removed. RLS policy lives in first_test_policies.sql and must
+-- be applied after this DDL.
+
+create table if not exists public.forecast_events (
+  workspace_id text not null,
+  id text not null,
+  month text not null,
+  type text not null,
+  title text not null,
+  note text null,
+  status text not null,
+  impact_mode text not null default 'fixed_amount',
+  cash_in_impact numeric not null default 0,
+  cash_out_impact numeric not null default 0,
+  enabled boolean not null default true,
+  updated_at timestamptz not null default now(),
+  primary key (workspace_id, id)
+);
+
+create index if not exists forecast_events_workspace_month_idx
+  on public.forecast_events (workspace_id, month);

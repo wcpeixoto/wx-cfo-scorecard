@@ -31,9 +31,11 @@ import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuick
 import {
   DEFAULT_WORKSPACE_SETTINGS,
   getSharedAccountSettings,
+  getSharedForecastEvents,
   getSharedWorkspaceSettings,
   isSharedPersistenceConfigured,
   saveSharedAccountSettings,
+  saveSharedForecastEvents,
   saveSharedWorkspaceSettings,
   type WorkspaceSettings,
 } from '../lib/data/sharedPersistence';
@@ -794,6 +796,30 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     };
 
     void loadWorkspaceSettings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sharedPersistenceEnabled]);
+
+  // Load persisted Known Events (Commit 1: Supabase persistence). Forecast
+  // math is unchanged — events are still passed as [] to composers; this
+  // restores them across refresh and is wired through the existing
+  // setForecastEvents handlers below.
+  useEffect(() => {
+    if (!sharedPersistenceEnabled) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const remote = await getSharedForecastEvents();
+        if (cancelled) return;
+        if (remote !== null) setForecastEvents(remote);
+      } catch (err) {
+        // Non-fatal: in-memory empty default remains correct.
+        console.warn('[forecast-events] Load failed, using empty defaults.', err);
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -2823,13 +2849,25 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               onReceivableDaysChange={(nextValue) => updateCustomScenario({ receivableDays: nextValue })}
               onPayableDaysChange={(nextValue) => updateCustomScenario({ payableDays: nextValue })}
               forecastEvents={forecastEvents}
-              onAddEvent={(events) => setForecastEvents((prev) => [...prev, ...events])}
-              onUpdateEvent={(updated) => setForecastEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)))}
-              onDeleteEvent={(groupId) => setForecastEvents((prev) => prev.filter((e) => {
-                const parts = e.id.split('__');
-                const eGroupId = parts.length === 3 ? parts[1] : e.id;
-                return eGroupId !== groupId;
-              }))}
+              onAddEvent={(events) => setForecastEvents((prev) => {
+                const next = [...prev, ...events];
+                void saveSharedForecastEvents(next);
+                return next;
+              })}
+              onUpdateEvent={(updated) => setForecastEvents((prev) => {
+                const next = prev.map((e) => (e.id === updated.id ? updated : e));
+                void saveSharedForecastEvents(next);
+                return next;
+              })}
+              onDeleteEvent={(groupId) => setForecastEvents((prev) => {
+                const next = prev.filter((e) => {
+                  const parts = e.id.split('__');
+                  const eGroupId = parts.length === 3 ? parts[1] : e.id;
+                  return eGroupId !== groupId;
+                });
+                void saveSharedForecastEvents(next);
+                return next;
+              })}
             />
 
             <article className="card table-card projection-table-card" ref={projectionTableRef}>

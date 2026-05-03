@@ -60,6 +60,28 @@ to anon
 using (workspace_id = 'default')
 with check (workspace_id = 'default');
 
+-- Forecast events: same first-test pattern as the tables above.
+-- Single-workspace read+write for anon, scoped by workspace_id.
+-- Requires the forecast_events table from shared_persistence_schema.sql.
+
+alter table public.forecast_events enable row level security;
+
+drop policy if exists "first_test_read_forecast_events" on public.forecast_events;
+drop policy if exists "first_test_write_forecast_events" on public.forecast_events;
+
+create policy "first_test_read_forecast_events"
+on public.forecast_events
+for select
+to anon
+using (workspace_id = 'default');
+
+create policy "first_test_write_forecast_events"
+on public.forecast_events
+for all
+to anon
+using (workspace_id = 'default')
+with check (workspace_id = 'default');
+
 -- Recommended cleanup before any broader rollout:
 -- 1. drop these first-test policies
 -- 2. replace anon access with authenticated policies or a server-side write path
