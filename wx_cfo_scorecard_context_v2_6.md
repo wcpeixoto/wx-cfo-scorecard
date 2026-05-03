@@ -610,6 +610,89 @@ Temporary 4th Forecast-page toggle (Path A) is rejected. The Forecast
 page should reach its final shape (no model toggle) as quickly as the
 Settings work allows.
 
+### May 2, 2026 — Reality Forecast implementation shipped
+
+Five-commit implementation pass executing the locked product decision
+("Reality Forecast as main/default"), plus the supporting Supabase
+migration. Forecast page now consumes the user's posture from Settings;
+Forecast-page model toggle is removed; Today posture-awareness is
+explicitly deferred to sub-phase 2c.2.
+
+**Commits (in order):**
+
+| Hash | Subject | Sub-phase |
+|---|---|---|
+| `90a1832` | feat(charts): hybrid axis for Projected Cash Balance y-axis | (chart polish, prereq) |
+| `c2e508d` | feat(forecast): add Reality Forecast pure composer | Step 2 — `composeConservativeFloor()` |
+| `0a3cf36` | feat(persistence): add forecast_posture to WorkspaceSettings | Step 4-2a |
+| `2b9ccae` | feat(settings): add Forecast style control to Rules section | Step 4-2b |
+| `b93cad2` | feat(forecast): route Forecast page through forecastPosture | Step 4-2c.1 |
+
+**Supabase migration (run manually via MCP against the Supabase test
+project before sub-phase 2b shipped):**
+
+```sql
+ALTER TABLE shared_workspace_settings
+  ADD COLUMN IF NOT EXISTS forecast_posture text
+    NOT NULL DEFAULT 'reality'
+    CHECK (forecast_posture IN ('reality', 'recovery'));
+```
+
+Migration-safe by design: the `getSharedWorkspaceSettings` row mapper
+defaults `forecastPosture` to `'reality'` if the column is absent, null,
+or unexpected. App was deployable before the column existed; pre-migration
+writes failed with PGRST204 silently (existing save-error swallow path)
+and the read-side default kept the UI consistent.
+
+**Verified live (12 horizon × posture combinations):**
+- Reality 1Y/2Y/3Y net change: −$5.4K / −$10.8K / −$16.3K (linear scaling)
+- Recovery 1Y/2Y/3Y net change: +$43K / +$86.1K / +$129.1K (linear scaling)
+- November cash-in preserved across years: $40,910.70 in 2026, 2027, 2028
+- Backtest regression unchanged (locked metrics held across all commits)
+
+**Today divergence — deferred to sub-phase 2c.2:**
+
+Today consumers (`coreConstraints.ts` reserve gauge, `signals.ts`
+priority cards) read `model.cashFlowForecastSeries`, an Engine-baseline
+forecast built inside `computeDashboardModel` via
+`buildCashFlowForecastSeries`. This is independent of the Forecast page
+projection and was always Engine-only. Pre-2c.1 the divergence was
+hidden because Engine was the default; post-2c.1 with Reality as
+default, Today and Forecast can show different forward-cash numbers.
+
+Documented in code comments at both call sites:
+"Forecast posture intentionally not applied here yet. Today
+posture-awareness is deferred to sub-phase 2c.2."
+
+The architectural choice for 2c.2 is between:
+- Threading posture into `computeDashboardModel` so
+  `cashFlowForecastSeries` becomes posture-aware globally
+  (locked `compute.ts` change, cleaner long-term, larger blast
+  radius)
+- Applying posture at the consumer layer (`coreConstraints.ts`,
+  `signals.ts` — both on the locked list, less invasive but couples
+  posture knowledge to each consumer)
+
+Decision deferred until fresh diagnosis.
+
+**Key learnings during implementation:**
+
+- `WorkspaceSettings` type lives in `sharedPersistence.ts`, not in
+  `contract.ts` as previously implied. The new field was added in
+  place; relocation deferred as housekeeping.
+- The Forecast model toggle lived in `Dashboard.tsx`, not in
+  `CashFlowForecastModule.tsx`. CashFlowForecastModule was not
+  touched in 2c.1.
+- Cadence has a hard 12-month cap (`HORIZON_MONTHS = 12`). Composers
+  throw on length mismatch by design. Long-horizon support is the
+  caller's responsibility — composers do not extrapolate.
+- The first `niceTicks` tier-table approach had bracket boundary
+  issues. Final algorithm: target-count-driven 1-2-5 snap with
+  hybrid local/zero-based axis. No tier table.
+- Hybrid axis matters because cash balance is a level metric, not a
+  volume metric. Zero-based axis on short horizons ($21K–$25K range)
+  visually flattens the signal; local axis preserves it.
+
 ---
 
 ## What Changed Recently (April 30, 2026 — afternoon session)
