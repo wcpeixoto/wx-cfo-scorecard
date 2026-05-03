@@ -53,6 +53,9 @@ function formatCurrency(value: number): string {
   return `${sign}$${Math.round(abs).toLocaleString()}`;
 }
 
+const formatSignedCurrency = (n: number) =>
+  `${n > 0 ? '+' : ''}${formatCurrency(n)}`;
+
 function xAxisLabelStep(count: number): number {
   if (count >= 24) return 3;
   if (count >= 12) return 2;
@@ -99,6 +102,31 @@ export default function ProjectedCashBalanceChart({
       if (netImpact === 0) continue;
       const idx = data.findIndex((d) => d.month.startsWith(event.month));
       if (idx < 0) continue;
+      // Two annotation points per event at the same x: an invisible-marker
+      // title-line above, and a value-line + visible dot below. Apex's
+      // label.text renders through a single SVG <text> element with no
+      // <tspan> children, so \n collapses; stacking via offsetY is the
+      // cleanest in-API path. See feasibility test results.
+      const labelStyle = {
+        background: 'rgba(255, 255, 255, 0.96)',
+        color: '#344054',
+        fontSize: '11px',
+        fontFamily: 'Outfit, sans-serif',
+        padding: { left: 6, right: 6, top: 2, bottom: 2 },
+      } as const;
+      points.push({
+        x: categories[idx],
+        y: values[idx],
+        marker: { size: 0 },
+        label: {
+          text: event.title,
+          offsetY: -36,
+          textAnchor: 'middle',
+          borderColor: '#F79009',
+          borderWidth: 1,
+          style: labelStyle,
+        },
+      });
       points.push({
         x: categories[idx],
         y: values[idx],
@@ -109,16 +137,12 @@ export default function ProjectedCashBalanceChart({
           strokeWidth: 2,
         },
         label: {
-          text: event.title,
+          text: formatSignedCurrency(netImpact),
+          offsetY: -18,
+          textAnchor: 'middle',
           borderColor: '#F79009',
           borderWidth: 1,
-          style: {
-            background: 'rgba(255, 255, 255, 0.96)',
-            color: '#344054',
-            fontSize: '11px',
-            fontFamily: 'Outfit, sans-serif',
-            padding: { left: 6, right: 6, top: 2, bottom: 2 },
-          },
+          style: labelStyle,
         },
       });
     }
@@ -192,14 +216,14 @@ export default function ProjectedCashBalanceChart({
           stroke: { color: '#b6b6b6', width: 1, dashArray: 3 },
         },
         labels: {
-          hideOverlappingLabels: false,
+          hideOverlappingLabels: true,
           trim: false,
           offsetY: 2,
           formatter: (value: string, _timestamp?: number, opts?: { dataPointIndex?: number }) => {
             const index = opts?.dataPointIndex ?? categories.indexOf(value);
             if (index < 0) return value;
             if (index === 0 || index === categories.length - 1) return value;
-            return index % labelStep === 0 ? value : '';
+            return value;
           },
           style: {
             fontSize: '12px',
