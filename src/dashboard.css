@@ -4099,14 +4099,6 @@ body {
   border: 1px solid var(--line);
 }
 
-.forecast-event-helper {
-  flex-basis: 100%;
-  margin: 0;
-  font-size: 0.75rem;
-  line-height: 1.4;
-  color: var(--text-secondary);
-}
-
 /* What-If page header — matches Big Picture top-anchored layout */
 .what-if-header {
   min-height: 74px;

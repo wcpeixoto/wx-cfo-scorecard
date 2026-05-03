@@ -909,9 +909,6 @@ export default function CashFlowForecastModule({
                     )}
                   </span>
                   <span className="forecast-event-status is-neutral">{group.freqLabel}</span>
-                  {group.firstEvent.enabled && (
-                    <span className="forecast-event-status is-positive">Included in forecast</span>
-                  )}
                   <button
                     type="button"
                     className="forecast-event-edit-btn"
@@ -947,11 +944,6 @@ export default function CashFlowForecastModule({
                     >
                       ✕
                     </button>
-                  )}
-                  {group.firstEvent.enabled && (
-                    <p className="forecast-event-helper">
-                      This event adjusts your projected cash by {group.amount > 0 ? '+' : '-'}{formatCurrencyCompact(Math.abs(group.amount))} {group.frequency === 'once' ? `in ${toMonthLabel(group.firstEvent.month)}` : group.frequency === 'monthly' ? `each month ${group.monthDisplay}` : group.monthDisplay}.
-                    </p>
                   )}
                 </li>
               ))}
