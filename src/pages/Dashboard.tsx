@@ -2484,7 +2484,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
         )}
 
         {hasImportedData && activeTab === 'today' && (
-          <TodayPage model={model} txns={filteredTxns} targetNetMargin={businessRules.targetNetMargin} />
+          <TodayPage model={model} txns={filteredTxns} forecastProjection={scenarioProjection} targetNetMargin={businessRules.targetNetMargin} />
         )}
 
         {hasImportedData && activeTab === 'big-picture' && (

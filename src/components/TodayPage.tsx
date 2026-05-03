@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { DashboardModel, Txn } from '../lib/data/contract';
+import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
 import { detectSignals } from '../lib/priorities/signals';
 import { rankPriorities } from '../lib/priorities/rank';
 import { classifyTxn } from '../lib/cashFlow';
@@ -14,11 +14,15 @@ const DIST_ON_TARGET_HIGH = 1.10; // actual <= target × 1.10
 interface TodayPageProps {
   model: DashboardModel;
   txns: Txn[];
+  forecastProjection: ScenarioPoint[];
   targetNetMargin?: number;
 }
 
-export function TodayPage({ model, txns, targetNetMargin }: TodayPageProps) {
-  const signals = useMemo(() => detectSignals(model, txns), [model, txns]);
+export function TodayPage({ model, txns, forecastProjection, targetNetMargin }: TodayPageProps) {
+  const signals = useMemo(
+    () => detectSignals(model, txns, forecastProjection),
+    [model, txns, forecastProjection]
+  );
   const { hero, secondary } = useMemo(() => rankPriorities(signals), [signals]);
 
   const distributionStatus = useMemo(() => {

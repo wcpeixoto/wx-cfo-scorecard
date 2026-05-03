@@ -1,4 +1,4 @@
-import type { DashboardModel, Txn } from '../data/contract';
+import type { DashboardModel, ScenarioPoint, Txn } from '../data/contract';
 import { classifyTxn } from '../cashFlow';
 import type { Signal } from './types';
 
@@ -39,7 +39,8 @@ function average(values: number[]): number {
 
 export function detectSignals(
   model: DashboardModel,
-  txns: Txn[]
+  txns: Txn[],
+  forecastProjection: ScenarioPoint[]
 ): Signal[] {
   const signals: Signal[] = [];
 
@@ -71,9 +72,7 @@ export function detectSignals(
   }
 
   // ── 2. Forward cash flow ─────────────────────────────────────────────────────
-  // Forecast posture intentionally not applied here yet.
-  // Today posture-awareness is deferred to sub-phase 2c.2.
-  const projected = model.cashFlowForecastSeries.filter(e => e.status === 'projected');
+  const projected = forecastProjection;
 
   if (projected.length > 0) {
     let runningBalance = currentCashBalance;

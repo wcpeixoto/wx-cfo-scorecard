@@ -1,4 +1,4 @@
-import type { DashboardModel } from '../data/contract';
+import type { DashboardModel, ScenarioPoint } from '../data/contract';
 
 export interface CoreConstraints {
   reservePercent: number | null;
@@ -6,12 +6,13 @@ export interface CoreConstraints {
   reserveTarget: number;
 }
 
-export function getCoreConstraints(model: DashboardModel): CoreConstraints {
+export function getCoreConstraints(
+  model: DashboardModel,
+  forecastProjection: ScenarioPoint[]
+): CoreConstraints {
   const { percentFunded, reserveTarget, currentCashBalance } = model.runway;
 
-  // Forecast posture intentionally not applied here yet.
-  // Today posture-awareness is deferred to sub-phase 2c.2.
-  const projected = model.cashFlowForecastSeries.filter(e => e.status === 'projected');
+  const projected = forecastProjection;
 
   let forwardCashBalance = currentCashBalance;
   if (projected.length > 0) {
