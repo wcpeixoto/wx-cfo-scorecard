@@ -54,6 +54,7 @@ import {
 import { projectCategoryCadenceScenario } from '../lib/kpis/categoryCadence';
 import { composeSplitConservative } from '../lib/kpis/splitConservative';
 import { composeConservativeFloor } from '../lib/kpis/conservativeFloor';
+import { applyEventsOverlay } from '../lib/kpis/applyEventsOverlay';
 import type {
   AccountRecord,
   AccountType,
@@ -1665,13 +1666,19 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
         }
         result = { points: extended, seasonality: composed.seasonality };
       }
+      // Post-composition Known Events overlay. Engine, Cadence, Reality
+      // composer, and Recovery composer remain event-free; the overlay
+      // sits OUTSIDE all of them and applies once to the final
+      // posture-aware horizon. When forecastEvents is empty, the helper
+      // returns its input unchanged so math is byte-for-byte identical.
+      result = { points: applyEventsOverlay(result.points, forecastEvents), seasonality: result.seasonality };
       if (import.meta.env.DEV && !bootPhaseLoggedRef.current.forecast && model.monthlyRollups.length > 0) {
         bootPhaseLoggedRef.current.forecast = true;
         console.log('[BOOT] Forecast compute:', Math.round(performance.now() - fcT0), 'ms');
       }
       return result;
     },
-    [filteredTxns, forecastCurrentCashBalance, businessRules.forecastPosture, forecastRangeMonths, model, scenarioInput]
+    [filteredTxns, forecastCurrentCashBalance, businessRules.forecastPosture, forecastEvents, forecastRangeMonths, model, scenarioInput]
   );
   const scenarioProjection = useMemo(() => forecastProjection.points, [forecastProjection.points]);
   const forecastSeasonality = useMemo(() => forecastProjection.seasonality, [forecastProjection.seasonality]);
