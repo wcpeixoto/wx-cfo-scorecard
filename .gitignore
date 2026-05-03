@@ -7,3 +7,6 @@ dist
 # build/cache artifacts
 *.tsbuildinfo
 vite.config.d.ts
+
+# scratch / archive workspace — local only
+Temp/
