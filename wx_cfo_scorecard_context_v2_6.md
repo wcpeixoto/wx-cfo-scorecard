@@ -1,6 +1,81 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: May 1, 2026*
+*Last updated: May 3, 2026*
+
+---
+
+### May 3, 2026 — Sub-phase 2c.2 shipped (Today posture-awareness)
+
+Today consumers (`detectSignals`, `getCoreConstraints`) previously read
+`model.cashFlowForecastSeries` (Engine 36-month baseline), causing
+Today to diverge from the Forecast page after sub-phase 2c.1.
+
+**Architectural decision: consumer-prop threading, not compute-layer posture.**
+
+Path A (thread `forecastPosture` into `computeDashboardModel`) was
+rejected after read-only diagnosis. It would have required modifying
+two locked files (`compute.ts` and `contract.ts` — `DashboardModel.cashFlowForecastSeries`
+is typed `CashFlowForecastPoint[]`, posture composers return `ScenarioPoint[]`).
+It would also have coupled a UI/Settings preference to the pure-math
+computation layer.
+
+Path B was implemented: pass `scenarioProjection` (already computed in
+`Dashboard.tsx` before `<TodayPage>` renders) down as a required prop.
+
+**Required-prop enforcement, no Engine fallback.** `detectSignals` and
+`getCoreConstraints` now require `forecastProjection: ScenarioPoint[]`.
+There is no fallback to `model.cashFlowForecastSeries`. Compile-time
+guarantee that Today cannot silently regress to Engine baseline.
+
+**Commit:**
+
+| Hash | Subject |
+|---|---|
+| `ef088be` | feat(today): route Today forward-cash signals through forecastPosture |
+
+**Files changed (4, no locked files):**
+- `src/lib/priorities/signals.ts` — required `forecastProjection` param
+- `src/lib/priorities/coreConstraints.ts` — required `forecastProjection` param (defensive; function is currently dead code, exported but never imported)
+- `src/components/TodayPage.tsx` — required `forecastProjection` prop, threaded to `detectSignals`
+- `src/pages/Dashboard.tsx` — pass `scenarioProjection` to `<TodayPage>`
+
+**`CoreConstraints.tsx` component was not touched** — it is dead code (defined, never rendered). Updating only the upstream function preserves a posture-correct path for future wiring.
+
+**Verified live (production, commit `ef088be`):**
+- Reality posture: Today "Cash floor" card = $15K; Forecast 1Y trough Apr 2027 = $14,693 traced from $20,115 cash-on-hand → match
+- Recovery posture: Today "Cash floor" card = $17K; Forecast trough Jun 2026 = $17,191 traced from $20,115 → match
+- Reality → Recovery → Reality reversible cycle: $15K → $17K → $15K
+- No console errors related to forecast posture path
+- Bundle hash `index-DaP_wuE1.js` confirmed live
+
+**Key learnings:**
+
+- `model.cashFlowForecastSeries` produces 36 months (Engine baseline);
+  posture composers cap at 12 months. The two series have different
+  types (`CashFlowForecastPoint` vs `ScenarioPoint`) but both expose
+  `.netCashFlow`. `ScenarioPoint` has no `status` field — all points
+  are projected by definition, so the `.filter(e => e.status === 'projected')`
+  step is dropped at consumer sites.
+- `getCoreConstraints` and `CoreConstraints.tsx` are dead code today.
+  They were defined as part of Today V1 scaffolding but never wired in.
+  Defensive update during 2c.2 ensures future wiring is posture-correct
+  by default.
+- Required-prop enforcement is the right discipline for posture: optional
+  fallback would have kept the Engine-baseline divergence alive as a
+  "just in case" path. Compile-time enforcement is the guarantee that
+  the bug we just fixed cannot silently return.
+- Posture toggle is a UI/Settings concern. Keeping posture out of
+  `compute.ts` preserves the abstraction boundary: pure math vs user
+  preference.
+
+**What's next:**
+
+- Future audit: check any new forecast-dependent surfaces for posture
+  consistency when they are added.
+- Known Events + AR/AP carry policy for composed forecasts (Reality and
+  Recovery) — unresolved; deferred policy phase.
+- Long-horizon UX boundary on Forecast page — communicate the 12-month
+  confidence boundary when users select 2y/3y horizons.
 
 ---
 
