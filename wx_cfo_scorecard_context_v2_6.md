@@ -1,6 +1,6 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: May 3, 2026*
+*Last updated: May 3, 2026 (post-Known-Events overlay)*
 
 ---
 
@@ -76,6 +76,72 @@ guarantee that Today cannot silently regress to Engine baseline.
   Recovery) — unresolved; deferred policy phase.
 - Long-horizon UX boundary on Forecast page — communicate the 12-month
   confidence boundary when users select 2y/3y horizons.
+
+---
+
+### May 3, 2026 — Composed Forecast Policy + Known Events overlay shipped
+
+**Composed Forecast Policy (locked May 3, 2026)**
+
+Wx CFO Scorecard is a cash-basis product. Operating reality is what the bank account does, month by month. Accrual concepts (receivables, payables, aging, invoice-level timing) are not part of the data model and are not modeled in any forecast.
+
+**Known Events:** persisted manual cash adjustments that DO affect the displayed forecast via a post-composition overlay. Engine, Cadence, Reality (Conservative Floor), and Recovery (Split Conservative) composers all continue to receive `events: []`. Events apply once to the final `ScenarioPoint[]` horizon visible to the user, in `Dashboard.tsx`'s `forecastProjection` useMemo, after the 2Y/3Y caller-layer extension. Apply to `cashIn` / `cashOut`, recompute `netCashFlow`, and roll forward `endingCashBalance` from the event month onward. Preserve `operatingCashIn` / `operatingCashOut`. `enabled` is the math switch; `status` is decorative.
+
+**AR/AP carry:** out of scope. The hidden "AR/AP days" Settings slider is to be removed. AR/AP terminology is stripped from UI. The Engine carry layer in `compute.ts:2293–2374` is dead code from a user perspective and stays in place for backtest compatibility, with a code comment marking it not-surfaced. Real AR/AP becomes possible only when the data model has receivable/payable entities — invoice-level data, aging, payment terms.
+
+**Composed forecast invariants:**
+
+| Property | Reality | Recovery | Engine |
+|---|---|---|---|
+| Includes Known Events in displayed forecast via overlay | Yes | Yes | Diagnostic/raw Engine path unchanged |
+| Includes AR/AP carry | No | No | No (effectively) |
+| Cash-basis | Yes | Yes | Yes |
+| Default user-facing posture | Yes | Optional | Diagnostic only |
+
+**Commits this session:**
+
+| Hash | Subject |
+|---|---|
+| `dd9b038` | fix(today): decouple forward-cash signal window from Forecast range |
+| `6e8628d` | feat(forecast): persist Known Events to Supabase |
+| `cbe5b38` | fix(forecast): two-line Cash Event marker label with elevated layout |
+| `1a9f7f2` | feat(forecast): post-composition Known Events overlay (Reality + Recovery) |
+| `dc12288` → reverted by `ee7c67c` | "Included in forecast" badge and helper text on event rows. Reverted because the badge and helper sentence became redundant once Commit 2 made events visibly affect the chart line and the row already shows month + amount + ONCE/MONTHLY pill. The truthfulness gap closed itself when math became real. |
+
+**Files changed across the sequence:**
+- `src/lib/priorities/signals.ts` — Today window slice (Commit 0)
+- `src/lib/priorities/coreConstraints.ts` — Today window slice (Commit 0, defensive — function still dead code)
+- `supabase/shared_persistence_schema.sql` — `forecast_events` DDL (Commit 1)
+- `supabase/first_test_policies.sql` — `forecast_events` RLS (Commit 1)
+- `src/lib/data/sharedPersistence.ts` — row type, mappers, get/save helpers (Commit 1, additive persistence helpers only)
+- `src/pages/Dashboard.tsx` — boot load + handler wrappers (Commit 1) + overlay seam (Commit 2)
+- `src/components/ProjectedCashBalanceChart.tsx` — marker rendering across ranges + two-line label (Commit 1b/1c)
+- `src/lib/kpis/applyEventsOverlay.ts` — new pure helper (Commit 2)
+
+**No locked forecast-math files modified across the sequence.** `sharedPersistence.ts` received additive persistence helpers only.
+
+**Verified live (production):**
+- Reality posture: Today $20K floor with the persistent +$100K Jun 2026 test event applied. Trough lifted from pre-event $15K because the +$100K shifts every subsequent point above the starting cash.
+- Recovery posture: composed correctly with overlay applied downstream.
+- Marker visible on 60d / 90d / 6M / 1Y / 2Y / 3Y; absent on 30d (Jun outside data window — correct).
+- Two-line label: title above, signed value below, dot at data point.
+- Math byte-identical when events list is empty (verified via early-exit paths in `applyEventsOverlay`).
+- Today + Forecast agree under both postures.
+
+**Key learnings:**
+
+- Post-composition overlay is the right architectural seam for Known Events. Avoids the Engine/Cadence asymmetry problem (Cadence has no event overlay path) and keeps composer math pure.
+- ApexCharts annotation positioning consults the rendered category-label text, not the underlying categories array. When `labels.formatter` returns `''` at the matching index, the annotation point is silently dropped — the marker simply does not render. Diagnosed during 1b: the chart's manual labelStep thinning at `ProjectedCashBalanceChart.tsx:202` was emptying the category text at non-step indexes (every other position on 1Y, every third on 2Y/3Y), which made markers appear only on 60d and 6M by coincidence (where labelStep happened to equal 1). Fix: stop returning `''` from the formatter; let Apex's built-in `hideOverlappingLabels: true` handle visual density without breaking annotation lookup.
+- ApexCharts `label.text` renders through a single SVG `<text>` element with no `<tspan>` children, so `\n` is collapsed to whitespace. Multi-line labels require two stacked annotation points at the same `x` with different `offsetY` — the two-line marker (Commit 1c) uses an invisible-marker title-line above and a value-line + visible dot below.
+- Required-prop enforcement at the persistence layer is not the same as required-prop enforcement at the math layer. Persistence (Commit 1) used save-on-change inside the existing handler updaters, mirroring `updateBusinessRules`. The math overlay (Commit 2) used a single insertion seam in the `forecastProjection` useMemo with the helper added to the dep array — no other call sites needed to change because every downstream consumer reads `scenarioProjection`.
+- The "Today is invariant to Forecast UI state" guarantee from sub-phase 2c.2 was a quiet regression introduced by 2c.2 itself (the new posture-aware series's length followed the user's Forecast range selector). Commit 0 (`dd9b038`) restored the invariant by slicing to a fixed 12-month window inside `detectSignals` and `getCoreConstraints`. Without that restoration, Commit 2's overlay would have made long-horizon events surface on Today as a function of where the user last clicked on the Forecast page — a non-obvious dependency that is now closed.
+- Commit 3 added an explicit "Included in forecast" pill plus a helper sentence per event row, then was reverted. The truthfulness gap no longer needed extra copy once the forecast line, table, marker, and Today signal all moved with the event. The badge was correct as a placeholder when math was silent (pre-Commit-2); after Commit 2 the product behavior became self-evident and the copy turned redundant. This is not a general "say nothing" principle — it's specific to surfaces where downstream behavior already communicates the fact the copy was meant to assert.
+
+**What's next (carried forward):**
+
+- Long-horizon UX boundary on Forecast page — communicate the 12-month confidence boundary when users select 2y/3y horizons. Especially relevant now that recurring events can extrapolate visually beyond the composer cap via the caller-layer month-of-year repeat.
+- Remove the AR/AP days Settings slider and any remaining AR/AP terminology from UI surfaces. The Engine carry layer in `compute.ts` stays for backtest compatibility but should carry an explicit "not user-surfaced" comment.
+- Visibility/exposure of the `enabled` flag on Cash Events. Today the schema honors `enabled = false` (overlay skips disabled events) but the row UI has no toggle to set it. Either add a toggle or document that disabling currently requires DB-direct edits.
 
 ---
 
