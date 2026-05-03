@@ -1,5 +1,7 @@
 import type { DashboardModel, ScenarioPoint } from '../data/contract';
 
+const TODAY_FORWARD_CASH_WINDOW_MONTHS = 12;
+
 export interface CoreConstraints {
   reservePercent: number | null;
   forwardCashBalance: number;
@@ -12,7 +14,7 @@ export function getCoreConstraints(
 ): CoreConstraints {
   const { percentFunded, reserveTarget, currentCashBalance } = model.runway;
 
-  const projected = forecastProjection;
+  const projected = forecastProjection.slice(0, TODAY_FORWARD_CASH_WINDOW_MONTHS);
 
   let forwardCashBalance = currentCashBalance;
   if (projected.length > 0) {

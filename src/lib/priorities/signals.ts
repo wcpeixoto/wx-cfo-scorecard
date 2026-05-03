@@ -28,6 +28,8 @@ const OWNER_DIST_PACE_THRESHOLD = 1.20;
 const OWNER_DIST_WEIGHT = 0.5;
 const OWNER_DIST_MIN_HISTORY_MONTHS = 15;
 
+const TODAY_FORWARD_CASH_WINDOW_MONTHS = 12;
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function average(values: number[]): number {
@@ -72,7 +74,7 @@ export function detectSignals(
   }
 
   // ── 2. Forward cash flow ─────────────────────────────────────────────────────
-  const projected = forecastProjection;
+  const projected = forecastProjection.slice(0, TODAY_FORWARD_CASH_WINDOW_MONTHS);
 
   if (projected.length > 0) {
     let runningBalance = currentCashBalance;
