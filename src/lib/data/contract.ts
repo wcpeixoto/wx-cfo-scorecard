@@ -376,7 +376,8 @@ export type ForecastEventImpactMode = "fixed_amount";
 
 export type ForecastEvent = {
   id: string;
-  month: string; // YYYY-MM
+  month: string; // YYYY-MM (derived from date on save; source-of-truth for overlay grouping)
+  date?: string; // YYYY-MM-DD (user-picked exact date; source-of-truth for display)
   type: ForecastEventType;
   title: string;
   note?: string;

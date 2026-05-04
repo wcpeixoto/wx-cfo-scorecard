@@ -168,6 +168,7 @@ create table if not exists public.forecast_events (
   cash_out_impact numeric not null default 0,
   enabled boolean not null default true,
   updated_at timestamptz not null default now(),
+  date date null,
   primary key (workspace_id, id)
 );
 
