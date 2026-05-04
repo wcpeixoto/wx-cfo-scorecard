@@ -79,11 +79,14 @@ export function detectSignals(
   if (projected.length > 0) {
     let runningBalance = currentCashBalance;
     let lowestProjectedBalance = runningBalance;
+    let lowestProjectedMonth = projected[0].month;
 
     for (const entry of projected) {
       runningBalance += entry.netCashFlow;
+      // Strict `<` keeps the earliest occurrence on ties.
       if (runningBalance < lowestProjectedBalance) {
         lowestProjectedBalance = runningBalance;
+        lowestProjectedMonth = entry.month;
       }
     }
 
@@ -95,6 +98,7 @@ export function detectSignals(
         metricValue: lowestProjectedBalance,
         targetValue: 0,
         gapAmount: Math.abs(lowestProjectedBalance),
+        troughMonth: lowestProjectedMonth,
         recommendedAction: 'Cash is projected to go negative — close the gap by pulling in revenue or deferring expenses.',
       });
     } else if (lowestProjectedBalance < reserveTarget) {
@@ -105,6 +109,7 @@ export function detectSignals(
         metricValue: lowestProjectedBalance,
         targetValue: reserveTarget,
         gapAmount: reserveTarget - lowestProjectedBalance,
+        troughMonth: lowestProjectedMonth,
         recommendedAction: 'Cash stays positive but dips below your safety target — watch for timing gaps.',
       });
     }

@@ -19,6 +19,7 @@ export interface Signal {
   gapAmount?: number;
   categoryFlagged?: string;
   recommendedAction?: string;
+  troughMonth?: string;
 }
 
 export interface RankedPriorities {
