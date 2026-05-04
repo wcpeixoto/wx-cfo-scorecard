@@ -19,6 +19,24 @@ function cat(category: string | undefined): string {
   return category ?? 'a category';
 }
 
+// "2026-05" → "May 2026". Mirrors the inline pattern used in
+// CashFlowForecastModule.tsx:387 — en-US, UTC, short month name.
+function formatTroughMonth(month: string | undefined): string {
+  if (!month) return 'the forecast window';
+  const match = month.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return 'the forecast window';
+  const year = Number.parseInt(match[1], 10);
+  const monthIndex = Number.parseInt(match[2], 10) - 1;
+  if (!Number.isFinite(year) || monthIndex < 0 || monthIndex > 11) {
+    return 'the forecast window';
+  }
+  return new Date(Date.UTC(year, monthIndex, 1)).toLocaleDateString('en-US', {
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
 function metricWorsened(signal: Signal, prior: PriorityHistoryRow | undefined): boolean {
   if (!prior || signal.metricValue === undefined || prior.metric_value === undefined) return false;
   switch (signal.type) {
@@ -80,12 +98,13 @@ export function getFallbackCopy(
     case 'cash_flow_negative': {
       const lowest = fmt(signal.metricValue);
       const gap = fmt(signal.gapAmount);
+      const troughMonth = formatTroughMonth(signal.troughMonth);
       return {
         headline: `Cash is projected to go negative by ${gap}`,
         why: worsened
           ? `The forward outlook has gotten worse since last time — your projected low point is now ${lowest}. This needs attention before it becomes a real constraint.`
           : `Based on your current pace, your balance is projected to go negative. That's not just a warning — it means bills don't get paid on time.`,
-        currentState: `Your lowest projected balance is ${lowest}. You need ${gap} more to stay above zero through the forecast window.`,
+        currentState: `Your lowest projected balance is ${lowest} in ${troughMonth}. You need ${gap} more to stay above zero through the forecast window.`,
         action: 'Send any outstanding invoices today and identify one upcoming payment you can push out by 30 days.',
         alternative: 'Pulling forward any annual renewals or a short promotion could bridge the gap.',
         followupNote: 'This is the most time-sensitive signal on the dashboard right now.',
@@ -95,12 +114,13 @@ export function getFallbackCopy(
     case 'cash_flow_tight': {
       const lowest = fmt(signal.metricValue);
       const gap = fmt(signal.gapAmount);
+      const troughMonth = formatTroughMonth(signal.troughMonth);
       return {
-        headline: `Cash floor drops to ${lowest} in the forecast`,
+        headline: `Cash floor drops to ${lowest} in ${troughMonth}`,
         why: worsened
           ? `The forward picture has tightened since last check — your lowest projected balance is ${lowest}. You won't run dry, but the cushion is thinner.`
           : `Your projected cash stays positive, but could fall ${gap} below your reserve target. You're not in danger, but you'd be cutting it close.`,
-        currentState: `The lowest your balance gets in the forecast is ${lowest} — just below the safety line you've set.`,
+        currentState: `The lowest your balance gets is ${lowest} in ${troughMonth} — just below the safety line you've set.`,
         action: 'Identify any payment that can shift out 2–4 weeks, or one revenue item you can pull forward.',
         alternative: 'Even smoothing out when bills are paid can help — timing matters as much as amount.',
         followupNote: 'You\'re in control here — a small adjustment now keeps you comfortable.',
