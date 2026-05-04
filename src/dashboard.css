@@ -4631,10 +4631,6 @@ body {
   padding-bottom: 0;
 }
 
-.rules-row--coming-soon {
-  opacity: 0.5;
-}
-
 .rules-row-info {
   display: grid;
   gap: 3px;
