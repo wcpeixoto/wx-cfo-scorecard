@@ -1,6 +1,74 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: May 3, 2026 (post-Known-Events overlay)*
+*Last updated: May 4, 2026 (post-AR/AP carry deprecation)*
+
+---
+
+### May 4, 2026 — Today V1 QA pass + AR/AP carry deprecation
+
+**Today V1 posture-aware QA pass: PASS with coverage gaps.**
+
+10 signal states identified canonically from `src/lib/priorities/signals.ts`,
+`rank.ts`, `copy.ts`, and `TodayPage.tsx`. 4 states verified live in
+production data; 6 states + 3 layout variants not reachable without
+synthetic data. Decision: declare verified-as-far-as-current-data-allows
+and move on. No synthetic-data QA pass scheduled — verify remaining
+states in flight when they fire naturally.
+
+**Verified live (production data, May 4 2026):**
+- `reserve_warning` as hero (59% funded, < 100% of $34,368 target)
+- `cash_flow_tight` as secondary
+- `expense_surge` warning tier as secondary (Rent or Lease ~50% above baseline)
+- 2-card secondary layout (`.today-secondary-row.is-pair`)
+- Deterministic fallback copy from `copy.ts` (AI provider stub always falls back)
+- Severity styling: `is-critical` / `is-warning` / `is-healthy` CSS verified
+- 12-month Today window invariant holds (Forecast range change does not affect Today)
+- Forecast posture math working — 90d Reality +$101.3K vs Recovery +$115.9K (delta $14.6K matches prior diagnostic)
+- Today + Forecast wiring stable
+
+**Coverage gaps (not reachable in current data):**
+- `reserve_critical`, `cash_flow_negative`
+- `expense_surge` critical tier (relDelta at boundary)
+- `revenue_decline` warning + critical tiers
+- `owner_distributions_high`
+- `steady_state`
+- 1-card and 0-card secondary layouts
+- Today cash-floor posture split — masked by standing +$100K June 2026 test event;
+  posture confirmed working via Forecast layer instead
+
+**Findings:**
+- F-1 — Today cards have no `.dark .today-*` / `.dark .hero-*` CSS coverage
+  despite UI_CARDS.md §19 requirement. Cosmetic; no dark-mode toggle exposed
+  in production yet. Logged in Notion as P3/Later.
+
+**Posture-sensitivity reality check:** Of 10 signals, only `cash_flow_negative`,
+`cash_flow_tight`, and (indirectly) `steady_state` shift on posture toggle.
+The other 7 are posture-invariant (read `model.runway`, `txns`, or
+`model.monthlyRollups` directly).
+
+---
+
+**AR/AP carry deprecation pass: shipped (commit `c3aec05`, merged via `cf65f92`).**
+
+Removed misleading product language. No math changed. Composed Forecast
+Policy is cash-basis only; the "Cash flow timing — Coming soon" Settings
+row implied a roadmap feature that was explicitly removed from scope.
+
+**Changes:**
+- `src/pages/Dashboard.tsx` — removed Rule 4 placeholder JSX block (7 lines)
+- `src/dashboard.css` — removed orphan `.rules-row--coming-soon` rule (3 lines)
+
+**Engine carry layer in `compute.ts` left untouched.** Locked file; cash-basis
+policy is already documented in `splitConservative.ts` and `conservativeFloor.ts`
+at the composition layer. The locked-file barrier itself signals not-in-production.
+
+**Verification:** Forecast 90d Reality net change unchanged at +$101.3K
+before and after commit on identical data state.
+
+**Deferred (logged in Notion as P4/Later):** Remove unused
+`receivableDays` / `payableDays` plumbing from `Dashboard.tsx` and
+`CashFlowForecastModule.tsx`. Vestigial; not rendered. Cleanup requires
+locked-file approval (`contract.ts`, `compute.ts`).
 
 ---
 
