@@ -28,6 +28,38 @@ function formatFullMonth(month: string): string {
 /** Bucket end date in "MMM D, YYYY" form for the tooltip header.
  *  Week granularity: extract the end of the existing range tooltipLabel ("May 25 – May 31, 2026").
  *  Month granularity: last day of the calendar month from YYYY-MM. */
+// Format YYYY-MM-DD → "Mmm DD, YYYY" (e.g. "Jun 12, 2026"). UTC-stable.
+// Mirrors formatEventDate in CashFlowForecastModule.tsx — the row display
+// uses the same shape for the same field. Inline rather than extracted
+// because only two callers exist; both live in non-locked files.
+function formatEventDate(date: string): string {
+  const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return date;
+  const year = Number.parseInt(match[1], 10);
+  const monthIndex = Number.parseInt(match[2], 10) - 1;
+  const day = Number.parseInt(match[3], 10);
+  if (!Number.isFinite(year) || monthIndex < 0 || monthIndex > 11 || !Number.isFinite(day)) return date;
+  return new Date(Date.UTC(year, monthIndex, day)).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+// Defensive fallback for in-memory events constructed before persistence
+// has populated `date`. Mirrors fromSharedForecastEventRow's read-time
+// fallback so display behavior is consistent with the row.
+function lastDayOfMonthDate(month: string): string {
+  const match = month.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return month;
+  const year = Number.parseInt(match[1], 10);
+  const monthIndex = Number.parseInt(match[2], 10) - 1;
+  if (!Number.isFinite(year) || monthIndex < 0 || monthIndex > 11) return month;
+  const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  return `${match[1]}-${match[2]}-${String(lastDay).padStart(2, '0')}`;
+}
+
 function formatBucketEndDate(d: TrendPoint, granularity: 'month' | 'week'): string {
   if (granularity === 'week') {
     const label = d.tooltipLabel ?? d.axisLabel ?? d.month;
@@ -102,9 +134,11 @@ export default function ProjectedCashBalanceChart({
       if (netImpact === 0) continue;
       const idx = data.findIndex((d) => d.month.startsWith(event.month));
       if (idx < 0) continue;
-      // Two annotation points per event at the same x: an invisible-marker
-      // title-line above, and a value-line + visible dot below. Apex's
-      // label.text renders through a single SVG <text> element with no
+      // Three annotation points per event at the same x, stacked via offsetY:
+      //   -54: title (no dot)
+      //   -36: impact amount (visible orange dot — anchors event math to bucket)
+      //   -18: exact event date (no dot)
+      // Apex's label.text renders through a single SVG <text> element with no
       // <tspan> children, so \n collapses; stacking via offsetY is the
       // cleanest in-API path. See feasibility test results.
       const labelStyle = {
@@ -114,13 +148,14 @@ export default function ProjectedCashBalanceChart({
         fontFamily: 'Outfit, sans-serif',
         padding: { left: 6, right: 6, top: 2, bottom: 2 },
       } as const;
+      const eventDate = event.date ?? lastDayOfMonthDate(event.month);
       points.push({
         x: categories[idx],
         y: values[idx],
         marker: { size: 0 },
         label: {
           text: event.title,
-          offsetY: -36,
+          offsetY: -54,
           textAnchor: 'middle',
           borderColor: '#F79009',
           borderWidth: 1,
@@ -138,6 +173,19 @@ export default function ProjectedCashBalanceChart({
         },
         label: {
           text: formatSignedCurrency(netImpact),
+          offsetY: -36,
+          textAnchor: 'middle',
+          borderColor: '#F79009',
+          borderWidth: 1,
+          style: labelStyle,
+        },
+      });
+      points.push({
+        x: categories[idx],
+        y: values[idx],
+        marker: { size: 0 },
+        label: {
+          text: formatEventDate(eventDate),
           offsetY: -18,
           textAnchor: 'middle',
           borderColor: '#F79009',
