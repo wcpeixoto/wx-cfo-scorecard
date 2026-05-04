@@ -71,6 +71,9 @@ type SharedForecastEventRow = {
   workspace_id: string;
   id: string;
   month: string;
+  // Optional in the row type because legacy rows predate the `date` column.
+  // The mapper falls back to last-day-of-stored-month for legacy rows on read.
+  date?: string | null;
   type: string;
   title: string;
   note: string | null;
@@ -275,6 +278,7 @@ function toSharedForecastEventRow(event: ForecastEvent): SharedForecastEventRow 
     workspace_id: WORKSPACE_ID,
     id: event.id,
     month: event.month,
+    date: event.date ?? null,
     type: event.type,
     title: event.title,
     note: event.note ?? null,
@@ -288,9 +292,14 @@ function toSharedForecastEventRow(event: ForecastEvent): SharedForecastEventRow 
 }
 
 function fromSharedForecastEventRow(row: SharedForecastEventRow): ForecastEvent {
+  // Read-time fallback for legacy rows persisted before the `date` column
+  // was added: synthesize last-day-of-month so display works without a
+  // DB backfill. Existing rows have date = null in the DB.
+  const date = row.date ?? lastDayOfMonth(row.month);
   return {
     id: row.id,
     month: row.month,
+    date,
     type: row.type as ForecastEvent['type'],
     title: row.title,
     note: row.note ?? undefined,
@@ -300,6 +309,17 @@ function fromSharedForecastEventRow(row: SharedForecastEventRow): ForecastEvent 
     cashOutImpact: typeof row.cash_out_impact === 'number' ? row.cash_out_impact : 0,
     enabled: row.enabled === true,
   };
+}
+
+function lastDayOfMonth(month: string): string {
+  const match = month.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return month;
+  const year = Number.parseInt(match[1], 10);
+  const monthIndex = Number.parseInt(match[2], 10) - 1;
+  if (!Number.isFinite(year) || monthIndex < 0 || monthIndex > 11) return month;
+  // Day 0 of next month = last day of current month.
+  const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  return `${match[1]}-${match[2]}-${String(lastDay).padStart(2, '0')}`;
 }
 
 export function isSharedPersistenceConfigured(): boolean {

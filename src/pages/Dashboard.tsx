@@ -2840,7 +2840,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               currentCashBalance={forecastCurrentCashBalance}
               forecastRangeMonths={forecastRangeMonths}
               forecastRangeValue={forecastRange}
-              forecastRangeOptions={FORECAST_RANGE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+              forecastRangeOptions={FORECAST_RANGE_OPTIONS.map((option) => ({ value: option.value, label: option.label, months: option.months }))}
               onForecastRangeChange={(nextValue) => {
                 const parsed = parseForecastRangeValue(nextValue);
                 if (parsed) setForecastRange(parsed);

@@ -11,11 +11,16 @@ import type {
 } from '../lib/data/contract';
 import { toMonthLabel } from '../lib/kpis/compute';
 
-type SelectOption = { value: string; label: string };
+type SelectOption = { value: string; label: string; months: number };
 
 type EventFrequency = 'once' | 'monthly' | 'yearly';
 
-function generateEventMonths(startMonth: string, frequency: EventFrequency, forecastRangeMonths: number): string[] {
+function generateEventMonths(startDate: string, frequency: EventFrequency, forecastRangeMonths: number): string[] {
+  // startDate is YYYY-MM-DD; recurrence still operates at month granularity
+  // because the overlay keys by YYYY-MM. Day-of-month is preserved on the
+  // event record via the `date` field but does not affect month generation.
+  const startMonth = startDate.slice(0, 7);
+
   if (frequency === 'once') return [startMonth];
 
   const today = new Date();
@@ -43,6 +48,49 @@ function generateEventMonths(startMonth: string, frequency: EventFrequency, fore
 
   if (months.length === 0) months.push(startMonth);
   return months;
+}
+
+// Format YYYY-MM-DD → "Mmm DD, YYYY" (e.g. "Jun 30, 2026"). UTC-stable.
+function formatEventDate(date: string): string {
+  const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return date;
+  const year = Number.parseInt(match[1], 10);
+  const monthIndex = Number.parseInt(match[2], 10) - 1;
+  const day = Number.parseInt(match[3], 10);
+  if (!Number.isFinite(year) || monthIndex < 0 || monthIndex > 11 || !Number.isFinite(day)) return date;
+  return new Date(Date.UTC(year, monthIndex, day)).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+// Today's local date as YYYY-MM-DD (matches <input type="date"> value format).
+function todayDateValue(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Last day of (today + months) as YYYY-MM-DD. Used for the picker max.
+function lastDayOfHorizon(monthsFromNow: number): string {
+  const d = new Date();
+  // Day 0 of (currentMonth + monthsFromNow + 1) = last day of horizon month.
+  const horizonEnd = new Date(d.getFullYear(), d.getMonth() + monthsFromNow + 1, 0);
+  return `${horizonEnd.getFullYear()}-${String(horizonEnd.getMonth() + 1).padStart(2, '0')}-${String(horizonEnd.getDate()).padStart(2, '0')}`;
+}
+
+// Build YYYY-MM-DD from a target month and a desired day, clamped to the
+// last valid day of that month (e.g. day 31 in Feb → Feb 28/29). Recurrence
+// uses this so monthly/yearly events on day 31 land cleanly in shorter months.
+function dateInMonth(month: string, desiredDay: number): string {
+  const match = month.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return month;
+  const year = Number.parseInt(match[1], 10);
+  const monthIndex = Number.parseInt(match[2], 10) - 1;
+  const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  const day = Math.min(Math.max(desiredDay, 1), lastDay);
+  return `${month}-${String(day).padStart(2, '0')}`;
 }
 
 // Forecast horizon segmented control split:
@@ -369,30 +417,30 @@ export default function CashFlowForecastModule({
 
   // Add Event modal state
   const [showAddModal, setShowAddModal] = useState(false);
-  const [formMonth, setFormMonth] = useState('');
+  const [formDate, setFormDate] = useState('');
+  const [formOriginalDate, setFormOriginalDate] = useState<string | null>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formAmount, setFormAmount] = useState('');
   const [formFrequency, setFormFrequency] = useState<EventFrequency>('once');
-  const [formErrors, setFormErrors] = useState<{ month?: string; title?: string }>({});
+  const [formErrors, setFormErrors] = useState<{ date?: string; title?: string }>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
 
-  // Next 24 months for the month selector
-  const forecastMonthOptions = useMemo(() => {
-    const today = new Date();
-    return Array.from({ length: 24 }, (_, i) => {
-      const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
-      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      return { value, label };
-    });
-  }, []);
+  // Date picker bounds. Max sourced from FORECAST_RANGE_OPTIONS (passed
+  // as forecastRangeOptions prop) — the canonical user-facing horizon.
+  // Never hardcode 36 here; if the canonical horizon changes, this follows.
+  const datePickerMin = useMemo(() => todayDateValue(), []);
+  const datePickerMax = useMemo(() => {
+    const maxMonths = forecastRangeOptions.reduce((acc, opt) => Math.max(acc, opt.months), 0);
+    return lastDayOfHorizon(maxMonths);
+  }, [forecastRangeOptions]);
 
   function openAddModal() {
     setEditingEventId(null);
     setEditingGroupId(null);
-    setFormMonth('');
+    setFormDate('');
+    setFormOriginalDate(null);
     setFormTitle('');
     setFormAmount('');
     setFormFrequency('once');
@@ -403,7 +451,11 @@ export default function CashFlowForecastModule({
   function openEditModal(group: (typeof groupedEventRows)[0]) {
     setEditingEventId(group.firstEvent.id);
     setEditingGroupId(group.groupId);
-    setFormMonth(group.firstEvent.month);
+    // Pre-fill with the existing date (legacy events have a synthesized
+    // last-day-of-month default applied at the persistence layer).
+    const existingDate = group.firstEvent.date ?? '';
+    setFormDate(existingDate);
+    setFormOriginalDate(existingDate || null);
     setFormTitle(group.title);
     setFormFrequency(group.frequency);
     setFormAmount(group.amount === 0 ? '' : String(group.amount));
@@ -412,8 +464,17 @@ export default function CashFlowForecastModule({
   }
 
   function handleAddEventSubmit() {
-    const errors: { month?: string; title?: string } = {};
-    if (!formMonth) errors.month = 'Month is required';
+    const errors: { date?: string; title?: string } = {};
+    if (!formDate) {
+      errors.date = 'Choose the expected event date.';
+    } else if (
+      // Allow legacy past-date pre-fill on edit if unchanged. Reject any
+      // new selection outside [today, last day of forecast horizon].
+      formDate !== formOriginalDate &&
+      (formDate < datePickerMin || formDate > datePickerMax)
+    ) {
+      errors.date = 'Choose a date within the forecast window.';
+    }
     if (!formTitle.trim()) errors.title = 'Event title is required';
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
@@ -430,10 +491,12 @@ export default function CashFlowForecastModule({
         typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
           ? crypto.randomUUID()
           : Date.now().toString();
-      const editMonths = generateEventMonths(formMonth, formFrequency, forecastRangeMonths);
+      const editMonths = generateEventMonths(formDate, formFrequency, forecastRangeMonths);
       const editEvents: ForecastEvent[] = editMonths.map((month, index) => ({
         id: `${formFrequency}__${newGroupId}__${index}`,
         month,
+        // Recurrence preserves day-of-month from the picked date.
+        date: dateInMonth(month, Number.parseInt(formDate.slice(8, 10), 10)),
         type: 'one_time_revenue',
         title: formTitle.trim(),
         status: 'planned',
@@ -455,10 +518,11 @@ export default function CashFlowForecastModule({
         ? crypto.randomUUID()
         : Date.now().toString();
 
-    const months = generateEventMonths(formMonth, formFrequency, forecastRangeMonths);
+    const months = generateEventMonths(formDate, formFrequency, forecastRangeMonths);
     const events: ForecastEvent[] = months.map((month, index) => ({
       id: `${formFrequency}__${groupId}__${index}`,
       month,
+      date: `${month}-${formDate.slice(8, 10)}`,
       type: 'one_time_revenue',
       title: formTitle.trim(),
       status: 'planned',
@@ -556,15 +620,17 @@ export default function CashFlowForecastModule({
       const first = sorted[0];
       const amount = first.cashInImpact > 0 ? first.cashInImpact : -first.cashOutImpact;
       const freqLabel = frequency === 'monthly' ? 'Monthly' : frequency === 'yearly' ? 'Yearly' : 'Once';
+      // Date is the source of truth for display. Persistence layer
+      // synthesizes last-day-of-month for legacy rows, so first.date is
+      // always populated when the event came from Supabase.
+      const firstDate = first.date ?? `${first.month}-01`;
       let monthDisplay: string;
       if (frequency === 'once') {
-        monthDisplay = toMonthLabel(first.month);
+        monthDisplay = formatEventDate(firstDate);
       } else if (frequency === 'monthly') {
-        monthDisplay = `starting ${toMonthLabel(first.month)}`;
+        monthDisplay = `starting ${formatEventDate(firstDate)}`;
       } else {
-        const calMonth = new Date(first.month + '-01T00:00:00Z').toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
-        const startYear = first.month.split('-')[0];
-        monthDisplay = `every ${calMonth}, starting ${startYear}`;
+        monthDisplay = `every ${formatEventDate(firstDate).replace(/, \d{4}$/, '')}, starting ${first.month.split('-')[0]}`;
       }
       return { groupId, frequency, freqLabel, events: sorted, firstEvent: first, title: first.title, amount, monthDisplay };
     }).sort((a, b) => a.firstEvent.month.localeCompare(b.firstEvent.month));
@@ -963,21 +1029,20 @@ export default function CashFlowForecastModule({
               <h3 className="event-modal-title">{editingEventId ? 'Edit Event' : 'Add Known Event'}</h3>
             </div>
             <div className="event-modal-body">
-              {/* Month */}
+              {/* Event Date */}
               <div className="event-form-field">
-                <label className="event-form-label" htmlFor="evt-month">Month</label>
-                <select
-                  id="evt-month"
-                  className={`event-form-select${!formMonth ? ' is-placeholder' : ''}`}
-                  value={formMonth}
-                  onChange={(e) => { setFormMonth(e.target.value); setFormErrors((prev) => ({ ...prev, month: undefined })); }}
-                >
-                  <option value="" disabled>Select month</option>
-                  {forecastMonthOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                {formErrors.month && <span className="event-form-error">{formErrors.month}</span>}
+                <label className="event-form-label" htmlFor="evt-date">Event Date</label>
+                <input
+                  id="evt-date"
+                  type="date"
+                  className="event-form-input"
+                  value={formDate}
+                  min={datePickerMin}
+                  max={datePickerMax}
+                  onChange={(e) => { setFormDate(e.target.value); setFormErrors((prev) => ({ ...prev, date: undefined })); }}
+                />
+                <span className="event-form-helper">Select the date this cash event is expected to hit.</span>
+                {formErrors.date && <span className="event-form-error">{formErrors.date}</span>}
               </div>
 
               {/* Title */}
