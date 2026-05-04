@@ -3790,14 +3790,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                           </div>
                         </div>
 
-                        {/* Rule 4 — Cash flow timing (placeholder) */}
-                        <div className="rules-row rules-row--coming-soon">
-                          <div className="rules-row-info">
-                            <span className="rules-row-label">Cash flow timing</span>
-                            <span className="rules-row-sub">Coming soon — receivables and payables timing offsets</span>
-                          </div>
-                        </div>
-
                         {/* Rule 5 — Duplicate warnings */}
                         <div className="rules-row">
                           <div className="rules-row-info">
