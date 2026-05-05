@@ -70,6 +70,7 @@ Before doing any work, read these files in order:
 2. `UI_RULES.md` — visual standard reference, must be read before any UI work
 3. `UI_CARDS.md` — card anatomy, height behavior, pairing classification
 4. This file (`CLAUDE.md`) — project rules, stack, and working discipline
+5. `SESSION_CLOSE_WORKFLOW.md` — required reading when ending a session
 
 For any UI work, also check the TailAdmin source at:
 `code/Code Supporting Docs/free-react-tailwind-admin-dashboard-main/`
