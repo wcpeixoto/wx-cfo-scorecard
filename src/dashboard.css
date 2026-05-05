@@ -7380,3 +7380,181 @@ body {
 }
 
 .dark .cth-placeholder-text { color: #667085; }
+
+/* === Phase 5.1 Branch 5 — Contracts & Renewals settings pane === */
+
+.contracts-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.contracts-add-btn {
+  height: 36px;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+.contracts-empty {
+  margin: 0;
+  padding: 24px 4px;
+  font-size: 14px;
+  color: #667085;
+}
+
+.contracts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.contracts-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 12px;
+  transition: border-color 150ms ease;
+}
+
+.contracts-row:hover {
+  border-color: #D0D5DD;
+}
+
+.contracts-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.contracts-row-name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.contracts-row-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #101828;
+}
+
+.contracts-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #667085;
+}
+
+.contracts-row-amount {
+  font-weight: 500;
+  color: #12B76A;
+}
+
+.contracts-row-amount.is-out {
+  color: #F04438;
+}
+
+.contracts-status-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+.contracts-status-badge.is-active {
+  color: #12B76A;
+  background: #ECFDF3;
+}
+
+.contracts-status-badge.is-paused {
+  color: #DC6803;
+  background: #FEF3E2;
+}
+
+.contracts-status-badge.is-ended {
+  color: #667085;
+  background: #F2F4F7;
+}
+
+.contracts-status-badge.is-disabled {
+  color: #667085;
+  background: #F2F4F7;
+}
+
+.contracts-row-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.contracts-delete-helper {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: #667085;
+  padding-top: 4px;
+}
+
+.contracts-modal-panel {
+  max-width: 520px;
+}
+
+.contracts-segmented {
+  align-self: flex-start;
+}
+
+.contracts-enabled-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #1D2939;
+  cursor: pointer;
+}
+
+.contracts-notes-input {
+  resize: vertical;
+  min-height: 72px;
+  font-family: inherit;
+}
+
+/* Dark mode coverage */
+.dark .contracts-row {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: #344054;
+}
+.dark .contracts-row:hover {
+  border-color: #475467;
+}
+.dark .contracts-row-name { color: rgba(255, 255, 255, 0.9); }
+.dark .contracts-row-meta { color: #98A2B3; }
+.dark .contracts-empty { color: #98A2B3; }
+.dark .contracts-status-badge.is-active {
+  color: #6CE9A6;
+  background: rgba(18, 183, 106, 0.12);
+}
+.dark .contracts-status-badge.is-paused {
+  color: #FDB022;
+  background: rgba(220, 104, 3, 0.15);
+}
+.dark .contracts-status-badge.is-ended,
+.dark .contracts-status-badge.is-disabled {
+  color: #98A2B3;
+  background: rgba(255, 255, 255, 0.05);
+}
+.dark .contracts-enabled-row { color: rgba(255, 255, 255, 0.9); }

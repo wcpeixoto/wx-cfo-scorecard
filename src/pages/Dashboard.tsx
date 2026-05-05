@@ -20,6 +20,7 @@ import { TodayPage } from '../components/TodayPage';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
 import DigHereCardMock from '../components/DigHereCardMock';
 import CurveLabCharts from '../components/CurveLabCharts';
+import ContractsSettingsPane from '../components/ContractsSettingsPane';
 import { computeEfficiencyOpportunities } from '../lib/kpis/efficiencyOpportunities';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
@@ -675,7 +676,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   // this pattern — the completed-only guard would no longer be
   // sufficient against re-entrancy.
   const renewalRegenerationCompletedRef = useRef(false);
-  const [activeSection, setActiveSection] = useState<'data' | 'accounts' | 'rules'>('data');
+  const [activeSection, setActiveSection] = useState<'data' | 'accounts' | 'rules' | 'contracts'>('data');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [isBigPictureFilterOpen, setIsBigPictureFilterOpen] = useState(false);
@@ -3463,6 +3464,13 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                   >
                     Rules
                   </button>
+                  <button
+                    type="button"
+                    className={`settings-subnav-btn${activeSection === 'contracts' ? ' is-active' : ''}`}
+                    onClick={() => setActiveSection('contracts')}
+                  >
+                    Contracts &amp; Renewals
+                  </button>
                 </div>
               </div>
 
@@ -4054,6 +4062,16 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 </div>
               </div>
               </div>{/* end rules wrapper */}
+
+              {/* ── Section 4: CONTRACTS & RENEWALS ─────────────────────── */}
+              <div className={`settings-section-pane${activeSection === 'contracts' ? '' : ' is-hidden'}`}>
+                <ContractsSettingsPane
+                  contracts={forecastContracts}
+                  onCreate={handleCreateRenewalContract}
+                  onUpdate={handleUpdateRenewalContract}
+                  onDelete={handleDeleteRenewalContract}
+                />
+              </div>
 
               </div>{/* end settings-content-shell */}
             </div>
