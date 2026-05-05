@@ -1,6 +1,81 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: May 4, 2026 (post Forecast chart curve research)*
+*Last updated: May 5, 2026 (Phase 5.1 Branches 1–4 shipped)*
+
+---
+
+### Phase 5.1 — Renewal contracts and generated events
+
+**Status:** Branches 1–4 shipped; Branch 5 not started.
+
+**Pipeline architecture:**
+- `renewal_contracts` table (Supabase): operator-managed source of truth
+  for recurring revenue agreements
+- `generateRenewalEvents(contract, horizonMonths, today)`: pure function
+  in `src/lib/forecast/generateRenewalEvents.ts` produces `ForecastEvent[]`
+  per contract; UTC-stable, deterministic, returns `[]` for malformed input
+- `saveSharedRenewalEvents(contractId, events)`: persists with delete-safety
+  (only deletes `source='renewal' AND contract_id=? AND is_override=false`
+  rows). Includes `retryDeleteOnce` helper for boot-window 503 transients
+- Dashboard load effect: fetches contracts → regenerates events → saves →
+  refetches `forecast_events`. Single completed-ref guards against
+  StrictMode double-invoke via convergence on idempotent backend writes
+- Existing `applyEventsOverlay` consumes renewal events transparently —
+  no overlay logic changes
+
+**Schema additions:**
+- `renewal_contracts` table: id, name, status (active/paused/ended),
+  renewal_date, renewal_cadence (monthly/annual), cash_in_amount,
+  cash_out_amount, enabled, notes, timestamps
+- `forecast_events` columns: source, contract_id, generated_date,
+  generated_cash_in, generated_cash_out, is_override
+- Anon RLS policies on `renewal_contracts` workspace-scoped to 'default'
+  (matches `first_test_*` pattern)
+
+**Branches merged on main:**
+- bac7e30 — Branch 1: schema + types
+- 37520cf — hotfix: is_override default
+- 9180f2b — Branch 2: persistence round-trip + delete safety
+- 78e1d54 — Vitest tooling (Vitest 2.1.9, node env, no globals)
+- 3aaff9e — Branch 3: pure generator (38 tests)
+- cfe4c29 — hotfix: anon RLS policies for renewal_contracts
+- 689aa37 — Branch 4: integration + StrictMode fix + retry helper
+
+**Branch 5 spec:**
+
+Core renewal-engine requirements:
+1. Bind the three Dashboard contract-mutation callbacks to a Settings
+   "Contracts & Renewals" section (handlers exist as
+   handleCreateRenewalContract / handleUpdateRenewalContract /
+   handleDeleteRenewalContract)
+2. Source-aware row styling for renewal events in Known Events list
+3. Replace "ONCE" badge fallback with renewal-aware label
+4. Decide renewal-row edit semantics: block + steer to contract, OR
+   allow in-place override preserving id with is_override=true
+5. Contract-delete cleanup of overridden renewal events (currently
+   orphaned — Branch 2 delete-safety preserves overrides)
+
+UI polish (within Branch 5):
+6. Known Events row layout tightening (amount/badge/controls
+   horizontally separated from date/title)
+
+**Cross-cutting deferred items (post-Phase-5.1):**
+- Persistence observability cleanup: saveSharedForecastEvents has no
+  try/catch (uncaught throws on save failure); savePriorityHistory
+  has a silent catch
+- forecast_events policy mismatch: live DB has qual=true, schema file
+  documents workspace-scoped. Decide direction
+- vite.config.js tracked-output convention worth removing
+
+**Lessons captured:**
+- RLS policies for new Supabase tables must land in the same branch
+  as the schema migration, not later. Anon-key access is empty without
+  policies and the failure is silent.
+- StrictMode + ref-as-guard race: synchronous ref-set before async
+  work locks permanently. Use single completed-ref + idempotent
+  backend writes for one-time async effects.
+- Stale-bundle / wrong-port can produce false-positive bug reports.
+  Hard-reload + port verification before capturing wire evidence.
 
 ---
 
