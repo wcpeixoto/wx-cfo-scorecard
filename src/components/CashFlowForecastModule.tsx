@@ -6,6 +6,7 @@ import type {
   ForecastEvent,
   ForecastScenarioKey,
   ForecastSeasonalityMeta,
+  RenewalContract,
   ScenarioPoint,
   TrendPoint,
 } from '../lib/data/contract';
@@ -146,6 +147,7 @@ type CashFlowForecastModuleProps = {
   onReceivableDaysChange: (nextValue: number) => void;
   onPayableDaysChange: (nextValue: number) => void;
   forecastEvents?: ForecastEvent[];
+  contracts?: RenewalContract[];
   onAddEvent?: (events: ForecastEvent[]) => void;
   onUpdateEvent?: (event: ForecastEvent) => void;
   onDeleteEvent?: (groupId: string) => void;
@@ -396,6 +398,7 @@ export default function CashFlowForecastModule({
   onRevenueGrowthChange,
   onExpenseChange,
   forecastEvents = [],
+  contracts = [],
   onAddEvent,
   onUpdateEvent,
   onDeleteEvent,
@@ -426,6 +429,7 @@ export default function CashFlowForecastModule({
   const [formFrequency, setFormFrequency] = useState<EventFrequency>('once');
   const [formErrors, setFormErrors] = useState<{ date?: string; title?: string }>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [activeSteerId, setActiveSteerId] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
 
@@ -608,24 +612,85 @@ export default function CashFlowForecastModule({
   ];
 
   const groupedEventRows = useMemo(() => {
-    const groups = new Map<string, { frequency: EventFrequency; events: ForecastEvent[] }>();
+    type ManualBucket = { kind: 'manual'; frequency: EventFrequency; events: ForecastEvent[] };
+    type RenewalBucket = { kind: 'renewal'; contractId: string; events: ForecastEvent[] };
+    type Bucket = ManualBucket | RenewalBucket;
+
+    const groups = new Map<string, Bucket>();
     for (const event of forecastEvents) {
+      // Renewal-generated events: group by contractId. Source of truth is
+      // the `source` column; the `renewal__{contractId}__{date}` id
+      // convention is a secondary signal for legacy rows that may pre-date
+      // the source field being populated.
+      if (event.source === 'renewal' && event.contractId) {
+        const groupId = `renewal:${event.contractId}`;
+        if (!groups.has(groupId)) {
+          groups.set(groupId, { kind: 'renewal', contractId: event.contractId, events: [] });
+        }
+        groups.get(groupId)!.events.push(event);
+        continue;
+      }
+
+      // Legacy manual events: encoded id `<freq>__<groupId>__<index>`.
       const parts = event.id.split('__');
       const isEncoded = parts.length === 3 && (parts[0] === 'once' || parts[0] === 'monthly' || parts[0] === 'yearly');
       const frequency: EventFrequency = isEncoded ? (parts[0] as EventFrequency) : 'once';
       const groupId = isEncoded ? parts[1] : event.id;
-      if (!groups.has(groupId)) groups.set(groupId, { frequency, events: [] });
+      if (!groups.has(groupId)) groups.set(groupId, { kind: 'manual', frequency, events: [] });
       groups.get(groupId)!.events.push(event);
     }
-    return Array.from(groups.entries()).map(([groupId, { frequency, events }]) => {
-      const sorted = [...events].sort((a, b) => a.month.localeCompare(b.month));
+
+    return Array.from(groups.entries()).map(([groupId, bucket]) => {
+      const sorted = [...bucket.events].sort((a, b) => a.month.localeCompare(b.month));
       const first = sorted[0];
       const amount = first.cashInImpact > 0 ? first.cashInImpact : -first.cashOutImpact;
-      const freqLabel = frequency === 'monthly' ? 'Monthly' : frequency === 'yearly' ? 'Yearly' : 'Once';
       // Date is the source of truth for display. Persistence layer
       // synthesizes last-day-of-month for legacy rows, so first.date is
       // always populated when the event came from Supabase.
       const firstDate = first.date ?? `${first.month}-01`;
+
+      if (bucket.kind === 'renewal') {
+        const contract = contracts.find((c) => c.id === bucket.contractId);
+        // Cadence resolution: contract is the reliable source. Spacing
+        // fallback only fires when contract is missing AND ≥2 events
+        // exist in the horizon (≈12 months between consecutive events =
+        // annual; otherwise monthly).
+        let cadenceLabel: 'Monthly' | 'Annual';
+        if (contract) {
+          cadenceLabel = contract.renewalCadence === 'annual' ? 'Annual' : 'Monthly';
+        } else if (sorted.length >= 2) {
+          const [a, b] = sorted;
+          const [ay, am] = a.month.split('-').map(Number);
+          const [by, bm] = b.month.split('-').map(Number);
+          const diff = (by - ay) * 12 + (bm - am);
+          cadenceLabel = diff >= 6 ? 'Annual' : 'Monthly';
+        } else {
+          cadenceLabel = 'Monthly';
+        }
+
+        const title = contract?.name ?? first.title;
+        const monthDisplay =
+          cadenceLabel === 'Annual'
+            ? `every ${formatEventDate(firstDate).replace(/, \d{4}$/, '')}, starting ${first.month.split('-')[0]}`
+            : `starting ${formatEventDate(firstDate)}`;
+
+        return {
+          groupId,
+          kind: 'renewal' as const,
+          contractId: bucket.contractId,
+          frequency: cadenceLabel === 'Annual' ? ('yearly' as EventFrequency) : ('monthly' as EventFrequency),
+          freqLabel: cadenceLabel,
+          events: sorted,
+          firstEvent: first,
+          title,
+          amount,
+          monthDisplay,
+          enabled: first.enabled,
+        };
+      }
+
+      const frequency = bucket.frequency;
+      const freqLabel = frequency === 'monthly' ? 'Monthly' : frequency === 'yearly' ? 'Yearly' : 'Once';
       let monthDisplay: string;
       if (frequency === 'once') {
         monthDisplay = formatEventDate(firstDate);
@@ -634,9 +699,21 @@ export default function CashFlowForecastModule({
       } else {
         monthDisplay = `every ${formatEventDate(firstDate).replace(/, \d{4}$/, '')}, starting ${first.month.split('-')[0]}`;
       }
-      return { groupId, frequency, freqLabel, events: sorted, firstEvent: first, title: first.title, amount, monthDisplay, enabled: first.enabled };
+      return {
+        groupId,
+        kind: 'manual' as const,
+        contractId: undefined as string | undefined,
+        frequency,
+        freqLabel,
+        events: sorted,
+        firstEvent: first,
+        title: first.title,
+        amount,
+        monthDisplay,
+        enabled: first.enabled,
+      };
     }).sort((a, b) => a.firstEvent.month.localeCompare(b.firstEvent.month));
-  }, [forecastEvents]);
+  }, [forecastEvents, contracts]);
 
   // --- Decision card computations ---
   const decisionWindow = fullForecast.slice(0, DECISION_WINDOW_MONTHS);
@@ -961,65 +1038,90 @@ export default function CashFlowForecastModule({
           {groupedEventRows.length > 0 && (
             <ul className="forecast-events-list">
               {groupedEventRows.map((group) => (
-                <li key={group.groupId} className={`forecast-event-row${group.enabled === false ? ' is-disabled' : ''}`}>
+                <li key={group.groupId} className={`forecast-event-row${group.enabled === false ? ' is-disabled' : ''}${group.kind === 'renewal' ? ' is-renewal' : ''}`}>
                   <span className="forecast-event-month">{group.monthDisplay}</span>
                   <span className="forecast-event-title">{group.title}</span>
-                  <span className="forecast-event-impacts">
-                    {group.amount > 0 && (
-                      <span className="forecast-event-impact forecast-event-impact--in">
-                        +{formatCurrencyCompact(group.amount)}
-                      </span>
-                    )}
-                    {group.amount < 0 && (
-                      <span className="forecast-event-impact forecast-event-impact--out">
-                        -{formatCurrencyCompact(Math.abs(group.amount))}
-                      </span>
-                    )}
-                  </span>
-                  <span className="forecast-event-status is-neutral">{group.freqLabel}</span>
-                  <button
-                    type="button"
-                    className="forecast-event-toggle-btn"
-                    onClick={() => onToggleEvent?.(group.groupId, !group.enabled)}
-                    aria-label={group.enabled === false ? `Enable ${group.title}` : `Disable ${group.title}`}
-                  >
-                    {group.enabled === false ? '○' : '●'}
-                  </button>
-                  <button
-                    type="button"
-                    className="forecast-event-edit-btn"
-                    onClick={() => openEditModal(group)}
-                    aria-label={`Edit ${group.title}`}
-                  >
-                    ✎
-                  </button>
-                  {confirmDeleteId === group.groupId ? (
-                    <>
-                      <span>Remove this event?</span>
+                  <span className="forecast-event-controls">
+                    <span className="forecast-event-impacts">
+                      {group.amount > 0 && (
+                        <span className="forecast-event-impact forecast-event-impact--in">
+                          +{formatCurrencyCompact(group.amount)}
+                        </span>
+                      )}
+                      {group.amount < 0 && (
+                        <span className="forecast-event-impact forecast-event-impact--out">
+                          -{formatCurrencyCompact(Math.abs(group.amount))}
+                        </span>
+                      )}
+                    </span>
+                    <span className="forecast-event-status is-neutral">{group.freqLabel}</span>
+                    {group.kind !== 'renewal' && (
                       <button
                         type="button"
-                        className="forecast-event-delete-confirm-yes"
-                        onClick={() => { onDeleteEvent?.(group.groupId); setConfirmDeleteId(null); }}
+                        className="forecast-event-toggle-btn"
+                        onClick={() => onToggleEvent?.(group.groupId, !group.enabled)}
+                        aria-label={group.enabled === false ? `Enable ${group.title}` : `Disable ${group.title}`}
                       >
-                        Yes
+                        {group.enabled === false ? '○' : '●'}
                       </button>
-                      <button
-                        type="button"
-                        className="forecast-event-delete-confirm-cancel"
-                        onClick={() => setConfirmDeleteId(null)}
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
+                    )}
                     <button
                       type="button"
-                      className="forecast-event-delete-btn"
-                      onClick={() => setConfirmDeleteId(group.groupId)}
-                      aria-label={`Remove ${group.title}`}
+                      className="forecast-event-edit-btn"
+                      onClick={() =>
+                        group.kind === 'renewal'
+                          ? setActiveSteerId((prev) => (prev === group.groupId ? null : group.groupId))
+                          : openEditModal(group)
+                      }
+                      aria-label={`Edit ${group.title}`}
                     >
-                      ✕
+                      ✎
                     </button>
+                    {group.kind !== 'renewal' && (
+                      confirmDeleteId === group.groupId ? (
+                        <>
+                          <span>Remove this event?</span>
+                          <button
+                            type="button"
+                            className="forecast-event-delete-confirm-yes"
+                            onClick={() => { onDeleteEvent?.(group.groupId); setConfirmDeleteId(null); }}
+                          >
+                            Yes
+                          </button>
+                          <button
+                            type="button"
+                            className="forecast-event-delete-confirm-cancel"
+                            onClick={() => setConfirmDeleteId(null)}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="forecast-event-delete-btn"
+                          onClick={() => setConfirmDeleteId(group.groupId)}
+                          aria-label={`Remove ${group.title}`}
+                        >
+                          ✕
+                        </button>
+                      )
+                    )}
+                  </span>
+                  {group.kind === 'renewal' && activeSteerId === group.groupId && (
+                    <div className="forecast-event-steer">
+                      <span className="forecast-event-steer-text">
+                        This event is generated from {group.title}. Edit the
+                        contract in Settings → Contracts &amp; Renewals to change it.
+                      </span>
+                      <button
+                        type="button"
+                        className="forecast-event-steer-close"
+                        onClick={() => setActiveSteerId(null)}
+                      >
+                        Close
+                      </button>
+                    </div>
                   )}
                 </li>
               ))}
