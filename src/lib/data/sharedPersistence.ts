@@ -1,4 +1,12 @@
-import type { AccountRecord, ForecastEvent, ImportedTransactionRecord, TransactionImportSummary } from './contract';
+import type {
+  AccountRecord,
+  ForecastEvent,
+  ImportedTransactionRecord,
+  RenewalContract,
+  RenewalContractCadence,
+  RenewalContractStatus,
+  TransactionImportSummary,
+} from './contract';
 import type { SignalType, PriorityHistoryRow } from '../priorities/types';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
@@ -10,6 +18,7 @@ const ACCOUNT_SETTINGS_TABLE = 'shared_account_settings';
 const WORKSPACE_SETTINGS_TABLE = 'shared_workspace_settings';
 const PRIORITY_HISTORY_TABLE = 'priority_history';
 const FORECAST_EVENTS_TABLE = 'forecast_events';
+const RENEWAL_CONTRACTS_TABLE = 'renewal_contracts';
 
 // TRANSACTION_FETCH_COLUMNS: explicit select list to minimize Supabase egress.
 // Only the `txn` jsonb payload is used by any downstream consumer on the read
@@ -93,8 +102,9 @@ type SharedForecastEventRow = {
   is_override: boolean | null;
 };
 
-// Phase 5.1 — Row shape for renewal_contracts. No get/save/delete
-// functions in this branch; type only.
+// Phase 5.1 — Row shape for renewal_contracts. created_at is optional
+// on writes so the writer can omit it and let the DB default
+// (now()) fire on insert; on read the DB always returns a real value.
 interface SharedRenewalContractRow {
   workspace_id: string;
   id: string;
@@ -106,7 +116,7 @@ interface SharedRenewalContractRow {
   cash_out_amount: number;
   enabled: boolean;
   notes: string | null;
-  created_at: string;
+  created_at?: string;
   updated_at: string;
 }
 
@@ -313,9 +323,10 @@ function toSharedForecastEventRow(event: ForecastEvent): SharedForecastEventRow 
     cash_out_impact: event.cashOutImpact,
     enabled: event.enabled,
     updated_at: new Date().toISOString(),
-    // Phase 5.1 — Direct field mappings only; legacy/manual events have
-    // these as undefined and persist as null. No behavior branches on
-    // these values yet.
+    // Phase 5.1 — Renewal metadata write mapping. Nullable columns
+    // persist as null when undefined (manual/legacy events). is_override
+    // defaults to false to satisfy the NOT NULL constraint. The matching
+    // read mapper hydrates these fields back onto ForecastEvent.
     source: event.source ?? null,
     contract_id: event.contractId ?? null,
     generated_date: event.generatedDate ?? null,
@@ -342,6 +353,17 @@ function fromSharedForecastEventRow(row: SharedForecastEventRow): ForecastEvent 
     cashInImpact: typeof row.cash_in_impact === 'number' ? row.cash_in_impact : 0,
     cashOutImpact: typeof row.cash_out_impact === 'number' ? row.cash_out_impact : 0,
     enabled: row.enabled === true,
+    // Phase 5.1 — Renewal metadata hydration. Closes the read/write
+    // asymmetry from Branch 1: rows now round-trip through the mapper
+    // instead of dropping these fields on read. source is normalized to
+    // the typed union; numeric fields coerce defensively; isOverride
+    // defaults to false to mirror the NOT NULL DEFAULT false column.
+    source: normalizeForecastEventSource(row.source),
+    contractId: row.contract_id ?? undefined,
+    generatedDate: row.generated_date ?? undefined,
+    generatedCashIn: typeof row.generated_cash_in === 'number' ? row.generated_cash_in : undefined,
+    generatedCashOut: typeof row.generated_cash_out === 'number' ? row.generated_cash_out : undefined,
+    isOverride: row.is_override ?? false,
   };
 }
 
@@ -354,6 +376,32 @@ function lastDayOfMonth(month: string): string {
   // Day 0 of next month = last day of current month.
   const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
   return `${match[1]}-${match[2]}-${String(lastDay).padStart(2, '0')}`;
+}
+
+// Phase 5.1 — Source normalization for ForecastEvent reads. Anything
+// that isn't 'manual' or 'renewal' (including null and unexpected
+// strings) becomes undefined so consumers see a clean typed union.
+function normalizeForecastEventSource(value: unknown): 'manual' | 'renewal' | undefined {
+  if (value === 'renewal') return 'renewal';
+  if (value === 'manual') return 'manual';
+  return undefined;
+}
+
+// Phase 5.1 — Status normalization for RenewalContract reads. Defaults
+// to 'active' when the DB value is unrecognized, so a stray string in
+// the column never breaks downstream consumers.
+function normalizeRenewalContractStatus(value: unknown): RenewalContractStatus {
+  if (value === 'paused') return 'paused';
+  if (value === 'ended') return 'ended';
+  return 'active';
+}
+
+// Phase 5.1 — Cadence normalization for RenewalContract reads. Defaults
+// to 'monthly' when the DB value is unrecognized. Same defensive
+// posture as status: the typed union is the contract.
+function normalizeRenewalContractCadence(value: unknown): RenewalContractCadence {
+  if (value === 'annual') return 'annual';
+  return 'monthly';
 }
 
 export function isSharedPersistenceConfigured(): boolean {
@@ -521,12 +569,23 @@ export async function getSharedForecastEvents(): Promise<ForecastEvent[] | null>
 export async function saveSharedForecastEvents(events: ForecastEvent[]): Promise<void> {
   if (!isConfigured()) return;
 
+  // Phase 5.1 — Manual Known Event saves are scoped to manual/legacy
+  // rows only. The save path mirrors the manual UI's view of the world:
+  // it sees and manages manual events. Renewal-generated rows
+  // (source = 'renewal') are owned by the renewal generator and must
+  // survive every manual save, including empty-list clears. PostgREST
+  // OR-filter encodes "source IS NULL OR source = 'manual'".
+  const manualOrLegacyFilter = `or=(source.is.null,source.eq.manual)`;
+
   if (events.length === 0) {
-    // Only delete when explicitly clearing — never as part of a save-then-insert.
-    await request<unknown>(withWorkspaceFilter(`${FORECAST_EVENTS_TABLE}?id=neq.__none__`), {
-      method: 'DELETE',
-      headers: { Prefer: 'return=minimal' },
-    });
+    // Empty-list save: clear manual/legacy events only. Renewal rows stay.
+    await request<unknown>(
+      withWorkspaceFilter(`${FORECAST_EVENTS_TABLE}?${manualOrLegacyFilter}`),
+      {
+        method: 'DELETE',
+        headers: { Prefer: 'return=minimal' },
+      }
+    );
     return;
   }
 
@@ -540,15 +599,186 @@ export async function saveSharedForecastEvents(events: ForecastEvent[]): Promise
     body: JSON.stringify(events.map(toSharedForecastEventRow)),
   });
 
-  // Remove stale rows that are no longer in the local event set.
+  // Remove stale manual/legacy rows that are no longer in the local
+  // event set. Renewal rows are out of scope for this save and are
+  // protected by the source filter even when their IDs are absent
+  // from the manual-event list.
   const currentIds = events.map((e) => `"${e.id}"`).join(',');
   await request<unknown>(
-    withWorkspaceFilter(`${FORECAST_EVENTS_TABLE}?id=not.in.(${currentIds})`),
+    withWorkspaceFilter(
+      `${FORECAST_EVENTS_TABLE}?id=not.in.(${currentIds})&${manualOrLegacyFilter}`
+    ),
     {
       method: 'DELETE',
       headers: { Prefer: 'return=minimal' },
     }
   );
+}
+
+// Phase 5.1 — Renewal-scoped event persistence. Forces source = 'renewal'
+// and contract_id on every written row, and scopes the stale-delete to
+// (source = 'renewal' AND contract_id = X AND is_override = false). This
+// keeps three classes of rows safe: manual events, renewal rows for
+// other contracts, and operator-overridden renewal rows for THIS
+// contract. Operator overrides survive even when the generator drops
+// the row from its output, on the principle that an operator edit is a
+// product decision the generator should not silently undo.
+export async function saveSharedRenewalEvents(
+  contractId: string,
+  events: ForecastEvent[]
+): Promise<boolean> {
+  if (!isConfigured()) return false;
+
+  const encodedContractId = encodeURIComponent(contractId);
+  // Scope every delete to this contract's non-overridden renewal rows.
+  // Manual rows, other contracts' rows, and overrides are all untouched.
+  const renewalScopeFilter =
+    `source=eq.renewal&contract_id=eq.${encodedContractId}&is_override=eq.false`;
+
+  try {
+    if (events.length === 0) {
+      // No events from the generator for this contract — clear our
+      // non-overridden renewal rows only. Overrides remain in place.
+      await request<unknown>(
+        withWorkspaceFilter(`${FORECAST_EVENTS_TABLE}?${renewalScopeFilter}`),
+        { method: 'DELETE', headers: { Prefer: 'return=minimal' } }
+      );
+      return true;
+    }
+
+    // Force source/contract_id at the write boundary so the generator
+    // cannot accidentally produce a row that escapes the delete scope.
+    // is_override is preserved if the caller supplied it (rare but
+    // legal — e.g., re-saving a known override) and defaults to false.
+    const rows = events.map((event) => ({
+      ...toSharedForecastEventRow(event),
+      source: 'renewal' as const,
+      contract_id: contractId,
+      is_override: event.isOverride ?? false,
+    }));
+
+    await request<unknown>(`${FORECAST_EVENTS_TABLE}?on_conflict=workspace_id,id`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal,resolution=merge-duplicates',
+      },
+      body: JSON.stringify(rows),
+    });
+
+    // Stale-delete: remove non-overridden renewal rows for this contract
+    // that the generator no longer produces. Overrides survive; manual
+    // events and other contracts' rows are out of scope.
+    const currentIds = events.map((e) => `"${e.id}"`).join(',');
+    await request<unknown>(
+      withWorkspaceFilter(
+        `${FORECAST_EVENTS_TABLE}?${renewalScopeFilter}&id=not.in.(${currentIds})`
+      ),
+      { method: 'DELETE', headers: { Prefer: 'return=minimal' } }
+    );
+    return true;
+  } catch (err) {
+    console.warn('[renewal-events] Save failed:', err);
+    return false;
+  }
+}
+
+// Phase 5.1 — RenewalContract row mappers. Mirror the ForecastEvent
+// pattern. created_at is omitted from the write body when undefined so
+// the DB default fires on insert and the existing value is preserved on
+// conflict (PostgREST upsert SET only includes columns present in the
+// payload).
+function toSharedRenewalContractRow(contract: RenewalContract): SharedRenewalContractRow {
+  return {
+    workspace_id: WORKSPACE_ID,
+    id: contract.id,
+    name: contract.name,
+    status: contract.status,
+    renewal_date: contract.renewalDate,
+    renewal_cadence: contract.renewalCadence,
+    cash_in_amount: contract.cashInAmount,
+    cash_out_amount: contract.cashOutAmount,
+    enabled: contract.enabled,
+    notes: contract.notes ?? null,
+    // JSON.stringify drops undefined-valued props, so PostgREST will not
+    // see created_at on first save (DB default fires) and will see the
+    // preserved value on subsequent saves where the caller threads it
+    // through from a prior read.
+    created_at: contract.createdAt,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function fromSharedRenewalContractRow(row: SharedRenewalContractRow): RenewalContract {
+  return {
+    id: row.id,
+    name: row.name,
+    status: normalizeRenewalContractStatus(row.status),
+    renewalDate: row.renewal_date,
+    renewalCadence: normalizeRenewalContractCadence(row.renewal_cadence),
+    cashInAmount: typeof row.cash_in_amount === 'number' ? row.cash_in_amount : 0,
+    cashOutAmount: typeof row.cash_out_amount === 'number' ? row.cash_out_amount : 0,
+    enabled: row.enabled === true,
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+// Phase 5.1 — RenewalContract persistence. Read returns null on
+// configuration absence or on table-missing errors so callers can fall
+// back to defaults. Save and delete return boolean for caller-side
+// success branching.
+export async function getSharedRenewalContracts(): Promise<RenewalContract[] | null> {
+  if (!isConfigured()) return null;
+
+  try {
+    const rows = await request<SharedRenewalContractRow[]>(
+      withWorkspaceFilter(`${RENEWAL_CONTRACTS_TABLE}?select=*&order=renewal_date.asc,id.asc`)
+    );
+    return (rows ?? []).map(fromSharedRenewalContractRow);
+  } catch (err) {
+    // Table may not yet exist in dev environments — return null so
+    // callers fall back to in-memory defaults.
+    console.warn('[renewal-contracts] Read failed (table may not exist yet):', err);
+    return null;
+  }
+}
+
+export async function saveSharedRenewalContract(contract: RenewalContract): Promise<boolean> {
+  if (!isConfigured()) return false;
+
+  try {
+    await request<unknown>(`${RENEWAL_CONTRACTS_TABLE}?on_conflict=workspace_id,id`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal,resolution=merge-duplicates',
+      },
+      body: JSON.stringify([toSharedRenewalContractRow(contract)]),
+    });
+    return true;
+  } catch (err) {
+    console.warn('[renewal-contracts] Save failed:', err);
+    return false;
+  }
+}
+
+export async function deleteSharedRenewalContract(contractId: string): Promise<boolean> {
+  if (!isConfigured()) return false;
+
+  try {
+    await request<unknown>(
+      withWorkspaceFilter(
+        `${RENEWAL_CONTRACTS_TABLE}?id=eq.${encodeURIComponent(contractId)}`
+      ),
+      { method: 'DELETE', headers: { Prefer: 'return=minimal' } }
+    );
+    return true;
+  } catch (err) {
+    console.warn('[renewal-contracts] Delete failed:', err);
+    return false;
+  }
 }
 
 function fromSharedWorkspaceSettingRow(row: SharedWorkspaceSettingRow): WorkspaceSettings {
