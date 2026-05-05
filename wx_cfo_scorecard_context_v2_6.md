@@ -1,6 +1,173 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: May 4, 2026 (post-AR/AP carry deprecation)*
+*Last updated: May 4, 2026 (post Forecast chart curve research)*
+
+---
+
+### May 4, 2026 (evening) — Known Events feature complete + Forecast chart honesty pass
+
+**Known Events row enabled/disabled toggle: shipped (commit `42b0dab`, merged via `61b7fa3`).**
+
+Per-row toggle button (●/○) on each Known Events row. Disabled events
+remain visible in the list, are excluded from `applyEventsOverlay`, and
+their markers do not render on the chart. Toggle state persists via
+Supabase. No schema migration required — `enabled` column already in
+place. Operators can keep events saved without applying them, removing
+"delete to test" friction.
+
+**Files:** `src/components/CashFlowForecastModule.tsx`,
+`src/pages/Dashboard.tsx`, `src/dashboard.css`.
+
+---
+
+**Known Events exact-date support: shipped (commit `8821299`, merged via `33c2567`).**
+
+Date is now the source of truth for Known Events. The Month picker is
+removed from the user-facing form; date is required and selected via a
+native date input. Picker constraints: min = today, max = last day of
+36-month forecast horizon (sourced from canonical
+`FORECAST_RANGE_OPTIONS`, never hardcoded). Empty default — no
+prepopulation. Validation: "Choose the expected event date." (empty)
+and "Choose a date within the forecast window." (out of range).
+
+Month column retained in DB and derived from date on save (`YYYY-MM`)
+to preserve existing grouping and overlay logic. Overlay math
+granularity unchanged (monthly); date precision is currently display +
+persistence only.
+
+**Schema migration applied:** `forecast_events` gains nullable
+`date date null` column. Read-time fallback synthesizes
+last-day-of-stored-month for legacy NULL rows. Legacy rows that pass
+through a save round-trip will have their synthesized date persisted
+back — no semantic change.
+
+**Files:** `src/lib/data/contract.ts` (additive optional `date?: string`),
+`src/lib/data/sharedPersistence.ts` (additive `date` pass-through +
+read-time fallback), `src/components/CashFlowForecastModule.tsx`,
+`src/pages/Dashboard.tsx` (`forecastRangeOptions` mapper passes `months`
+so the form can derive the canonical horizon),
+`supabase/shared_persistence_schema.sql`.
+
+---
+
+**Cash Event marker label shows exact date: shipped (commit `0ec6f57`, merged via `33c2567`).**
+
+Marker dot stays bucket-aligned (chart uses categorical x-axis;
+sub-bucket placement requires datetime x-axis rework deferred as Issue
+B Tier 2). Marker label now displays `event.date` in `Mmm DD, YYYY`
+format alongside title and impact, so the operator sees the date they
+entered even when the dot is bucket-aligned.
+
+**Label structure (top → bottom):** title (no dot), impact amount
+(visible orange dot — anchored to bucket math), exact event date (no
+dot). Dot stays adjacent to impact because the impact is the
+load-bearing fact; date is supporting context.
+
+**Files:** `src/components/ProjectedCashBalanceChart.tsx`.
+
+---
+
+**Forecast weekly tooltip range fix: shipped (commit `989545b`, merged via `286f742`).**
+
+Tooltip header now displays the full week range
+(e.g. "Jun 8 – Jun 14, 2026") for weekly granularity instead of only
+the week-end date. Tells the truth about what the data point
+represents — a weekly bucket, not a single day. X-axis ticks unchanged
+(still week-start). Monthly granularity tooltip unchanged.
+
+**Pre-existing bug** introduced in `5c8614d` (Apr 29). Surfaced
+visibly when exact-date events made the date inconsistency
+operator-noticeable. The function name `formatBucketEndDate` is now
+slightly misleading (returns range for weekly) — kept for scope
+discipline.
+
+**Files:** `src/components/ProjectedCashBalanceChart.tsx`.
+
+---
+
+**Forecast chart curve research (UI Lab): shipped (commit `af40655`, merged via `92e32e5`).**
+
+Visual side-by-side comparison of three ApexCharts curve modes (smooth,
+straight, stepline) against two data shapes (TailAdmin-style continuous
+variance vs Wx-style flat-baseline-plus-spike). Pure research; no
+production chart changes.
+
+**Decision: production stays on `curve: 'smooth'`.** Lab confirmed
+smoothing handles Wx-style spike data acceptably — the bell-curve
+around an isolated spike is a fine representation. Straight and
+stepline alternatives sacrifice aesthetic consistency across the whole
+chart to address one visual surface. With realistic operating data
+(natural revenue/expense variance), smoothing reads as flow, not
+distortion. The lab persists in the codebase as documentation for this
+decision.
+
+**Files:** `src/components/CurveLabCharts.tsx` (new),
+`src/pages/Dashboard.tsx`.
+
+---
+
+**Today V1 QA pass — re-verification on integrated branch:**
+
+Cross-feature integration verified on the rebased toggle branch:
+toggle composes cleanly with exact-date display and marker labels. 8/8
+verification checks passed including persistence round-trip across
+Supabase. Cash floor with test event enabled = $22,194; disabled =
+$15,578 (delta confirms event correctly excluded from overlay when
+disabled).
+
+**Branch hygiene incident:** the toggle branch was originally cut from
+the trough-month branch instead of main, creating tangled ancestry.
+Caught and corrected via `merge → rebase` sequence. New rule
+established: every prompt's pre-flight explicitly verifies branch is
+cut from main, never from another feature branch.
+
+---
+
+**Diagnostic findings logged to Notion:**
+
+- **Issue B Tier 2 — Forecast chart datetime x-axis** for true
+  sub-bucket marker placement (architectural rework). P3/Later. Touch
+  candidate: `ProjectedCashBalanceChart.tsx`. Would also resolve any
+  remaining tooltip/marker precision concerns by making the chart's
+  date semantics continuous instead of categorical.
+
+**No new follow-ups from the curve lab** — the research concluded
+production stays as-is.
+
+---
+
+**Session learnings:**
+
+- **Phase-gate discipline catches real issues.** Twice this session
+  (toggle work, exact-date work) Phase 1 diagnosis surfaced
+  scope-expansion triggers (signal payload type change, schema
+  migration) that warranted explicit approval before Phase 2.
+  Skipping the gate once on the toggle commit was acknowledged but
+  passed; the exact-date schema migration showed why the gate
+  matters.
+
+- **Branch ancestry is load-bearing.** Cutting feature branches from
+  main (not from other feature branches) prevents tangled history
+  and unexpected commits leaking across features. Pre-flight
+  verification of branch base is now standard.
+
+- **Pre-existing bugs surface when foundations get more precise.**
+  The weekly tooltip mismatch existed for ~5 days before exact-date
+  support made it visible. Adding precision to one part of a system
+  exposes imprecision elsewhere.
+
+- **Visual research before product decisions.** The curve lab took
+  one focused commit to definitively answer "should we change the
+  Forecast chart curve?" Direct comparison was faster and more
+  trustworthy than debate.
+
+- **"Operator-honest" beats "scope-correct."** The exact-date commit
+  technically delivered its scope (display + persistence only,
+  overlay stays monthly), but shipping it as-is would have left the
+  chart marker landing at month-start while the row showed
+  user-entered day. Adding the marker label fix made the feature
+  operator-honest. Scope correctness without product honesty isn't
+  done.
 
 ---
 
