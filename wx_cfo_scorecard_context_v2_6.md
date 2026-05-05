@@ -1,12 +1,12 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: May 5, 2026 (Phase 5.1 Branches 1–4 shipped)*
+*Last updated: May 5, 2026 (Phase 5.1 Branch 5 shipped — renewal pipeline complete)*
 
 ---
 
 ### Phase 5.1 — Renewal contracts and generated events
 
-**Status:** Branches 1–4 shipped; Branch 5 not started.
+**Status:** Branches 1–5 shipped. Renewal pipeline operator-facing end-to-end.
 
 **Pipeline architecture:**
 - `renewal_contracts` table (Supabase): operator-managed source of truth
@@ -40,24 +40,17 @@
 - 3aaff9e — Branch 3: pure generator (38 tests)
 - cfe4c29 — hotfix: anon RLS policies for renewal_contracts
 - 689aa37 — Branch 4: integration + StrictMode fix + retry helper
+- 122cf62 / 351ac5a / 6c8cc57 / d0693c2 / a2f41f6 — Branch 5: renewal
+  contracts UI + override semantics (merged via `2ac68c3`)
 
-**Branch 5 spec:**
+**Product rule (locked May 5, 2026 — Branch 5):**
 
-Core renewal-engine requirements:
-1. Bind the three Dashboard contract-mutation callbacks to a Settings
-   "Contracts & Renewals" section (handlers exist as
-   handleCreateRenewalContract / handleUpdateRenewalContract /
-   handleDeleteRenewalContract)
-2. Source-aware row styling for renewal events in Known Events list
-3. Replace "ONCE" badge fallback with renewal-aware label
-4. Decide renewal-row edit semantics: block + steer to contract, OR
-   allow in-place override preserving id with is_override=true
-5. Contract-delete cleanup of overridden renewal events (currently
-   orphaned — Branch 2 delete-safety preserves overrides)
+> Contracts own renewal events. Editing a contract rewrites its generated
+> events. Deleting a contract removes its generated events. One-off
+> exceptions belong as manual events.
 
-UI polish (within Branch 5):
-6. Known Events row layout tightening (amount/badge/controls
-   horizontally separated from date/title)
+`is_override=true` remains backend future-proofing — schema columns are
+preserved but no UI surface in V1.
 
 **Cross-cutting deferred items (post-Phase-5.1):**
 - Persistence observability cleanup: saveSharedForecastEvents has no
@@ -76,6 +69,111 @@ UI polish (within Branch 5):
   backend writes for one-time async effects.
 - Stale-bundle / wrong-port can produce false-positive bug reports.
   Hard-reload + port verification before capturing wire evidence.
+
+---
+
+### May 5, 2026 — Phase 5.1 Branch 5 shipped (Renewal Contracts UI + override semantics)
+
+**Feature branch:** `claude/gallant-pasteur-52b3c9` (PR merged via merge
+commit `2ac68c3`).
+
+Five single-purpose commits, in build order:
+
+| Hash | Subject |
+|---|---|
+| `122cf62` | feat(phase-5.1): contracts & renewals settings pane |
+| `351ac5a` | fix(phase-5.1): group renewal events by contract |
+| `6c8cc57` | feat(phase-5.1): style renewal rows in known events |
+| `d0693c2` | feat(phase-5.1): block unsupported renewal row controls |
+| `a2f41f6` | refactor(phase-5.1): tighten known events row layout |
+
+**Files changed (4, no locked files):**
+- `src/components/ContractsSettingsPane.tsx` — new component (604
+  lines): contract list, add/edit modal, delete-confirm, segmented
+  toggles for direction / status / cadence
+- `src/components/CashFlowForecastModule.tsx` — `groupedEventRows`
+  rewritten to discriminate manual vs renewal buckets via
+  `event.source === 'renewal'`; `.is-renewal` row class; `activeSteerId`
+  state; toggle/delete hidden on renewal rows; edit click on renewal
+  rows opens an inline steer panel; right-side controls wrapped in
+  `<span class="forecast-event-controls">`
+- `src/dashboard.css` — contracts pane styles, `.forecast-event-row.is-renewal`
+  rule (gray-25 surface + default-strong border accent),
+  `.forecast-event-steer*` panel rules, `.forecast-event-controls`
+  cluster wrapper (4px inner gap, `margin-left: auto`)
+- `src/pages/Dashboard.tsx` — `'contracts'` added to `activeSection`
+  union, fourth Settings sub-tab button, fourth section pane rendering
+  `<ContractsSettingsPane>`, `contracts={forecastContracts}` prop on
+  `<CashFlowForecastModule>`
+
+**V1 decisions (locked):**
+- `is_override=true` remains backend future-proofing only — column kept
+  but no UI surface in V1. Override semantics deferred until a real
+  product reason emerges.
+- "Direction" (Revenue / Expense / Both) is UI-only form state. The
+  persisted shape is the existing `cashInAmount` / `cashOutAmount` pair
+  on `RenewalContract`; no `direction` field on the schema. The form
+  controls visibility of the cash-in / cash-out inputs and zeroes the
+  unused side on save.
+- Renewal date input means *next upcoming renewal* — the first
+  generated occurrence anchor. The generator emits forward from that
+  date at the contract's cadence stride.
+- Renewal row controls in Known Events: toggle hidden, delete hidden,
+  edit visible (click opens inline steer panel referencing the contract
+  name). Manual rows retain full toggle / edit (modal) / delete
+  (confirm) behavior.
+- "Go to Contracts" deep link from the steer panel: deferred. Would
+  require lifting `activeSection` out of Dashboard's local state or
+  introducing a URL-fragment scheme. The steer copy alone is sufficient
+  for V1.
+- Per-instance enabled/disabled persistence across regeneration:
+  deferred. Today the row toggle is hidden on renewal rows. Future
+  approach: match `(contract_id, generated_date)` before delete/reinsert
+  in `saveSharedRenewalEvents`.
+
+**Verified live (production Supabase, May 5 2026, post-merge):**
+
+Six-check verification passed end-to-end against live Supabase from the
+main repo path (worktree had no `.env.local`):
+
+1. Create contract → `renewal_contracts` row written + `forecast_events`
+   generated. (Verified: 1 event for the 90d horizon, then 10 events
+   after switching to 1y horizon.)
+2. Edit contract amount → renewal events regenerated with new amount
+   ($2,500 → $3,500 across all 10 events).
+3. Delete contract → renewal events removed (contract row gone, all 10
+   forecast_events gone).
+4. Renewal grouped row in Known Events: one row per contract, badge
+   reads "Monthly" (not "Once"), title from `contract.name`.
+5. Renewal row controls: toggle hidden, delete hidden, edit click opens
+   inline steer panel with contract name in copy.
+6. Manual rows still render with full toggle/edit/delete and "Once"
+   badge; both row kinds use the new `.forecast-event-controls`
+   right-side cluster.
+
+Test data was cleaned up — no QA artifacts remain in production.
+
+**Lessons captured:**
+
+- Worktree environments often lack `.env.local`. Live Supabase
+  verification must run from the main repo path. Don't copy env files
+  into worktrees — they create drift across worktrees and require
+  cleanup. Run live checks post-merge from main.
+- Build the data-source UI first when later steps depend on its data.
+  Step 1 (contracts pane) shipped before Steps 2–5 so subsequent steps
+  had real renewal events to verify against. No synthetic data needed.
+- Group-level discriminators beat per-event prefix rechecks.
+  `groupedEventRows` returns a `kind: 'manual' | 'renewal'` field; all
+  downstream control branches read `group.kind`. Adding new grouping
+  rules in the future does not require revisiting every consumer.
+- One-off exceptions stay manual. Once contracts own generated events,
+  resist the temptation to override individual instances in the UI —
+  that path drags the schema toward a half-implemented override system.
+  If the operator wants a one-off, they add a manual event.
+- The post-composition Known Events overlay (Phase 5.1 May 3) consumes
+  renewal events transparently. No overlay-engine changes were needed
+  in Branch 5 — the source-of-truth column on `forecast_events` was
+  already enough.
 
 ---
 
