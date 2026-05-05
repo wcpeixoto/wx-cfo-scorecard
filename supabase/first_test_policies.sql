@@ -82,6 +82,30 @@ to anon
 using (workspace_id = 'default')
 with check (workspace_id = 'default');
 
+-- Renewal contracts (Phase 5.1): same first-test pattern as the tables
+-- above. Single-workspace read+write for anon, scoped by workspace_id.
+-- Requires the renewal_contracts table from shared_persistence_schema.sql.
+-- Without these policies, anon clients see an empty result set even when
+-- rows exist (RLS-enabled table with no policy = deny by default).
+
+alter table public.renewal_contracts enable row level security;
+
+drop policy if exists "first_test_read_renewal_contracts" on public.renewal_contracts;
+drop policy if exists "first_test_write_renewal_contracts" on public.renewal_contracts;
+
+create policy "first_test_read_renewal_contracts"
+on public.renewal_contracts
+for select
+to anon
+using (workspace_id = 'default');
+
+create policy "first_test_write_renewal_contracts"
+on public.renewal_contracts
+for all
+to anon
+using (workspace_id = 'default')
+with check (workspace_id = 'default');
+
 -- Recommended cleanup before any broader rollout:
 -- 1. drop these first-test policies
 -- 2. replace anon access with authenticated policies or a server-side write path
