@@ -7558,3 +7558,19 @@ body {
   background: rgba(255, 255, 255, 0.05);
 }
 .dark .contracts-enabled-row { color: rgba(255, 255, 255, 0.9); }
+
+/* === Phase 5.1 Branch 5 — Source-aware renewal row styling === */
+
+/* Renewal-generated rows carry a calm visual signal — left-border accent
+   plus a faint muted surface — so the operator can distinguish them
+   from manual events without an alert-color treatment. Tokens reused
+   from UI_RULES.md (gray-100 muted surface, default border for accent). */
+.forecast-event-row.is-renewal {
+  border-left: 3px solid #D0D5DD;
+  background: #FCFCFD;
+}
+
+.dark .forecast-event-row.is-renewal {
+  border-left-color: #475467;
+  background: rgba(255, 255, 255, 0.02);
+}

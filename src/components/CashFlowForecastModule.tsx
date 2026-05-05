@@ -1037,7 +1037,7 @@ export default function CashFlowForecastModule({
           {groupedEventRows.length > 0 && (
             <ul className="forecast-events-list">
               {groupedEventRows.map((group) => (
-                <li key={group.groupId} className={`forecast-event-row${group.enabled === false ? ' is-disabled' : ''}`}>
+                <li key={group.groupId} className={`forecast-event-row${group.enabled === false ? ' is-disabled' : ''}${group.kind === 'renewal' ? ' is-renewal' : ''}`}>
                   <span className="forecast-event-month">{group.monthDisplay}</span>
                   <span className="forecast-event-title">{group.title}</span>
                   <span className="forecast-event-impacts">
