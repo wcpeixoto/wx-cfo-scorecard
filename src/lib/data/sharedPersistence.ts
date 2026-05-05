@@ -615,6 +615,39 @@ export async function saveSharedForecastEvents(events: ForecastEvent[]): Promise
   );
 }
 
+// Branch 4 — Private helper: resolves after ~250 ms.
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Branch 4 — Private helper: executes one DELETE request and, on failure,
+// waits 250 ms then retries exactly once. If both attempts fail, logs the
+// DELETE-specific path/errors and rethrows so saveSharedRenewalEvents can
+// return false and emit its contract-level warning.
+//
+// Scope is intentionally limited to renewal stale-cleanup DELETEs. Other
+// DELETE call sites (saveSharedForecastEvents, deleteSharedRenewalContract,
+// account/import paths) are unchanged.
+async function retryDeleteOnce(path: string): Promise<void> {
+  try {
+    await request<unknown>(path, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    return;
+  } catch (firstErr) {
+    await sleepMs(250);
+    try {
+      await request<unknown>(path, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      return;
+    } catch (secondErr) {
+      console.warn('[renewal-events] Stale-cleanup DELETE failed after retry', {
+        path,
+        firstError: firstErr instanceof Error ? firstErr.message : String(firstErr),
+        secondError: secondErr instanceof Error ? secondErr.message : String(secondErr),
+      });
+      throw secondErr;
+    }
+  }
+}
+
 // Phase 5.1 — Renewal-scoped event persistence. Forces source = 'renewal'
 // and contract_id on every written row, and scopes the stale-delete to
 // (source = 'renewal' AND contract_id = X AND is_override = false). This
@@ -623,6 +656,11 @@ export async function saveSharedForecastEvents(events: ForecastEvent[]): Promise
 // contract. Operator overrides survive even when the generator drops
 // the row from its output, on the principle that an operator edit is a
 // product decision the generator should not silently undo.
+//
+// DELETEs go through retryDeleteOnce so a transient 5xx from the
+// stale-cleanup step doesn't abort an otherwise-successful regeneration.
+// POST stays on the bare request() path because POST upserts are already
+// retried on the next regeneration via deterministic IDs (idempotent).
 export async function saveSharedRenewalEvents(
   contractId: string,
   events: ForecastEvent[]
@@ -639,9 +677,8 @@ export async function saveSharedRenewalEvents(
     if (events.length === 0) {
       // No events from the generator for this contract — clear our
       // non-overridden renewal rows only. Overrides remain in place.
-      await request<unknown>(
-        withWorkspaceFilter(`${FORECAST_EVENTS_TABLE}?${renewalScopeFilter}`),
-        { method: 'DELETE', headers: { Prefer: 'return=minimal' } }
+      await retryDeleteOnce(
+        withWorkspaceFilter(`${FORECAST_EVENTS_TABLE}?${renewalScopeFilter}`)
       );
       return true;
     }
@@ -670,15 +707,18 @@ export async function saveSharedRenewalEvents(
     // that the generator no longer produces. Overrides survive; manual
     // events and other contracts' rows are out of scope.
     const currentIds = events.map((e) => `"${e.id}"`).join(',');
-    await request<unknown>(
+    await retryDeleteOnce(
       withWorkspaceFilter(
         `${FORECAST_EVENTS_TABLE}?${renewalScopeFilter}&id=not.in.(${currentIds})`
-      ),
-      { method: 'DELETE', headers: { Prefer: 'return=minimal' } }
+      )
     );
     return true;
   } catch (err) {
-    console.warn('[renewal-events] Save failed:', err);
+    console.warn('[renewal-events] Save failed', {
+      contractId,
+      eventCount: events.length,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return false;
   }
 }

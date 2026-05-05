@@ -31,12 +31,16 @@ import { runDataSanityChecks } from '../lib/dataSanity';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
 import {
   DEFAULT_WORKSPACE_SETTINGS,
+  deleteSharedRenewalContract,
   getSharedAccountSettings,
   getSharedForecastEvents,
+  getSharedRenewalContracts,
   getSharedWorkspaceSettings,
   isSharedPersistenceConfigured,
   saveSharedAccountSettings,
   saveSharedForecastEvents,
+  saveSharedRenewalContract,
+  saveSharedRenewalEvents,
   saveSharedWorkspaceSettings,
   type WorkspaceSettings,
 } from '../lib/data/sharedPersistence';
@@ -56,6 +60,7 @@ import { projectCategoryCadenceScenario } from '../lib/kpis/categoryCadence';
 import { composeSplitConservative } from '../lib/kpis/splitConservative';
 import { composeConservativeFloor } from '../lib/kpis/conservativeFloor';
 import { applyEventsOverlay } from '../lib/kpis/applyEventsOverlay';
+import { generateRenewalEvents } from '../lib/forecast/generateRenewalEvents';
 import type {
   AccountRecord,
   AccountType,
@@ -70,6 +75,7 @@ import type {
   KpiComparisonTimeframe,
   KpiTimeframeComparison,
   MoverGrouping,
+  RenewalContract,
   ScenarioInput,
   ScenarioPoint,
   TransactionImportSummary,
@@ -631,6 +637,44 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
   const [forecastEvents, setForecastEvents] = useState<ForecastEvent[]>(DEFAULT_FORECAST_EVENTS);
+  // Phase 5.1 — Renewal contracts loaded from Supabase. No UI consumes
+  // this state in Branch 4; Branch 5 wires it to the operator-facing
+  // contract management screen. Mutation handlers below keep the local
+  // mirror in sync with remote during create/update/delete.
+  const [forecastContracts, setForecastContracts] = useState<RenewalContract[]>([]);
+  // Loop-guard: a single "completed" flag, set only after a
+  // regeneration pass reaches the end without being cancelled. This
+  // is the second-attempt fix for a React 18 strict-mode bug where a
+  // ref set eagerly before any await would be flipped on the first
+  // (cancelled) invocation and then block the strict-mode-spawned
+  // second invocation forever.
+  //
+  // Strict-mode behavior with this guard:
+  //   1. Mount A: completed=false → start work; cleanup_A captured.
+  //   2. Cleanup A: cancelled_A = true. The completed ref is NOT
+  //      touched, because cleanup-set-completed would defeat the
+  //      whole point: we only mark completed when work actually
+  //      finished without cancellation.
+  //   3. Mount B: completed=false → start a fresh independent run.
+  //      Run A's IIFE eventually resumes, sees cancelled, returns
+  //      without setting completed. Run B continues to completion,
+  //      sets completed = true on success.
+  //
+  // No in-flight guard is used. We considered one and rejected it:
+  // it created a livelock where mount B was blocked by mount A's
+  // not-yet-released in-flight slot, and the slot only cleared in
+  // A's `finally` after B had already early-returned. With a stable
+  // dep array (sharedPersistenceEnabled doesn't toggle mid-session)
+  // and an idempotent persistence layer (saveSharedRenewalEvents
+  // upserts by deterministic id and source-scopes its stale-delete
+  // per Branch 2), letting both strict-mode mounts kick off work is
+  // safe — duplicate writes converge on the same row state.
+  //
+  // If saveSharedRenewalEvents ever stops being idempotent, or if
+  // sharedPersistenceEnabled becomes session-toggleable, revisit
+  // this pattern — the completed-only guard would no longer be
+  // sufficient against re-entrancy.
+  const renewalRegenerationCompletedRef = useRef(false);
   const [activeSection, setActiveSection] = useState<'data' | 'accounts' | 'rules'>('data');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -804,28 +848,120 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     };
   }, [sharedPersistenceEnabled]);
 
-  // Load persisted Known Events (Commit 1: Supabase persistence). Forecast
-  // math is unchanged — events are still passed as [] to composers; this
-  // restores them across refresh and is wired through the existing
-  // setForecastEvents handlers below.
+  // Phase 5.1 — Combined renewal contracts + forecast events bootstrap.
+  //
+  // Replaces the standalone forecast_events load effect. On first load
+  // (and only first load) we:
+  //   1. Fetch renewal_contracts from Supabase.
+  //   2. For each contract, regenerate its renewal forecast_events using
+  //      the pure generator. `today` is injected here so the generator
+  //      stays I/O-free; the horizon is captured via closure at first
+  //      run and pinned for the session (horizon changes do not
+  //      trigger regeneration in Branch 4).
+  //   3. Save the regenerated rows via saveSharedRenewalEvents — Branch
+  //      2 scopes the stale-delete to non-overridden renewal rows for
+  //      this contract only, so manual events, other contracts' rows,
+  //      and operator overrides are all preserved.
+  //   4. Refetch the unified forecast_events list and install it. The
+  //      existing overlay path picks up the new rows without any
+  //      compute or overlay change.
+  //
+  // Loop-guard: completed-only ref. See the ref declaration above
+  // for the strict-mode rationale and the explicit assumptions
+  // (idempotent persistence + stable dep) that make a single flag
+  // sufficient.
+  //
+  // The effect reads sharedPersistenceEnabled (in deps) and
+  // forecastRangeMonths (closure-pinned, intentionally omitted from
+  // deps). It writes forecastContracts and forecastEvents, neither
+  // of which is a dep — so a write cannot re-trigger the effect.
   useEffect(() => {
     if (!sharedPersistenceEnabled) return;
+    if (renewalRegenerationCompletedRef.current) return;
 
     let cancelled = false;
+    // Pin "today" and the horizon at load time. The pure generator
+    // never constructs a Date — that's why `today` is supplied here at
+    // the integration boundary. Horizon stays fixed for this session.
+    const todayAtLoad = new Date();
+    const horizonAtLoad = forecastRangeMonths;
+
     (async () => {
+      let contracts: RenewalContract[] = [];
       try {
-        const remote = await getSharedForecastEvents();
+        const remoteContracts = await getSharedRenewalContracts();
         if (cancelled) return;
-        if (remote !== null) setForecastEvents(remote);
+        contracts = remoteContracts ?? [];
+        setForecastContracts(contracts);
+      } catch (contractsErr) {
+        // Non-fatal: continue to refetch forecast_events below so
+        // existing manual-event behavior doesn't regress.
+        console.warn('[renewal-contracts] Load failed; skipping regeneration.', contractsErr);
+      }
+
+      for (const contract of contracts) {
+        if (cancelled) return;
+        try {
+          const events = generateRenewalEvents(contract, horizonAtLoad, todayAtLoad);
+          await saveSharedRenewalEvents(contract.id, events);
+        } catch (regenErr) {
+          // Per-contract failures are non-fatal so a single bad
+          // contract doesn't block other contracts or the refetch.
+          console.warn(`[renewal-events] Regenerate failed for contract ${contract.id}:`, regenErr);
+        }
+      }
+
+      try {
+        const events = await getSharedForecastEvents();
+        if (cancelled) return;
+        if (events !== null) setForecastEvents(events);
       } catch (err) {
         // Non-fatal: in-memory empty default remains correct.
         console.warn('[forecast-events] Load failed, using empty defaults.', err);
       }
+
+      // Mark the pass as completed only if it reached this point
+      // without being cancelled. A cancelled run (strict-mode
+      // cleanup, unmount, etc.) returns early above and never reaches
+      // this line — the completed flag stays false and a healthy
+      // follow-up run (e.g., strict-mode's second mount) can start
+      // a fresh pass.
+      if (!cancelled) {
+        renewalRegenerationCompletedRef.current = true;
+      }
     })();
 
     return () => {
+      // Cleanup intentionally only sets cancelled. It does NOT touch
+      // the completed ref — that would erase the whole point of the
+      // pattern, since cancelled runs by definition didn't complete.
       cancelled = true;
     };
+    // forecastRangeMonths is intentionally omitted from deps.
+    //
+    // Why pin the horizon at load time:
+    // (1) Stability — re-running regeneration every time the user
+    //     toggles the horizon button would cause repeated DB writes
+    //     and a brief UI flicker for a feature that doesn't need it.
+    // (2) Correctness — saveSharedRenewalEvents stale-deletes
+    //     non-overridden renewal rows for a contract. If the user
+    //     shrinks the horizon mid-session, re-running regen would
+    //     drop renewal rows past the new horizon — including ones
+    //     the chart is still showing in scrolled/expanded views.
+    // (3) Idempotency under double-mount — React 18 strict-mode
+    //     re-invokes effects in dev. The completed-only ref above
+    //     handles this: a cancelled first run never sets completed,
+    //     so strict-mode's second mount can start a fresh pass and
+    //     converge on the same end state. Pinning the horizon makes
+    //     that convergence guarantee transitive: even if the guard
+    //     were lifted, the dep array would still not provoke a
+    //     refire from horizon changes. (See the ref-declaration
+    //     comment for why we don't use an in-flight guard.)
+    //
+    // Tradeoff: a user who loads with horizon=90d and then expands
+    // to 3 years won't see renewal events past month 3 until the
+    // next page load. Acceptable for Branch 4; Branch 5 may revisit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sharedPersistenceEnabled]);
 
   useEffect(() => {
@@ -1578,6 +1714,87 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     () => FORECAST_RANGE_OPTIONS.find((option) => option.value === forecastRange)?.months ?? 3,
     [forecastRange]
   );
+
+  // Phase 5.1 — RenewalContract mutation handlers. Wired here for
+  // Branch 5 to consume; no UI binds them in Branch 4. Each handler
+  // mirrors the load-time pattern: update local mirror, persist the
+  // contract, regenerate this contract's renewal events, then refetch
+  // the unified forecast_events list so the overlay sees the change.
+  //
+  // Refetch (not local merge) is the canonical path. It costs slightly
+  // more network than a local merge would, but it's the only path that
+  // respects the source-aware delete scoping in saveSharedRenewalEvents
+  // and the operator-override survival rules in Branch 2 — without
+  // re-implementing them here.
+  //
+  // Horizon is read at handler-fire time (not pinned). Initial-load
+  // pins for stability; mutations are operator-driven and should use
+  // the live horizon.
+  //
+  // Known limitation (Branch 5 to address): handleDeleteRenewalContract
+  // calls saveSharedRenewalEvents(contractId, []) which only deletes
+  // is_override = false rows. Operator-overridden renewal rows survive
+  // contract deletion as orphaned forecast_events with a now-dangling
+  // contract_id. This is intentional — the operator's edit is a
+  // product decision the system should not silently undo — but the
+  // operator-facing UI in Branch 5 needs to surface and clean these.
+  // (Defined here, after forecastRangeMonths, because the handler
+  // useCallback dep arrays reference it.)
+  const refetchForecastEvents = useCallback(async () => {
+    try {
+      const events = await getSharedForecastEvents();
+      if (events !== null) setForecastEvents(events);
+    } catch (err) {
+      console.warn('[forecast-events] Refetch after mutation failed:', err);
+    }
+  }, []);
+
+  const handleCreateRenewalContract = useCallback(
+    async (contract: RenewalContract) => {
+      setForecastContracts((prev) => [...prev, contract]);
+      try {
+        await saveSharedRenewalContract(contract);
+        const events = generateRenewalEvents(contract, forecastRangeMonths, new Date());
+        await saveSharedRenewalEvents(contract.id, events);
+      } catch (err) {
+        console.warn(`[renewal-contracts] Create failed for ${contract.id}:`, err);
+      }
+      await refetchForecastEvents();
+    },
+    [forecastRangeMonths, refetchForecastEvents]
+  );
+
+  const handleUpdateRenewalContract = useCallback(
+    async (contract: RenewalContract) => {
+      setForecastContracts((prev) => prev.map((c) => (c.id === contract.id ? contract : c)));
+      try {
+        await saveSharedRenewalContract(contract);
+        const events = generateRenewalEvents(contract, forecastRangeMonths, new Date());
+        await saveSharedRenewalEvents(contract.id, events);
+      } catch (err) {
+        console.warn(`[renewal-contracts] Update failed for ${contract.id}:`, err);
+      }
+      await refetchForecastEvents();
+    },
+    [forecastRangeMonths, refetchForecastEvents]
+  );
+
+  const handleDeleteRenewalContract = useCallback(
+    async (contractId: string) => {
+      setForecastContracts((prev) => prev.filter((c) => c.id !== contractId));
+      try {
+        await deleteSharedRenewalContract(contractId);
+        // Clears non-overridden renewal rows for this contract.
+        // Overrides survive (see comment block above).
+        await saveSharedRenewalEvents(contractId, []);
+      } catch (err) {
+        console.warn(`[renewal-contracts] Delete failed for ${contractId}:`, err);
+      }
+      await refetchForecastEvents();
+    },
+    [refetchForecastEvents]
+  );
+
   const forecastProjection = useMemo(
     () => {
       const fcT0 = performance.now();
