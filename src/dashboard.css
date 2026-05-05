@@ -7621,3 +7621,16 @@ body {
 
 .dark .forecast-event-steer-close { color: #D0D5DD; }
 .dark .forecast-event-steer-close:hover { background: rgba(255, 255, 255, 0.05); }
+
+/* Right-side cluster wrapper. Pinned to the row's right edge with
+   margin-left: auto and given a tight 4px inner gap so amount, badge,
+   and controls read as a single unit instead of five drifting columns.
+   Sibling of the steer panel — not a parent — so the steer's
+   flex-basis: 100% still drops it onto a new flex line below the row. */
+.forecast-event-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
