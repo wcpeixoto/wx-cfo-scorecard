@@ -11,6 +11,29 @@ End every coding session with:
 
 ---
 
+## Agent roles
+
+**Chat writes the implementation prompt. Codex executes it.**
+
+If using Claude Code / Codex:
+- Handle repo reads
+- Verify Notion status if needed
+- Run tests/build
+- Implement code from a chat-provided prompt
+- Commit/PR
+- Run live verification
+- Execute approved Notion writes only from an exact approved payload
+- Do not draft your own implementation prompts — wait for chat to provide one
+
+If using ChatGPT / Claude Chat:
+- Do not start by verifying Notion
+- Use root docs first
+- Help with planning, product decisions, prompt writing, and review
+- Draft Notion write plans when needed
+- Touch Notion only if explicitly asked
+
+---
+
 ## Step 1 — Chat creates the session-close bundle
 
 Chat writes one closeout bundle with:
@@ -54,24 +77,8 @@ No vague Notion instructions.
 
 ### 7. Next-chat handoff
 
-Paste-ready handoff for a new chat.
-Keep it under 200 words and use this format:
-
-```md
-# NEW SESSION — Wx CFO Scorecard
-
-## Current state
-[Where the repo/project stands now.]
-
-## What shipped
-[Main branch/PR/commits/features shipped.]
-
-## What remains
-[Verification, docs, deploy, deferred items.]
-
-## Next recommended move
-[One clear next action.]
-```
+Filled-in version of the **Handoff template** below.
+Target length: 200–400 words.
 
 ---
 
@@ -149,8 +156,106 @@ This is required so the next chat starts with the latest project context.
 
 ## Step 5 — Start the next chat
 
-Copy the Next-chat handoff from the session-close bundle into a new chat.
+Copy the filled-in handoff from the session-close bundle into a new chat.
 The handoff should be the first message.
+
+---
+
+## Handoff template
+
+Use this at the end of every session-close bundle.
+
+Target length: 200–400 words.
+
+```md
+# NEW SESSION — Wx CFO Scorecard
+
+## Current state
+
+- main HEAD:
+- Working tree:
+- Current branch / PR:
+- Deploy/live status:
+- Last completed phase/branch:
+
+## What shipped last session
+
+- [commit SHA] — [summary]
+- [commit SHA] — [summary]
+- [commit SHA] — [summary]
+
+## Verification status
+
+- Build:
+- Tests:
+- Browser smoke:
+- Live Supabase / production verification:
+- Test data cleanup:
+
+## Required reads before any work
+
+Required:
+- `wx_cfo_scorecard_context_v2_6.md`
+- `CLAUDE.md`
+
+As needed:
+- `SESSION_CLOSE_WORKFLOW.md` — when opening/closing a coding session
+- `UI_RULES.md` — when touching UI
+- `UI_CARDS.md` — when touching cards
+- `UI_Verification_Rules.md` — when doing browser/UI verification
+
+## Agent roles
+
+If using Claude Code / Codex:
+- Handle repo reads
+- Verify Notion status if needed
+- Run tests/build
+- Implement code from a chat-provided prompt
+- Commit/PR
+- Run live verification
+- Execute approved Notion writes only from an exact approved payload
+- Do not draft your own implementation prompts — wait for chat to provide one
+
+If using ChatGPT / Claude Chat:
+- Do not start by verifying Notion
+- Use root docs first
+- Help with planning, product decisions, prompt writing, and review
+- Draft Notion write plans when needed
+- Touch Notion only if explicitly asked
+
+## Notion status
+
+Last Notion sync:
+- [date/time or session note]
+
+Freshness rule:
+- If more than 24 hours have passed, Claude Code / Codex should re-verify Notion before pulling the next task.
+- ChatGPT / Claude Chat should skip Notion unless explicitly asked.
+
+Known possible housekeeping:
+- [item, if any]
+
+## Open work
+
+- [Open item 1]
+- [Open item 2]
+- [Open item 3]
+
+## Deferred items
+
+- [Item] — [why deferred] — [priority]
+- [Item] — [why deferred] — [priority]
+
+## Do not touch
+
+- [locked file/path]
+- [locked feature/system]
+- [known sensitive area]
+
+## Recommended next move
+
+[one clear next action]
+```
 
 ---
 
@@ -161,6 +266,8 @@ You approve.
 Codex executes everything: repo mechanics and Notion writes.
 You re-upload the context doc.
 Next chat starts from the handoff.
+
+**Chat writes the implementation prompt. Codex executes it.**
 
 No silent merges.
 No silent Notion writes.
