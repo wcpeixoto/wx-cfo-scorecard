@@ -7574,3 +7574,50 @@ body {
   border-left-color: #475467;
   background: rgba(255, 255, 255, 0.02);
 }
+
+/* Inline steer message for renewal-row edit clicks. Spans the full row
+   width below the existing controls so it does not push them around.
+   Calm visual treatment — gray-25 surface, gray-500 text, no alert color. */
+.forecast-event-steer {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #FCFCFD;
+  border: 1px solid #E4E7EC;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #667085;
+}
+
+.forecast-event-steer-text {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.forecast-event-steer-close {
+  border: none;
+  background: transparent;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 150ms ease;
+}
+
+.forecast-event-steer-close:hover {
+  background: #F2F4F7;
+}
+
+.dark .forecast-event-steer {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: #344054;
+  color: #98A2B3;
+}
+
+.dark .forecast-event-steer-close { color: #D0D5DD; }
+.dark .forecast-event-steer-close:hover { background: rgba(255, 255, 255, 0.05); }

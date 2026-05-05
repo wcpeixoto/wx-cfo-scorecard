@@ -429,6 +429,7 @@ export default function CashFlowForecastModule({
   const [formFrequency, setFormFrequency] = useState<EventFrequency>('once');
   const [formErrors, setFormErrors] = useState<{ date?: string; title?: string }>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [activeSteerId, setActiveSteerId] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
 
@@ -1053,49 +1054,72 @@ export default function CashFlowForecastModule({
                     )}
                   </span>
                   <span className="forecast-event-status is-neutral">{group.freqLabel}</span>
-                  <button
-                    type="button"
-                    className="forecast-event-toggle-btn"
-                    onClick={() => onToggleEvent?.(group.groupId, !group.enabled)}
-                    aria-label={group.enabled === false ? `Enable ${group.title}` : `Disable ${group.title}`}
-                  >
-                    {group.enabled === false ? '○' : '●'}
-                  </button>
+                  {group.kind !== 'renewal' && (
+                    <button
+                      type="button"
+                      className="forecast-event-toggle-btn"
+                      onClick={() => onToggleEvent?.(group.groupId, !group.enabled)}
+                      aria-label={group.enabled === false ? `Enable ${group.title}` : `Disable ${group.title}`}
+                    >
+                      {group.enabled === false ? '○' : '●'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="forecast-event-edit-btn"
-                    onClick={() => openEditModal(group)}
+                    onClick={() =>
+                      group.kind === 'renewal'
+                        ? setActiveSteerId((prev) => (prev === group.groupId ? null : group.groupId))
+                        : openEditModal(group)
+                    }
                     aria-label={`Edit ${group.title}`}
                   >
                     ✎
                   </button>
-                  {confirmDeleteId === group.groupId ? (
-                    <>
-                      <span>Remove this event?</span>
+                  {group.kind !== 'renewal' && (
+                    confirmDeleteId === group.groupId ? (
+                      <>
+                        <span>Remove this event?</span>
+                        <button
+                          type="button"
+                          className="forecast-event-delete-confirm-yes"
+                          onClick={() => { onDeleteEvent?.(group.groupId); setConfirmDeleteId(null); }}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          type="button"
+                          className="forecast-event-delete-confirm-cancel"
+                          onClick={() => setConfirmDeleteId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
                       <button
                         type="button"
-                        className="forecast-event-delete-confirm-yes"
-                        onClick={() => { onDeleteEvent?.(group.groupId); setConfirmDeleteId(null); }}
+                        className="forecast-event-delete-btn"
+                        onClick={() => setConfirmDeleteId(group.groupId)}
+                        aria-label={`Remove ${group.title}`}
                       >
-                        Yes
+                        ✕
                       </button>
+                    )
+                  )}
+                  {group.kind === 'renewal' && activeSteerId === group.groupId && (
+                    <div className="forecast-event-steer">
+                      <span className="forecast-event-steer-text">
+                        This event is generated from {group.title}. Edit the
+                        contract in Settings → Contracts &amp; Renewals to change it.
+                      </span>
                       <button
                         type="button"
-                        className="forecast-event-delete-confirm-cancel"
-                        onClick={() => setConfirmDeleteId(null)}
+                        className="forecast-event-steer-close"
+                        onClick={() => setActiveSteerId(null)}
                       >
-                        Cancel
+                        Close
                       </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      className="forecast-event-delete-btn"
-                      onClick={() => setConfirmDeleteId(group.groupId)}
-                      aria-label={`Remove ${group.title}`}
-                    >
-                      ✕
-                    </button>
+                    </div>
                   )}
                 </li>
               ))}
