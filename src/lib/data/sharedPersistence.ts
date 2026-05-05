@@ -321,7 +321,7 @@ function toSharedForecastEventRow(event: ForecastEvent): SharedForecastEventRow 
     generated_date: event.generatedDate ?? null,
     generated_cash_in: event.generatedCashIn ?? null,
     generated_cash_out: event.generatedCashOut ?? null,
-    is_override: event.isOverride ?? null,
+    is_override: event.isOverride ?? false,
   };
 }
 
