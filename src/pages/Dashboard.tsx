@@ -3075,6 +3075,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               onReceivableDaysChange={(nextValue) => updateCustomScenario({ receivableDays: nextValue })}
               onPayableDaysChange={(nextValue) => updateCustomScenario({ payableDays: nextValue })}
               forecastEvents={forecastEvents}
+              contracts={forecastContracts}
               onAddEvent={(events) => setForecastEvents((prev) => {
                 const next = [...prev, ...events];
                 void saveSharedForecastEvents(next);
