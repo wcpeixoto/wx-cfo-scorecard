@@ -25,9 +25,14 @@ function formatFullMonth(month: string): string {
   return `${MONTH_NAMES[idx] ?? m} ${year}`;
 }
 
-/** Bucket end date in "MMM D, YYYY" form for the tooltip header.
- *  Week granularity: extract the end of the existing range tooltipLabel ("May 25 – May 31, 2026").
- *  Month granularity: last day of the calendar month from YYYY-MM. */
+/** Tooltip header date for the cash-balance chart.
+ *  Week granularity: full range string from the bucket's tooltipLabel
+ *    ("Jun 8 – Jun 14, 2026"), so the tooltip tells the truth about the
+ *    weekly bucket instead of showing only the week-end date.
+ *  Month granularity: last day of the calendar month from YYYY-MM
+ *    ("Jun 30, 2026"), unchanged.
+ *  Function name predates the weekly behavior change; renaming requires
+ *  touching the caller and is intentionally out of scope. */
 // Format YYYY-MM-DD → "Mmm DD, YYYY" (e.g. "Jun 12, 2026"). UTC-stable.
 // Mirrors formatEventDate in CashFlowForecastModule.tsx — the row display
 // uses the same shape for the same field. Inline rather than extracted
@@ -62,10 +67,7 @@ function lastDayOfMonthDate(month: string): string {
 
 function formatBucketEndDate(d: TrendPoint, granularity: 'month' | 'week'): string {
   if (granularity === 'week') {
-    const label = d.tooltipLabel ?? d.axisLabel ?? d.month;
-    // Range separator may be en dash, em dash, or hyphen; trim and take the right side
-    const parts = label.split(/\s[–—-]\s/);
-    return (parts.length >= 2 ? parts[parts.length - 1] : label).trim();
+    return d.tooltipLabel ?? d.axisLabel ?? d.month;
   }
   const [yearStr, mmStr] = d.month.split('-');
   const year = parseInt(yearStr, 10);
