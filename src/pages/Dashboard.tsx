@@ -19,6 +19,7 @@ import NetCashFlowChart from '../components/NetCashFlowChart';
 import { TodayPage } from '../components/TodayPage';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
 import DigHereCardMock from '../components/DigHereCardMock';
+import CurveLabCharts from '../components/CurveLabCharts';
 import { computeEfficiencyOpportunities } from '../lib/kpis/efficiencyOpportunities';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
 import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccountRecords } from '../lib/accounts';
@@ -3895,6 +3896,17 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                   onCashFlowModeChange={setNetCashFlowChartMode}
                   onTimeframeChange={setNetChartTimeframe}
                 />
+              </div>
+            </div>
+
+            {/* ── Forecast Chart Curve Lab ─────────────────────────────── */}
+            <div className="ui-lab-section">
+              <div className="ui-lab-section-head">
+                <h3 className="ui-lab-section-title">Forecast Chart Curve Lab</h3>
+                <p className="ui-lab-section-subtitle">Visual comparison of curve modes against two data shapes. Reference: TailAdmin Active Users (top). Wx-style synthetic event data (bottom three) with smooth, straight, and stepline curves. Goal: confirm whether the spike distortion observed in production Forecast is curve-driven or data-shape-driven.</p>
+              </div>
+              <div className="ui-lab-two-col-grid">
+                <CurveLabCharts />
               </div>
             </div>
 
