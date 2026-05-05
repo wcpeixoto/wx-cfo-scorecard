@@ -149,6 +149,7 @@ type CashFlowForecastModuleProps = {
   onAddEvent?: (events: ForecastEvent[]) => void;
   onUpdateEvent?: (event: ForecastEvent) => void;
   onDeleteEvent?: (groupId: string) => void;
+  onToggleEvent?: (groupId: string, enabled: boolean) => void;
 };
 
 type ForecastSliderControlProps = {
@@ -398,6 +399,7 @@ export default function CashFlowForecastModule({
   onAddEvent,
   onUpdateEvent,
   onDeleteEvent,
+  onToggleEvent,
 }: CashFlowForecastModuleProps) {
   const chartMountT0Ref = useRef(performance.now());
   const chartBootLoggedRef = useRef(false);
@@ -632,7 +634,7 @@ export default function CashFlowForecastModule({
       } else {
         monthDisplay = `every ${formatEventDate(firstDate).replace(/, \d{4}$/, '')}, starting ${first.month.split('-')[0]}`;
       }
-      return { groupId, frequency, freqLabel, events: sorted, firstEvent: first, title: first.title, amount, monthDisplay };
+      return { groupId, frequency, freqLabel, events: sorted, firstEvent: first, title: first.title, amount, monthDisplay, enabled: first.enabled };
     }).sort((a, b) => a.firstEvent.month.localeCompare(b.firstEvent.month));
   }, [forecastEvents]);
 
@@ -959,7 +961,7 @@ export default function CashFlowForecastModule({
           {groupedEventRows.length > 0 && (
             <ul className="forecast-events-list">
               {groupedEventRows.map((group) => (
-                <li key={group.groupId} className="forecast-event-row">
+                <li key={group.groupId} className={`forecast-event-row${group.enabled === false ? ' is-disabled' : ''}`}>
                   <span className="forecast-event-month">{group.monthDisplay}</span>
                   <span className="forecast-event-title">{group.title}</span>
                   <span className="forecast-event-impacts">
@@ -975,6 +977,14 @@ export default function CashFlowForecastModule({
                     )}
                   </span>
                   <span className="forecast-event-status is-neutral">{group.freqLabel}</span>
+                  <button
+                    type="button"
+                    className="forecast-event-toggle-btn"
+                    onClick={() => onToggleEvent?.(group.groupId, !group.enabled)}
+                    aria-label={group.enabled === false ? `Enable ${group.title}` : `Disable ${group.title}`}
+                  >
+                    {group.enabled === false ? '○' : '●'}
+                  </button>
                   <button
                     type="button"
                     className="forecast-event-edit-btn"

@@ -2875,6 +2875,15 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 void saveSharedForecastEvents(next);
                 return next;
               })}
+              onToggleEvent={(groupId, enabled) => setForecastEvents((prev) => {
+                const next = prev.map((e) => {
+                  const parts = e.id.split('__');
+                  const eGroupId = parts.length === 3 ? parts[1] : e.id;
+                  return eGroupId === groupId ? { ...e, enabled } : e;
+                });
+                void saveSharedForecastEvents(next);
+                return next;
+              })}
             />
 
             <article className="card table-card projection-table-card" ref={projectionTableRef}>
