@@ -174,3 +174,46 @@ create table if not exists public.forecast_events (
 
 create index if not exists forecast_events_workspace_month_idx
   on public.forecast_events (workspace_id, month);
+
+-- Phase 5.1 — Renewal contracts. Source-of-truth for recurring revenue
+-- agreements. Generated forecast_events rows link back via contract_id.
+-- Operator-managed; no scheduler touches this table directly.
+
+create table if not exists public.renewal_contracts (
+  workspace_id text not null,
+  id text not null,
+  name text not null,
+  status text not null default 'active',
+  renewal_date date not null,
+  renewal_cadence text not null,
+  cash_in_amount numeric not null default 0,
+  cash_out_amount numeric not null default 0,
+  enabled boolean not null default true,
+  notes text null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (workspace_id, id)
+);
+
+create index if not exists renewal_contracts_workspace_idx
+  on public.renewal_contracts (workspace_id);
+
+-- Phase 5.1 — Additive columns on forecast_events to support the renewal
+-- generator. All new columns are nullable / defaulted so legacy rows
+-- (operator-entered events) remain valid without backfill. `source`
+-- distinguishes manual rows (null/'manual') from generator-created rows
+-- ('renewal'). `contract_id` links generated rows back to their source
+-- contract. `generated_*` capture the generator's original output so
+-- operator overrides remain detectable. `is_override` flags rows the
+-- operator has edited away from the generator's value.
+
+alter table public.forecast_events
+  add column if not exists source text null,
+  add column if not exists contract_id text null,
+  add column if not exists generated_date date null,
+  add column if not exists generated_cash_in numeric null,
+  add column if not exists generated_cash_out numeric null,
+  add column if not exists is_override boolean not null default false;
+
+create index if not exists forecast_events_workspace_source_contract_idx
+  on public.forecast_events (workspace_id, source, contract_id);

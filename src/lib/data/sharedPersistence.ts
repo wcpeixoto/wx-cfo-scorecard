@@ -83,7 +83,32 @@ type SharedForecastEventRow = {
   cash_out_impact: number;
   enabled: boolean;
   updated_at: string;
+  // Phase 5.1 — Renewal generator metadata. Shape only; no consumers in
+  // this branch. Nullable to keep legacy rows valid without backfill.
+  source: string | null;
+  contract_id: string | null;
+  generated_date: string | null;
+  generated_cash_in: number | null;
+  generated_cash_out: number | null;
+  is_override: boolean | null;
 };
+
+// Phase 5.1 — Row shape for renewal_contracts. No get/save/delete
+// functions in this branch; type only.
+interface SharedRenewalContractRow {
+  workspace_id: string;
+  id: string;
+  name: string;
+  status: string;
+  renewal_date: string;
+  renewal_cadence: string;
+  cash_in_amount: number;
+  cash_out_amount: number;
+  enabled: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 // Matches the shared_workspace_settings table schema.
 type SharedWorkspaceSettingRow = {
@@ -288,6 +313,15 @@ function toSharedForecastEventRow(event: ForecastEvent): SharedForecastEventRow 
     cash_out_impact: event.cashOutImpact,
     enabled: event.enabled,
     updated_at: new Date().toISOString(),
+    // Phase 5.1 — Direct field mappings only; legacy/manual events have
+    // these as undefined and persist as null. No behavior branches on
+    // these values yet.
+    source: event.source ?? null,
+    contract_id: event.contractId ?? null,
+    generated_date: event.generatedDate ?? null,
+    generated_cash_in: event.generatedCashIn ?? null,
+    generated_cash_out: event.generatedCashOut ?? null,
+    is_override: event.isOverride ?? null,
   };
 }
 

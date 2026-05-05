@@ -386,4 +386,34 @@ export type ForecastEvent = {
   cashInImpact: number;   // positive dollars
   cashOutImpact: number;  // positive dollars
   enabled: boolean;
+  // Phase 5.1 — Renewal generator metadata. All optional; null/undefined
+  // means the row is a legacy/manual event. No runtime logic reads these
+  // fields yet — shape only.
+  source?: 'manual' | 'renewal';
+  contractId?: string;
+  generatedDate?: string;       // YYYY-MM-DD; the generator's original date
+  generatedCashIn?: number;     // the generator's original cash-in amount
+  generatedCashOut?: number;    // the generator's original cash-out amount
+  isOverride?: boolean;         // null/undefined = false for legacy/manual rows
 };
+
+// Phase 5.1 — Renewal contracts. Source-of-truth for recurring revenue
+// agreements. Generated ForecastEvent rows link back via contractId.
+// Operator-managed; no generator/scheduler logic exists in this branch.
+
+export type RenewalContractStatus = 'active' | 'paused' | 'ended';
+export type RenewalContractCadence = 'monthly' | 'annual';
+
+export interface RenewalContract {
+  id: string;
+  name: string;
+  status: RenewalContractStatus;
+  renewalDate: string;        // YYYY-MM-DD
+  renewalCadence: RenewalContractCadence;
+  cashInAmount: number;       // positive dollars
+  cashOutAmount: number;      // positive dollars
+  enabled: boolean;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
