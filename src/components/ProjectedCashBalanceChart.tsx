@@ -26,13 +26,13 @@ function formatFullMonth(month: string): string {
 }
 
 /** Tooltip header date for the cash-balance chart.
- *  Week granularity: full range string from the bucket's tooltipLabel
- *    ("Jun 8 – Jun 14, 2026"), so the tooltip tells the truth about the
- *    weekly bucket instead of showing only the week-end date.
+ *  Week granularity: single date string from the bucket's periodStart
+ *    ("Jun 8, 2026"), formatted via formatEventDate.
  *  Month granularity: last day of the calendar month from YYYY-MM
  *    ("Jun 30, 2026"), unchanged.
- *  Function name predates the weekly behavior change; renaming requires
- *  touching the caller and is intentionally out of scope. */
+ *  Function name does not perfectly describe the week branch (it returns
+ *  start, not end); renaming requires touching the caller and is
+ *  intentionally out of scope. */
 // Format YYYY-MM-DD → "Mmm DD, YYYY" (e.g. "Jun 12, 2026"). UTC-stable.
 // Mirrors formatEventDate in CashFlowForecastModule.tsx — the row display
 // uses the same shape for the same field. Inline rather than extracted
@@ -67,6 +67,7 @@ function lastDayOfMonthDate(month: string): string {
 
 function formatBucketEndDate(d: TrendPoint, granularity: 'month' | 'week'): string {
   if (granularity === 'week') {
+    if (d.periodStart) return formatEventDate(d.periodStart);
     return d.tooltipLabel ?? d.axisLabel ?? d.month;
   }
   const [yearStr, mmStr] = d.month.split('-');
