@@ -3299,22 +3299,22 @@ body {
 
 .table-card .projection-sub-row th {
   background: #FFFFFF;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   text-align: center;
   color: #667085;
 }
 
-.projection-sub-forecast {
-  color: #101828 !important;
-  font-weight: 600 !important;
-  font-size: 13px !important;
+.projection-table .projection-sub-row .projection-sub-forecast {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 12px;
 }
 
-.projection-sub-actual {
-  color: #667085 !important;
-  font-weight: 500 !important;
-  font-size: 13px !important;
+.projection-table .projection-sub-row .projection-sub-actual {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 12px;
 }
 
 /* Center-align all data cells except MONTH column in comparison mode */
@@ -3324,13 +3324,40 @@ body {
 
 /* Group start border — separates CASH IN / CASH OUT / NET / VS PRIOR / BALANCE */
 .proj-group-start {
-  border-left: 2px solid #E4E7EC;
+  border-left: 1px solid var(--line);
 }
 
 /* Title-case projection table headers — override .table-card th uppercase rule */
 .projection-table th {
   text-transform: none;
   letter-spacing: normal;
+}
+
+/* Simple-mode header band — calm, breathable, TailAdmin Recent Orders style.
+   Comparison-mode headers keep their existing group/sub styling. */
+.projection-table:not(.comparison-mode) thead th {
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--bg-muted);
+  border-bottom: 1px solid var(--bg-muted);
+}
+
+/* Body cells — taller rows, lighter dividers, consistent padding rhythm */
+.projection-table tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--bg-muted);
+}
+
+/* Drop the last body-row divider — tfoot border-top takes over */
+.projection-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Subtle row hover for scanning long projection rows */
+.projection-table tbody tr:hover td {
+  background: var(--bg-muted);
 }
 
 /* Remove the first vertical divider only — between Month column and Cash In group.
@@ -3356,22 +3383,22 @@ body {
 }
 
 .projection-var-positive {
-  color: #12B76A;
+  color: var(--positive);
   font-weight: 500;
 }
 
 .projection-var-negative {
-  color: #F04438;
+  color: var(--negative);
   font-weight: 500;
 }
 
 .projection-var-neutral {
-  color: #667085;
+  color: var(--text-secondary);
 }
 
 /* Data value hierarchy — forecast vs actuals */
 .proj-forecast-value {
-  color: #101828;
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -3388,16 +3415,15 @@ body {
 
 /* Totals row — appears below all monthly data rows */
 .projection-table .total-row {
-  background-color: #F9FAFB;
-  border-top: 2px solid #D0D5DD;
+  background-color: var(--bg-main);
+  border-top: 1px solid var(--line);
 }
 
 .projection-table .total-row td {
-  border-top: 2px solid #D0D5DD;
-  font-weight: 700;
-  padding-top: 14px;
-  padding-bottom: 14px;
-  letter-spacing: 0.01em;
+  border-top: none;
+  font-weight: 600;
+  padding: 12px 16px;
+  letter-spacing: normal;
 }
 
 .projection-table .total-row .total-label {
@@ -3405,13 +3431,9 @@ body {
 }
 
 .projection-table .total-row .balance-placeholder {
-  color: #9CA3AF;
+  color: var(--text-secondary);
   text-align: center;
   font-weight: 400;
-}
-
-.projection-table th {
-  font-size: 14px;
 }
 
 .projection-table td {
@@ -3420,12 +3442,12 @@ body {
 
 /* Cash Out VAR % color logic is inverted: spending less than prior = good */
 .projection-var-cashout-positive {
-  color: #F04438;
+  color: var(--negative);
   font-weight: 500;
 }
 
 .projection-var-cashout-negative {
-  color: #12B76A;
+  color: var(--positive);
   font-weight: 500;
 }
 
