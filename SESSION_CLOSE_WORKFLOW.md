@@ -32,6 +32,112 @@ If using ChatGPT / Claude Chat:
 - Draft Notion write plans when needed
 - Touch Notion only if explicitly asked
 
+
+---
+
+## Top of queue — single source of truth
+
+The context doc `wx_cfo_scorecard_context_v2_6.md` must contain a section
+titled **"Top of queue (as of [date])"** near the top of the file.
+
+This section lists the next 3–5 items, in order, with one line each
+explaining why each item is next. It is the **single source of truth** for
+"what comes next" — agents must not infer the next move from older roadmap
+sections, planning notes, or implementation drafts elsewhere in the doc.
+
+When the queue changes, update this section. When session close happens,
+update this section as part of the context-doc update block (Step 1.5
+below).
+
+Format:
+
+```md
+## Top of queue (as of [YYYY-MM-DD])
+
+1. [Item] — [why it's next]
+2. [Item] — [why it's next]
+3. [Item] — [why it's next]
+```
+
+Older roadmap sections, planning notes, and superseded priorities should
+either be deleted or clearly marked as historical when they no longer
+reflect current priorities.
+
+---
+
+## Session start checklist
+
+When the user says **"start session"**, **"start a session"**, or equivalent, the active agent runs this checklist.
+
+Behavior splits by agent type per the **Agent roles** section above.
+
+### All agents
+
+1. Read the required files in order:
+   - `wx_cfo_scorecard_context_v2_6.md`
+   - `CLAUDE.md`
+   - as-needed docs based on the task:
+     - `SESSION_CLOSE_WORKFLOW.md` — when opening/closing a coding session
+     - `UI_RULES.md` — when touching UI
+     - `UI_CARDS.md` — when touching cards
+     - `UI_Verification_Rules.md` — when doing browser/UI verification
+
+2. Confirm current state:
+   - main HEAD commit and message
+   - working tree status: clean / dirty
+   - current branch
+   - last shipped phase or branch
+
+3. Surface the **Top of queue** section from the context doc verbatim.
+   Do not infer the next move from other parts of the doc. If the section
+   is missing or stale, flag it and stop — ask the user to refresh it
+   before proceeding.
+
+4. If a handoff was provided:
+   - confirm the recommended next move matches Top of queue item #1
+   - surface any mismatch between the handoff, Top of queue, and current repo/docs state
+
+5. If no handoff was provided:
+   - propose Top of queue item #1 as the default task
+   - ask: **"What's the task?"**
+
+### If using Claude Code / Codex
+
+6. Run pre-flight:
+
+```bash
+   git branch --show-current
+   git status --short
+   git log --oneline -5
+```
+
+7. Verify Notion only if:
+   - more than 24 hours have passed since the last documented Notion sync, or
+   - the user explicitly asks for Notion verification.
+
+8. Do not draft an implementation prompt.
+
+9. Say: **"Ready for kickoff prompt"** and wait for chat to provide the prompt.
+
+10. Do not start coding until a chat-provided kickoff prompt is received.
+
+### If using ChatGPT / Claude Chat
+
+6. Do not start by verifying Notion unless explicitly asked.
+
+7. Lead with planning:
+   - confirm scope
+   - surface open product questions
+   - surface open technical questions
+   - align on approach before writing any prompt or code
+
+8. When the task is clear and ready for execution, write the kickoff prompt for Codex.
+
+### All agents
+
+Do not code until the task, scope, and approach are clear.
+
+
 ---
 
 ## Step 1 — Chat creates the session-close bundle
@@ -61,8 +167,17 @@ Chat writes one closeout bundle with:
 Exact checks still needed, written as a checklist.
 
 ### 5. Context-doc update block
-Paste-ready markdown to append to:
+
+Paste-ready markdown to append to or replace in:
 `wx_cfo_scorecard_context_v2_6.md`
+
+This update **must include**:
+- The new phase/branch summary block (what shipped, decisions locked, lessons)
+- A refreshed **Top of queue (as of [date])** section reflecting the
+  current next 3–5 items in order. If items shipped this session, remove
+  them from the queue. If new priorities emerged, add them. The Top of
+  queue section is the single source of truth — every session close must
+  refresh it.
 
 ### 6. Exact Notion write plan
 For each Notion change:
@@ -85,7 +200,7 @@ Target length: 200–400 words.
 ## Step 2 — You approve the bundle
 
 Approval means:
-- context-doc update is approved
+- context-doc update is approved (including the refreshed Top of queue)
 - Notion writes are approved
 - Codex can execute everything: repo mechanics + Notion writes
 
@@ -99,8 +214,9 @@ Codex does:
 
 ### Repo mechanics
 
-1. Append the approved context-doc block to:
+1. Append or replace the approved context-doc block in:
    `wx_cfo_scorecard_context_v2_6.md`
+   (including the refreshed Top of queue section)
 
 2. Run:
 ```bash
@@ -150,7 +266,8 @@ After the context-doc commit lands on main, manually re-upload:
 `wx_cfo_scorecard_context_v2_6.md`
 to the project knowledge snapshot.
 
-This is required so the next chat starts with the latest project context.
+This is required so the next chat starts with the latest project context
+and the refreshed Top of queue.
 
 ---
 
@@ -191,6 +308,16 @@ Target length: 200–400 words.
 - Browser smoke:
 - Live Supabase / production verification:
 - Test data cleanup:
+
+## Top of queue (as of [YYYY-MM-DD])
+
+1. [Item] — [why it's next]
+2. [Item] — [why it's next]
+3. [Item] — [why it's next]
+
+This is the authoritative next-move list. The full ordered queue
+lives in `wx_cfo_scorecard_context_v2_6.md` under the same heading.
+Do not infer the next move from older roadmap sections.
 
 ## Required reads before any work
 
@@ -235,12 +362,6 @@ Freshness rule:
 Known possible housekeeping:
 - [item, if any]
 
-## Open work
-
-- [Open item 1]
-- [Open item 2]
-- [Open item 3]
-
 ## Deferred items
 
 - [Item] — [why deferred] — [priority]
@@ -254,7 +375,7 @@ Known possible housekeeping:
 
 ## Recommended next move
 
-[one clear next action]
+Default to Top of queue item #1 unless the user redirects.
 ```
 
 ---
@@ -268,6 +389,8 @@ You re-upload the context doc.
 Next chat starts from the handoff.
 
 **Chat writes the implementation prompt. Codex executes it.**
+
+**Top of queue in the context doc is the single source of truth for what comes next.** Refresh it every session close.
 
 No silent merges.
 No silent Notion writes.
