@@ -9,6 +9,7 @@ import { useSidebar } from '../context/SidebarContext';
 import CashFlowForecastModule from '../components/CashFlowForecastModule';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
+import ProjectionTableV2 from '../components/ProjectionTableV2';
 import LoadingScreen from '../components/LoadingScreen';
 import DigHereHighlights from '../components/DigHereHighlights';
 import CashTrendHero, { CashTrendPlaceholder } from '../components/CashTrendHero';
@@ -794,6 +795,18 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const sharedAccountSettingsSyncArmedRef = useRef(false);
   const compareYearHandledRef = useRef<number | null>(null);
   const projectionTableRef = useRef<HTMLDivElement>(null);
+  // Temporary DEV-only fallback flag — append ?oldProjectionTable=1 to the URL (or hash,
+  // e.g. #/forecast?oldProjectionTable=1) to render the old projection table instead of V2.
+  // V2 is the default. Remove this flag and the conditional after V2 is fully validated.
+  const useOldProjectionTable = import.meta.env.DEV && (() => {
+    const hash = window.location.hash;
+    const hashQueryIdx = hash.indexOf('?');
+    const hashSearch = hashQueryIdx >= 0 ? hash.slice(hashQueryIdx) : '';
+    return (
+      new URLSearchParams(window.location.search).has('oldProjectionTable') ||
+      new URLSearchParams(hashSearch).has('oldProjectionTable')
+    );
+  })();
   const [sharedAccountSettingsReady, setSharedAccountSettingsReady] = useState(!sharedPersistenceEnabled);
   const [sharedAccountSettingsHasRemoteData, setSharedAccountSettingsHasRemoteData] = useState(false);
   const [businessRules, setBusinessRules] = useState<BusinessRules>(() => ({ ...DEFAULT_BUSINESS_RULES }));
@@ -3273,77 +3286,80 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
             <article className="card table-card projection-table-card" ref={projectionTableRef}>
               <div className="projection-header">
-                <h3 className="projection-table-title">Projection Table</h3>
+                <div className="projection-header-left">
+                  <h3 className="projection-table-title">Projection Table</h3>
+                  <button
+                    type="button"
+                    className="projection-export-btn"
+                    onClick={() => {
+                      const scenarioLabel = selectedScenarioKey;
+                      const today = new Date().toISOString().slice(0, 10);
+                      const filename = `wx-cfo-projection-${scenarioLabel}-${today}.csv`;
+                      const allDetectedAsc = [...priorYearActuals.years.map((ya) => ya.year)]
+                        .filter((y) => y !== currentForecastYear)
+                        .sort((a, b) => a - b);
+                      const headers = ['Month'];
+                      for (const y of allDetectedAsc) {
+                        headers.push(`${y} Cash In`, `${y} Cash Out`, `${y} Net`);
+                      }
+                      headers.push('Cash In', 'Cash Out', 'Net', 'Balance');
+                      const yearDataMap = new Map(priorYearActuals.years.map((ya) => [ya.year, ya]));
+                      const csvRows = [headers.join(',')];
+                      for (const row of visibleScenarioProjection) {
+                        const monthNum = Number.parseInt(row.month.slice(5, 7), 10);
+                        const cells: string[] = [toMonthLabel(row.month)];
+                        for (const y of allDetectedAsc) {
+                          const ya = yearDataMap.get(y);
+                          const ma = ya?.months[monthNum] ?? { cashIn: 0, cashOut: 0, net: 0 };
+                          cells.push(ma.cashIn.toFixed(2), ma.cashOut.toFixed(2), ma.net.toFixed(2));
+                        }
+                        cells.push(row.cashIn.toFixed(2), row.cashOut.toFixed(2), row.netCashFlow.toFixed(2), row.endingCashBalance.toFixed(2));
+                        csvRows.push(cells.join(','));
+                      }
+                      const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const anchor = document.createElement('a');
+                      anchor.href = url;
+                      anchor.download = filename;
+                      anchor.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    Export CSV
+                  </button>
+                </div>
                 <div className="projection-table-actions">
-                <div className="projection-table-compare-wrap">
-                  <span className="projection-table-compare-label">Compare</span>
-                  <div className="projection-compare-toggle" role="group" aria-label="Compare years">
-                    {/* Phase 4.11: when compareYear URL param is present on load,
-                        use it as the active comparison year for this session only.
-                        If the year is outside the default 3, temporarily use it as
-                        the selected year — do not expand the list permanently.
-                        Behavior is replace-on-load only, not sticky across navigation. */}
-                    {pillYears.map((year) => {
-                      const isActive = projectionActiveYears.includes(year);
-                      return (
-                        <button
-                          key={year}
-                          type="button"
-                          aria-pressed={isActive}
-                          className={`projection-compare-toggle-option${isActive ? ' is-active' : ''}`}
-                          onClick={() =>
-                            setProjectionActiveYears((prev) =>
-                              isActive ? prev.filter((y) => y !== year) : [...prev, year]
-                            )
-                          }
-                        >
-                          {year}
-                        </button>
-                      );
-                    })}
+                  <div className="projection-table-compare-wrap">
+                    <span className="projection-table-compare-label">Compare</span>
+                    <div className="projection-compare-toggle" role="group" aria-label="Compare years">
+                      {/* Phase 4.11: when compareYear URL param is present on load,
+                          use it as the active comparison year for this session only.
+                          If the year is outside the default 3, temporarily use it as
+                          the selected year — do not expand the list permanently.
+                          Behavior is replace-on-load only, not sticky across navigation. */}
+                      {pillYears.map((year) => {
+                        const isActive = projectionActiveYears.includes(year);
+                        return (
+                          <button
+                            key={year}
+                            type="button"
+                            aria-pressed={isActive}
+                            className={`projection-compare-toggle-option${isActive ? ' is-active' : ''}`}
+                            onClick={() =>
+                              setProjectionActiveYears((prev) =>
+                                isActive ? prev.filter((y) => y !== year) : [...prev, year]
+                              )
+                            }
+                          >
+                            {year}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="projection-export-btn"
-                  onClick={() => {
-                    const scenarioLabel = selectedScenarioKey;
-                    const today = new Date().toISOString().slice(0, 10);
-                    const filename = `wx-cfo-projection-${scenarioLabel}-${today}.csv`;
-                    const allDetectedAsc = [...priorYearActuals.years.map((ya) => ya.year)]
-                      .filter((y) => y !== currentForecastYear)
-                      .sort((a, b) => a - b);
-                    const headers = ['Month'];
-                    for (const y of allDetectedAsc) {
-                      headers.push(`${y} Cash In`, `${y} Cash Out`, `${y} Net`);
-                    }
-                    headers.push('Cash In', 'Cash Out', 'Net', 'Balance');
-                    const yearDataMap = new Map(priorYearActuals.years.map((ya) => [ya.year, ya]));
-                    const csvRows = [headers.join(',')];
-                    for (const row of visibleScenarioProjection) {
-                      const monthNum = Number.parseInt(row.month.slice(5, 7), 10);
-                      const cells: string[] = [toMonthLabel(row.month)];
-                      for (const y of allDetectedAsc) {
-                        const ya = yearDataMap.get(y);
-                        const ma = ya?.months[monthNum] ?? { cashIn: 0, cashOut: 0, net: 0 };
-                        cells.push(ma.cashIn.toFixed(2), ma.cashOut.toFixed(2), ma.net.toFixed(2));
-                      }
-                      cells.push(row.cashIn.toFixed(2), row.cashOut.toFixed(2), row.netCashFlow.toFixed(2), row.endingCashBalance.toFixed(2));
-                      csvRows.push(cells.join(','));
-                    }
-                    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const anchor = document.createElement('a');
-                    anchor.href = url;
-                    anchor.download = filename;
-                    anchor.click();
-                    URL.revokeObjectURL(url);
-                  }}
-                >
-                  Export CSV
-                </button>
-                </div>
               </div>
+              {useOldProjectionTable ? (
               <div className="projection-table-scroll">
                 {(() => {
                   const sortedActiveDesc = [...projectionActiveYears].sort((a, b) => b - a);
@@ -3594,6 +3610,17 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                   );
                 })()}
               </div>
+              ) : (
+                <ProjectionTableV2
+                  visibleScenarioProjection={visibleScenarioProjection}
+                  priorYearActuals={priorYearActuals}
+                  projectionActiveYears={projectionActiveYears}
+                  currentForecastYear={currentForecastYear}
+                  hasForecastCurrentCashBalance={hasForecastCurrentCashBalance}
+                  formatCurrency={formatCurrency}
+                  toMonthLabel={toMonthLabel}
+                />
+              )}
             </article>
           </div>
         )}
