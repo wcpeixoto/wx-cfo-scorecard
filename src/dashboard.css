@@ -1176,9 +1176,10 @@ body {
 
 .forecast-chart-title {
   margin: 0;
-  font-size: 1.06rem;
-  font-weight: 700;
-  color: #101828;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: #667085;
 }
 
 .cash-summary-strip {
@@ -1274,25 +1275,26 @@ body {
 
 .projected-cash-date-range {
   margin: 0;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 18px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
   color: #667085;
   letter-spacing: 0.01em;
 }
 
-/* Net Change context — compact inline value + label, sits under the date range */
+/* Net Change — TailAdmin metric scale; the dominant value in the header */
 .projected-cash-net-change {
-  margin: 2px 0 0;
+  margin: 6px 0 0;
   display: inline-flex;
   align-items: baseline;
-  gap: 6px;
-  line-height: 18px;
+  gap: 8px;
+  line-height: 32px;
 }
 
 .projected-cash-net-change-value {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 32px;
   color: #101828;
   letter-spacing: -0.01em;
 }
@@ -1306,8 +1308,9 @@ body {
 }
 
 .projected-cash-net-change-label {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
   color: #667085;
   letter-spacing: 0.01em;
 }
