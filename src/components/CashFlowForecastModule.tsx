@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { FiCheck, FiSlash } from 'react-icons/fi';
 import ProjectedCashBalanceChart from './ProjectedCashBalanceChart';
 import type {
   CashFlowForecastStatus,
@@ -445,8 +446,11 @@ export default function CashFlowForecastModule({
   function openAddModal() {
     setEditingEventId(null);
     setEditingGroupId(null);
-    setFormDate('');
-    setFormOriginalDate(null);
+    // Default the date to today (local-tz) so the operator can submit
+    // without touching the field. Edit modal still pre-fills the existing date.
+    const todayValue = todayDateValue();
+    setFormDate(todayValue);
+    setFormOriginalDate(todayValue);
     setFormTitle('');
     setFormAmount('');
     setFormFrequency('once');
@@ -1043,26 +1047,32 @@ export default function CashFlowForecastModule({
         </div>
 
         <div className="forecast-events-section">
+          <div className="forecast-events-header">
+            <h4 className="forecast-events-title">Known Events</h4>
+            <button type="button" className="forecast-event-add-btn" onClick={openAddModal}>
+              + Add Cash Event
+            </button>
+          </div>
           {groupedEventRows.length > 0 && (
             <ul className="forecast-events-list">
               {groupedEventRows.map((group) => (
                 <li key={group.groupId} className={`forecast-event-row${group.enabled === false ? ' is-disabled' : ''}${group.kind === 'renewal' ? ' is-renewal' : ''}`}>
                   <span className="forecast-event-month">{group.monthDisplay}</span>
                   <span className="forecast-event-title">{group.title}</span>
+                  <span className="forecast-event-impacts">
+                    {group.amount > 0 && (
+                      <span className="forecast-event-impact forecast-event-impact--in">
+                        +{formatCurrencyCompact(group.amount)}
+                      </span>
+                    )}
+                    {group.amount < 0 && (
+                      <span className="forecast-event-impact forecast-event-impact--out">
+                        -{formatCurrencyCompact(Math.abs(group.amount))}
+                      </span>
+                    )}
+                  </span>
+                  <span className="forecast-event-status is-neutral">{group.freqLabel}</span>
                   <span className="forecast-event-controls">
-                    <span className="forecast-event-impacts">
-                      {group.amount > 0 && (
-                        <span className="forecast-event-impact forecast-event-impact--in">
-                          +{formatCurrencyCompact(group.amount)}
-                        </span>
-                      )}
-                      {group.amount < 0 && (
-                        <span className="forecast-event-impact forecast-event-impact--out">
-                          -{formatCurrencyCompact(Math.abs(group.amount))}
-                        </span>
-                      )}
-                    </span>
-                    <span className="forecast-event-status is-neutral">{group.freqLabel}</span>
                     {group.kind !== 'renewal' && (
                       <button
                         type="button"
@@ -1070,7 +1080,7 @@ export default function CashFlowForecastModule({
                         onClick={() => onToggleEvent?.(group.groupId, !group.enabled)}
                         aria-label={group.enabled === false ? `Enable ${group.title}` : `Disable ${group.title}`}
                       >
-                        {group.enabled === false ? '○' : '●'}
+                        {group.enabled === false ? <FiSlash size={14} aria-hidden="true" /> : <FiCheck size={14} aria-hidden="true" />}
                       </button>
                     )}
                     <button
@@ -1135,9 +1145,6 @@ export default function CashFlowForecastModule({
               ))}
             </ul>
           )}
-          <button type="button" className="forecast-event-add-btn" onClick={openAddModal}>
-            + Add Cash Event
-          </button>
         </div>
       </section>
 
