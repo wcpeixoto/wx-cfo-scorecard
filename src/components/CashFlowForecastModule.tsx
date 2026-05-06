@@ -804,6 +804,16 @@ export default function CashFlowForecastModule({
     return <>{wrapUnit(str.slice(0, idx))}<span className="forecast-mo">/mo</span></>;
   }
 
+  // Profit-goal-card variant: amount + " per month" suffix (no leading "+",
+  // no "/mo"). Used only on the Profit goal card per the May 2026 copy
+  // refresh — the value reads as estimated additional revenue.
+  function fmtMonthlyValuePerMonth(value: number): ReactNode {
+    const str = fmtMonthly(value);
+    const idx = str.lastIndexOf('/mo');
+    const amount = idx === -1 ? str : str.slice(0, idx);
+    return <>{wrapUnit(amount)}<span className="forecast-mo"> per month</span></>;
+  }
+
   // Signed variant: preserves the negative sign for values like avgNet.
   // fmtMonthly always strips sign via Math.abs — this wrapper re-applies it.
   function fmtMonthlyValueSigned(value: number): ReactNode {
@@ -839,14 +849,14 @@ export default function CashFlowForecastModule({
             {bufferState === 'at-risk' && shortfall !== null && (
               <>
                 <span className="forecast-decision-label">To stay above your safety line</span>
-                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--warning">{formatCurrencyCompactNode(shortfall)}</strong>
+                <strong className="forecast-decision-value forecast-decision-value--md">{formatCurrencyCompactNode(shortfall)}</strong>
                 <span className="forecast-decision-detail">To reach your 1-month reserve</span>
               </>
             )}
             {bufferState === 'at-risk' && shortfall === null && (
               <>
                 <span className="forecast-decision-label">Below your safety line</span>
-                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--warning">—</strong>
+                <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
                 <span className="forecast-decision-detail">Across your full forecast</span>
               </>
             )}
@@ -885,8 +895,8 @@ export default function CashFlowForecastModule({
             </>
           ) : profitGap !== null && targetProfit !== null ? (
             <>
-              <strong className="forecast-decision-value forecast-decision-value--md">+{fmtMonthlyValue(profitGap)}</strong>
-              <span className="forecast-decision-meta">This gets you to {fmtMonthly(targetProfit)} at {Math.round(effectiveTargetNetMargin * 100)}% net profit</span>
+              <strong className="forecast-decision-value forecast-decision-value--md">{fmtMonthlyValuePerMonth(profitGap)}</strong>
+              <span className="forecast-decision-meta">Estimated additional revenue at your current margin to reach {Math.round(effectiveTargetNetMargin * 100)}% net profit.</span>
             </>
           ) : (
             <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
@@ -917,9 +927,7 @@ export default function CashFlowForecastModule({
                   <div className="forecast-info-help">
                     <button type="button" className="forecast-info-icon" aria-label="How this forecast works">&#9432;</button>
                     <div role="tooltip" className="forecast-info-panel">
-                      <p className="forecast-info-title">How this forecast works</p>
-                      <p className="forecast-info-body">Projected cash balance is based on recent operating cash trends, seasonal patterns from prior years, and the scenario assumptions shown below.</p>
-                      <p className="forecast-info-important"><strong>Important:</strong> This forecast is directional, not exact. Use the sliders if this year is tracking differently than usual.</p>
+                      <p className="forecast-info-body">A directional view of where your cash is heading, based on recent activity and seasonal patterns &mdash; adjust the sliders to test scenarios.</p>
                     </div>
                   </div>
                 </div>

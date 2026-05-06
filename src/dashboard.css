@@ -1120,7 +1120,7 @@ body {
   color: #98A2B3;
   background: #F9FAFB;
   font-size: 0.75rem;
-  cursor: help;
+  cursor: pointer;
   user-select: none;
   line-height: 1;
   padding: 0;
@@ -1509,7 +1509,7 @@ body {
 .forecast-control-stack {
   display: grid;
   gap: 14px;
-  padding-top: 16px;
+  padding-top: 24px;
   padding-bottom: 6px;
   border-top: 1px solid var(--line);
 }
