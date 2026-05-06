@@ -4015,6 +4015,21 @@ body {
   border-top: 1px solid var(--line);
 }
 
+/* Section header — title left, Add button right (TailAdmin section pattern). */
+.forecast-events-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 0.75rem;
+}
+
+.forecast-events-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
 
 .forecast-events-list {
   list-style: none;
@@ -4023,10 +4038,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
-}
-
-.forecast-events-list + .forecast-event-add-btn {
-  margin-top: 0.75rem;
 }
 
 .forecast-event-row {
@@ -4047,7 +4058,6 @@ body {
 
 .forecast-event-title {
   color: var(--text-primary);
-  flex: 1;
   min-width: 0;
 }
 
@@ -4198,13 +4208,12 @@ body {
   width: 24px;
   height: 24px;
   padding: 0;
-  font-size: 10px;
-  color: var(--accent);
+  color: var(--positive);
   background: transparent;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  opacity: 0.5;
+  opacity: 0.7;
   transition: opacity 0.15s, background 0.15s;
 }
 

@@ -137,34 +137,11 @@ export default function ProjectedCashBalanceChart({
       if (netImpact === 0) continue;
       const idx = data.findIndex((d) => d.month.startsWith(event.month));
       if (idx < 0) continue;
-      // Three annotation points per event at the same x, stacked via offsetY:
-      //   -54: title (no dot)
-      //   -36: impact amount (visible orange dot — anchors event math to bucket)
-      //   -18: exact event date (no dot)
-      // Apex's label.text renders through a single SVG <text> element with no
-      // <tspan> children, so \n collapses; stacking via offsetY is the
-      // cleanest in-API path. See feasibility test results.
-      const labelStyle = {
-        background: 'rgba(255, 255, 255, 0.96)',
-        color: '#344054',
-        fontSize: '11px',
-        fontFamily: 'Outfit, sans-serif',
-        padding: { left: 6, right: 6, top: 2, bottom: 2 },
-      } as const;
+      // One annotation per event: visible orange marker dot at the data
+      // point + a single rounded label line above it.
+      // Format: "May 5, 2026  •  Test  +$10K"
       const eventDate = event.date ?? lastDayOfMonthDate(event.month);
-      points.push({
-        x: categories[idx],
-        y: values[idx],
-        marker: { size: 0 },
-        label: {
-          text: event.title,
-          offsetY: -54,
-          textAnchor: 'middle',
-          borderColor: '#F79009',
-          borderWidth: 1,
-          style: labelStyle,
-        },
-      });
+      const labelText = `${formatEventDate(eventDate)}  •  ${event.title}  ${formatSignedCurrency(netImpact)}`;
       points.push({
         x: categories[idx],
         y: values[idx],
@@ -175,25 +152,19 @@ export default function ProjectedCashBalanceChart({
           strokeWidth: 2,
         },
         label: {
-          text: formatSignedCurrency(netImpact),
-          offsetY: -36,
-          textAnchor: 'middle',
-          borderColor: '#F79009',
-          borderWidth: 1,
-          style: labelStyle,
-        },
-      });
-      points.push({
-        x: categories[idx],
-        y: values[idx],
-        marker: { size: 0 },
-        label: {
-          text: formatEventDate(eventDate),
+          text: labelText,
           offsetY: -18,
           textAnchor: 'middle',
           borderColor: '#F79009',
           borderWidth: 1,
-          style: labelStyle,
+          borderRadius: 6,
+          style: {
+            background: 'rgba(255, 255, 255, 0.96)',
+            color: '#344054',
+            fontSize: '11px',
+            fontFamily: 'Outfit, sans-serif',
+            padding: { left: 8, right: 8, top: 4, bottom: 4 },
+          },
         },
       });
     }
