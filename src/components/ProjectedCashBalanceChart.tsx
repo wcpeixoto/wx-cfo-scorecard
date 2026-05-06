@@ -91,10 +91,22 @@ function formatCurrency(value: number): string {
 const formatSignedCurrency = (n: number) =>
   `${n > 0 ? '+' : ''}${formatCurrency(n)}`;
 
-function xAxisLabelStep(count: number): number {
-  if (count >= 24) return 3;
-  if (count >= 12) return 2;
-  return 1;
+// Density control via Apex `xaxis.tickAmount`, not the formatter.
+// Earlier formatter-based suppression (return '' or '​' for skipped
+// indices) collided with Apex's annotation x-matching, which uses the
+// formatter output as the lookup key — annotations on suppressed buckets
+// silently dropped. tickAmount keeps formatter output stable so
+// `x: categories[idx]` continues to match the raw category value.
+// Apex distributes ticks internally; counts are approximate (±1 from target).
+function computeTickAmount(count: number, granularity: 'month' | 'week'): number {
+  if (granularity === 'week') {
+    return count <= 5 ? Math.max(1, count - 1) : 5;
+  }
+  // monthly
+  if (count <= 6) return Math.max(1, count - 1);
+  if (count <= 12) return 6;
+  if (count <= 24) return 8;
+  return 9;
 }
 
 export default function ProjectedCashBalanceChart({
@@ -122,7 +134,10 @@ export default function ProjectedCashBalanceChart({
 
   const values = useMemo(() => data.map((d) => d.net), [data]);
 
-  const labelStep = useMemo(() => xAxisLabelStep(categories.length), [categories.length]);
+  const xAxisTickAmount = useMemo(
+    () => computeTickAmount(categories.length, granularity),
+    [categories.length, granularity],
+  );
 
   // Known Events → annotation points. Map ForecastEvent fields to annotation shape internally.
   // Event month is YYYY-MM; match to first data point whose month starts with that prefix
@@ -230,6 +245,7 @@ export default function ProjectedCashBalanceChart({
       xaxis: {
         categories,
         type: 'category',
+        tickAmount: xAxisTickAmount,
         axisBorder: { show: false },
         axisTicks: { show: false },
         tooltip: { enabled: false },
@@ -241,12 +257,6 @@ export default function ProjectedCashBalanceChart({
           hideOverlappingLabels: true,
           trim: false,
           offsetY: 2,
-          formatter: (value: string, _timestamp?: number, opts?: { dataPointIndex?: number }) => {
-            const index = opts?.dataPointIndex ?? categories.indexOf(value);
-            if (index < 0) return value;
-            if (index === 0 || index === categories.length - 1) return value;
-            return value;
-          },
           style: {
             fontSize: '12px',
             fontFamily: 'Outfit, sans-serif',
@@ -295,7 +305,7 @@ export default function ProjectedCashBalanceChart({
       },
       legend: { show: false },
     }),
-    [categories, tooltipLabels, labelStep, eventAnnotationPoints, height, yAxisMin, yAxisMax, yAxisTickAmount]
+    [categories, tooltipLabels, xAxisTickAmount, eventAnnotationPoints, height, yAxisMin, yAxisMax, yAxisTickAmount]
   );
 
   const series = useMemo(
