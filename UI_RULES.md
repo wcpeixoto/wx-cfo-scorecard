@@ -1606,6 +1606,148 @@ parses as UTC midnight and shifts the window one month early in US timezones.
 
 ---
 
+## TailAdmin-style Data Table / Projection Table V2 Pattern
+
+Canonical **target** visual spec for dense financial data tables in this project. Reuse this pattern for any new tabular data view (projection tables, transaction lists, account ledgers, etc.).
+
+> **Read this first — shipped vs. target.** This section describes the canonical TARGET spec — the TailAdmin row rhythm that was prototyped in UI Lab and visually approved. Several of the values below (card horizontal padding `0`, body cell padding `20px 24px`, header band background `#F9FAFB`, title `18px / 28px`, card `overflow: hidden`) are **not yet present in `src/dashboard.css`** as of commit `1e07af0`. The shipped V2 ships a smaller subset of the rhythm (left alignment, full-width table, blank trailing total cell, V2 component structure) on top of legacy `.projection-table-card` padding. Reconciling `dashboard.css` to this spec is queued as part of the **"Remove old Forecast Projection Table fallback"** cleanup item — see "Implementation status" at the bottom of this section, and `wx_cfo_scorecard_context_v2_6.md` → "May 6, 2026 — Forecast Projection Table V2 shipped" for the full gap table. Use this section as the authoritative spec for **new** tables and for closing the V2 polish gap; do not assume the live Forecast table already matches every value below.
+
+### Purpose
+
+Use this pattern when the table should feel **integrated into the card** — row dividers, header band, and total row span the full card width; the table is part of the card surface, not a floating mini-table inside a padded container.
+
+Do not use for narrative cards, KPI cards, mixed-content cards, or tables where content should sit inside a uniformly padded container — see `UI_CARDS.md` for those patterns.
+
+### Card / table width — non-negotiable
+
+- Table must be `width: 100%`
+- Never `width: 90%`, `auto`, or content-sized for this pattern
+- Row dividers, header band, and total row background must reach the full available right edge
+- Visual containment comes from **cell padding and column rhythm**, not from shrinking the table
+
+### Card shell
+
+- Background: `var(--bg-panel)` / white
+- Border: `1px solid var(--line)`
+- Border radius: `16px`
+- `overflow: hidden` when the table/header/footer should clip to the rounded corners
+- Card horizontal padding: `0` — the table runs edge-to-edge
+- Header / control row inside the card carries its own `24px` horizontal padding so the title stays inset while the table band reaches the card border
+
+### Header / title row
+
+- Container padding: `20px 24px 16px` (or equivalent — title sits inside the card padding zone)
+- Title:
+  - `font-size: 18px`
+  - `line-height: 28px`
+  - `font-weight: 600`
+  - `color: #101828` (`--text-primary`)
+- Right-side controls (Compare year toggle, Export CSV, etc.) align with the title row and remain outside the table itself
+- Controls follow the existing project conventions for segmented toggles (Compare year toggle reuses `.projection-compare-toggle*` — see "Segmented toggle (standard pattern)" above)
+
+### Table header band
+
+- Background: `var(--bg-main)` / `#F9FAFB`
+- Header cells:
+  - `padding: 12px 24px`
+  - `font-size: 12px`
+  - `line-height: 20px`
+  - `font-weight: 500`
+  - `color: var(--text-secondary)` / `#667085`
+  - `text-transform: none`, `letter-spacing: normal` (TailAdmin-style; not uppercase)
+- Header band must span the full card width
+- Use `border-top: 1px solid var(--line)` and `border-bottom: 1px solid var(--line)` to anchor the band visually
+
+### Body cells
+
+- `padding: 20px 24px`
+- `border-bottom: 1px solid var(--line)`
+- Color: `#344054` (`--text-primary` body weight)
+- `font-size: 14px`
+- `font-weight: 400`
+- Target row height: ~58–60px
+- Drop the bottom border on the last body row when a `<tfoot>` follows — the tfoot's top border takes over
+
+### Total row
+
+- Background: `var(--bg-main)` / `#F9FAFB`
+- `font-weight: 600`
+- Same `20px 24px` cell padding as body rows
+- Background and divider must span the full card width
+- **Trailing-cell rule:** when no aggregation applies to the trailing column (e.g., per-month "Cumulative Net" or "Balance"), render the cell as **blank** (`<td />`). Do not insert an `&mdash;` or any other placeholder unless explicitly designed and verified — a centered placeholder will misalign with right- or left-aligned values above it.
+
+### Alignment rules
+
+Headers and body/total cells must align to the **same edge** within each column. Choose one alignment strategy per table:
+
+- **Left-aligned (approved for Projection Table V2 simple mode):**
+  - Headers, body cells, and total cells all `text-align: left`
+  - Used when readability and label proximity matter more than vertical numeric scanning
+- **Right-aligned numeric (financial-table convention, allowed):**
+  - Headers AND values both right-aligned for numeric columns
+  - First column (label) stays left-aligned
+  - Use only when vertical numeric scanning is the primary affordance
+
+**Forbidden:** mixing left-aligned headers with right-aligned values in the same column. The header label must sit directly above its values.
+
+When extending or scoping width / alignment / typography rules to a specific table variant, scope via a component-specific class (the V2 implementation uses `.ui-lab-projection-table-shell` as a CSS scope marker on the wrapper div). Do not modify shared `.table-card` rules — they govern unrelated tables and may regress those.
+
+### Negative number format
+
+- Negative currency must render with a **leading minus sign before the dollar sign**:
+  - `-$4,118` ✓
+- Forbidden:
+  - `$-4,118`
+  - `($4,118)` / accountant-style parentheses
+  - Red-only / color-only with no minus sign (color cannot carry the sign — fails accessibility and copy/paste)
+- Use `formatCurrency(value)` (locale `undefined` resolving to en-US in this project) — `toLocaleString` with `style: 'currency'` already produces the correct format
+- CSV export must preserve the sign (`(-4118).toFixed(2)` → `-4118.00`)
+
+### Mobile behavior
+
+- The `.projection-table-scroll` wrapper provides `overflow-x: auto` for horizontal scroll
+- On narrow viewports the table can grow beyond the card width; `min-width: 100%` keeps it from shrinking below the container
+- Do not compress numeric columns until values become unreadable
+- Do not use mobile-specific column hiding without an explicit decision
+
+### Anti-patterns / lessons learned
+
+- ❌ Do not shrink the table to create visual breathing room (`width: 90%`, `auto`, or content-sized) — use cell padding instead
+- ❌ Do not solve edge-stretching by reducing table width — the symptom is a "floating mini-table" feel; the fix is always cell padding + edge-to-edge card structure
+- ❌ Do not rely on the shared `.table-card` rules for new table variants — those rules right-align cells from the second column on (`.table-card td:nth-child(n+2) { text-align: right }`) and will fight any new alignment scheme
+- ❌ Do not put a full-width table inside a standard padded card and then try to fix the floating feel with table-level tweaks — the card itself needs zero horizontal padding for this pattern
+- ✅ Scope new table variants by a component-specific class on the wrapper (e.g., `.ui-lab-projection-table-shell`) — keeps rules from bleeding into siblings
+
+### Reference implementations
+
+- Production component: `src/components/ProjectionTableV2.tsx` (table-only — renders the `<thead>`, `<tbody>`, and `<tfoot>`; card shell, title, Compare year toggle, and Export CSV button live in `src/pages/Dashboard.tsx`)
+- Visual prototype: UI Lab → "Projection Table — TailAdmin Prototype" — canonical visual reference for the full TARGET rhythm; remains in place until the old Projection Table fallback is removed
+- See `UI_CARDS.md` → "Edge-to-edge Data Table Card" for the card-anatomy half of this pattern
+
+### Implementation status — shipped vs. target (as of commit `1e07af0`)
+
+The table below distinguishes what is currently live in `src/dashboard.css` from what remains as TARGET work to be reconciled during the cleanup pass for the old Projection Table fallback. **All values in the spec sections above are TARGET values.** When using this spec for a new table, follow the spec as written. When touching the live Forecast Projection Table, expect the gaps below until they are closed.
+
+| Spec section / property | Live in `dashboard.css` (commit `1e07af0`) | TARGET value (this spec) | Status |
+|---|---|---|---|
+| Card horizontal padding | `24px` (uniform) on `.projection-table-card` | `0` (so table runs edge-to-edge) | ❌ pending |
+| Card `overflow: hidden` | not set | set | ❌ pending |
+| Body cell padding | `12px 16px` (~44px row) | `20px 24px` (~58–60px row) | ❌ pending |
+| Header band cell padding | `12px 16px` | `12px 24px` | ❌ pending |
+| Header band background | none (top + bottom borders only, `var(--bg-muted)`) | `var(--bg-main)` / `#F9FAFB`, borders `var(--line)` | ❌ pending |
+| Title typography | `1.06rem / 700` | `18px / 28px / 600` | ❌ pending |
+| Total row background | none | `var(--bg-main)` / `#F9FAFB` | ❌ pending |
+| Table `width: 100%` (simple mode, V2 only) | shipped via `.ui-lab-projection-table-shell` scope | `100%` | ✅ shipped |
+| Left-aligned headers + cells (V2 simple mode) | shipped via `.ui-lab-projection-table-shell` scope | left-aligned | ✅ shipped |
+| Blank trailing total cell in simple mode | shipped in V2 component (`<td />`) | blank | ✅ shipped |
+| Negative number format `-$4,118` | shipped (locale en-US `formatCurrency`) | `-$4,118` | ✅ shipped |
+| CSV export preserves negative sign | shipped (`toFixed(2)`) | preserved | ✅ shipped |
+| V2 mounted as default Forecast table | shipped behind `useOldProjectionTable` fallback flag | mounted as default | ✅ shipped |
+
+When the cleanup pass runs (Notion item: "Remove old Forecast Projection Table fallback"), the ❌ rows above must be closed in the same commit that removes the legacy fallback so the spec and the implementation become identical. Until then, treat the spec as aspirational for the live Forecast table and authoritative for new tables.
+
+---
+
 # PART 6B — CARD COHERENCE RULE
 
 All numbers shown within a single card (badge, tooltip, subtitle, chart axes,
