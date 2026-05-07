@@ -3,6 +3,7 @@ import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { ForecastEvent, TrendPoint } from '../lib/data/contract';
 import { niceTicks, formatTickLabel } from '../lib/charts/niceTicks';
+import { chartTokens } from '../lib/ui/chartTokens';
 
 type ProjectedCashBalanceChartProps = {
   data: TrendPoint[];
@@ -162,7 +163,7 @@ export default function ProjectedCashBalanceChart({
         y: values[idx],
         marker: {
           size: 5,
-          fillColor: '#F79009',
+          fillColor: chartTokens.warning,
           strokeColor: '#FFFFFF',
           strokeWidth: 2,
         },
@@ -170,12 +171,12 @@ export default function ProjectedCashBalanceChart({
           text: labelText,
           offsetY: -18,
           textAnchor: 'middle',
-          borderColor: '#F79009',
+          borderColor: chartTokens.warning,
           borderWidth: 1,
           borderRadius: 6,
           style: {
             background: 'rgba(255, 255, 255, 0.96)',
-            color: '#344054',
+            color: chartTokens.chartTextStrong,
             fontSize: '11px',
             fontFamily: 'Outfit, sans-serif',
             padding: { left: 8, right: 8, top: 4, bottom: 4 },
@@ -210,7 +211,7 @@ export default function ProjectedCashBalanceChart({
         sparkline: { enabled: false },
         animations: { enabled: true },
       },
-      colors: ['#465FFF'],
+      colors: [chartTokens.brand],
       fill: {
         type: 'gradient',
         gradient: {
@@ -233,10 +234,10 @@ export default function ProjectedCashBalanceChart({
         strokeColors: '#FFFFFF',
         strokeWidth: 2,
         fillOpacity: 1,
-        colors: ['#465FFF'],
+        colors: [chartTokens.brand],
       },
       grid: {
-        borderColor: '#e0e0e0',
+        borderColor: chartTokens.gridBorder,
         strokeDashArray: 4,
         yaxis: { lines: { show: true } },
         xaxis: { lines: { show: false } },
@@ -251,7 +252,7 @@ export default function ProjectedCashBalanceChart({
         tooltip: { enabled: false },
         crosshairs: {
           show: true,
-          stroke: { color: '#b6b6b6', width: 1, dashArray: 3 },
+          stroke: { color: chartTokens.crosshairStroke, width: 1, dashArray: 3 },
         },
         labels: {
           hideOverlappingLabels: true,
@@ -261,7 +262,7 @@ export default function ProjectedCashBalanceChart({
             fontSize: '12px',
             fontFamily: 'Outfit, sans-serif',
             fontWeight: '400',
-            colors: '#344054',
+            colors: chartTokens.chartTextStrong,
           },
         },
       },
@@ -277,7 +278,7 @@ export default function ProjectedCashBalanceChart({
             fontSize: '11px',
             fontFamily: 'Outfit, sans-serif',
             fontWeight: '400',
-            colors: '#344054',
+            colors: chartTokens.chartTextStrong,
           },
         },
       },
