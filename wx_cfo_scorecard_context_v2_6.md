@@ -2301,9 +2301,9 @@ demo `/sales` "Users & Revenue Statistics"
   TailAdmin's 1011px render without compression artifacts).
 - Each card sits under a `.ui-lab-section` label with TailAdmin source
   URL and "Locked spec, 2026-05-06" subtitle.
-### Doc reconciliation deltas (queued for next session)
-UI_RULES.md and UI_CARDS.md need updates to reflect the following.
-NOT edited in this session — deferred to a focused doc-update pass.
+### Doc reconciliation deltas (shipped May 7, 2026)
+UI_RULES.md (+222 lines) and UI_CARDS.md (+104 lines) updated in the May 7 session.
+All 14 deltas applied. See branch `claude/stoic-chaum-f90bfd`. Delta list below for reference.
 1. **Brand-400** `#637AEA` — new entry in Brand color table (icon
    color on metric cards)
 2. **Success text** `#039855` — distinct from semantic success

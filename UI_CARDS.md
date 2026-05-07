@@ -99,6 +99,17 @@ Container: `overflow-hidden rounded-2xl border bg-white p-6`
 | Metric | 24px | 600 | 32px |
 | Comparison line | 12px | 400 | 18px |
 
+### Canonical card padding scales (UI Lab — fixed, not responsive)
+
+Three canonical shells are DevTools-extracted from TailAdmin Pro dashboard tiles. Unlike the
+responsive `p-5 sm:p-6` pattern, these are fixed-scale — they do not expand at larger viewports.
+
+| Shell | Padding | Radius | Border |
+|-------|---------|--------|--------|
+| Metric card (`.metric-card`) | 20px fixed | 16px | 1px `#E4E7EC` |
+| Revenue card (`.revenue-card`) | 20px fixed | 12px | **none** |
+| Statistics/chart card (`.statistics-card`) | 24px fixed | 16px | 1px `#E4E7EC` |
+
 ### Rule
 
 Use the **SaaS richer card scale** when the card has any of:
@@ -156,6 +167,36 @@ Only use 20px padding for very compact KPI cards with no subtitle, no badge, no 
 }
 ```
 
+### Borderless shell (12px radius)
+
+A second shell variant for compact/metric cards that sit in a tight grid without visible border
+separation between cards. DevTools-extracted from TailAdmin /sales "Total Revenue" tile.
+
+```css
+.card--borderless {
+  background: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 20px;
+  font-family: 'Outfit', sans-serif;
+}
+```
+
+| Property | Value |
+|---|---|
+| Background | `#ffffff` |
+| Border | **none** |
+| Border radius | `12px` |
+| Padding | `20px` (fixed — not responsive) |
+| Font family | `'Outfit', sans-serif` |
+
+Use the borderless shell when: the card is a compact KPI/metric card, the grid context provides
+visual separation without per-card borders (e.g. surrounding page background creates sufficient
+contrast), and the TailAdmin source card has no border.
+
+Do not use the borderless shell on signal cards with a status badge or interpretation line —
+those cards need the standard bordered shell for visual anchoring.
+
 ### Do not
 
 - Do not add a shadow unless the surrounding system already uses shadows.
@@ -207,9 +248,9 @@ Optional elements must improve operator understanding. If an element does not ma
 
 Every card needs a clear title or label.
 
-### Full title style
+### Full title style (standard)
 
-Use for richer cards.
+Use for richer signal and status cards. The TailAdmin default.
 
 | Property | Value |
 |---|---|
@@ -227,9 +268,48 @@ User Growth
 Cost Spikes to Investigate
 ```
 
+### Card title (large) — chart-card variant
+
+Use for large chart-cards (250px+ chart area) where the 600 weight would overpower the chart visual.
+
+| Property | Value |
+|---|---|
+| Font size | 18px |
+| Font weight | **500** |
+| Line height | 28px |
+| Color | `#1D2939` |
+
+Source: TailAdmin /sales "Users & Revenue Statistics" (DevTools-extracted).
+
+Example:
+
+```
+Users & Revenue Statistics
+```
+
+### Card title (medium) — compact card variant
+
+Use for compact/metric cards where the title sits above a sparkline or alongside a hero value.
+The smaller size prevents the title competing with the primary metric.
+
+| Property | Value |
+|---|---|
+| Font size | **16px** |
+| Font weight | 600 |
+| Line height | **24px** |
+| Color | **`#344054`** |
+
+Source: TailAdmin /sales "Total Revenue" (DevTools-extracted).
+
+Example:
+
+```
+Total Revenue
+```
+
 ### Compact label style
 
-Use for simple KPI cards.
+Use for the simplest KPI cards where the "title" is really a metadata label, not a named signal.
 
 | Property | Value |
 |---|---|
@@ -242,9 +322,17 @@ Examples:
 
 ```
 Unique Visitors
-Total Revenue
 Active Members
 ```
+
+### Which title style to use
+
+| Card type | Style |
+|-----------|-------|
+| Signal card with status, badge, or interpretation | Full title (18px/600/#1D2939) |
+| Large chart-card (250px+ chart) | Card title (large) — 18px/500/#1D2939 |
+| Compact KPI card with sparkline or hero value | Card title (medium) — 16px/600/#344054 |
+| Very simple KPI with label only (no badge, no subtitle) | Compact label — 14px/400/#667085 |
 
 ### Rules
 
@@ -252,6 +340,7 @@ Active Members
 - Do not use vague titles like "Performance" without context.
 - Do not rely on tooltip text to explain what the card is.
 - If the card has a status badge, title should stay clean and readable.
+- Use card title (large) only when 18px/500 — never mix 18px/600 and 18px/500 in the same card.
 
 ---
 
@@ -695,10 +784,15 @@ Default transitions:
 | Transition | Default gap |
 |---|---|
 | Title → subtitle | 4px |
-| Header → body | 16px |
+| Header → body (signal/KPI card) | 16px |
+| Header → body (chart-card, 250px+ chart) | **32px** |
 | Primary metric → secondary metric | 4px |
 | Metric block → interpretation | 16px |
 | Body → mobile stacked stat | 12px |
+
+> The 32px chart-card header margin (`margin-bottom: 32px` on the header row) applies to
+> `.statistics-card` and future large chart-cards. The extra space creates breathing room between
+> the title/tabs and the chart area. Signal and KPI cards use the standard 16px default.
 
 Do not invent random spacing values.
 

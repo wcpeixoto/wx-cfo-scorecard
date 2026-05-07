@@ -64,19 +64,32 @@ Weights: 400 Regular · 500 Medium · 600 Semibold · 700 Bold
 |------|-----|
 | Default border | #E4E7EC |
 | Strong border | #D0D5DD |
-| Chart grid lines | #EAECF0 |
+| Chart grid lines | #e0e0e0 |
 | Divider (inside dropdowns, rows) | #F2F4F7 |
 
-> Chart grid (#EAECF0) is intentionally lighter than default border (#E4E7EC). Never swap.
+> Chart grid `#e0e0e0` is the TailAdmin Sales/Pro dashboard native value (DevTools-extracted).
+> The earlier value `#EAECF0` came from the free React demo and is superseded. Per the source-of-truth
+> rule, DevTools-extracted Pro values win. Update `chartTokens.ts` when applying to new chart components.
 
 ### Text
 | Role | Hex |
 |------|-----|
 | Primary | #1D2939 (gray-800) |
 | Primary strong | #101828 (gray-900) |
+| Card title / strong secondary | #344054 (gray-700) |
 | Secondary / labels | #667085 (gray-500) |
 | Muted / metadata | #98A2B3 (gray-400) |
 | Inverse (on dark bg) | white/90 |
+
+### Chart-specific text
+| Role | Hex |
+|------|-----|
+| Chart axis labels (TailAdmin Sales) | #373d3f |
+| Chart axis labels (general) | #667085 |
+
+> Use `#373d3f` for axis labels on chart-cards sourced from the TailAdmin Sales/Pro dashboards
+> (statistics-card, future sales-family cards). Use `#667085` for axis labels on all other charts.
+> Do not mix within the same card.
 
 ### Brand
 | Role | Hex |
@@ -85,17 +98,24 @@ Weights: 400 Regular · 500 Medium · 600 Semibold · 700 Bold
 | Hover | #3641F5 |
 | Pressed | #2A31D8 |
 | Disabled | #9CB9FF |
+| Brand-400 (icon accent) | #637AEA |
 | Soft active bg | #ECF3FF |
 | Focus ring | brand-500/20 (rgba overlay) |
 
 ### Semantic
 | Purpose | Color | Soft bg |
 |---------|-------|---------|
-| Success | #12B76A | #ECFDF3 |
+| Success accent (filled badge / icon) | #12B76A | #ECFDF3 |
+| Success text on white | #039855 | — |
 | Error | #F04438 | #FEF3F2 |
 | Warning | #F79009 | #FFFAEB |
 | Under Pressure (project) | #DC6803 | #FEF3E2 |
 | Info | #0BA5EC | #F0F9FF |
+
+> `#12B76A` and `#039855` are both green but serve distinct roles. Use `#12B76A` for filled
+> accent surfaces (badge bg tint, icon fills, sparkline stroke/gradient). Use `#039855` for
+> success *text* rendered directly on a white card surface (e.g. delta percentage in a KPI card
+> header). Never swap them.
 
 ### Interaction States
 | State | Value |
@@ -129,10 +149,29 @@ Every component requires dark variants.
 | text-title-sm | 30px | Large metric value |
 | text-2xl | 24px | Modal title (large) |
 | text-theme-xl | 20px | Modal title (medium) |
-| text-lg | 18px | Card title — always font-semibold |
+| text-lg | 18px | Card title (standard) — font-semibold 600 |
 | text-base | 16px | Body text |
 | text-theme-sm / text-sm | 14px | Secondary text, labels, nav items |
 | text-theme-xs | 12px | Metadata, helper text, table headers |
+
+### Card title roles
+
+Two named card title roles extend the base type scale. Both are TailAdmin-native (DevTools-extracted).
+
+| Role | Size | Weight | Line height | Color | Source |
+|------|------|--------|-------------|-------|--------|
+| Card title (medium) | 16px | 600 | 24px | #344054 | TailAdmin /sales "Total Revenue" |
+| Card title (large) | 18px | 500 | 28px | #1D2939 | TailAdmin /sales "Users & Revenue Statistics" |
+
+**When to use:**
+- **Card title (medium)** — compact or hybrid cards where the title sits above a sparkline or alongside
+  a hero value; the smaller size keeps the title from competing with the primary metric.
+- **Card title (large)** — full chart-cards with a 250px+ chart area where the title needs more
+  weight but the 600 semibold would be too heavy against the chart visual.
+- **Standard card title (text-lg / 600)** — all other cards; the TailAdmin default.
+
+Note: "Card title (large)" is 18px/500, not 18px/600. The weight reduction is intentional on
+chart-cards — the title lives above a large visual and 600 would overpower it.
 
 ---
 
@@ -192,6 +231,20 @@ Table card uses intentionally asymmetric padding — `pt-4` on root,
 horizontal padding pushed into the inner header child. This is TailAdmin-native.
 Do not normalize it to uniform padding.
 
+#### Fixed-scale card shells (canonical components — not responsive)
+
+Some canonical cards use a fixed, non-responsive padding. These are DevTools-extracted from
+specific TailAdmin Pro dashboard tiles and do not use the responsive `sm:p-6` pattern.
+
+| Shell | Padding | Border radius | Border | Source |
+|-------|---------|---------------|--------|--------|
+| Metric card (`.metric-card`) | 20px fixed | 16px | 1px `#E4E7EC` | TailAdmin /ai "Users" |
+| Revenue card (`.revenue-card`) | 20px fixed | 12px | **none** | TailAdmin /sales "Total Revenue" |
+| Chart-card (`.statistics-card` family) | 24px fixed | 16px | 1px `#E4E7EC` | TailAdmin /sales "Statistics" |
+
+> Use fixed-scale shells for components built as UI Lab canonical references. These do not vary
+> with viewport — the TailAdmin Pro tiles are fixed-width layout tiles, not fluid-width cards.
+
 ---
 
 ### Card internal spacing
@@ -200,11 +253,16 @@ Do not normalize it to uniform padding.
 
 | Element | Class | Value |
 |---------|-------|-------|
-| Header → body margin | `mb-6` on header row | 24px |
+| Header → body margin (standard) | `mb-6` on header row | 24px |
+| Header → body margin (chart-card) | `mb-8` on header row | 32px |
 | Header internal gap | `gap-5` | 20px |
 | Inner element rows | `gap-3` | 12px |
 | Sub-list vertical rhythm | `space-y-5` | 20px |
 | Table cell vertical | `py-3` | 12px |
+
+> The 32px chart-card header margin applies to large chart-cards (statistics-card family) where a
+> chart area of 250px+ height follows the header. The extra 8px creates breathing room between the
+> title/tabs and the chart. Standard signal cards and KPI cards use the 24px default.
 
 ---
 
@@ -278,7 +336,8 @@ TailAdmin relies on default stretch. Wx CFO does not.
 
 | Element | Tailwind | px |
 |---------|----------|----|
-| Cards / panels | rounded-2xl | 16px |
+| Cards / panels (standard) | rounded-2xl | 16px |
+| Cards / panels (borderless variant) | rounded-xl | 12px |
 | Dropdowns, notification panel | rounded-2xl | 16px |
 | Standalone table wrapper | rounded-xl | 12px |
 | Icon containers, alerts | rounded-xl | 12px |
@@ -286,6 +345,11 @@ TailAdmin relies on default stretch. Wx CFO does not.
 | ChartTab active pill, DropdownItems | rounded-md | 6px |
 | Modals | rounded-3xl | 24px |
 | Badges / pills, avatar | rounded-full | 999px |
+
+> **Borderless card shell (12px):** A card with no border, `border-radius: 12px`, 20px padding,
+> and white background. Used on compact/metric cards where the card sits in a grid without a visible
+> border separation. Source: TailAdmin /sales "Total Revenue" tile. See Part 6 — Canonical card
+> shells for the full spec.
 
 ---
 
@@ -796,8 +860,8 @@ card [p-5 md:p-6]
 
 ---
 
-## Pattern E — ChartTab (Inline Segmented Toggle)
-*Source: ChartTab.tsx*
+## Pattern E — Segmented Toggle (Inline)
+*Source: ChartTab.tsx (TailAdmin-native) → implemented as `.segmented-toggle` in this project*
 
 ```
 track [flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5 dark:bg-gray-900]
@@ -809,9 +873,19 @@ track [flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5 dark:bg-gray-900]
 Track: `bg-gray-100 rounded-lg (8px)`, no border. Pill: `rounded-md (6px)`.
 Always in header-right column or above chart. Never below chart.
 
-> **Project note:** Pattern E is the TailAdmin-native ChartTab. For new toggle work in this project,
-> use the standard segmented toggle defined in Part 6 instead. Pattern E is documented here for
-> reference and for understanding existing components — it is not the approved pattern for new work.
+> **Implementation note:** This project implements Pattern E as `.segmented-toggle` in `dashboard.css`.
+> There is no `.chart-tab` class in this codebase — that is the TailAdmin source class name and
+> is not used here. Three toggle scales coexist (all use the same visual structure, different sizes):
+>
+> 1. **Global `.segmented-toggle`** — 40px track / 36px buttons / 8px padding — timeframe and mode
+>    selectors throughout the dashboard. This is the default for new work.
+> 2. **Chart-card locally scoped** (e.g. `.statistics-card__tab*`) — 44px track / 40px buttons /
+>    10px padding — used only on large chart-cards where the toggle sits at full card width.
+>    Do NOT consolidate with the global scale; the two scales coexist deliberately.
+> 3. **Deprecated patterns** — chart-style blue pill, outlined button-group — scheduled for
+>    replacement; do not replicate in new work.
+>
+> See Part 6 — Segmented toggle for the full spec and guidance on which scale to use when.
 
 ---
 
@@ -887,7 +961,8 @@ Edit button uses `rounded-full`. This is profile-card specific — not `rounded-
 
 | Transition | Value | Implementation |
 |---|---|---|
-| Header-block → content below | mb-6 (24px) | margin-bottom on header-block |
+| Header-block → content below (standard) | mb-6 (24px) | margin-bottom on header-block |
+| Header-block → content below (chart-card) | mb-8 (32px) | margin-bottom on header-block |
 | **Subtitle → legend row** | **20px** | **`pt-5` on legend container — NOT margin** |
 | Legend → chart | 0px | chart-container is flush sibling, no gap |
 | Legend row → chart (old pattern) | mb-4 (16px) | only applies when legend is a standalone sibling, not in anonymous wrapper |
@@ -911,18 +986,22 @@ Required on every chart.
 | chart.toolbar.show | false |
 | chart.background | "transparent" |
 | legend.show | false when using custom JSX legend |
-| grid.borderColor | "#EAECF0" |
+| grid.borderColor | "#e0e0e0" |
 | grid.strokeDashArray | 4 |
 | xaxis.axisBorder.show | false |
 | xaxis.axisTicks.show | false |
 | xaxis/yaxis labels fontSize | "12px" |
-| xaxis/yaxis labels colors | ["#667085"] |
+| xaxis/yaxis labels colors (standard) | ["#667085"] |
+| xaxis/yaxis labels colors (Sales-family chart-cards) | ["#373d3f"] |
 | dataLabels.enabled | false |
 | tooltip.theme | "light" |
 | tooltip.style.fontSize | "12px" |
 
 Series colors: primary `#465FFF` · secondary `#9CB9FF` · success `#12B76A` · error `#F04438`.
 Area opacity: 0.15–0.25. No 3D. No decorative gradients.
+
+> `grid.borderColor` updated to `#e0e0e0` (TailAdmin Sales/Pro DevTools-extracted value).
+> Prior value `#EAECF0` from the free React demo is superseded. Update `chartTokens.ts` to match.
 
 ---
 
@@ -1034,7 +1113,7 @@ exception section in Part 6 for the full policy.
 9. **Modal state via raw useState.** Use `useModal()`.
 10. **Shadow added to card or panel without justification.** Pattern F is the only valid exception.
 11. **`rounded-md` or `rounded-sm` on cards.** Cards are always `rounded-2xl`.
-12. **Toggle pattern other than the standard segmented control.** For new toggle work, use the pattern defined in Part 6 — Segmented toggle. The ChartTab (Pattern E) and outlined button-group toggles are deprecated for new work and scheduled for replacement in an upcoming implementation pass. They are currently in production and must not be disturbed until that pass runs — but they must not be replicated in any new component.
+12. **Toggle pattern other than the standard segmented control.** For new toggle work, use `.segmented-toggle` (global 40/36/8 scale) or the chart-card locally scoped variant (44/40/10) — see Part 6 Segmented toggle for when to use each. The existing outlined button-group toggle (e.g. Big Picture "This Month / Last Month") is deprecated; do not replicate it. Note: there is no `.chart-tab` class in this codebase — the TailAdmin source component is named ChartTab.tsx but the project implementation is `.segmented-toggle`. Do not introduce `.chart-tab` as a new class.
 
 ---
 
@@ -1204,7 +1283,7 @@ Use whenever the user must choose exactly one of 2–5 options that are views of
 - A single on/off control — use a Switch (Part 3 — Switch / Toggle)
 - Navigation between pages — use the sidebar
 
-### Visual spec
+### Scale 1 — Global `.segmented-toggle` (default for new work)
 
 | Element | Token | Value |
 |---------|-------|-------|
@@ -1226,19 +1305,133 @@ Use whenever the user must choose exactly one of 2–5 options that are views of
 
 No border on the track. No shadow on the track. Shadow on the active pill only.
 
-These dimensions match the TailAdmin Analytics card Monthly/Quarterly/Annually toggle. Do not deviate.
+Matches the TailAdmin Analytics card Monthly/Quarterly/Annually toggle. This is the default for
+all new segmented toggle work outside large chart-cards.
 
-### Reference implementation
+**Reference implementation:** Settings page (`#/settings`) Data / Accounts / Rules control.
 
-The canonical example is the Settings page (`#/settings`) Data / Accounts / Rules control. All new segmented toggles must match this visual treatment exactly.
+### Scale 2 — Chart-card locally scoped (`.statistics-card__tab*` pattern)
+
+Used only on large chart-cards (250px+ chart area) where the toggle sits at the full width of the
+card header and the larger touch target matches the visual weight of the chart below it.
+
+| Element | Value |
+|---------|-------|
+| Track height | 44px |
+| Segment height | 40px |
+| Segment padding | 10px horizontal, 10px vertical (`padding: 10px 12px`) |
+| Font size | 14px |
+| Everything else | Same as Scale 1 (colors, radius, shadow, border rules) |
+
+**Do NOT consolidate Scale 1 and Scale 2.** The global `.segmented-toggle` is calibrated for
+compact header usage (7+ consumers across the dashboard). Chart-card toggles are locally scoped
+per card. Both scales coexist deliberately and must not be normalized into a single class.
+
+### Which scale to use
+
+| Context | Scale |
+|---------|-------|
+| Timeframe selector on any card header (compact) | Scale 1 — global `.segmented-toggle` |
+| View mode selector on a signal card | Scale 1 — global `.segmented-toggle` |
+| Section tab selector (Settings, etc.) | Scale 1 — global `.segmented-toggle` |
+| Series toggle inside a large chart-card (250px+ chart) | Scale 2 — locally scoped |
+
+When uncertain: use Scale 1. Only use Scale 2 when the card is a full chart-card and the toggle
+visually needs to match the weight of the chart area.
 
 ### Deprecated patterns
 
-The following patterns exist in the codebase and are scheduled for replacement. Do not use them in new work:
+The following patterns exist in the codebase and are scheduled for replacement. Do not replicate:
 
-- **Chart-style blue pill** — e.g. Operating / Total toggle on Monthly Net Cash Flow. Heavy blue active state, more visually prominent than the standard. Scheduled for replacement.
-- **Outlined button-group toggle** — e.g. This Month / Last Month / Last 3 Months / More on Big Picture. Outlined border per segment, different background treatment. Scheduled for replacement.
-- Any toggle that uses a different visual treatment from the Settings segmented control.
+- **Chart-style blue pill** — e.g. Operating / Total toggle on Monthly Net Cash Flow.
+- **Outlined button-group toggle** — e.g. This Month / Last Month on Big Picture.
+- Any toggle that uses a different visual treatment from Scale 1 or Scale 2 above.
+
+---
+
+---
+
+## Icon implementation pattern
+
+All icon SVGs in this project use `stroke="currentColor"` (not hardcoded hex). Color is
+driven by a CSS class on the icon container — this centralizes color in CSS and lets status
+modifier classes propagate color without JSX conditionals.
+
+```tsx
+// Correct — color set by CSS class
+<span className="metric-card__icon">
+  <MyIcon />  {/* SVG uses stroke="currentColor" or fill="currentColor" */}
+</span>
+```
+
+```css
+/* Color lives in CSS */
+.metric-card__icon { color: #637AEA; }  /* brand-400 */
+```
+
+**TailAdmin deviation:** TailAdmin's own SVG components sometimes hardcode `stroke="#xxxxxx"` as
+an SVG attribute. This project deliberately overrides that pattern. When copying TailAdmin SVGs,
+replace any hardcoded `stroke` or `fill` hex attrs with `currentColor`.
+
+---
+
+## Sparkline canonical config
+
+Standard sparkline pattern for all inline chart components (revenue-card, future KPI cards with
+trend line). DevTools-extracted from TailAdmin /sales "Total Revenue" tile.
+
+```ts
+// Series
+const SPARKLINE_SERIES = [{ data: [...numbers] }];
+
+// Options
+const SPARKLINE_OPTIONS: ApexCharts.ApexOptions = {
+  chart: {
+    type: 'area',
+    sparkline: { enabled: true },  // hides axes, grid, labels — sparkline mode
+    fontFamily: 'Outfit, sans-serif',
+    toolbar: { show: false },
+  },
+  stroke: { curve: 'smooth', width: 1 },
+  fill: {
+    type: 'gradient',
+    gradient: {
+      opacityFrom: 0.45,  // top opacity
+      opacityTo: 0,       // bottom opacity (transparent)
+    },
+  },
+  // All suppressed in sparkline mode — no explicit config needed:
+  // grid, legend, xaxis, yaxis, markers, dataLabels, tooltip
+};
+```
+
+**Token values for the revenue-card sparkline:**
+- Stroke color: `#12B76A` (success accent) — 1px
+- Gradient top opacity: 0.45 — bottom: 0 (transparent)
+- Dimensions: 99×70px (set on `<ReactApexChart width={99} height={70} />`)
+
+**Rules:**
+- `chart.sparkline.enabled = true` suppresses all axes, grid, legend, markers automatically.
+  Do not add explicit `grid: { show: false }` or `xaxis: { show: false }` — they are redundant.
+- Use `curve: 'smooth'` — TailAdmin sparklines always use smooth curves.
+- Use `stroke.width: 1` — sparkline strokes are thin; wider values look heavy at 70px height.
+- Sparkline fixtures (series + options) live as module-scope `const` in the component file.
+  Lift to a shared lib only when a second sparkline-bearing card needs the same config.
+
+---
+
+## Canonical card shells
+
+Three canonical shells built from DevTools-extracted TailAdmin Pro specs. Classes are locked
+references — do not modify without explicit instruction.
+
+| Shell class | Radius | Border | Padding | Source |
+|-------------|--------|--------|---------|--------|
+| `.metric-card` | 16px | 1px `#E4E7EC` | 20px | TailAdmin /ai "Users" |
+| `.revenue-card` | 12px | none | 20px | TailAdmin /sales "Total Revenue" |
+| `.statistics-card` | 16px | 1px `#E4E7EC` | 24px | TailAdmin /sales "Statistics" |
+
+All three are in `src/dashboard.css`. Their UI Lab canonical variants live in `src/pages/UILab.tsx`.
 
 ---
 
@@ -1318,13 +1511,17 @@ create it as part of a documentation patch.
 
 Example structure:
   export const chartTokens = {
-    brand:      '#465FFF',
-    success:    '#12B76A',
-    error:      '#F04438',
-    warning:    '#F79009',
-    pressure:   '#DC6803',
-    gridBorder: '#EAECF0',
-    axisText:   '#667085',
+    brand:           '#465FFF',
+    brandSecondary:  '#9CB9FF',
+    brand400:        '#637AEA',
+    success:         '#12B76A',   // accent: filled badge/icon/sparkline
+    successText:     '#039855',   // text on white
+    error:           '#F04438',
+    warning:         '#F79009',
+    pressure:        '#DC6803',
+    gridBorder:      '#e0e0e0',   // updated from #EAECF0 (TailAdmin Sales DevTools)
+    axisText:        '#667085',   // standard charts
+    axisTextSales:   '#373d3f',   // Sales-family chart-cards
   } as const;
 
 ---
