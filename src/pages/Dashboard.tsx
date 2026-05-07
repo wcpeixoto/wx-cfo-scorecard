@@ -83,6 +83,7 @@ import type {
   TrendPoint,
   Txn,
 } from '../lib/data/contract';
+import { chartTokens } from '../lib/ui/chartTokens';
 
 type TabId =
   | 'today'
@@ -235,7 +236,7 @@ const UI_LAB_SPARKLINE_OPTIONS: ApexOptions = {
   stroke: {
     curve: 'smooth',
     width: 1,
-    colors: ['#12B76A'],
+    colors: [chartTokens.success],
   },
   fill: {
     type: 'gradient',
@@ -245,8 +246,8 @@ const UI_LAB_SPARKLINE_OPTIONS: ApexOptions = {
       opacityTo: 0,
       stops: [0, 100],
       colorStops: [
-        { offset: 0, color: '#12B76A', opacity: 0.55 },
-        { offset: 100, color: '#89DBB5', opacity: 0 },
+        { offset: 0, color: chartTokens.success, opacity: 0.55 },
+        { offset: 100, color: chartTokens.successGradientEnd, opacity: 0 },
       ],
     },
   },
@@ -279,7 +280,7 @@ const STATISTICS_CARD_OPTIONS: ApexOptions = {
     toolbar: { show: false },
     background: 'transparent',
   },
-  colors: ['#465fff', '#9cb9ff'],
+  colors: [chartTokens.brand, chartTokens.brandSecondary],
   stroke: { curve: 'smooth', width: 2 },
   fill: {
     type: 'gradient',
@@ -295,7 +296,7 @@ const STATISTICS_CARD_OPTIONS: ApexOptions = {
   legend: { show: false }, // Custom JSX legend rendered above the chart per Pattern C.
   grid: {
     // Solid grid per TailAdmin Sales spec — overrides global dashed default.
-    borderColor: '#e0e0e0',
+    borderColor: chartTokens.gridBorder,
     strokeDashArray: 0,
     xaxis: { lines: { show: false } },
     yaxis: { lines: { show: true } },
@@ -305,14 +306,14 @@ const STATISTICS_CARD_OPTIONS: ApexOptions = {
     axisBorder: { show: false },
     axisTicks: { show: false },
     labels: {
-      style: { fontSize: '12px', fontWeight: 600, colors: '#373d3f' },
+      style: { fontSize: '12px', fontWeight: 600, colors: chartTokens.axisTextSales },
     },
     // Crosshair styling handled by global .apexcharts-xcrosshairs in dashboard.css.
     crosshairs: { show: true },
   },
   yaxis: {
     labels: {
-      style: { fontSize: '11px', fontWeight: 400, colors: '#373d3f' },
+      style: { fontSize: '11px', fontWeight: 400, colors: chartTokens.axisTextSales },
     },
   },
   tooltip: { theme: 'light' },
