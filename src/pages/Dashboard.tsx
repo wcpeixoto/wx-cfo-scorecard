@@ -18,8 +18,6 @@ import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import { TodayPage } from '../components/TodayPage';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
-import DigHereCardMock from '../components/DigHereCardMock';
-import CurveLabCharts from '../components/CurveLabCharts';
 import ContractsSettingsPane from '../components/ContractsSettingsPane';
 import { computeEfficiencyOpportunities } from '../lib/kpis/efficiencyOpportunities';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
@@ -2583,7 +2581,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
       <div className="app-main-column">
         <AppHeader query={query} onQueryChange={setQuery} />
       <section className="main-zone">
-        {activeTab !== 'today' && activeTab !== 'what-if' && activeTab !== 'settings' && <header className="top-bar glass-panel">
+        {activeTab !== 'today' && activeTab !== 'what-if' && activeTab !== 'settings' && activeTab !== 'ui-lab' && <header className="top-bar glass-panel">
           <div className="top-bar-main">
             <div className="top-bar-copy">
               <h2>
@@ -4081,81 +4079,12 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
         {import.meta.env.DEV && activeTab === 'ui-lab' && (
           <div className="stack-grid">
-
-            {/* ── Page header ─────────────────────────────────────────── */}
             <div className="ui-lab-header">
               <div className="ui-lab-header-copy">
                 <h2 className="ui-lab-title">UI Lab</h2>
-                <p className="ui-lab-subtitle">Use this page to settle layout, spacing, and component patterns before applying them to production surfaces.</p>
-              </div>
-              <span className="ui-lab-dev-badge">Dev only</span>
-            </div>
-
-            {/* ── Efficiency Opportunities Card ────────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Efficiency Opportunities Card</h3>
-                <p className="ui-lab-section-subtitle">Primary insight card — half-width, diagnostic list, dominant gap amounts. Static mock data.</p>
-              </div>
-              <div className="ui-lab-two-col-grid">
-                <EfficiencyOpportunitiesCard result={efficiencyResult} />
+                <p className="ui-lab-subtitle">Canonical component reference. Components added one at a time.</p>
               </div>
             </div>
-
-            {/* ── Dig Here Card (new design mock) ──────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Dig Here Card — New Design</h3>
-                <p className="ui-lab-section-subtitle">YoY ratio-variance design — category label, ratio shift, change badge, dollar impact, sparkline. Static mock data.</p>
-              </div>
-              <div className="ui-lab-two-col-grid">
-                <DigHereCardMock updated refinedLabels />
-              </div>
-            </div>
-
-            {/* ── Cash Trend Hero Card ─────────────────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Cash Trend Hero Card</h3>
-                <p className="ui-lab-section-subtitle">Pattern B macro signal card — 1/3 width, status badge, dominant metric, mini-stat block. Status-driven accent via CSS custom property.</p>
-              </div>
-              <div className="ui-lab-three-col-grid">
-                <CashTrendHero result={cashTrendResult} />
-                <CashTrendHero result={cashTrendResult} negativeMonthsAsSubtitle />
-                <CashTrendPlaceholder />
-              </div>
-            </div>
-
-            {/* ── Cash Trend + Monthly Net Cash Flow ───────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Cash Trend + Monthly Net Cash Flow</h3>
-                <p className="ui-lab-section-subtitle">Asymmetric row — Cash Trend hero (1/3) left, Monthly Net Cash Flow chart (2/3) right. Live data.</p>
-              </div>
-              <div className="ui-lab-one-two-grid">
-                <CashTrendHero result={cashTrendResult} negativeMonthsAsSubtitle />
-                <NetCashFlowChart
-                  data={netCashFlowChartModel.trend}
-                  cashFlowMode={netCashFlowChartMode}
-                  timeframe={netChartTimeframe}
-                  onCashFlowModeChange={setNetCashFlowChartMode}
-                  onTimeframeChange={setNetChartTimeframe}
-                />
-              </div>
-            </div>
-
-            {/* ── Forecast Chart Curve Lab ─────────────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Forecast Chart Curve Lab</h3>
-                <p className="ui-lab-section-subtitle">Visual comparison of curve modes against two data shapes. Reference: TailAdmin Active Users (top). Wx-style synthetic event data (bottom three) with smooth, straight, and stepline curves. Goal: confirm whether the spike distortion observed in production Forecast is curve-driven or data-shape-driven.</p>
-              </div>
-              <div className="ui-lab-two-col-grid">
-                <CurveLabCharts />
-              </div>
-            </div>
-
-
           </div>
         )}
       </section>
