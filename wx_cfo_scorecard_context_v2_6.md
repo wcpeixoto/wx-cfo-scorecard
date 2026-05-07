@@ -2469,3 +2469,55 @@ Five planned migration commits, in order; DigHereHighlights is deferred:
   bang. Each is independently revertable.
 - `Prefer: count=exact` is now the standing pattern for paginated
   Supabase fetches.
+
+### May 7, 2026 (afternoon) — chartTokens migration complete
+
+Branch: `claude/goofy-faraday-1158f7` merged to main via PR #18
+(rebase merge). All 6 commits live on main; branch and worktree
+removed.
+
+Migration sequence (rebased SHAs on main):
+- 4ee2e72 — OwnerDistributionsChart
+- 5b82798 — successGradientEnd token added (#89DBB5)
+- d282daa — Dashboard.tsx UI-Lab consts
+- 91865bd — crosshairStroke token added (#b6b6b6)
+- 26e86d8 — ProjectedCashBalanceChart
+- 945f3ac — NetCashFlowChart (drift heal)
+
+TopCategoriesCard skipped — already compliant.
+DigHereHighlights deferred — pending product call on #FB5454.
+
+chartTokens.ts now has 14 tokens. Two added during migration:
+- successGradientEnd '#89DBB5' (gradient fade-to for sparklines)
+- crosshairStroke '#b6b6b6' (subtle reference lines: crosshairs,
+  zero-line annotations)
+
+NetCashFlowChart drift heals (Tailwind palette → TailAdmin canonical,
+intentional and accepted):
+- ef4444 → F04438 (red, 4 gradient stops)
+- 6b7280 → 667085 (axis labels, 2 occurrences)
+- E4E7EC → e0e0e0 (grid border, 1 occurrence)
+- 9ca3af → b6b6b6 (zero-line, folded into crosshairStroke)
+
+Locked decisions:
+- One-off color use does not earn a dedicated token. #9ca3af folded
+  into crosshairStroke rather than spawning a new zeroLine token.
+- "Drift is healed, not preserved" — when a Tailwind-flavored hex
+  encounters a TailAdmin canonical, the canonical wins. Do not invent
+  tokens to keep old hexes alive.
+- Codex prompt template no longer includes "WAIT for me to review"
+  clause — review gate lives between Wes and Claude (chat), not
+  between Wes and Claude Code.
+- Doc workflow split: spec docs (UI_RULES.md, chartTokens.ts) commit
+  alongside the code that depends on them on the feature branch;
+  narrative docs (this file, session logs) commit only on main after
+  merge. Keeps one visible source of truth across worktrees.
+
+Open from this session:
+- Notion item ID TBD — "Audit Dashboard.tsx JSX color swatches
+  against chartTokens" (P3 Later).
+- chartTokens.ts header comment still references #9ca3af even though
+  it was folded into crosshairStroke this session. Doc-comment nit,
+  non-blocking; cleanup commit if desired.
+- DigHereHighlights migration still pending #FB5454 decision.
+- Hero pill production-path QA still unresolved from morning handoff.
