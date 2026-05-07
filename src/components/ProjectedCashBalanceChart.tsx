@@ -236,7 +236,7 @@ export default function ProjectedCashBalanceChart({
         colors: ['#465FFF'],
       },
       grid: {
-        borderColor: '#EAECF0',
+        borderColor: '#e0e0e0',
         strokeDashArray: 4,
         yaxis: { lines: { show: true } },
         xaxis: { lines: { show: false } },
