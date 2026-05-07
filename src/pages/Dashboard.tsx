@@ -7,6 +7,8 @@ import { AppSidebar } from '../components/AppSidebar';
 import { AppHeader } from '../components/AppHeader';
 import { useSidebar } from '../context/SidebarContext';
 import CashFlowForecastModule from '../components/CashFlowForecastModule';
+import ReactApexChart from 'react-apexcharts';
+import type { ApexOptions } from 'apexcharts';
 import LoadingScreen from '../components/LoadingScreen';
 import DigHereHighlights from '../components/DigHereHighlights';
 import CashTrendHero, { CashTrendPlaceholder } from '../components/CashTrendHero';
@@ -18,8 +20,6 @@ import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import { TodayPage } from '../components/TodayPage';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
-import DigHereCardMock from '../components/DigHereCardMock';
-import CurveLabCharts from '../components/CurveLabCharts';
 import ContractsSettingsPane from '../components/ContractsSettingsPane';
 import { computeEfficiencyOpportunities } from '../lib/kpis/efficiencyOpportunities';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
@@ -218,6 +218,46 @@ const TRENDS_MA_OPTIONS: TrendsMaOption[] = [
   { value: 12, label: '12-Month Trend' },
   { value: 24, label: '24-Month Trend' },
 ];
+
+// Illustrative fixture series for UI Lab mini-charts. Reusable by any
+// future UI Lab card that needs a sparkline. Not wired to production data.
+const UI_LAB_SPARKLINE_SERIES = [18, 24, 21, 30, 28, 38, 35, 46, 42, 54, 58, 66];
+
+// Locked mini-sparkline visual spec; series data below is illustrative UI Lab fixture data.
+const UI_LAB_SPARKLINE_OPTIONS: ApexOptions = {
+  chart: {
+    type: 'area',
+    height: 70,
+    sparkline: { enabled: true },
+    toolbar: { show: false },
+    animations: { enabled: false },
+  },
+  stroke: {
+    curve: 'smooth',
+    width: 1,
+    colors: ['#12B76A'],
+  },
+  fill: {
+    type: 'gradient',
+    gradient: {
+      shadeIntensity: 1,
+      opacityFrom: 0.55,
+      opacityTo: 0,
+      stops: [0, 100],
+      colorStops: [
+        { offset: 0, color: '#12B76A', opacity: 0.55 },
+        { offset: 100, color: '#89DBB5', opacity: 0 },
+      ],
+    },
+  },
+  dataLabels: { enabled: false },
+  markers: { size: 0 },
+  grid: { show: false },
+  xaxis: { labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
+  yaxis: { labels: { show: false } },
+  tooltip: { enabled: false },
+  legend: { show: false },
+};
 type ForecastRangeValue = '30d' | '60d' | '90d' | '6m' | '1y' | '2y' | '3y';
 type ForecastRangeOption = { value: ForecastRangeValue; label: string; months: number };
 const FORECAST_RANGE_OPTIONS: ForecastRangeOption[] = [
@@ -638,6 +678,8 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
   const [forecastEvents, setForecastEvents] = useState<ForecastEvent[]>(DEFAULT_FORECAST_EVENTS);
+  // UI Lab — StatisticsCard tab demo state. Local-only, not persisted.
+  const [uiLabStatsTab, setUiLabStatsTab] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   // Phase 5.1 — Renewal contracts loaded from Supabase. No UI consumes
   // this state in Branch 4; Branch 5 wires it to the operator-facing
   // contract management screen. Mutation handlers below keep the local
@@ -2583,7 +2625,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
       <div className="app-main-column">
         <AppHeader query={query} onQueryChange={setQuery} />
       <section className="main-zone">
-        {activeTab !== 'today' && activeTab !== 'what-if' && activeTab !== 'settings' && <header className="top-bar glass-panel">
+        {activeTab !== 'today' && activeTab !== 'what-if' && activeTab !== 'settings' && activeTab !== 'ui-lab' && <header className="top-bar glass-panel">
           <div className="top-bar-main">
             <div className="top-bar-copy">
               <h2>
@@ -4081,81 +4123,142 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
         {import.meta.env.DEV && activeTab === 'ui-lab' && (
           <div className="stack-grid">
-
-            {/* ── Page header ─────────────────────────────────────────── */}
             <div className="ui-lab-header">
               <div className="ui-lab-header-copy">
                 <h2 className="ui-lab-title">UI Lab</h2>
-                <p className="ui-lab-subtitle">Use this page to settle layout, spacing, and component patterns before applying them to production surfaces.</p>
+                <p className="ui-lab-subtitle">Canonical component reference. Components added one at a time.</p>
               </div>
-              <span className="ui-lab-dev-badge">Dev only</span>
             </div>
 
-            {/* ── Efficiency Opportunities Card ────────────────────────── */}
             <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Efficiency Opportunities Card</h3>
-                <p className="ui-lab-section-subtitle">Primary insight card — half-width, diagnostic list, dominant gap amounts. Static mock data.</p>
-              </div>
-              <div className="ui-lab-two-col-grid">
-                <EfficiencyOpportunitiesCard result={efficiencyResult} />
+              <h3 className="ui-lab-section-title">MetricCard</h3>
+              <p className="ui-lab-section-subtitle">Source: demo.tailadmin.com/ai (Users tile). Locked spec, 2026-05-06.</p>
+              <div className="ui-lab-preview-width">
+                <article className="metric-card">
+                  <div className="metric-card__header">
+                    <span className="metric-card__label">Users</span>
+                    <svg
+                      className="metric-card__icon"
+                      viewBox="0 0 24 24"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" />
+                      <circle cx="9" cy="7" r="4" stroke="currentColor" />
+                      <path d="M22 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" />
+                    </svg>
+                  </div>
+                  <h2 className="metric-card__value">10,590</h2>
+                  <div className="metric-card__footer">
+                    <span className="metric-card__subtitle">Last 30 Days</span>
+                    <span className="metric-card__delta metric-card__delta--up">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 19V5" stroke="currentColor" />
+                        <path d="m5 12 7-7 7 7" stroke="currentColor" />
+                      </svg>
+                      3.52%
+                    </span>
+                  </div>
+                </article>
               </div>
             </div>
 
-            {/* ── Dig Here Card (new design mock) ──────────────────────── */}
             <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Dig Here Card — New Design</h3>
-                <p className="ui-lab-section-subtitle">YoY ratio-variance design — category label, ratio shift, change badge, dollar impact, sparkline. Static mock data.</p>
-              </div>
-              <div className="ui-lab-two-col-grid">
-                <DigHereCardMock updated refinedLabels />
+              <h3 className="ui-lab-section-title">RevenueCard</h3>
+              <p className="ui-lab-section-subtitle">Source: demo.tailadmin.com/sales (Total Revenue tile). Locked spec, 2026-05-06. Borderless 12px shell — distinct from MetricCard.</p>
+              <div className="ui-lab-preview-width">
+                <article className="revenue-card">
+                  <div className="revenue-card__header">
+                    <div className="revenue-card__title-block">
+                      <h3 className="revenue-card__title">Total Revenue</h3>
+                      <div className="revenue-card__delta-row">
+                        <p className="revenue-card__delta revenue-card__delta--up">
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M7.9974 2.66602L7.9974 13.3336M4 6.66334L7.99987 2.66602L12 6.66334" stroke="currentColor" />
+                          </svg>
+                          32%
+                        </p>
+                        <p className="revenue-card__delta-context">vs last month</p>
+                      </div>
+                    </div>
+                    <svg
+                      className="revenue-card__icon"
+                      viewBox="0 0 24 24"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" />
+                      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" />
+                    </svg>
+                  </div>
+                  <div className="revenue-card__hero-row">
+                    <h2 className="revenue-card__value">$10,590</h2>
+                    <div className="revenue-card__sparkline-slot" aria-hidden="true">
+                      <ReactApexChart
+                        options={UI_LAB_SPARKLINE_OPTIONS}
+                        series={[{ name: 'value', data: UI_LAB_SPARKLINE_SERIES }]}
+                        type="area"
+                        height={70}
+                        width="100%"
+                      />
+                    </div>
+                  </div>
+                </article>
               </div>
             </div>
 
-            {/* ── Cash Trend Hero Card ─────────────────────────────────── */}
             <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Cash Trend Hero Card</h3>
-                <p className="ui-lab-section-subtitle">Pattern B macro signal card — 1/3 width, status badge, dominant metric, mini-stat block. Status-driven accent via CSS custom property.</p>
-              </div>
-              <div className="ui-lab-three-col-grid">
-                <CashTrendHero result={cashTrendResult} />
-                <CashTrendHero result={cashTrendResult} negativeMonthsAsSubtitle />
-                <CashTrendPlaceholder />
-              </div>
-            </div>
-
-            {/* ── Cash Trend + Monthly Net Cash Flow ───────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Cash Trend + Monthly Net Cash Flow</h3>
-                <p className="ui-lab-section-subtitle">Asymmetric row — Cash Trend hero (1/3) left, Monthly Net Cash Flow chart (2/3) right. Live data.</p>
-              </div>
-              <div className="ui-lab-one-two-grid">
-                <CashTrendHero result={cashTrendResult} negativeMonthsAsSubtitle />
-                <NetCashFlowChart
-                  data={netCashFlowChartModel.trend}
-                  cashFlowMode={netCashFlowChartMode}
-                  timeframe={netChartTimeframe}
-                  onCashFlowModeChange={setNetCashFlowChartMode}
-                  onTimeframeChange={setNetChartTimeframe}
-                />
-              </div>
-            </div>
-
-            {/* ── Forecast Chart Curve Lab ─────────────────────────────── */}
-            <div className="ui-lab-section">
-              <div className="ui-lab-section-head">
-                <h3 className="ui-lab-section-title">Forecast Chart Curve Lab</h3>
-                <p className="ui-lab-section-subtitle">Visual comparison of curve modes against two data shapes. Reference: TailAdmin Active Users (top). Wx-style synthetic event data (bottom three) with smooth, straight, and stepline curves. Goal: confirm whether the spike distortion observed in production Forecast is curve-driven or data-shape-driven.</p>
-              </div>
-              <div className="ui-lab-two-col-grid">
-                <CurveLabCharts />
+              <h3 className="ui-lab-section-title">StatisticsCard</h3>
+              <p className="ui-lab-section-subtitle">Source: demo.tailadmin.com/sales (Users &amp; Revenue Statistics card). Locked spec, 2026-05-06. Shell + header + tabs only. Chart pending Prompt B.</p>
+              <div className="ui-lab-preview-width--wide">
+                <article className="statistics-card">
+                  <div className="statistics-card__header">
+                    <div className="statistics-card__title-block">
+                      <h3 className="statistics-card__title">Users &amp; Revenue Statistics</h3>
+                      <p className="statistics-card__subtitle">Visualize month-to-month progress and engagement.</p>
+                    </div>
+                    <div className="statistics-card__tabs" role="tablist">
+                      {(['daily','weekly','monthly'] as const).map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          role="tab"
+                          aria-selected={uiLabStatsTab === id}
+                          className={`statistics-card__tab${uiLabStatsTab === id ? ' statistics-card__tab--active' : ''}`}
+                          onClick={() => setUiLabStatsTab(id)}
+                        >
+                          {id.charAt(0).toUpperCase() + id.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="statistics-card__chart" />
+                </article>
               </div>
             </div>
-
-
           </div>
         )}
       </section>

@@ -2,8 +2,7 @@
  * DigHereHighlights — "What Needs Attention" card
  *
  * Consumes WhatNeedsAttentionResult from computeWhatNeedsAttention.
- * Matches the locked UI Lab mock (DigHereCardMock.tsx) visual design:
- * refined category labels, vivid sparklines, inline ⓘ tooltip.
+ * Visual design: refined category labels, vivid sparklines, inline ⓘ tooltip.
  *
  * Interaction model: the card is non-interactive except for the ⓘ icon
  * which toggles an explanatory tooltip. No row or title click handlers.

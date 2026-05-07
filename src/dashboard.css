@@ -5079,40 +5079,19 @@ body {
   color: #667085;
 }
 
-.ui-lab-dev-badge {
-  flex-shrink: 0;
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #98A2B3;
-  background: #F2F4F7;
-  border: 1px solid #E4E7EC;
-  align-self: flex-start;
-  margin-top: 4px;
-}
-
+/* UI Lab — per-component section label. Flat on page background.
+   No padding, border, or framing — that belongs to the component itself. */
 .ui-lab-section {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 20px 24px;
-  background: #FFFFFF;
-  border: 1px solid #E4E7EC;
-  border-radius: 16px;
-}
-
-.ui-lab-section-head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
 .ui-lab-section-title {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+  line-height: 24px;
   color: #101828;
 }
 
@@ -5120,50 +5099,285 @@ body {
   margin: 0;
   font-size: 13px;
   font-weight: 400;
+  line-height: 18px;
   color: #98A2B3;
 }
 
-/* UI Lab — 2-column half-width preview grid */
-.ui-lab-two-col-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-  align-items: flex-start;
+/* Preview-width simulator for single-component UI Lab instances.
+   Approximates the dashboard column a fluid card normally lives in.
+   Does not constrain the card itself — the card remains fluid. */
+.ui-lab-preview-width {
+  width: 100%;
+  max-width: 365px;
 }
 
-@media (max-width: 767px) {
-  .ui-lab-two-col-grid {
-    grid-template-columns: 1fr;
-  }
+/* ============================================================
+   .metric-card — canonical metric card
+   Source: TailAdmin demo /ai "Users" tile
+   Spec extracted: 2026-05-06
+   ============================================================ */
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+  box-shadow: none;
+  font-family: 'Outfit', sans-serif;
 }
 
-/* UI Lab — 3-column full-width preview grid */
-.ui-lab-three-col-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  align-items: flex-start;
+.metric-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
 }
 
-@media (max-width: 767px) {
-  .ui-lab-three-col-grid {
-    grid-template-columns: 1fr;
-  }
+.metric-card__label {
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
 }
 
-/* UI Lab — 1/3 + 2/3 asymmetric grid */
-.ui-lab-one-two-grid {
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 24px;
-  align-items: start;
+.metric-card__icon {
+  width: 24px;
+  height: 24px;
+  color: #637AEA;
+  fill: none;
 }
 
-@media (max-width: 767px) {
-  .ui-lab-one-two-grid {
-    grid-template-columns: 1fr;
-  }
+.metric-card__value {
+  margin: 0 0 8px 0;
+  height: 36px;
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 36px;
+  color: #1D2939;
 }
+
+.metric-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.metric-card__subtitle {
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.metric-card__delta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.metric-card__delta--up {
+  color: #039855;
+}
+
+/* .metric-card__delta--down — TODO: defer until a down-state card is requested. */
+
+/* ============================================================
+   .revenue-card — canonical revenue card
+   Source: TailAdmin demo /sales "Total Revenue" tile
+   Spec extracted: 2026-05-06
+   ============================================================ */
+
+.revenue-card {
+  display: block;
+  padding: 20px;
+  background: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  box-shadow: none;
+  font-family: 'Outfit', sans-serif;
+  line-height: 24px;
+}
+
+.revenue-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.revenue-card__title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 24px;
+  color: #344054;
+}
+
+.revenue-card__delta-row {
+  display: flex;
+  flex-direction: row;
+  align-items: normal;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.revenue-card__delta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.revenue-card__delta--up {
+  color: #039855;
+}
+
+/* .revenue-card__delta--down — TODO: defer until needed. */
+
+.revenue-card__delta-context {
+  margin: 0;
+  padding: 0;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.revenue-card__icon {
+  width: 24px;
+  height: 24px;
+  color: #12B76A;
+  fill: none;
+}
+
+.revenue-card__hero-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.revenue-card__value {
+  margin: 0;
+  width: 50%;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 36px;
+  color: #1D2939;
+}
+
+.revenue-card__sparkline-slot {
+  width: 50%;
+  height: 70px;
+  background: transparent;
+  border-radius: 0;
+  border: none;
+}
+
+/* Wide preview canvas for chart-cards that need horizontal room to validate
+   header, tabs, and future chart proportions. */
+.ui-lab-preview-width--wide {
+  width: 100%;
+  max-width: 800px;
+}
+
+/* ============================================================
+   .statistics-card — canonical statistics card (shell)
+   Source: TailAdmin demo /sales "Users & Revenue Statistics"
+   Spec extracted: 2026-05-06
+   Tabs are locally scoped (.statistics-card__tabs/__tab/--active)
+   to avoid conflicts with global .segmented-toggle (40/36/8 scale).
+   ============================================================ */
+
+.statistics-card {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+  box-shadow: none;
+  font-family: 'Outfit', sans-serif;
+}
+
+.statistics-card__header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 32px;
+  padding: 0;
+}
+
+.statistics-card__title {
+  margin: 0;
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 28px;
+  color: #1D2939;
+}
+
+.statistics-card__subtitle {
+  margin: 4px 0 0 0;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.statistics-card__tabs {
+  display: inline-flex;
+  background: #F2F4F7;
+  border: none;
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+  height: 44px;
+}
+
+.statistics-card__tab {
+  background: transparent;
+  color: #667085;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: normal;
+  padding: 10px 12px;
+  height: 40px;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.statistics-card__tab--active {
+  background: #FFFFFF;
+  color: #101828;
+  box-shadow: 0px 1px 2px 0px rgba(16, 24, 40, 0.05);
+}
+
+/* Empty container — Prompt B (ApexCharts) populates this. */
+.statistics-card__chart {
+  display: block;
+  width: 100%;
+  height: 250px;
+  background: transparent;
+}
+
 
 /* ── Efficiency Opportunities Card ───────────────────────────────────── */
 
@@ -6897,26 +7111,6 @@ body {
     from { transform: translateY(100%); }
     to   { transform: translateY(0); }
   }
-}
-
-/* ─── UI Lab: reopen button for dismissed modal mock ──────────────────── */
-.ui-lab-reopen-btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 16px;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  color: #667085;
-  background: var(--bg-muted);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.ui-lab-reopen-btn:hover {
-  background: var(--line);
 }
 
 /* ============================================================

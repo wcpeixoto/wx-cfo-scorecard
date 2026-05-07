@@ -2244,3 +2244,111 @@ Suggest commit message only — never git add, never commit
 - `src/lib/priorities/ai.ts`
 - `src/lib/priorities/coreConstraints.ts`
 - `.github/workflows/`
+
+---
+## May 6, 2026 — UI Lab canonical components, three shipped
+UI Lab repurposed as the canonical component reference. Three locked
+references built from DevTools-extracted TailAdmin specs, each as a
+standalone primitive with its own BEM namespace.
+### Source-of-truth rule (locked May 6, 2026)
+For UI components built in UI Lab as canonical references:
+> TailAdmin native specs (DevTools-extracted computed values) win on
+> visual appearance. Project tokens win where deliberately overridden
+> (`--bg-muted` = `#F2F4F7`, etc.). When unclear, ask before guessing.
+The canonical TailAdmin demo is `https://demo.tailadmin.com` and its
+sub-routes. The free React repo is incomplete (only 1 of 7 dashboards);
+Pro dashboards (AI, Sales, etc.) require DevTools extraction from the
+live demo.
+### Three canonical components shipped
+**`.metric-card`** — Source: TailAdmin demo `/ai` "Users" tile
+- Bordered shell, 20px padding, 16px radius, `#FFFFFF` bg
+- Header (label left + icon right) → hero h2 (`30px/36px/600`, `#1D2939`)
+  → footer (subtitle left + delta right)
+- Up-delta color `#039855` (success-text), icon color `#637AEA` (brand-400)
+- Icon stroke uses `currentColor` driven by CSS — project deviation from
+  TailAdmin's hardcoded SVG attr. Centralizes color in CSS.
+**`.revenue-card`** — Source: TailAdmin demo `/sales` "Total Revenue" tile
+- Borderless shell, 20px padding, 12px radius, `#FFFFFF` bg
+- Two-row anatomy: header (title-block with nested delta, icon right) +
+  hero row (h2 50% width + sparkline 50% width, `align-items: flex-end`)
+- Title h3 `16px/24px/600`, `#344054` (new "Card title (medium)" role)
+- Sparkline: ApexCharts area, 99×70, stroke `#12B76A` 1px, gradient
+  `rgba(18,183,106,0.55)` → `rgba(137,219,181,0)`, smooth curve,
+  `chart.sparkline.enabled = true`. Series + options live as
+  module-scope fixtures in `Dashboard.tsx` (`UI_LAB_SPARKLINE_SERIES`,
+  `UI_LAB_SPARKLINE_OPTIONS`); lift to shared lib when second sparkline
+  card needs them.
+- Icon accent `#12B76A` (success-accent) is distinct from `#039855`
+  (success-text). Two greens, two roles.
+**`.statistics-card`** (shell only — chart pending) — Source: TailAdmin
+demo `/sales` "Users & Revenue Statistics"
+- Bordered shell, 24px padding, 16px radius
+- Title h3 `18px/28px/500`, `#1D2939` (new "Card title (large)" role)
+- Header `margin-bottom: 32px` — chart-card rhythm distinct from
+  metric/revenue cards
+- Tabs locally scoped: `.statistics-card__tabs` (44px wrapper),
+  `.statistics-card__tab` (40px buttons, padding 10px 12px),
+  `.statistics-card__tab--active`. Do NOT consolidate with global
+  `.segmented-toggle` — that pattern is calibrated to a smaller
+  40/36/8 scale and has 7+ consumers. Two scales coexist deliberately.
+- Chart container `.statistics-card__chart`: 250px height, 100% width,
+  empty. ApexCharts implementation is Prompt B (next session).
+### UI Lab page additions
+- `.ui-lab-preview-width` (default 365px) — MetricCard, RevenueCard
+- `.ui-lab-preview-width--wide` (800px) — StatisticsCard, future
+  chart-cards. 800px chosen for spec validation fidelity (wide enough
+  to keep ApexCharts axis label spacing and gradient behavior matching
+  TailAdmin's 1011px render without compression artifacts).
+- Each card sits under a `.ui-lab-section` label with TailAdmin source
+  URL and "Locked spec, 2026-05-06" subtitle.
+### Doc reconciliation deltas (queued for next session)
+UI_RULES.md and UI_CARDS.md need updates to reflect the following.
+NOT edited in this session — deferred to a focused doc-update pass.
+1. **Brand-400** `#637AEA` — new entry in Brand color table (icon
+   color on metric cards)
+2. **Success text** `#039855` — distinct from semantic success
+   `#12B76A`. Add as a separate role: "Success text on white" vs
+   "Success accent (filled badge / icon)"
+3. **Borderless 12px card shell** — new pattern. UI_RULES.md and
+   UI_CARDS.md assume bordered 16px radius as default. Borderless
+   12px needs its own anatomy entry
+4. **Card title (medium)** `16px/24px/600 #344054` — new text role
+   distinct from existing hero/label scales
+5. **Card title (large)** `18px/28px/500 #1D2939` — new text role
+6. **Card padding scales** — 20px (metric/revenue cards) vs 24px
+   (chart-cards). Document both
+7. **Header margin-bottom 32px** — chart-card rhythm
+8. **`#344054` "Card title" text color** — distinct from `#1D2939`
+   (Primary) and `#667085` (Secondary). Add to Text colors table
+9. **Icon implementation pattern** — project standard is
+   `stroke="currentColor"` with color driven by CSS class.
+   TailAdmin sometimes hardcodes `stroke="#xxxxxx"` on SVG attrs;
+   we deliberately deviate
+10. **Sparkline canonical config** — area, smooth, stroke 1px,
+    gradient at 0.55 opacity → 0 transparent, all axes/grid/legend/
+    markers suppressed, sparkline mode enabled. Document as the
+    standard sparkline pattern
+11. **Tab scale duality** — 40/36/8 (global `.segmented-toggle`,
+    Analytics-card scale) and 44/40/10 (chart-card scale, locally
+    scoped per card). Document both, document the rule for which
+    to use when
+12. **Pattern E "ChartTab" stale** — UI_RULES.md describes a
+    `.chart-tab` class that does not exist in code. Only
+    `.segmented-toggle` is implemented. Dedup
+13. **Chart axis label color** `#373d3f` — new token (TailAdmin
+    Sales chart spec)
+14. **Chart grid color** `#e0e0e0` — TailAdmin Sales spec uses this;
+    UI_RULES.md currently has `#EAECF0` as chart grid. Project drift
+    from TailAdmin native. Reconcile (likely TailAdmin wins per
+    source-of-truth rule)
+### Locked files unchanged this session
+All standard locked files per CLAUDE.md remain untouched.
+`compute.ts`, `cashFlow.ts`, `contract.ts`, `sharedPersistence.ts`,
+all priorities files, all locked components — unchanged.
+### Next session
+Prompt B: `.statistics-card` ApexCharts implementation. Series,
+legend, tooltip, axes, grid, crosshair. Tooltip reconciliation
+against existing global ApexCharts tooltip rules — diagnosis-first,
+scope local if global drifts. Recommended: complete the doc
+reconciliation pass (items 1–14 above) BEFORE Prompt B so the
+component build references current docs.
