@@ -4,6 +4,7 @@ import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { Txn } from '../lib/data/contract';
 import { classifyTxn } from '../lib/cashFlow';
+import { chartTokens } from '../lib/ui/chartTokens';
 
 function formatCompact(value: number): string {
   const abs = Math.abs(value);
@@ -172,7 +173,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       fontFamily: 'Outfit, sans-serif',
       background: 'transparent',
     },
-    colors: ['#465FFF', '#9CB9FF'],
+    colors: [chartTokens.brand, chartTokens.brandSecondary],
     plotOptions: {
       bar: {
         horizontal: false,
@@ -192,17 +193,17 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       categories: years.map(String),
       axisBorder: { show: false },
       axisTicks: { show: false },
-      labels: { style: { fontSize: '12px', colors: '#667085' } },
+      labels: { style: { fontSize: '12px', colors: chartTokens.axisText } },
       crosshairs: { width: 'barWidth', opacity: 0 },
     },
     yaxis: {
       labels: {
         formatter: (val: number) => '$' + (val / 1000).toFixed(0) + 'k',
-        style: { fontSize: '12px', colors: '#667085' },
+        style: { fontSize: '12px', colors: chartTokens.axisText },
       },
     },
     grid: {
-      borderColor: '#e0e0e0',
+      borderColor: chartTokens.gridBorder,
       strokeDashArray: 4,
       yaxis: { lines: { show: true } },
       xaxis: { lines: { show: false } },
@@ -231,7 +232,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         let rows = '';
         if (actualVal > 0) {
           rows += `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
-            ${dot('#465FFF')}
+            ${dot(chartTokens.brand)}
             <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
               <span class="apexcharts-tooltip-text-y-label">Actual</span>
               <span class="apexcharts-tooltip-text-y-value">${formatCompact(actualVal)}</span>
@@ -240,7 +241,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         }
         if (forecastVal > 0) {
           rows += `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
-            ${dot('#9CB9FF')}
+            ${dot(chartTokens.brandSecondary)}
             <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
               <span class="apexcharts-tooltip-text-y-label">Forecast</span>
               <span class="apexcharts-tooltip-text-y-value">${formatCompact(forecastVal)}</span>
