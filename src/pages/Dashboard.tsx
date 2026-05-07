@@ -678,6 +678,8 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
   const [forecastEvents, setForecastEvents] = useState<ForecastEvent[]>(DEFAULT_FORECAST_EVENTS);
+  // UI Lab — StatisticsCard tab demo state. Local-only, not persisted.
+  const [uiLabStatsTab, setUiLabStatsTab] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   // Phase 5.1 — Renewal contracts loaded from Supabase. No UI consumes
   // this state in Branch 4; Branch 5 wires it to the operator-facing
   // contract management screen. Mutation handlers below keep the local
@@ -4224,6 +4226,36 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       />
                     </div>
                   </div>
+                </article>
+              </div>
+            </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">StatisticsCard</h3>
+              <p className="ui-lab-section-subtitle">Source: demo.tailadmin.com/sales (Users &amp; Revenue Statistics card). Locked spec, 2026-05-06. Shell + header + tabs only. Chart pending Prompt B.</p>
+              <div className="ui-lab-preview-width--wide">
+                <article className="statistics-card">
+                  <div className="statistics-card__header">
+                    <div className="statistics-card__title-block">
+                      <h3 className="statistics-card__title">Users &amp; Revenue Statistics</h3>
+                      <p className="statistics-card__subtitle">Visualize month-to-month progress and engagement.</p>
+                    </div>
+                    <div className="statistics-card__tabs" role="tablist">
+                      {(['daily','weekly','monthly'] as const).map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          role="tab"
+                          aria-selected={uiLabStatsTab === id}
+                          className={`statistics-card__tab${uiLabStatsTab === id ? ' statistics-card__tab--active' : ''}`}
+                          onClick={() => setUiLabStatsTab(id)}
+                        >
+                          {id.charAt(0).toUpperCase() + id.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="statistics-card__chart" />
                 </article>
               </div>
             </div>

@@ -5287,6 +5287,98 @@ body {
   border: none;
 }
 
+/* Wide preview canvas for chart-cards that need horizontal room to validate
+   header, tabs, and future chart proportions. */
+.ui-lab-preview-width--wide {
+  width: 100%;
+  max-width: 800px;
+}
+
+/* ============================================================
+   .statistics-card — canonical statistics card (shell)
+   Source: TailAdmin demo /sales "Users & Revenue Statistics"
+   Spec extracted: 2026-05-06
+   Tabs are locally scoped (.statistics-card__tabs/__tab/--active)
+   to avoid conflicts with global .segmented-toggle (40/36/8 scale).
+   ============================================================ */
+
+.statistics-card {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 16px;
+  box-shadow: none;
+  font-family: 'Outfit', sans-serif;
+}
+
+.statistics-card__header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 32px;
+  padding: 0;
+}
+
+.statistics-card__title {
+  margin: 0;
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 28px;
+  color: #1D2939;
+}
+
+.statistics-card__subtitle {
+  margin: 4px 0 0 0;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.statistics-card__tabs {
+  display: inline-flex;
+  background: #F2F4F7;
+  border: none;
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+  height: 44px;
+}
+
+.statistics-card__tab {
+  background: transparent;
+  color: #667085;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: normal;
+  padding: 10px 12px;
+  height: 40px;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.statistics-card__tab--active {
+  background: #FFFFFF;
+  color: #101828;
+  box-shadow: 0px 1px 2px 0px rgba(16, 24, 40, 0.05);
+}
+
+/* Empty container — Prompt B (ApexCharts) populates this. */
+.statistics-card__chart {
+  display: block;
+  width: 100%;
+  height: 250px;
+  background: transparent;
+}
+
+
 /* ── Efficiency Opportunities Card ───────────────────────────────────── */
 
 /* Card header */
