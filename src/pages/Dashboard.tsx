@@ -7,6 +7,8 @@ import { AppSidebar } from '../components/AppSidebar';
 import { AppHeader } from '../components/AppHeader';
 import { useSidebar } from '../context/SidebarContext';
 import CashFlowForecastModule from '../components/CashFlowForecastModule';
+import ReactApexChart from 'react-apexcharts';
+import type { ApexOptions } from 'apexcharts';
 import LoadingScreen from '../components/LoadingScreen';
 import DigHereHighlights from '../components/DigHereHighlights';
 import CashTrendHero, { CashTrendPlaceholder } from '../components/CashTrendHero';
@@ -216,6 +218,46 @@ const TRENDS_MA_OPTIONS: TrendsMaOption[] = [
   { value: 12, label: '12-Month Trend' },
   { value: 24, label: '24-Month Trend' },
 ];
+
+// Illustrative fixture series for UI Lab mini-charts. Reusable by any
+// future UI Lab card that needs a sparkline. Not wired to production data.
+const UI_LAB_SPARKLINE_SERIES = [18, 24, 21, 30, 28, 38, 35, 46, 42, 54, 58, 66];
+
+// Locked mini-sparkline visual spec; series data below is illustrative UI Lab fixture data.
+const UI_LAB_SPARKLINE_OPTIONS: ApexOptions = {
+  chart: {
+    type: 'area',
+    height: 70,
+    sparkline: { enabled: true },
+    toolbar: { show: false },
+    animations: { enabled: false },
+  },
+  stroke: {
+    curve: 'smooth',
+    width: 1,
+    colors: ['#12B76A'],
+  },
+  fill: {
+    type: 'gradient',
+    gradient: {
+      shadeIntensity: 1,
+      opacityFrom: 0.55,
+      opacityTo: 0,
+      stops: [0, 100],
+      colorStops: [
+        { offset: 0, color: '#12B76A', opacity: 0.55 },
+        { offset: 100, color: '#89DBB5', opacity: 0 },
+      ],
+    },
+  },
+  dataLabels: { enabled: false },
+  markers: { size: 0 },
+  grid: { show: false },
+  xaxis: { labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
+  yaxis: { labels: { show: false } },
+  tooltip: { enabled: false },
+  legend: { show: false },
+};
 type ForecastRangeValue = '30d' | '60d' | '90d' | '6m' | '1y' | '2y' | '3y';
 type ForecastRangeOption = { value: ForecastRangeValue; label: string; months: number };
 const FORECAST_RANGE_OPTIONS: ForecastRangeOption[] = [
@@ -4126,6 +4168,61 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       </svg>
                       3.52%
                     </span>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">RevenueCard</h3>
+              <p className="ui-lab-section-subtitle">Source: demo.tailadmin.com/sales (Total Revenue tile). Locked spec, 2026-05-06. Borderless 12px shell — distinct from MetricCard.</p>
+              <div className="ui-lab-preview-width">
+                <article className="revenue-card">
+                  <div className="revenue-card__header">
+                    <div className="revenue-card__title-block">
+                      <h3 className="revenue-card__title">Total Revenue</h3>
+                      <div className="revenue-card__delta-row">
+                        <p className="revenue-card__delta revenue-card__delta--up">
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M7.9974 2.66602L7.9974 13.3336M4 6.66334L7.99987 2.66602L12 6.66334" stroke="currentColor" />
+                          </svg>
+                          32%
+                        </p>
+                        <p className="revenue-card__delta-context">vs last month</p>
+                      </div>
+                    </div>
+                    <svg
+                      className="revenue-card__icon"
+                      viewBox="0 0 24 24"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" />
+                      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" />
+                    </svg>
+                  </div>
+                  <div className="revenue-card__hero-row">
+                    <h2 className="revenue-card__value">$10,590</h2>
+                    <div className="revenue-card__sparkline-slot" aria-hidden="true">
+                      <ReactApexChart
+                        options={UI_LAB_SPARKLINE_OPTIONS}
+                        series={[{ name: 'value', data: UI_LAB_SPARKLINE_SERIES }]}
+                        type="area"
+                        height={70}
+                        width="100%"
+                      />
+                    </div>
                   </div>
                 </article>
               </div>

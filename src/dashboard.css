@@ -5187,6 +5187,106 @@ body {
 
 /* .metric-card__delta--down — TODO: defer until a down-state card is requested. */
 
+/* ============================================================
+   .revenue-card — canonical revenue card
+   Source: TailAdmin demo /sales "Total Revenue" tile
+   Spec extracted: 2026-05-06
+   ============================================================ */
+
+.revenue-card {
+  display: block;
+  padding: 20px;
+  background: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  box-shadow: none;
+  font-family: 'Outfit', sans-serif;
+  line-height: 24px;
+}
+
+.revenue-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.revenue-card__title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 24px;
+  color: #344054;
+}
+
+.revenue-card__delta-row {
+  display: flex;
+  flex-direction: row;
+  align-items: normal;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.revenue-card__delta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.revenue-card__delta--up {
+  color: #039855;
+}
+
+/* .revenue-card__delta--down — TODO: defer until needed. */
+
+.revenue-card__delta-context {
+  margin: 0;
+  padding: 0;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.revenue-card__icon {
+  width: 24px;
+  height: 24px;
+  color: #12B76A;
+  fill: none;
+}
+
+.revenue-card__hero-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.revenue-card__value {
+  margin: 0;
+  width: 50%;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 36px;
+  color: #1D2939;
+}
+
+.revenue-card__sparkline-slot {
+  width: 50%;
+  height: 70px;
+  background: transparent;
+  border-radius: 0;
+  border: none;
+}
+
 /* ── Efficiency Opportunities Card ───────────────────────────────────── */
 
 /* Card header */
