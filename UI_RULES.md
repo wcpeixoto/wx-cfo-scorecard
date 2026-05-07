@@ -70,6 +70,7 @@ Weights: 400 Regular · 500 Medium · 600 Semibold · 700 Bold
 > Chart grid `#e0e0e0` is the TailAdmin Sales/Pro dashboard native value (DevTools-extracted).
 > The earlier value `#EAECF0` came from the free React demo and is superseded. Per the source-of-truth
 > rule, DevTools-extracted Pro values win. Update `chartTokens.ts` when applying to new chart components.
+> Production charts updated in commit `95820db` (May 7, 2026).
 
 ### Text
 | Role | Hex |
@@ -1002,6 +1003,7 @@ Area opacity: 0.15–0.25. No 3D. No decorative gradients.
 
 > `grid.borderColor` updated to `#e0e0e0` (TailAdmin Sales/Pro DevTools-extracted value).
 > Prior value `#EAECF0` from the free React demo is superseded. Update `chartTokens.ts` to match.
+> Production charts updated in commit `95820db` (May 7, 2026).
 
 ---
 
