@@ -10,7 +10,7 @@
  * literal is allowed in ApexCharts options objects.
  *
  * Orphan hexes encountered during per-chart migration
- * (#FB5454, #b6b6b6, #89DBB5, #9ca3af, etc.) are decided
+ * (#FB5454, #b6b6b6, #9ca3af, etc.) are decided
  * commit-by-commit, not pre-added here.
  */
 export const chartTokens = {
@@ -20,8 +20,9 @@ export const chartTokens = {
   brand400:        '#637AEA',
 
   // Semantic
-  success:         '#12B76A',
-  successText:     '#039855',
+  success:              '#12B76A',
+  successGradientEnd:   '#89DBB5',
+  successText:          '#039855',
   error:           '#F04438',
   warning:         '#F79009',
   pressure:        '#DC6803',

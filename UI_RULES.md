@@ -1516,8 +1516,9 @@ Example structure:
     brand:           '#465FFF',
     brandSecondary:  '#9CB9FF',
     brand400:        '#637AEA',
-    success:         '#12B76A',   // accent: filled badge/icon/sparkline
-    successText:     '#039855',   // text on white
+    success:              '#12B76A',   // accent: filled badge/icon/sparkline
+    successGradientEnd:   '#89DBB5',   // gradient fade end for success sparkline
+    successText:          '#039855',   // text on white
     error:           '#F04438',
     warning:         '#F79009',
     pressure:        '#DC6803',
