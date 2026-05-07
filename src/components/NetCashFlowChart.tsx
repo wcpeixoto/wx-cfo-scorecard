@@ -3,6 +3,7 @@ import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import { toMonthLabel } from '../lib/kpis/compute';
 import type { CashFlowMode, TrendPoint } from '../lib/data/contract';
+import { chartTokens } from '../lib/ui/chartTokens';
 
 type TimeframeOption = 6 | 12 | 24 | 36 | 'all';
 
@@ -160,18 +161,18 @@ export default function NetCashFlowChart({
     const colorStops = hasPositive && hasNegative
       ? [
           [
-            { offset: 0, color: '#465fff', opacity: 0.28 },
-            { offset: z, color: '#465fff', opacity: 0 },
-            { offset: z, color: '#ef4444', opacity: 0 },
-            { offset: 100, color: '#ef4444', opacity: 0.28 },
+            { offset: 0, color: chartTokens.brand, opacity: 0.28 },
+            { offset: z, color: chartTokens.brand, opacity: 0 },
+            { offset: z, color: chartTokens.error, opacity: 0 },
+            { offset: 100, color: chartTokens.error, opacity: 0.28 },
           ],
         ]
       : hasNegative
       ? [
-          [{ offset: 0, color: '#ef4444', opacity: 0 }, { offset: 100, color: '#ef4444', opacity: 0.28 }],
+          [{ offset: 0, color: chartTokens.error, opacity: 0 }, { offset: 100, color: chartTokens.error, opacity: 0.28 }],
         ]
       : [
-          [{ offset: 0, color: '#465fff', opacity: 0.28 }, { offset: 100, color: '#465fff', opacity: 0 }],
+          [{ offset: 0, color: chartTokens.brand, opacity: 0.28 }, { offset: 100, color: chartTokens.brand, opacity: 0 }],
         ];
 
     return ({
@@ -194,7 +195,7 @@ export default function NetCashFlowChart({
     plotOptions: {
       area: { fillTo: 'origin' },
     },
-    colors: ['#465fff'],
+    colors: [chartTokens.brand],
     fill: {
       type: 'gradient',
       opacity: 1,
@@ -218,7 +219,7 @@ export default function NetCashFlowChart({
       yaxis: [
         {
           y: 0,
-          borderColor: '#9ca3af',
+          borderColor: chartTokens.crosshairStroke,
           borderWidth: 0.75,
           strokeDashArray: 0,
           label: { text: '' },
@@ -243,7 +244,7 @@ export default function NetCashFlowChart({
         style: {
           fontSize: '12px',
           fontWeight: '500',
-          colors: '#6b7280',
+          colors: chartTokens.axisText,
         },
       },
     },
@@ -257,12 +258,12 @@ export default function NetCashFlowChart({
         style: {
           fontSize: '12px',
           fontWeight: '500',
-          colors: '#6b7280',
+          colors: chartTokens.axisText,
         },
       },
     },
     grid: {
-      borderColor: '#E4E7EC',
+      borderColor: chartTokens.gridBorder,
       strokeDashArray: 4,
       padding: {
         left: 6,
