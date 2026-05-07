@@ -2352,3 +2352,48 @@ against existing global ApexCharts tooltip rules — diagnosis-first,
 scope local if global drifts. Recommended: complete the doc
 reconciliation pass (items 1–14 above) BEFORE Prompt B so the
 component build references current docs.
+
+---
+
+## May 7, 2026 — StatisticsCard chart shipped + doc reconciliation
+
+### Doc reconciliation pass shipped
+14 deltas captured across UI_RULES.md (+222 lines net) and
+UI_CARDS.md (+104 lines net). Brand-400 #637AEA, success-text/accent
+split (#039855 vs #12B76A), borderless 12px shell, card-title medium
+(16/600/#344054) and large (18/500/#1D2939), fixed-scale padding
+(20px metric/revenue, 24px chart-card), 32px chart-card header rhythm,
+Pattern E stale-doc cleanup, tab scale duality (40/36/8 global vs
+44/40/10 chart-card), currentColor icon pattern, canonical sparkline
+config, axis label #373d3f, chart grid reconciled to #e0e0e0
+(TailAdmin source-of-truth). Merged via PR #10.
+
+### StatisticsCard ApexCharts shipped (Prompt B)
+The empty `.statistics-card__chart` container from May 6 is now
+populated. Two area series (Online Sales #465fff, Offline Sales #9cb9ff)
+with 0.45 → 0 gradient. Custom JSX legend top-left per Pattern C
+(deviated to two named siblings — `.statistics-card__legend` +
+`.statistics-card__chart` — instead of anonymous wrapper, since the
+two children don't need a shared parent for layout). Solid grid
+`#e0e0e0` (first compliant chart with reconciled docs; production
+charts still on `#EAECF0`, sweep tracked at Later/P3). Axis labels
+`#373d3f`. Crosshair `#b6b6b6` 1px dash-3, styled by global CSS only
+(redundant per-chart config skipped). Tooltip behavior matches global
+spec on every value except marker size — local override of 6px (vs
+global 8px) scoped to `.statistics-card`, documented inline. Local
+fixtures (`STATISTICS_CARD_CATEGORIES`, `STATISTICS_CARD_SERIES`,
+`STATISTICS_CARD_OPTIONS`) live in `Dashboard.tsx` alongside the
+existing UI Lab section — no carve-out to `src/components/UiLab/*`
+yet. Merged via PR #11.
+
+### Locked decisions
+- StatisticsCard tooltip marker override is per-card, not global
+- Legend two-sibling structure is a documented minor deviation from
+  Pattern C (acceptable when shared parent isn't needed for layout)
+- Crosshair styling lives in global CSS only — per-chart ApexOptions
+  duplication explicitly avoided
+
+### Locked files unchanged this session
+All standard locked files per CLAUDE.md remain untouched. Doc files
+(UI_RULES.md, UI_CARDS.md, wx_cfo_scorecard_context_v2_6.md) edited
+in the doc reconciliation pass only — not touched by Prompt B.
