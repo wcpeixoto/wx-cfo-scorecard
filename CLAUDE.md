@@ -493,3 +493,13 @@ Why this exists: project files are snapshots, not live repo files.
 Every commit that changes a doc file makes the project snapshot stale.
 Stale project files cause future agents to read outdated specs and produce
 wrong guidance.
+
+---
+
+## Snapshot drift check (line-level edits)
+
+Before applying any line-level edit (diff, str_replace,
+line-numbered patch), read the live target file. If line
+numbers, surrounding prose, or target text don't match the
+spec, STOP. Report the mismatch and stand by. Do not edit,
+do not improvise.
