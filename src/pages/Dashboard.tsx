@@ -4085,6 +4085,51 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 <p className="ui-lab-subtitle">Canonical component reference. Components added one at a time.</p>
               </div>
             </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">MetricCard</h3>
+              <p className="ui-lab-section-subtitle">Source: demo.tailadmin.com/ai (Users tile). Locked spec, 2026-05-06.</p>
+              <div className="ui-lab-preview-width">
+                <article className="metric-card">
+                  <div className="metric-card__header">
+                    <span className="metric-card__label">Users</span>
+                    <svg
+                      className="metric-card__icon"
+                      viewBox="0 0 24 24"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" />
+                      <circle cx="9" cy="7" r="4" stroke="currentColor" />
+                      <path d="M22 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" />
+                    </svg>
+                  </div>
+                  <h2 className="metric-card__value">10,590</h2>
+                  <div className="metric-card__footer">
+                    <span className="metric-card__subtitle">Last 30 Days</span>
+                    <span className="metric-card__delta metric-card__delta--up">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 19V5" stroke="currentColor" />
+                        <path d="m5 12 7-7 7 7" stroke="currentColor" />
+                      </svg>
+                      3.52%
+                    </span>
+                  </div>
+                </article>
+              </div>
+            </div>
           </div>
         )}
       </section>
