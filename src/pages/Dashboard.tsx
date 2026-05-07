@@ -258,6 +258,66 @@ const UI_LAB_SPARKLINE_OPTIONS: ApexOptions = {
   tooltip: { enabled: false },
   legend: { show: false },
 };
+
+// UI Lab — StatisticsCard chart fixtures (TailAdmin /sales "Users & Revenue Statistics").
+// Local to StatisticsCard. Do not lift to a shared lib until a second consumer needs them.
+const STATISTICS_CARD_CATEGORIES = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+const STATISTICS_CARD_SERIES = [
+  { name: 'Online Sales',  data: [180, 190, 170, 160, 175, 165, 170, 200, 180, 195, 230, 210] },
+  { name: 'Offline Sales', data: [110, 120, 150, 100, 140, 110, 100, 140, 100, 120, 130, 100] },
+];
+
+const STATISTICS_CARD_OPTIONS: ApexOptions = {
+  chart: {
+    type: 'area',
+    height: 250,
+    fontFamily: 'Outfit, sans-serif',
+    toolbar: { show: false },
+    background: 'transparent',
+  },
+  colors: ['#465fff', '#9cb9ff'],
+  stroke: { curve: 'smooth', width: 2 },
+  fill: {
+    type: 'gradient',
+    gradient: {
+      shadeIntensity: 1,
+      opacityFrom: 0.45,
+      opacityTo: 0,
+      stops: [0, 100],
+    },
+  },
+  dataLabels: { enabled: false },
+  markers: { size: 0 },
+  legend: { show: false }, // Custom JSX legend rendered above the chart per Pattern C.
+  grid: {
+    // Solid grid per TailAdmin Sales spec — overrides global dashed default.
+    borderColor: '#e0e0e0',
+    strokeDashArray: 0,
+    xaxis: { lines: { show: false } },
+    yaxis: { lines: { show: true } },
+  },
+  xaxis: {
+    categories: STATISTICS_CARD_CATEGORIES,
+    axisBorder: { show: false },
+    axisTicks: { show: false },
+    labels: {
+      style: { fontSize: '12px', fontWeight: 600, colors: '#373d3f' },
+    },
+    // Crosshair styling handled by global .apexcharts-xcrosshairs in dashboard.css.
+    crosshairs: { show: true },
+  },
+  yaxis: {
+    labels: {
+      style: { fontSize: '11px', fontWeight: 400, colors: '#373d3f' },
+    },
+  },
+  tooltip: { theme: 'light' },
+};
+
 type ForecastRangeValue = '30d' | '60d' | '90d' | '6m' | '1y' | '2y' | '3y';
 type ForecastRangeOption = { value: ForecastRangeValue; label: string; months: number };
 const FORECAST_RANGE_OPTIONS: ForecastRangeOption[] = [
@@ -4232,7 +4292,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
             <div className="ui-lab-section">
               <h3 className="ui-lab-section-title">StatisticsCard</h3>
-              <p className="ui-lab-section-subtitle">Source: demo.tailadmin.com/sales (Users &amp; Revenue Statistics card). Locked spec, 2026-05-06. Shell + header + tabs only. Chart pending Prompt B.</p>
+              <p className="ui-lab-section-subtitle">Source: demo.tailadmin.com/sales (Users &amp; Revenue Statistics card). Locked spec, 2026-05-06. Chart implemented 2026-05-07.</p>
               <div className="ui-lab-preview-width--wide">
                 <article className="statistics-card">
                   <div className="statistics-card__header">
@@ -4255,7 +4315,35 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       ))}
                     </div>
                   </div>
-                  <div className="statistics-card__chart" />
+                  {/* Pattern C custom legend — minor structural deviation: legend and chart
+                      are named siblings (not wrapped in an anonymous block) so the chart
+                      container can keep its locked 250px height without nesting. */}
+                  <div className="statistics-card__legend" role="list">
+                    <div className="statistics-card__legend-item" role="listitem">
+                      <span
+                        className="statistics-card__legend-marker"
+                        style={{ background: '#465fff' }}
+                        aria-hidden="true"
+                      />
+                      <span className="statistics-card__legend-label">Online Sales</span>
+                    </div>
+                    <div className="statistics-card__legend-item" role="listitem">
+                      <span
+                        className="statistics-card__legend-marker"
+                        style={{ background: '#9cb9ff' }}
+                        aria-hidden="true"
+                      />
+                      <span className="statistics-card__legend-label">Offline Sales</span>
+                    </div>
+                  </div>
+                  <div className="statistics-card__chart">
+                    <ReactApexChart
+                      type="area"
+                      height={250}
+                      options={STATISTICS_CARD_OPTIONS}
+                      series={STATISTICS_CARD_SERIES}
+                    />
+                  </div>
                 </article>
               </div>
             </div>
