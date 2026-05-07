@@ -34,6 +34,13 @@ If using ChatGPT / Claude Chat:
 
 ---
 
+## Backlog
+
+Backlog source of truth is Notion. Do not recreate BACKLOG.md.
+If Notion page IDs are needed, fetch them from Notion directly.
+
+---
+
 ## Step 1 — Chat creates the session-close bundle
 
 Chat writes one closeout bundle with:
