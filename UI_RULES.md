@@ -1523,6 +1523,7 @@ Example structure:
     warning:         '#F79009',
     pressure:        '#DC6803',
     gridBorder:      '#e0e0e0',   // updated from #EAECF0 (TailAdmin Sales DevTools)
+    crosshairStroke: '#b6b6b6',   // x-axis crosshair on hover
     axisText:        '#667085',   // standard charts
     axisTextSales:   '#373d3f',   // Sales-family chart-cards
   } as const;

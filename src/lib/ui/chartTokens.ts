@@ -10,7 +10,7 @@
  * literal is allowed in ApexCharts options objects.
  *
  * Orphan hexes encountered during per-chart migration
- * (#FB5454, #b6b6b6, #9ca3af, etc.) are decided
+ * (#FB5454, #9ca3af, etc.) are decided
  * commit-by-commit, not pre-added here.
  */
 export const chartTokens = {
@@ -29,6 +29,7 @@ export const chartTokens = {
 
   // Structural
   gridBorder:      '#e0e0e0',
+  crosshairStroke: '#b6b6b6',
   axisText:        '#667085',
   axisTextSales:   '#373d3f',
 
