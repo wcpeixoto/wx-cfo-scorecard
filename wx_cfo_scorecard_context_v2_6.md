@@ -2397,3 +2397,75 @@ yet. Merged via PR #11.
 All standard locked files per CLAUDE.md remain untouched. Doc files
 (UI_RULES.md, UI_CARDS.md, wx_cfo_scorecard_context_v2_6.md) edited
 in the doc reconciliation pass only — not touched by Prompt B.
+
+---
+
+## May 7, 2026 — chartTokens infrastructure + snapshot drift rule
+
+### Shipped to main
+
+- `95820db` (PR #13) — fix(charts): grid color #EAECF0 → #e0e0e0 in
+  OwnerDistributionsChart and ProjectedCashBalanceChart
+- `b41869f` (PR #13) — fix(persistence): detect silent truncation in
+  requestAllRows. Inline fetch with `Prefer: count=exact` to read
+  `Content-Range` header. Console.error on mismatch, console.warn at
+  80% of PAGE_SIZE. Verified live against Supabase: 4,851 rows / 4,851
+  total, no truncation, no warn.
+- PR #14 — docs: add "Snapshot drift check (line-level edits)" rule
+  to CLAUDE.md
+- PR #15 — docs: reconcile chart grid color token in UI_RULES.md
+  (added production-commit reference, preserved historical narrative
+  per option (a))
+- `b5c90e1` (PR #16) — feat(ui): create chartTokens.ts as single
+  source of truth. 12 canonical tokens, no consumers yet.
+
+### Decisions locked
+
+**Snapshot drift rule.** Project file snapshots in `/mnt/project/`
+may drift from main and cannot be trusted for line-level edits.
+Before any diff, str_replace, or line-numbered patch, the
+implementing agent must read the live target file. Mismatch halts
+the task. Codified in three places: User Preferences, Notion CLAUDE.md
+template, and live CLAUDE.md.
+
+**chartTokens.ts spec — 12 tokens:**
+- Brand: brand `#465FFF`, brandSecondary `#9CB9FF`, brand400 `#637AEA`
+- Semantic: success `#12B76A`, successText `#039855`, error `#F04438`,
+  warning `#F79009`, pressure `#DC6803`
+- Structural: gridBorder `#e0e0e0`, axisText `#667085`,
+  axisTextSales `#373d3f`
+- Text-on-chart: chartTextStrong `#344054`
+
+**Inline-white exception.** `#FFFFFF` is the only hex literal
+permitted inline in ApexCharts options objects (stroke separators,
+marker fills). Documented in chartTokens.ts JSDoc.
+
+**Orphan hex policy.** `#FB5454`, `#b6b6b6`, `#89DBB5`, `#9ca3af`
+decided commit-by-commit during per-chart migration, not pre-added
+to chartTokens.ts.
+
+**NetCashFlowChart drift policy.** Existing Tailwind-palette values
+(`#ef4444`, `#6b7280`, `#9ca3af`, `#E4E7EC`) NOT preserved via
+additional tokens. Accept visual change toward TailAdmin canonical
+palette during migration. Rationale: card system-wide is converging
+on TailAdmin native; preserving one-off drift institutionalizes it.
+Migration PR must include side-by-side screenshot for review.
+
+### Migration plan (Notion: 359ad957-9339-81e8-8ba6-ec81c713295a)
+
+Five planned migration commits, in order; DigHereHighlights is deferred:
+1. OwnerDistributionsChart (smallest safe first)
+2. TopCategoriesCard (confirms #FFFFFF inline exception)
+3. Dashboard.tsx UI-Lab consts (lowest blast radius, casing drift cleanup)
+4. ProjectedCashBalanceChart (forces #344054 token use; #b6b6b6 decision)
+5. NetCashFlowChart (highest risk; visual change accepted)
+6. DigHereHighlights deferred pending product confirmation on #FB5454
+
+### Learned
+
+- Diagnosis-first surfaced 4 chartTokens spec gaps that would have
+  become silent drift if we'd shipped from the canonical 11.
+- Per-chart migration is correctly scoped as five commits, not one big
+  bang. Each is independently revertable.
+- `Prefer: count=exact` is now the standing pattern for paginated
+  Supabase fetches.
