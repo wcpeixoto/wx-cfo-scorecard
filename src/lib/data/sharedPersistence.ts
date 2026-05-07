@@ -167,16 +167,57 @@ async function requestAllRows<T>(path: string): Promise<T[]> {
   const PAGE_SIZE = 10000;
   const all: T[] = [];
   let from = 0;
+  let serverTotal: number | null = null;
 
   for (;;) {
-    const page = await request<T[]>(path, {
-      headers: { Range: `${from}-${from + PAGE_SIZE - 1}` },
+    // Inline fetch so we can read Content-Range for truncation detection.
+    // Using Prefer: count=exact asks PostgREST to return the full dataset
+    // count in Content-Range even when max_rows caps the response.
+    const headers = buildHeaders({
+      Range: `${from}-${from + PAGE_SIZE - 1}`,
+      Prefer: 'count=exact',
     });
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers });
 
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || `Shared persistence request failed (${response.status}).`);
+    }
+
+    // Parse server total from first page: "Content-Range: 0-999/4843"
+    if (serverTotal === null) {
+      const contentRange = response.headers.get('Content-Range');
+      if (contentRange) {
+        const match = contentRange.match(/\/(\d+)$/);
+        if (match) serverTotal = parseInt(match[1], 10);
+      }
+    }
+
+    const body = await response.text();
+    if (!body.trim()) break;
+    const page = JSON.parse(body) as T[];
     if (!page || page.length === 0) break;
     all.push(...page);
     if (page.length < PAGE_SIZE) break;
     from += PAGE_SIZE;
+  }
+
+  // Detect silent truncation: server told us the total but we received fewer.
+  // This happens when Supabase max_rows < PAGE_SIZE. Fix: raise max_rows in
+  // Supabase Dashboard → Settings → Data API → Max Rows.
+  if (serverTotal !== null && all.length < serverTotal) {
+    console.error(
+      `[sharedPersistence] requestAllRows: fetched ${all.length} rows but server total is ${serverTotal}. ` +
+      `Silent data truncation is active. Raise max_rows in Supabase Dashboard (Settings → Data API) to at least ${serverTotal}.`
+    );
+  }
+
+  // Warn when approaching the limit so the issue is caught before it bites.
+  if (all.length > PAGE_SIZE * 0.8) {
+    console.warn(
+      `[sharedPersistence] requestAllRows: ${all.length} rows fetched — within 20% of PAGE_SIZE (${PAGE_SIZE}). ` +
+      `Plan to raise max_rows before the dataset crosses ${PAGE_SIZE} rows.`
+    );
   }
 
   return all;
