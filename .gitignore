@@ -10,3 +10,8 @@ vite.config.d.ts
 
 # scratch / archive workspace — local only
 Temp/
+
+# Supabase local state and secrets — never commit
+supabase/.env
+supabase/.env.local
+supabase/.temp/
