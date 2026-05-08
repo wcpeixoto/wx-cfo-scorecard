@@ -1749,7 +1749,7 @@ It returns HTTP 200 with partial data — no error, no warning, silent data loss
 - `shared_import_batches`
 - `shared_account_settings`
 - `shared_workspace_settings` ← added April 17, 2026
-- `priority_history` ← designed April 18, 2026 — **NOT YET CREATED in Supabase**
+- `priority_history` ← created in Phase 3 (see Phase 3 closeout entry below for confirmation). The earlier "NOT YET CREATED" note is superseded.
 
 **Current Supabase project:**
 - Region: `us-west-2` (Oregon) — suboptimal for East Coast users, minor latency penalty
@@ -2513,11 +2513,102 @@ Locked decisions:
   narrative docs (this file, session logs) commit only on main after
   merge. Keeps one visible source of truth across worktrees.
 
+---
+
+## May 8, 2026 — Documentation commit workflow + AI prose cache V1 architecture
+
+### Shipped to main
+
+- 1639967 — docs(chartTokens): remove stale #9ca3af orphan-list reference.
+  Single-line cleanup of stale commentary; #9ca3af was folded into
+  crosshairStroke during the May 7 migration but the orphan-list comment
+  hadn't been updated.
+
+- cd33668 — docs(claude): codify spec-doc / narrative-doc commit workflow.
+  Adds a new top-level section to CLAUDE.md formalizing the rule that
+  emerged informally during the May 7 chartTokens migration: spec docs
+  commit on the feature branch alongside dependent code; narrative docs
+  commit only on main after merge. Section sits between "Git discipline"
+  and "Worktree and branch hygiene." Landed via docs/doc-commit-workflow-rule
+  branch — first session to use a docs/ prefix for a spec-doc-only change.
+
+### Decisions locked
+
+**Documentation commit workflow rule.** The split is between operational
+truth (main branch, Notion, shipped commits) and narrative truth
+(handoffs, context docs, session logs). Spec docs include CLAUDE.md,
+AGENTS.md, README.md, UI_RULES.md, UI_CARDS.md, UI_Verification_Rules.md,
+SESSION_CLOSE_WORKFLOW.md, and token/type/system-definition source files.
+Narrative docs include this file, handoff documents, session logs, and
+migration journals. Rule rationale: prevents four timelines (feature
+branch, narrative, backlog, main) from drifting into separate states.
+The Hero pill QA drift caught at start of this session is the canonical
+example of the failure mode the rule prevents.
+
+**AI prose cache read path V1 — full architecture.** All eight scoping
+questions (G1–G8) decided and locked. Captured as Notion backlog item
+35aad957-9339-818c-a8fa-ccc27e07879c (Later, P2). Implementation
+intentionally split into staged prompts (migration → helper →
+persistence → integration → verification); the staging is part of the
+architecture, not project management. Key decisions:
+- Schema: separate priority_prose_cache table, not a column on
+  priority_history. Reasons: avoids coupling cache lifecycle to
+  fire-history PATCH-vs-POST logic; allows future prompt versioning;
+  preserves auditability.
+- Cache validity: (workspace_id, cache_key, prompt_version) match.
+  No time-based expiry. Time fights determinism — same condition,
+  same prose, regardless of age.
+- Quantization: floor-based bucketing across all dollar metrics ($1K
+  bands), 5% bands for percent funded, exact for categorical fields
+  (categoryFlagged, troughMonth). Floor avoids cache-key oscillation
+  at boundaries.
+- Invalidation: bump AI_PROSE_PROMPT_VERSION constant, or change cache
+  key composition. No flag, no env gate.
+- Scope: hero-only V1. SecondaryPriority does not call getAIProse today.
+
+**Drift detection caught and corrected.**
+- Hero pill QA was Done in Notion (commit aff4491) but carried forward
+  in two handoffs as unresolved. First instance of the new doc-commit
+  workflow rule preventing real drift.
+- DigHereHighlights deferral previously lived only as a footnote in
+  the closed parent chartTokens migration's Why field. Promoted to
+  standalone Notion item 35aad957-9339-813a-acdb-f94a2305c1e1.
+
+### Discovery artifact
+
+Codex (Opus 4.6) produced a read-only scoping report covering current
+callAIProvider flow, priority_history persistence surface, candidate
+cache-lookup boundaries, cache key composition analysis, freshness
+signals, and fallback decision tree. Report sections A–H. Findings
+informed every G1–G8 decision. Report not committed (one-shot scoping
+artifact); decisions captured in Notion item Why field and this entry.
+
+### Learned
+
+- A discovery prompt with structured section headings produces structured
+  reports. Open-ended "investigate this" produces wandering ones.
+- The first enforcement action of a new workflow rule should model the
+  rule it codifies. Task #2 (CLAUDE.md doc-commit rule) landed via a
+  feature branch + fast-forward merge precisely because committing it
+  directly to main would have weakened the rule's debut.
+- Snapshot drift between project files and live repo is real and load-
+  bearing. The Codex discovery prompt enforced read-live-first; the
+  context-doc patch from this session does the same.
+
+### Working tree at session end
+
+Clean. Main only. No worktrees. No branches except main.
+
 Open from this session:
-- Notion item ID TBD — "Audit Dashboard.tsx JSX color swatches
-  against chartTokens" (P3 Later).
-- chartTokens.ts header comment still references #9ca3af even though
-  it was folded into crosshairStroke this session. Doc-comment nit,
-  non-blocking; cleanup commit if desired.
-- DigHereHighlights migration still pending #FB5454 decision.
-- Hero pill production-path QA still unresolved from morning handoff.
+- Notion item 359ad957-9339-8118-9000-d764b6478bf7 — "Audit
+  Dashboard.tsx JSX color swatches against chartTokens" (P3 Later).
+- DigHereHighlights migration tracked as standalone Notion item
+  35aad957-9339-813a-acdb-f94a2305c1e1 (Later, P3) — blocked on
+  #FB5454 product decision. Parent chartTokens migration is Done.
+
+Resolved in subsequent sessions:
+- chartTokens.ts orphan-list comment nit cleared on May 8, 2026
+  (commit 1639967).
+- Hero pill QA shipped May 7, 2026 in commit aff4491 (verified all
+  10 signal × severity states). Carried forward in error in two
+  handoffs after that — corrected here.
