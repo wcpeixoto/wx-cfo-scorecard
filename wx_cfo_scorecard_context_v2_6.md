@@ -2515,6 +2515,63 @@ Locked decisions:
 
 ---
 
+## May 9, 2026 — AI proxy V1 architecture locked (discovery, not implementation)
+
+### Discovery, not code
+
+This session was scoping only. No code changed, no commits to source files. Output: an Opus 4.6 / Extra-High discovery report covering current `callAIProvider` state, browser-secret audit, provider comparison (Supabase Edge Function vs. Cloudflare Worker), request/response contract, cache integration seam, and determinism/retry/timeout behavior. Implementation prompts deferred to a future session.
+
+The proxy and cache are now tracked as separate Notion items. The proxy is its own architectural layer, not a footnote on the cache work — it has independent platform choice, deploy story, secret rotation policy, and observability surface. Cache item `35aad957-9339-818c-a8fa-ccc27e07879c` carries a dependency line pointing to the new proxy item; it does not start until the proxy ships.
+
+### The architectural principle worth preserving
+
+**Every failure mode in the AI layer collapses back into deterministic copy with no UI branching.**
+
+This was true before the proxy decision (the rollback path in `callAIProvider` is a one-function throw) and it stays true after. Non-2xx response, timeout, malformed JSON, validation failure, missing field, network error — all funnel through `getAIProse`'s catch into `getFallbackCopy(signal, priorHistory)`. The user never sees an error pill, banner, modal, or "AI unavailable" copy. They see deterministic prose. The Today page is a confidence surface; cycling between AI and "AI down" copy would erode trust faster than always-deterministic copy.
+
+This principle predates the proxy and is independent of it. The proxy decision is downstream of it.
+
+### The proxy is intentionally thin
+
+The proxy's job is, completely: **`request in → Anthropic call → validated JSON out`**. Nothing else.
+
+"Smartness" belongs in three other places:
+
+1. **Prompt construction** — client-side. The system prompt lives at [src/lib/priorities/ai.ts](src/lib/priorities/ai.ts) and is sent in the request body. Prose changes ride frontend deploys. Single grep target for prompt versioning. Avoids browser/proxy version skew.
+2. **Cache quantization** — client-side. `buildPriorityProseCacheKey(signal)` is a pure helper in the priorities module. The proxy has no cache awareness.
+3. **Deterministic fallback logic** — client-side. `getFallbackCopy` is pure, synchronous, no I/O. The proxy has no fallback awareness.
+
+This split exists to resist scope creep. Future feature requests against the proxy ("add user-specific personalization," "branch on signal type," "include trailing context window") fail the test: the proxy does not know about the user, the signal type, or the conversation. It is a secret-isolation and cost-protection layer, not a logic layer. If a feature requires the proxy to know more, that growth needs justification, not just convenience.
+
+### Locked decisions
+
+Six decisions captured in the new Notion proxy item Why field. Summary:
+
+1. **Platform: Supabase Edge Function.** Extends existing footprint; secrets, logs, dashboards live where the rest of app state lives. The rollback path makes regional outage user-invisible, neutralizing Cloudflare's multi-region advantage.
+2. **Cache placement: browser-side, read and write.** Keeps proxy minimal; preserves `AI_PROSE_PROMPT_VERSION` as single grep target for cache invalidation.
+3. **System prompt location: client-side, in request body.** See above.
+4. **Determinism settings: temperature `0`, max_tokens `512`, model pinned to a constant inside the proxy.** Byte-stable outputs for identical inputs. Any future drift in these values funnels through `AI_PROSE_PROMPT_VERSION` bumps to flush stale cache entries.
+5. **Auth model: CORS allowlist only for V1.** Anon-key JWT verification on a publishable key is theatre, not security. The proxy is a cost-protection and secret-isolation layer, not an auth boundary. Escalation ladder if abuse materializes: signed requests → Supabase Auth → server-issued nonce. None pre-built.
+6. **Failure behavior: silent fallback to deterministic copy on every non-2xx, timeout, or malformed response.** Preserves the one-function rollback path. DEV-mode console warning acceptable; PROD silent.
+
+### Open questions before implementation
+
+1. **Specific Anthropic model ID.** Cost note in the context doc ("$0.006–0.010 per call" at 1500-in/500-out) aligns with the Haiku tier of the current Anthropic family. Defer to live Anthropic documentation at implementation time.
+2. **CI/CD path.** No GitHub Actions step exists today for `supabase functions deploy`. Manual CLI deploy vs. pipeline step with `SUPABASE_ACCESS_TOKEN` secret — decide before implementation.
+3. **Rotation cadence playbook.** No rotation policy defined for Supabase secrets. Worth writing alongside the proxy launch but not blocking.
+4. **CORS allowlist scope.** Production GitHub Pages origin + localhost dev. Exact list belongs in the implementation prompt.
+
+### Next-session entry point
+
+First implementation prompt: scaffold the Edge Function and ship a deployable hello-world that verifies CORS + secret loading. **Before any Anthropic integration.** Confirms the platform, deploy story, and secret-handling work end-to-end without entangling the Anthropic call. Anthropic wiring is the second prompt.
+
+### Lessons captured
+
+- **Cache work was almost started before the proxy was scoped.** Cache is downstream infrastructure; building it first means committing to architecture (cache-key shape, prompt versioning, table layout) before the thing it caches is real. Order is: proxy → first real call → then cache. Caught and corrected at session start.
+- **Auth recommendations need a threat model, not just a credential mention.** "Verify the anon-key JWT" reads like security but verifies nothing on a publishable key. CORS-only is the honest answer for V1 because it doesn't pretend to be more than it is.
+
+---
+
 ## May 8, 2026 — Documentation commit workflow + AI prose cache V1 architecture
 
 ### Shipped to main
