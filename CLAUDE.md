@@ -383,6 +383,73 @@ When making decisions, prioritize in this order:
 
 ---
 
+## Documentation commit workflow
+
+Project documentation falls into two categories with different commit
+cadences. The split exists to prevent operational truth (main branch,
+Notion, shipped commits) and narrative truth (handoffs, context docs,
+session logs) from drifting into separate timelines.
+
+**Spec docs** define rules, contracts, workflows, or implementation
+constraints that active work depends on. They must evolve with feature
+work and stay accurate before merge.
+
+Spec docs in this repo:
+- `CLAUDE.md`
+- `AGENTS.md`
+- `README.md`
+- `UI_RULES.md`
+- `UI_CARDS.md`
+- `UI_Verification_Rules.md`
+- `SESSION_CLOSE_WORKFLOW.md`
+- Token, type, and system-definition source files (e.g. `chartTokens.ts`)
+
+`CLAUDE.md` and other operational-rule docs are spec docs even when
+they contain process guidance. Process rules are spec, not narrative.
+
+**Narrative docs** record what happened and when — session history,
+shipped chronology, temporary queue state, migration journals, closeout
+summaries. They record work; they do not define or gate it.
+
+Narrative docs in this repo:
+- `wx_cfo_scorecard_context_v2_6.md`
+- handoff documents
+- session logs and closeout summaries
+- migration journals
+
+### Commit cadence
+
+Spec docs commit on the feature branch alongside the code they
+describe. They land on main at the same time as the code that depends
+on them.
+
+Narrative docs commit only on main, after the associated feature work
+has merged. They do not travel on feature branches.
+
+A session that changes both kinds of docs splits the work: the spec
+changes ride with the feature branch; the narrative update lands on
+main as a separate commit after merge.
+
+### Edge cases
+
+If feature work appears to require editing a narrative doc to proceed,
+the change is not actually narrative — it is a spec change in the
+wrong file. Reclassify and move it to the appropriate spec doc.
+
+Narrative docs may reference feature branches or pre-merge work during
+a live session, but they are not committed until the associated code
+is merged to main.
+
+### Why this rule exists
+
+Without this split, four timelines drift apart: feature branch state,
+narrative history, backlog state, and main branch state. The recent
+Hero pill QA drift — a backlog item shown as Done in Notion but carried
+forward in two handoffs as unresolved — is the failure mode this rule
+prevents.
+
+---
+
 ## Worktree and branch hygiene
 
 Worktrees and feature branches are working state, not storage.
