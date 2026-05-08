@@ -383,6 +383,33 @@ When making decisions, prioritize in this order:
 
 ---
 
+## Worktree and branch hygiene
+
+Worktrees and feature branches are working state, not storage.
+At session close, every worktree must end in one of three states:
+
+1. **Merged and removed** — work shipped to main, worktree and branch deleted
+2. **Abandoned and removed** — work no longer wanted, worktree and branch deleted
+3. **Paused with a Notion item** — work intentionally on hold, with a tracked Notion backlog item recording: worktree name, branch name, intent, and a review-by date
+
+No worktree may survive a session close in undecided state.
+"Decide later" without a Notion item is what produces orphan worktrees.
+
+The same applies to local branches without worktrees:
+- Branches whose content has shipped (even under a different SHA via rebase or squash merge) must be deleted, not preserved as historical artifacts
+- Branches with unique unmerged content must be tracked in Notion if intentionally paused, or deleted if abandoned
+
+Verification at session close:
+- `git worktree list` shows only intentional worktrees, each accounted for
+- `git branch` shows only intentional branches, each accounted for
+- Any backup directories under `.claude/worktree-backups/` are matched
+  to a Notion item or removed
+
+When in doubt, prefer deletion. Real work surfaces as user-facing
+friction; backed-up patches age into noise.
+
+---
+
 ## Prompt discipline (for every implementation task)
 
 Every task must follow this sequence:
