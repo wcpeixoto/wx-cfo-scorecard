@@ -2609,21 +2609,32 @@ commit on the feature branch with the deferred verification named
 in the commit message, so downstream readers cannot mistake the
 scaffold for production-ready.
 
-### End-of-session repo state
+### End-of-session repo state (reconciled)
 
-- main HEAD: `502b32b` (this entry adds one commit on top)
-- `feat/ai-proxy-scaffold` HEAD: `88990c2` (one commit ahead of
-  main, unmerged, not pushed)
-- Three `claude/*` deferred-hygiene branches still present
+This block was reconciled in a follow-up narrative-doc commit on
+main after the original May 10 entry froze pre-close state at
+draft time. Actual state at session close:
+
+- main HEAD: `8fa8907` (this entry's commit)
+- `feat/ai-proxy-scaffold` HEAD: `88990c2` — one commit ahead of
+  main, unmerged, not pushed
+- Three previously-listed `claude/*` deferred-hygiene branches
   (`epic-lamarr-923f2e`, `festive-goldwasser-f21174`,
-  `jolly-hofstadter-fcf57b`) plus the harness branch
-  (`claude/inspiring-shannon-4f480e`)
-- Two worktrees: main worktree + harness worktree
+  `jolly-hofstadter-fcf57b`) classified merged-and-removed and
+  deleted at session close
+- Remaining branches: `main`, `feat/ai-proxy-scaffold`,
+  `claude/inspiring-shannon-4f480e` (harness)
+- Worktrees: main worktree + harness worktree
+  (`inspiring-shannon-4f480e`)
 
-The three `claude/*` branches are known inherited exceptions that
-still need classification. Adding them to next session's queue:
-each needs the three-state disposition (merged-and-removed /
-abandoned-and-removed / paused-with-Notion-item).
+Lesson captured: a narrative entry that describes its own
+end-of-session state inside the same commit that adds the entry
+freezes that state at draft time. Disposition steps that run
+after the doc is staged are not reflected. Future close entries
+should either (a) commit disposition steps first and the
+narrative entry last, or (b) explicitly mark the End-of-session
+block as "draft-time state, see follow-up commit for
+reconciliation."
 
 ### Open follow-ups created or materially affected today
 
