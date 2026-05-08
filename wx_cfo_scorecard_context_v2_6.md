@@ -2515,6 +2515,131 @@ Locked decisions:
 
 ---
 
+## May 10, 2026 — AI proxy scaffold + repo hygiene pass
+
+### AI proxy hello-world scaffolded (`88990c2` on `feat/ai-proxy-scaffold`)
+
+Implemented the May 9 locked architecture as a deployable skeleton.
+Single feature-branch commit, not merged, not pushed.
+`supabase/functions/ai-proxy/index.ts` (90 lines) + README.md (117
+lines) + `.gitignore` additions for `supabase/.env*` and
+`supabase/.temp/`.
+
+**Behavior:**
+- CORS allowlist locked to two origins:
+  `https://wcpeixoto.github.io` and `http://localhost:5173`
+- Fail-closed on every origin check — no wildcard, no permissive
+  fallback, disallowed origins return 403 with no CORS headers
+- `Deno.env.get('ANTHROPIC_API_KEY')` presence-only check; response
+  body returns `secret_loaded: <boolean>`, never the value
+- 405 on non-POST/OPTIONS; generic 500 on errors with no detail
+  leak
+- Zero third-party imports — supply-chain surface is zero, property
+  worth preserving when the Anthropic integration lands
+
+**Verification status:**
+- Manual review passed 7-row spec checklist (CORS fail-closed, no
+  wildcard, no secret leak, gitignore coverage, edge cases)
+- `deno check` skipped — Deno toolchain not installed locally
+- Local serve smoke test **deferred** — `supabase functions serve`
+  requires Docker daemon, not installed locally
+
+The scaffold is reviewed but not executed. Commit message marks
+the deferred smoke test explicitly so it cannot be mistaken for
+production-ready. No `supabase functions deploy` ran. No browser-
+side wiring. No `callAIProvider` modification.
+
+### Repo hygiene pass — 14 worktrees + 44 branches removed
+
+Audited all stale worktrees and orphan branches. Every removal
+backed by evidence — patches read, intent summarized, cross-
+referenced against context doc and Notion before disposal. The
+methodology is the shippable artifact, not the deletion count.
+
+**Pattern surfaced:** agent worktrees and feature branches kept
+alive past the point where their work either shipped under a
+different SHA (rebase/squash merge) or was superseded by parallel
+mainline progress. Specific cases:
+- `agent-a95e163d` (598-line "Efficiency drilldown drawer" patch) —
+  byte-for-byte identical to live `EfficiencyDrilldownDrawer.tsx`
+- `agent-aa2ccc28` (TopCategoriesCard tooltip refactor) — would
+  have reverted the documented exception in UI_RULES.md §1004–1015,
+  causing pie/donut multi-series stacking
+- `nifty-banach-b0b1bc` (`computeTickAmount` x-axis fix) — already
+  shipped as `d995623` (PR #5, May 5)
+- `optimistic-maxwell-da29bc` (ProjectionTableV2) — already shipped
+  as `1e07af0`, tagged `projection-v2-checkpoint`
+- `codex/percent-delta-rounding` (chart scale fix) —
+  architecturally obsolete; the file it modified (TrendLineChart
+  for Net Cash Flow) was replaced by `NetCashFlowChart.tsx` in
+  `b1baf05` the next day
+
+**Output:** 14 stale worktrees removed (4 agent-* + 6 named clean-
+merged + 4 named with stale uncommitted work), 44 orphan local
+branches deleted (40 mechanical + 4 evaluated for unique content).
+
+Cleanup also produced commit `843afdd` ("docs: add worktree and
+branch hygiene rule"), which the May 8 entry's "Shipped to main"
+list omitted. Recording it here for the narrative record.
+
+### Operational lessons locked this session
+
+**Recursive STOP discipline.** When a prompt's STOP catches a
+missing prerequisite (Supabase CLI), and resolving that
+prerequisite reveals a second prerequisite (Docker), the executor
+re-STOPs. The discipline is recursive, not one-shot. Codex
+executed this correctly across two retries — diagnosis-first
+caught both gates before any code was written.
+
+**Bounded override pattern.** When a verification step physically
+cannot run, two-AI override is allowed only when (1) the override
+is explicitly authorized at chat level, (2) verification is
+deferred not skipped — the deferred verification is named in the
+commit message and the handoff, and (3) production-affecting
+actions (deploy, push, merge) remain locked even under override.
+This is how the ai-proxy scaffold landed: scaffold + manual review
+authorized, smoke test deferred to a follow-up session that
+installs Docker first.
+
+**Working state is not storage — applies to scaffolds too.** The
+May 8 hygiene rule says working-tree state across sessions is
+worse than a clearly-scoped commit. Today's scaffold tested that
+rule against an unverified-but-reviewed artifact. Resolution:
+commit on the feature branch with the deferred verification named
+in the commit message, so downstream readers cannot mistake the
+scaffold for production-ready.
+
+### End-of-session repo state
+
+- main HEAD: `502b32b` (this entry adds one commit on top)
+- `feat/ai-proxy-scaffold` HEAD: `88990c2` (one commit ahead of
+  main, unmerged, not pushed)
+- Three `claude/*` deferred-hygiene branches still present
+  (`epic-lamarr-923f2e`, `festive-goldwasser-f21174`,
+  `jolly-hofstadter-fcf57b`) plus the harness branch
+  (`claude/inspiring-shannon-4f480e`)
+- Two worktrees: main worktree + harness worktree
+
+The three `claude/*` branches are known inherited exceptions that
+still need classification. Adding them to next session's queue:
+each needs the three-state disposition (merged-and-removed /
+abandoned-and-removed / paused-with-Notion-item).
+
+### Open follow-ups created or materially affected today
+
+- Three `claude/*` deferred-hygiene branches — apply the hygiene
+  rule, classify each, remove or track in Notion
+- Install Docker Desktop, run four-scenario curl smoke test
+  against `supabase functions serve` (commands documented in
+  `supabase/functions/ai-proxy/README.md`)
+- After smoke test passes: deploy decision + Anthropic integration
+  prompt (separate commit)
+
+**Working tree:** clean.
+**Active branch:** main.
+
+---
+
 ## May 9, 2026 — AI proxy V1 architecture locked (discovery, not implementation)
 
 ### Discovery, not code
