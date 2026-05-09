@@ -626,3 +626,24 @@ line-numbered patch), read the live target file. If line
 numbers, surrounding prose, or target text don't match the
 spec, STOP. Report the mismatch and stand by. Do not edit,
 do not improvise.
+
+---
+
+## Suggested-change format (prompts, instructions, documents)
+
+Any suggested correction, adjustment, tweak, or text modification
+to prompts, instructions, documents, or project copy must be
+merge-safe.
+
+If the suggestion is one or two lines:
+- Clearly state where to insert it.
+- If it replaces existing text, quote the current text and the
+  exact replacement text.
+
+If the suggestion is more than two lines:
+- Rewrite the full prompt, instruction, document section, or
+  message in complete form.
+- Do not provide partial fragments or loose diff-style edits.
+
+Purpose: prevent snapshot drift and hand-merge mistakes when
+live files or prompts have changed.
