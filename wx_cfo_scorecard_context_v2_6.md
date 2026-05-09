@@ -1662,18 +1662,18 @@ business owners, using CFO-style signal design and Nubank-level usability.
 
 **Last known commits (most recent first):**
 ```
-8b22985  feat(big-picture): remove Trajectory card with noisy momentum signals
-ba2c678  feat(cash-trend): drop target+gap, drop 6-bar chart, add status interpretation line
-46e1ccf  docs: add wx-design-system and TailAdmin canonical source references to CLAUDE.md
-08ff398  docs: UI_RULES — CSS architecture clarity, font correction, chartTokens pattern
-32627e2  fix: cash trend font regression — revert to Outfit
-31330e2  feat(cash-trend): hero card — T6M margin, status hysteresis, velocity, Big Picture wiring
-658c0b2  chore(ui): rename What Needs Attention to Cost Spikes to Investigate
+5e31ad8  fix(ai-prose): round dollars to $K and lock reserve ratio to percent
+fe3d661  docs: update narrative entry to reflect final intent-based rule
+1481436  docs: tighten suggested-change format rule to intent-based criteria
+5051039  docs: narrative entry for suggested-change format rule
+03cc755  docs: add suggested-change format rule to CLAUDE.md
+2e31aa0  docs: narrative entry for Trigger B switch to GitHub Sync now
+94e0789  docs: switch Trigger B from re-upload to GitHub Sync now
 ```
 
-**Working tree:** clean (stray .rtf untracked — leave alone)
+**Working tree:** clean
 **Active branch:** main
-**Last updated:** April 27, 2026
+**Last updated:** May 9, 2026
 **Today page V1:** SHIPPED
 **Phase 5 routing:** SHIPPED — Today is landing page, Big Picture at /big-picture
 **Deployment:** GitHub Pages via GitHub Actions — automatic on push to main
