@@ -635,15 +635,12 @@ Any suggested correction, adjustment, tweak, or text modification
 to prompts, instructions, documents, or project copy must be
 merge-safe.
 
-If the suggestion is one or two lines:
-- Clearly state where to insert it.
-- If it replaces existing text, quote the current text and the
-  exact replacement text.
+If the change replaces a small, clearly identifiable sentence or
+line, quote the exact current text and the exact replacement text.
 
-If the suggestion is more than two lines:
-- Rewrite the full prompt, instruction, document section, or
-  message in complete form.
-- Do not provide partial fragments or loose diff-style edits.
+If the change affects structure, logic, wording across multiple
+lines, or could be ambiguous, rewrite the full affected block or
+section in complete form.
 
-Purpose: prevent snapshot drift and hand-merge mistakes when
-live files or prompts have changed.
+Purpose: prevent snapshot drift and hand-merge mistakes while
+avoiding unnecessary full rewrites for tiny changes.
