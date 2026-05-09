@@ -3046,3 +3046,23 @@ Resolved in subsequent sessions:
 - Hero pill QA shipped May 7, 2026 in commit aff4491 (verified all
   10 signal × severity states). Carried forward in error in two
   handoffs after that — corrected here.
+
+---
+
+### 2026-05-09 — Session workflow split
+
+The monolithic `SESSION_HANDOFF_WORKFLOW_TEMPLATE.md` was replaced by a
+split workflow system at the repo root:
+
+- `PROJECT_CONFIG.md` — shared project/workflow config (required reads,
+  locked files, spec-doc list, arc signals, irreversible-action rules).
+- `TASK_PROMPT_TEMPLATE.md` — implementation-prompt drafting template
+  for Codex / Claude Code / other coding agents.
+- `SESSION_CLOSE_WORKFLOW.md` — trigger-based session close behavior.
+- `README_SESSION_WORKFLOWS.md` — map of the workflow docs.
+
+`CLAUDE.md` now points to `PROJECT_CONFIG.md` for required-read order
+rather than restating it. `README.md` gained a Workflow docs section
+and dropped the obsolete `AGENTS.md` row (file does not exist in repo).
+
+No app code changed.

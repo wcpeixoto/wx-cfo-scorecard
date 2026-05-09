@@ -208,7 +208,6 @@ This README is orientation only. Authoritative documentation lives in:
 | File | Purpose |
 |---|---|
 | [CLAUDE.md](CLAUDE.md) | Project rules, source-of-truth hierarchy, key files, locked files, dev rules, prompt discipline |
-| [AGENTS.md](AGENTS.md) | Codex-flavored runbook (mirrors CLAUDE.md) |
 | [UI_RULES.md](UI_RULES.md) | Design system tokens, primitives, page compositions, project overlay |
 | [UI_CARDS.md](UI_CARDS.md) | Card anatomy, height behavior, pairing classification |
 | [wx_cfo_scorecard_context_v2_6.md](wx_cfo_scorecard_context_v2_6.md) | Current project state, architecture, queued roadmap |
@@ -218,3 +217,17 @@ This README is orientation only. Authoritative documentation lives in:
 Backlog state lives in Notion (single source of truth):
 <https://www.notion.so/084420fff00444de9413a542db3dddf0>. There is no
 `BACKLOG.md` in this repo.
+
+---
+
+## Workflow docs
+
+Session-close, task-prompt, and shared-config doctrine live in dedicated
+files at the repo root. Read these directly; do not rely on summaries.
+
+| File | Purpose |
+|---|---|
+| [PROJECT_CONFIG.md](PROJECT_CONFIG.md) | Shared workflow/config source of truth: required reads, locked files, spec-doc list, arc signals, irreversible-action rules |
+| [TASK_PROMPT_TEMPLATE.md](TASK_PROMPT_TEMPLATE.md) | Required template when drafting an implementation prompt for Codex, Claude Code, or another coding agent |
+| [SESSION_CLOSE_WORKFLOW.md](SESSION_CLOSE_WORKFLOW.md) | Trigger model and behavior for closing a session |
+| [README_SESSION_WORKFLOWS.md](README_SESSION_WORKFLOWS.md) | Map of the workflow docs above |

@@ -62,15 +62,19 @@ What does not trigger a sync:
 
 ## Required reading on session start
 
-Before doing any work, read these files in order:
+`PROJECT_CONFIG.md` is the canonical workflow source. Its
+**Required Reads Before Code** section defines the read order for
+implementation work. Follow that order; do not duplicate it here.
 
-1. `wx_cfo_scorecard_context_v2_6.md` — current project state, architecture,
-   data layer, forecast engine, locked parameters, and queued roadmap.
-   **Today page V1 is shipped** (Phase 4.10d–f complete).
-2. `UI_RULES.md` — visual standard reference, must be read before any UI work
-3. `UI_CARDS.md` — card anatomy, height behavior, pairing classification
-4. This file (`CLAUDE.md`) — project rules, stack, and working discipline
-5. `SESSION_CLOSE_WORKFLOW.md` — required reading when ending a session
+In addition, this file (`CLAUDE.md`) is required reading for project
+rules, stack, and working discipline.
+
+Workflow files to consult when their trigger applies:
+
+- `TASK_PROMPT_TEMPLATE.md` — required when drafting an implementation
+  prompt for a coding agent.
+- `SESSION_CLOSE_WORKFLOW.md` — required when closing a session.
+- `README_SESSION_WORKFLOWS.md` — map of the workflow docs.
 
 For any UI work, also check the TailAdmin source at:
 `code/Code Supporting Docs/free-react-tailwind-admin-dashboard-main/`
@@ -396,13 +400,19 @@ work and stay accurate before merge.
 
 Spec docs in this repo:
 - `CLAUDE.md`
-- `AGENTS.md`
 - `README.md`
 - `UI_RULES.md`
 - `UI_CARDS.md`
 - `UI_Verification_Rules.md`
+- `PROJECT_CONFIG.md`
+- `TASK_PROMPT_TEMPLATE.md`
 - `SESSION_CLOSE_WORKFLOW.md`
+- `README_SESSION_WORKFLOWS.md`
 - Token, type, and system-definition source files (e.g. `chartTokens.ts`)
+
+The authoritative spec-doc list (used by Trigger B in
+`SESSION_CLOSE_WORKFLOW.md`) lives in `PROJECT_CONFIG.md`. If this list
+and `PROJECT_CONFIG.md` ever disagree, `PROJECT_CONFIG.md` wins.
 
 `CLAUDE.md` and other operational-rule docs are spec docs even when
 they contain process guidance. Process rules are spec, not narrative.
@@ -567,18 +577,26 @@ wx_cfo_scorecard_context_v2_6.md for full context and rationale.
 
 ## Session close discipline
 
-Any session that commits a change to a documentation file in the repo root
-must re-upload that file to the Codex/Claude project snapshot before closing.
+Session close behavior is governed by `SESSION_CLOSE_WORKFLOW.md`. Run
+it when the user signals close (“close session,” “wrap,” “handoff,” or
+similar). Do not run a close when no trigger fires.
+
+Any session that **commits** a change to a documentation file in the
+repo root must re-upload that file to the Codex/Claude project snapshot
+before closing. This is Trigger B in `SESSION_CLOSE_WORKFLOW.md`.
 
 Documentation files that must stay in sync with the Codex/Claude project:
+- `CLAUDE.md`
 - `UI_RULES.md`
 - `UI_CARDS.md`
-- `CLAUDE.md`
+- `UI_Verification_Rules.md`
 - `wx_cfo_scorecard_context_v2_6.md`
-- UI_Verification_Rules.md
+- `PROJECT_CONFIG.md`
+- `TASK_PROMPT_TEMPLATE.md`
+- `SESSION_CLOSE_WORKFLOW.md`
+- `README_SESSION_WORKFLOWS.md`
 
-
-Checklist before closing any session that touched doc files:
+Checklist before closing any session that committed a doc-file change:
 □ Re-upload changed .md files to the Codex/Claude project (project → files)
 □ Confirm project files match repo state
 □ Do not close the session until the upload is confirmed
