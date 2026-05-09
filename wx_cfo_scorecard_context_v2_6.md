@@ -1,6 +1,6 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: May 9, 2026 (Trigger B mechanic switched to GitHub Sync now)*
+*Last updated: May 9, 2026 (Suggested-change format rule added)*
 
 ---
 
@@ -69,6 +69,35 @@ preserved but no UI surface in V1.
   backend writes for one-time async effects.
 - Stale-bundle / wrong-port can produce false-positive bug reports.
   Hard-reload + port verification before capturing wire evidence.
+
+---
+
+### May 9, 2026 — Suggested-change format rule added to CLAUDE.md
+
+**What changed**
+- `03cc755` docs: add suggested-change format rule to CLAUDE.md
+
+**Why it matters**
+- Codifies how chats deliver text suggestions to the user.
+  ≤2 lines: state location and explicit replace/with. >2 lines:
+  rewrite the full block. No partial diffs across more than two
+  lines. Pairs with the existing snapshot-drift check — both rules
+  protect against hand-merge errors when live files have moved.
+
+**Current state**
+- main HEAD: `03cc755`. Working tree clean.
+- Rule lives at the bottom of CLAUDE.md, after "Snapshot drift
+  check (line-level edits)".
+
+**Next step**
+- Click "Sync now" on the Claude project (CLAUDE.md is on the
+  snapshot-refresh list → Trigger B fires).
+
+**Lessons**
+- The user's own delivery of the rule text demonstrated it: their
+  message was >2 lines, so they rewrote the section in full rather
+  than diffing against my draft. Good reinforcement of the rule's
+  intent at the moment it shipped.
 
 ---
 
