@@ -2637,6 +2637,125 @@ in a follow-up step or follow-up session.
 
 ---
 
+## May 8, 2026 — evening session — AI proxy V0 deployed, smoke-tested, merged to main
+
+### Shipped to main
+
+- `04eef21` — Merge branch 'feat/ai-proxy-scaffold' — AI proxy V0
+  deployed and smoke-tested. Non-FF merge preserving scaffold SHAs
+  `88990c2` (scaffold) and `d31ae59` (README fix). Brings two new
+  files into main: `supabase/functions/ai-proxy/index.ts` and
+  `supabase/functions/ai-proxy/README.md`. `.gitignore` produced no
+  diff — main's `6903c05` had already landed identical content.
+
+### Deployed function
+
+- URL: `https://gzgxcvjvoivlwaksnmxy.supabase.co/functions/v1/ai-proxy`
+- Project ref: `gzgxcvjvoivlwaksnmxy` (wx-cfo-scorecard-test)
+- Source: `index.ts @ 88990c2` (preserved exactly through merge)
+- Deploy command: `supabase functions deploy ai-proxy --no-verify-jwt --use-api`
+
+### Production smoke — all scenarios passed
+
+Four base scenarios against the deployed URL:
+
+- OPTIONS allowed origin (`http://localhost:5173`) → 204 + correct
+  CORS headers
+- OPTIONS disallowed origin (`https://evil.example.com`) → 403, no
+  CORS headers, no body leak
+- POST allowed origin (`http://localhost:5173`) → 200,
+  `secret_loaded: true`
+- POST disallowed origin (`https://evil.example.com`) → 403, no CORS
+  headers, body `origin_not_allowed`
+
+Three gap-closing scenarios after reviewer flagged coverage gaps:
+
+- OPTIONS allowed origin (`https://wcpeixoto.github.io`) → 204 +
+  correct CORS headers
+- POST allowed origin (`https://wcpeixoto.github.io`) → 200,
+  `secret_loaded: true`
+- POST with no Origin header at all → 403, no CORS headers, body
+  `origin_not_allowed`
+
+Both allowlist origins now verified end-to-end. CORS fail-closed
+verified on OPTIONS, POST, and missing-Origin paths.
+`ANTHROPIC_API_KEY` confirmed present in deployed secrets and loads
+correctly.
+
+### Decisions locked
+
+**`--no-verify-jwt` is required for V1 deploys.** V1 threat model is
+CORS allowlist only; the function performs no JWT check. Without the
+flag, Supabase's default JWT verification 401s every request before it
+reaches `index.ts`. Verified end-to-end this session. README updated
+to reflect this requirement (commit `d31ae59`). This is an operational
+deploy-runbook constraint that future redeploys must honor until/unless
+V2 introduces JWT verification.
+
+**`--use-api` bundles server-side; no Docker required for deploys.**
+Resolves the May 8 morning gate where Docker absence blocked local
+`supabase functions serve`. Deploys do not require Docker.
+
+**Non-FF merge chosen for SHA stability.** Main had advanced five
+commits past the scaffold branch point at `502b32b`, making FF
+impossible. Rebase would have rewritten `88990c2` — the SHA literally
+named in the May 8 afternoon entry as "the smoke-tested artifact."
+Merge commit preserves both scaffold SHAs as discoverable history. The
+audit trail integrity (deployed = merged = same SHA) was deemed more
+valuable than linear history for this track.
+
+**Project ref `gzgxcvjvoivlwaksnmxy` (wx-cfo-scorecard-test) is the V1
+deploy target.** Confirmed pre-deploy. The `-test` suffix is
+intentional for V1.
+
+### Workflow patterns reinforced
+
+**Pre-deploy gate before irreversible action.** The deploy track ran
+as three single-purpose Codex prompts with two-AI review between them:
+(1) read-only pre-deploy gate, (2) deploy + production smoke, (3)
+merge + cleanup. Each prompt had hard STOPs on unexpected state. Two
+real STOPs fired: FF-NOT-POSSIBLE on the first merge attempt
+(corrected by switching to non-FF), and a divergence between the
+handoff State block and live main HEAD (correctly diagnosed as benign
+— `f85ac73` was a docs commit landed earlier in the session that
+post-dated the handoff). Both STOPs caught real conditions without
+escalating into incidents. The discipline prevented two silent failure
+modes: rebased audit-trail SHA and out-of-date pre-flight assumption.
+
+**Reviewer-flagged coverage gaps closed before merge.** The production
+smoke initially exercised only one of the two allowlist origins
+(`localhost:5173`). The reviewer flagged that the production browser
+origin `wcpeixoto.github.io` was untested — logically covered by
+`Array.includes()` symmetry but not verified at runtime. Three
+additional curls closed the gap before authorizing merge. Pattern:
+production smoke verifies, never infers.
+
+**Non-FF merge with `--no-commit` inspection.** Pattern for any future
+non-FF merge where conflict surfaces are unclear: run
+`git merge --no-commit --no-ff <branch>`, inspect with
+`git diff --cached`, commit only if clean, abort otherwise. This turned
+a potential silent `.gitignore` conflict into an explicit verification
+step. The merge produced zero diff in `.gitignore` — auto-merge
+converged because main and scaffold had landed identical content from
+independent paths — but the inspect step proved that, rather than
+assuming it.
+
+### End-of-session repo state
+
+Per the commit-ordering rule, this block describes draft-time state.
+The narrative-doc commit will advance main's HEAD beyond `04eef21`.
+
+- main HEAD: `04eef21` (merge commit pushed this session)
+- Active branch: `main`
+- Working tree: clean
+- Branches: `main`, `claude/cranky-gauss-2f0df1` (active harness for
+  the chat that drove this session — expected, not orphan)
+- Worktrees: main + `cranky-gauss-2f0df1` (active harness)
+- AI proxy V0 deployed and live; integration prompt deferred to next
+  session
+
+---
+
 ## May 10, 2026 — AI proxy scaffold + repo hygiene pass
 
 ### AI proxy hello-world scaffolded (`88990c2` on `feat/ai-proxy-scaffold`)
