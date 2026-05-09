@@ -31,7 +31,10 @@ Your job is to produce six short fields that explain one operating signal:
 - alternative: 1 sentence — a backup move if the primary action isn't available
 - followupNote: 1 sentence — what to watch for or expect next
 
-Return a single JSON object with exactly these six string fields. No markdown, no preamble, no commentary — only the JSON object.`;
+Return a single JSON object with exactly these six string fields. Output only the raw JSON object — do not wrap it in markdown code fences, do not include a preamble, postamble, or any surrounding text.`;
+
+const AI_PROXY_URL = 'https://gzgxcvjvoivlwaksnmxy.supabase.co/functions/v1/ai-proxy';
+const AI_PROXY_TIMEOUT_MS = 5000;
 
 // ─── Metric direction ─────────────────────────────────────────────────────────
 
@@ -115,15 +118,103 @@ function buildUserMessage(signal: Signal, priorHistory?: PriorityHistoryRow): st
   return lines.join('\n');
 }
 
-// ─── Provider call (stub) ─────────────────────────────────────────────────────
+// ─── Provider call ────────────────────────────────────────────────────────────
+
+type FallbackCategory =
+  | `status_${number}`
+  | 'timeout'
+  | 'parse_error'
+  | 'validation_error'
+  | 'network_error'
+  | 'unknown_error';
+
+function warnFallback(category: FallbackCategory): void {
+  if (import.meta.env.DEV) {
+    console.warn('[priorities/ai] fallback:', category);
+  }
+}
+
+const FENCE_RE = /^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/;
+
+function stripJsonFences(raw: string): string {
+  const trimmed = raw.trim();
+  const fenceMatch = trimmed.match(FENCE_RE);
+  return fenceMatch ? fenceMatch[1].trim() : trimmed;
+}
 
 async function callAIProvider(
-  _systemPrompt: string,
-  _userMessage: string
+  systemPrompt: string,
+  userMessage: string
 ): Promise<string> {
-  throw new Error(
-    'AI provider not configured — secure server-side proxy is not yet in place. Falling back to deterministic copy.'
-  );
+  let categorized = false;
+  const warn = (category: FallbackCategory): void => {
+    categorized = true;
+    warnFallback(category);
+  };
+
+  try {
+    let res: Response;
+    try {
+      res = await fetch(AI_PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userMessage }],
+          temperature: 0,
+          max_tokens: 512,
+        }),
+        signal: AbortSignal.timeout(AI_PROXY_TIMEOUT_MS),
+      });
+    } catch (err) {
+      const name = err instanceof Error ? err.name : '';
+      warn(name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'network_error');
+      throw err;
+    }
+
+    if (!res.ok) {
+      warn(`status_${res.status}` as FallbackCategory);
+      throw new Error(`AI proxy returned status ${res.status}`);
+    }
+
+    let data: unknown;
+    try {
+      data = await res.json();
+    } catch (err) {
+      warn('parse_error');
+      throw err;
+    }
+
+    if (data === null || typeof data !== 'object') {
+      warn('validation_error');
+      throw new Error('AI proxy response is not an object');
+    }
+    const content = (data as { content?: unknown }).content;
+    if (!Array.isArray(content) || content.length === 0) {
+      warn('validation_error');
+      throw new Error('AI proxy response missing content array');
+    }
+    const first = content[0] as { type?: unknown; text?: unknown } | null;
+    if (
+      first === null ||
+      typeof first !== 'object' ||
+      first.type !== 'text' ||
+      typeof first.text !== 'string'
+    ) {
+      warn('validation_error');
+      throw new Error('AI proxy response content[0] is not a text block');
+    }
+
+    const text = stripJsonFences(first.text);
+    if (text.length === 0) {
+      warn('validation_error');
+      throw new Error('AI proxy response text is empty after fence strip');
+    }
+    return text;
+  } catch (err) {
+    if (!categorized) warnFallback('unknown_error');
+    throw err;
+  }
 }
 
 // ─── Response validation ──────────────────────────────────────────────────────
@@ -165,7 +256,7 @@ export async function getAIProse(
   try {
     const userMessage = buildUserMessage(signal, priorHistory);
     const raw = await callAIProvider(SYSTEM_PROMPT, userMessage);
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(stripJsonFences(raw));
     const prose = validateProseResponse(parsed);
 
     // Write-back stub: only on AI success, never on fallback.
