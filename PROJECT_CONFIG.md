@@ -52,9 +52,13 @@ Flag it before acting.
 
 ---
 
-## Spec Docs
+## Snapshot-refresh files
 
-Changes to these files trigger project-file re-upload:
+Changes to these files trigger project-file re-upload to the
+Codex/Claude project after commit. This list is independent of
+the spec-vs-narrative commit cadence in CLAUDE.md — files of
+either kind appear here because both kinds inform receiving
+chats.
 
 - `CLAUDE.md`
 - `UI_RULES.md`
@@ -128,7 +132,7 @@ Trigger D in `SESSION_CLOSE_WORKFLOW.md` fires when one of these occurs:
 - Phase number bumped in `wx_cfo_scorecard_context_v2_6.md`
 - Constraint added to locked files or locked decisions in `CLAUDE.md`
 - Feature branch with 3+ commits merged to main
-- New project rule landed in any spec doc
+- New project rule landed in any rule-defining doc
 - Multi-session feature reached a stopping point named in Notion backlog
 
 ---

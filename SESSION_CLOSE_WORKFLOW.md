@@ -71,7 +71,7 @@ Run close logic only if a trigger fires.
 | Trigger | Detection | Action |
 |---|---|---|
 | A — Code shipped to main | New commit on main since session start | Confirm clean tree, report push state, ask before pushing |
-| B — Spec/project file committed | A file listed in `PROJECT_CONFIG.md` spec docs was committed during this session (`git log --since=<session-start> --name-only` includes it) | Flag project-file re-upload |
+| B — Snapshot-refresh file committed | A file listed in `PROJECT_CONFIG.md` snapshot-refresh files was committed during this session (`git log --since=<session-start> --name-only` includes it) | Flag project-file re-upload |
 | C — Worktree/branch changed | New worktree exists vs. session start, OR `git branch --merged main` shows a non-main branch | Classify and dispose/track |
 | D — Arc shipped | Configured arc signal fired | Write short narrative entry, after C/E complete |
 | E — Workspace not clean | Dirty/untracked files, failed/skipped checks, or background process remains | Classify, resolve, preserve, or note |
@@ -166,14 +166,14 @@ User action items
 
 ---
 
-## 7. Trigger B — Spec / Project File Committed
+## 7. Trigger B — Snapshot-Refresh File Committed
 
-Run when any spec/project file listed in `PROJECT_CONFIG.md` was **committed** during this session. Working-tree edits that are not yet committed do not fire B — they fire only after the commit lands. This avoids false positives from reverted edits and noise from multi-commit sessions.
+Run when any file listed in `PROJECT_CONFIG.md` **Snapshot-refresh files** was **committed** during this session — regardless of whether the file is classified as spec or narrative under the CLAUDE.md documentation commit workflow. Working-tree edits that are not yet committed do not fire B — they fire only after the commit lands. This avoids false positives from reverted edits and noise from multi-commit sessions.
 
 Detection:
 
 ```bash
-git log --since=<session-start> --name-only -- <spec-doc-paths>
+git log --since=<session-start> --name-only -- <snapshot-refresh-paths>
 ```
 
 Steps:

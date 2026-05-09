@@ -410,9 +410,8 @@ Spec docs in this repo:
 - `README_SESSION_WORKFLOWS.md`
 - Token, type, and system-definition source files (e.g. `chartTokens.ts`)
 
-The authoritative spec-doc list (used by Trigger B in
-`SESSION_CLOSE_WORKFLOW.md`) lives in `PROJECT_CONFIG.md`. If this list
-and `PROJECT_CONFIG.md` ever disagree, `PROJECT_CONFIG.md` wins.
+The authoritative snapshot-refresh list (used by Trigger B in
+`SESSION_CLOSE_WORKFLOW.md`) lives in `PROJECT_CONFIG.md`.
 
 `CLAUDE.md` and other operational-rule docs are spec docs even when
 they contain process guidance. Process rules are spec, not narrative.
