@@ -170,5 +170,3 @@ For these actions, the builder reports findings and stops. The user routes the r
 | Cross-platform restart state | Cross-agent stub from `SESSION_CLOSE_WORKFLOW.md` |
 
 If a fact appears in two places, one will eventually become stale. Handoffs point to source-of-truth records; they do not replace them.
-
-<!-- sync-test-marker 2026-05-09: pineapple-velocity-7421 -->
