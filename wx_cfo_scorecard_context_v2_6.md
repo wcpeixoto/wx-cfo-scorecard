@@ -1,6 +1,6 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: May 9, 2026 (Suggested-change format rule added)*
+*Last updated: May 9, 2026 (Suggested-change format rule — intent-based)*
 
 ---
 
@@ -75,17 +75,22 @@ preserved but no UI surface in V1.
 ### May 9, 2026 — Suggested-change format rule added to CLAUDE.md
 
 **What changed**
-- `03cc755` docs: add suggested-change format rule to CLAUDE.md
+- `03cc755` docs: add suggested-change format rule (initial draft
+  with line-count threshold)
+- `1481436` docs: tighten rule to intent-based criteria
+  (final shipped form)
 
 **Why it matters**
-- Codifies how chats deliver text suggestions to the user.
-  ≤2 lines: state location and explicit replace/with. >2 lines:
-  rewrite the full block. No partial diffs across more than two
-  lines. Pairs with the existing snapshot-drift check — both rules
-  protect against hand-merge errors when live files have moved.
+- Codifies how chats deliver text suggestions to the user. Final
+  rule: small identifiable sentence/line edits use exact
+  quote-current / quote-replacement. Anything that affects
+  structure, logic, multi-line wording, or could be ambiguous gets
+  a full block rewrite. Pairs with the existing snapshot-drift
+  check — both rules protect against hand-merge errors when live
+  files have moved.
 
 **Current state**
-- main HEAD: `03cc755`. Working tree clean.
+- main HEAD: `1481436`. Working tree clean.
 - Rule lives at the bottom of CLAUDE.md, after "Snapshot drift
   check (line-level edits)".
 
@@ -94,10 +99,14 @@ preserved but no UI surface in V1.
   snapshot-refresh list → Trigger B fires).
 
 **Lessons**
-- The user's own delivery of the rule text demonstrated it: their
-  message was >2 lines, so they rewrote the section in full rather
-  than diffing against my draft. Good reinforcement of the rule's
-  intent at the moment it shipped.
+- First draft used a 2-line threshold; user pushed back that the
+  threshold was too loose and judgment-prone. Replacing the
+  numeric trigger with intent-based criteria ("affects structure,
+  logic, multi-line wording, or could be ambiguous") removed the
+  line-counting argument.
+- The user's own delivery of both the original and the revision
+  demonstrated the rule: each rewrite was >2 lines and shipped as
+  a full block, not a diff.
 
 ---
 
