@@ -1,8 +1,10 @@
-import type { Signal, SignalType, PriorityHistoryRow } from './types';
+import type { Signal, SignalType, Severity, PriorityHistoryRow } from './types';
 import { getFallbackCopy } from './copy';
 import { savePriorityHistory } from '../data/sharedPersistence';
 
 export interface AIProse {
+  signalType: SignalType;
+  severity: Severity;
   headline: string;
   why: string;
   currentState: string;
@@ -235,12 +237,13 @@ const REQUIRED_FIELDS: readonly (keyof AIProse)[] = [
   'followupNote',
 ];
 
-function validateProseResponse(parsed: unknown): AIProse {
+function validateProseResponse(parsed: unknown, signal: Signal): AIProse {
   if (parsed === null || typeof parsed !== 'object') {
     throw new Error('AI response is not an object');
   }
   const obj = parsed as Record<string, unknown>;
-  const out: Partial<AIProse> = {};
+  type ProseField = Exclude<keyof AIProse, 'signalType' | 'severity'>;
+  const prose: Partial<Record<ProseField, string>> = {};
   for (const field of REQUIRED_FIELDS) {
     const v = obj[field];
     if (typeof v !== 'string') {
@@ -249,9 +252,16 @@ function validateProseResponse(parsed: unknown): AIProse {
     if (v.trim().length === 0) {
       throw new Error(`AI response field "${field}" is empty`);
     }
-    out[field] = v;
+    prose[field as ProseField] = v;
   }
-  return out as AIProse;
+  // Identity fields come from the source Signal, not the AI response, so
+  // the AI cannot influence them. Spread order guarantees prose can never
+  // overwrite signalType / severity.
+  return {
+    signalType: signal.type,
+    severity: signal.severity,
+    ...(prose as Record<ProseField, string>),
+  };
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -264,7 +274,7 @@ export async function getAIProse(
     const userMessage = buildUserMessage(signal, priorHistory);
     const raw = await callAIProvider(SYSTEM_PROMPT, userMessage);
     const parsed = JSON.parse(stripJsonFences(raw));
-    const prose = validateProseResponse(parsed);
+    const prose = validateProseResponse(parsed, signal);
 
     // Write-back stub: only on AI success, never on fallback.
     try {
