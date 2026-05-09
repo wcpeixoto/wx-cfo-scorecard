@@ -2515,6 +2515,128 @@ Locked decisions:
 
 ---
 
+## May 8, 2026 — afternoon session — AI proxy local smoke test passed (Path B)
+
+### Shipped to main
+
+- `e485a2e` — docs: reconcile May 10 end-of-session block + dispose
+  redundant worktree. Updates the May 10 entry's End-of-session
+  block to reflect actual post-close state (main HEAD `8fa8907`,
+  three `claude/*` deferred-hygiene branches classified
+  merged-and-removed and deleted). Removes redundant worktree
+  `claude/crazy-satoshi-9c5cd3` (identical to main, no unique
+  content). Single narrative-doc commit, pushed.
+
+### Smoke test passed — `feat/ai-proxy-scaffold @ 88990c2`
+
+Path B local smoke test against `supabase/functions/ai-proxy/index.ts`
+ran via `deno run --allow-net --allow-env`. All four README scenarios
+passed:
+
+- OPTIONS allowed origin (`http://localhost:5173`) → 204 + correct
+  CORS headers
+- OPTIONS disallowed origin (`https://evil.example.com`) → 403,
+  no CORS headers, no body leak
+- POST without secret → 200, `secret_loaded: false`
+- POST with secret loaded via `set -a; . supabase/.env; set +a` →
+  200, `secret_loaded: true`
+
+CORS allowlist works in both directions. Fail-closed verified.
+Secret loading via `Deno.env.get('ANTHROPIC_API_KEY')` correct in
+both states. No secret echoed in any response, header, or log.
+The May 9 locked architecture's CORS + secret-isolation surface
+is verified end-to-end at V0. Scaffold unchanged; no new commit
+on the branch.
+
+### Decisions locked
+
+**Path B accepted (`deno run` over `supabase functions serve`).**
+Initial attempt with `supabase functions serve ai-proxy --env-file
+supabase/.env` failed at boot: CLI 2.98.2 gates `functions serve`
+on `supabase start` having been run first, which would download
+multi-GB images (Postgres, Auth, Realtime, Storage, Studio) and
+create `config.toml`/Postgres state in the scaffold worktree.
+Read-only diagnostic confirmed `index.ts` has zero imports and
+uses only `Deno.serve` + `Deno.env.get`, so it runs standalone
+under Deno with no functional difference for this scaffold's
+surface (CORS, env reading, response shape). Path B accepted on
+that basis. Path A remains the right call later for any function
+that adds Supabase-runtime-specific imports (`@supabase/functions-js`
+etc.) — the scaffold currently has none.
+
+Boot command translation: `deno serve` (Deno 2.x) requires
+`export default { fetch }`; imperative `Deno.serve(handler)`
+modules use `deno run --allow-net --allow-env` instead.
+
+**Production deploy deferred to a fresh session.** May 9 plan
+explicitly named "Anthropic wiring is the second prompt" implying
+a session boundary between scaffold verification and integration.
+Recommendation for V1: manual `supabase functions deploy` over
+GitHub Actions pipeline. One deploy doesn't justify the workflow
+file plus `SUPABASE_ACCESS_TOKEN` secret management. Manual deploy
+is one command, takes seconds, produces a clear log. Pipeline is
+reasonable later if/when deploy frequency justifies it.
+
+### Workflow clarifications captured
+
+**Freshness hierarchy when sources conflict.** Closer-to-now wins:
+live repo + live backlog > handoff State block > project file
+snapshots > narrative entries. When the handoff conflicts with a
+snapshot, the handoff wins. When State conflicts with narrative,
+State wins. Branches, items, or open threads named in narrative
+or older snapshots but absent from State should be treated as
+closed, not as drift. Surfaced when the receiving chat correctly
+read the May 10 narrative entry and flagged the three `claude/*`
+branches as drift — they were deleted earlier in the May 10
+session, but the narrative entry's End-of-session block had frozen
+pre-close state. The freshness hierarchy resolves this for future
+receiving chats without manual override each time.
+
+**Project-snapshot upload, not chat-upload.** Project file snapshots
+used by the chat (read-only mounts) refresh only via the project
+settings UI (Project → Files → replace), not by dragging a file
+into the chat. Chat-only re-upload looks like it worked but leaves
+new chats reading the pre-edit version. Surfaced this session when
+the reconciled `wx_cfo_scorecard_context_v2_6.md` was uploaded to
+the chat first; the next chat would have read the stale
+pre-reconciliation version. The project-level upload is now in the
+close checklist.
+
+### Open follow-ups
+
+- `claude/sweet-wing-96cf4b` — orphan local branch surfaced during
+  this session's Step 6 enumeration. At `8fa8907` (= pre-`e485a2e`
+  main HEAD), 0 ahead / 0 behind, no unique commits. Disposition
+  deferred to Step 6 of this close.
+- Production deploy of `feat/ai-proxy-scaffold @ 88990c2` (manual
+  `supabase functions deploy` recommended), followed by production
+  smoke test against deployed URL, followed by merge to main and
+  branch deletion.
+- After deploy: Anthropic integration prompt (the second prompt
+  per May 9 plan) — wires `callAIProvider` to the deployed proxy,
+  removes the stub, kicks off the cache work that depends on it
+  (Notion item `35aad957-9339-818c-a8fa-ccc27e07879c`).
+
+### End-of-session repo state
+
+Per the commit-ordering rule, this block describes draft-time state.
+The session-end disposition for `claude/sweet-wing-96cf4b` will land
+in a follow-up step or follow-up session.
+
+- main HEAD: `e485a2e` (reconciliation commit from this morning,
+  pushed)
+- `feat/ai-proxy-scaffold` HEAD: `88990c2` — one commit ahead of
+  main, unmerged, not pushed; smoke-test verified locally
+- Remaining branches: `main`, `feat/ai-proxy-scaffold`,
+  `claude/inspiring-shannon-4f480e` (harness),
+  `claude/sweet-wing-96cf4b` (orphan, disposition pending)
+- Worktrees: main + `inspiring-shannon-4f480e` (scaffold)
+
+**Working tree:** clean.
+**Active branch:** main.
+
+---
+
 ## May 10, 2026 — AI proxy scaffold + repo hygiene pass
 
 ### AI proxy hello-world scaffolded (`88990c2` on `feat/ai-proxy-scaffold`)
