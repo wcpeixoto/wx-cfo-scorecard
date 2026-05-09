@@ -1,27 +1,34 @@
 # ai-proxy Edge Function
 
-Hello-world scaffold for the AI proxy. Verifies CORS allowlist and
-`ANTHROPIC_API_KEY` secret loading via `Deno.env`. **No Anthropic
-integration.** No browser-side wiring.
+V1 thin forwarder to `api.anthropic.com/v1/messages`. Holds the
+`ANTHROPIC_API_KEY` secret server-side, pins the model, validates
+request shape, and forwards Anthropic's status and JSON body verbatim
+with CORS headers added.
 
 See the May 9, 2026 entry in `wx_cfo_scorecard_context_v2_6.md` at the
 repo root for the locked V1 architecture, six locked decisions, and
 why the proxy is intentionally thin.
 
-## Purpose
+## Behavior
 
-This V0 scaffold proves four things end-to-end:
-
-1. The function deploys cleanly via `supabase functions deploy`.
-2. CORS allowlist works — only `https://wcpeixoto.github.io` and
-   `http://localhost:5173` are accepted. Disallowed origins receive
-   `403` with no CORS headers (fail closed).
-3. The `ANTHROPIC_API_KEY` secret loads correctly via
-   `Deno.env.get()`. The function reports presence only — never the
-   value.
-4. A browser at an allowed origin can reach the function.
-
-The Anthropic integration is a follow-up session.
+- Accepts POST from allowlisted origins only (`https://wcpeixoto.github.io`,
+  `http://localhost:5173`). Disallowed origins receive `403` with no
+  CORS headers (fail closed).
+- Validates request body shape: `system` (string), `messages`
+  (non-empty array), `temperature` (number), `max_tokens` (number).
+  Bad shape returns `400 { "error": "invalid_request_body" }`.
+- Server-pinned model: `claude-haiku-4-5` (dated snapshot at deploy
+  time: `claude-haiku-4-5-20251001`). Any `model` field in the
+  incoming body is silently discarded.
+- Calls Anthropic with `anthropic-version: 2023-06-01` and an 8s
+  timeout. Forwards Anthropic's status and JSON body verbatim
+  (re-serialized) with CORS headers added.
+- Network failure or upstream timeout returns
+  `502 { "error": "upstream_unavailable" }` with CORS headers. No
+  exception detail leaks.
+- Missing or empty `ANTHROPIC_API_KEY` returns generic
+  `500 { "error": "internal_error" }` with no CORS headers.
+- Never logs request bodies, response bodies, headers, or the secret.
 
 ## Manual deploy
 
@@ -106,15 +113,13 @@ override.
 
 ## Out of scope for V1
 
-- Anthropic API integration (next session)
-- Browser-side wiring of `callAIProvider` (deferred — proxy must
-  ship and verify before any browser code references it)
+- Browser-side wiring of `callAIProvider` (next prompt)
 - Automated deploy via GitHub Actions
 - JWT verification, signed requests, or any auth beyond CORS
   allowlist (V1 threat model: cost protection and secret isolation,
   not access control)
-- Caching (browser-side, separate Notion item, blocked on this proxy
-  shipping)
+- Caching (browser-side, separate Notion item)
+- Retry logic (one upstream attempt; failures forwarded)
 
 See the "May 9, 2026 — AI proxy V1 architecture locked" entry in
 `wx_cfo_scorecard_context_v2_6.md` for the full architecture and
