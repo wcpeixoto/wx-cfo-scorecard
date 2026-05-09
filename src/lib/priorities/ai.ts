@@ -1,6 +1,12 @@
 import type { Signal, SignalType, Severity, PriorityHistoryRow } from './types';
 import { getFallbackCopy } from './copy';
-import { savePriorityHistory } from '../data/sharedPersistence';
+import {
+  savePriorityHistory,
+  getCachedProse,
+  saveCachedProse,
+  getSharedPersistenceWorkspaceId,
+} from '../data/sharedPersistence';
+import { AI_PROSE_PROMPT_VERSION, buildPriorityProseCacheKey } from './cacheKey';
 
 export interface AIProse {
   signalType: SignalType;
@@ -271,6 +277,20 @@ export async function getAIProse(
   priorHistory?: PriorityHistoryRow
 ): Promise<AIProse> {
   try {
+    // Cache read — inside outer try/catch. getCachedProse is contracted
+    // not to throw (Step 3 degrades every error class to null), so a hit
+    // returns the prior AI-generated prose for this exact signal shape
+    // immediately: no provider call, no priority_history write, no cache
+    // write. The outer catch is the defensive net if getCachedProse ever
+    // does throw (regression, network edge) — a thrown read degrades to
+    // the deterministic fallback rather than breaking the hero card.
+    const workspaceId = getSharedPersistenceWorkspaceId();
+    const cacheKey = buildPriorityProseCacheKey(signal);
+    const cached = await getCachedProse(workspaceId, cacheKey, AI_PROSE_PROMPT_VERSION);
+    if (cached !== null) {
+      return cached;
+    }
+
     const userMessage = buildUserMessage(signal, priorHistory);
     const raw = await callAIProvider(SYSTEM_PROMPT, userMessage);
     const parsed = JSON.parse(stripJsonFences(raw));
@@ -291,6 +311,11 @@ export async function getAIProse(
     } catch (writeErr) {
       console.error('[priorities/ai] write-back failed:', writeErr);
     }
+
+    // Cache write — fire-and-forget. Runs only on AI success, after
+    // savePriorityHistory. saveCachedProse swallows its own errors;
+    // the unawaited promise rejection cannot reach the user path.
+    void saveCachedProse(workspaceId, cacheKey, AI_PROSE_PROMPT_VERSION, prose);
 
     return prose;
   } catch (err) {
