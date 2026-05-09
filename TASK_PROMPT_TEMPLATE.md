@@ -57,6 +57,12 @@ Copy everything below the start marker.
 
 # Codex Task — [MODEL] — [TASK TITLE]
 
+Target AI: [Claude Chat / ChatGPT / Claude Code / ChatGPT Codex]
+
+See `PROJECT_CONFIG.md` → **AI Roles and Prompt Routing** for role
+definitions. Prompts without a `Target AI:` header are treated as
+drafts; the receiving role must stop and ask before acting.
+
 ## Project context
 
 Read and follow:

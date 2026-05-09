@@ -171,3 +171,20 @@ For these actions, the builder reports findings and stops. The user routes the r
 | Cross-platform restart state | Cross-agent stub from `SESSION_CLOSE_WORKFLOW.md` |
 
 If a fact appears in two places, one will eventually become stale. Handoffs point to source-of-truth records; they do not replace them.
+
+---
+
+## AI Roles and Prompt Routing
+
+Every prompt must clearly state which AI system it is for.
+
+| Role | Responsibility |
+|---|---|
+| Claude Chat | Creates prompts and plans |
+| ChatGPT | Reviews and improves prompts before execution |
+| Claude Code | Executes approved prompts in the codebase |
+| ChatGPT Codex | Supervises, validates, and verifies execution when requested |
+
+Every drafted prompt must include the `Target AI:` header defined in
+`TASK_PROMPT_TEMPLATE.md`. Prompts without a `Target AI:` header are
+treated as drafts; the receiving role must stop and ask before acting.
