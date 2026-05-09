@@ -3066,3 +3066,98 @@ rather than restating it. `README.md` gained a Workflow docs section
 and dropped the obsolete `AGENTS.md` row (file does not exist in repo).
 
 No app code changed.
+
+## May 9, 2026 — AI proxy V1 + client wiring shipped to production
+
+### What changed
+
+- `38cac6e` — feat(ai-proxy): wire V1 Anthropic forwarder. Replaces V0
+  echo scaffold with thin forwarder to api.anthropic.com/v1/messages.
+  Server-pinned model `claude-haiku-4-5` (dated snapshot at deploy
+  time: `claude-haiku-4-5-20251001`), `anthropic-version: 2023-06-01`,
+  8s timeout. Forwards Anthropic's status and body verbatim;
+  network/timeout failures return 502. Incoming `model` field silently
+  discarded.
+- `f4cfcbf` — feat(ai): wire callAIProvider to deployed proxy. Replaces
+  throw stub with fetch to deployed proxy URL. Sends system + messages
+  + temperature 0 + max_tokens 512; no model field. 5s
+  AbortSignal.timeout. Six-category DEV-only `console.warn` on
+  fallback. SYSTEM_PROMPT tightened with explicit "no markdown code
+  fences" instruction. `stripJsonFences` helper used in both
+  `callAIProvider` (before return) and at the `JSON.parse` site in
+  `getAIProse` — defense in depth.
+- `b7308d4` — Merge AI proxy V1 + client wiring (non-FF, preserves
+  both feature SHAs).
+
+### Why it matters
+
+Today page hero prose now renders from real Anthropic Haiku 4.5 calls
+on every render at `https://wcpeixoto.github.io/wx-cfo-scorecard/`.
+The May 9 architectural invariant ("every failure mode collapses to
+deterministic copy with no UI branching") verified end-to-end against
+the production origin: every non-2xx, timeout, parse error,
+validation error, network error, or unknown error throws and is
+caught by `getAIProse`'s existing try/catch, routing to
+`getFallbackCopy(signal, priorHistory)`. The user never sees an error
+pill, banner, or "AI unavailable" copy.
+
+The cache layer (Notion `35aad957-9339-818c-a8fa-ccc27e07879c`) is
+now unblocked — its only dependency was this client wiring landing.
+
+### Current state
+
+- main HEAD: `b7308d4`, pushed
+- AI proxy V1 deployed at
+  `https://gzgxcvjvoivlwaksnmxy.supabase.co/functions/v1/ai-proxy`
+- Production-origin browser smoke verified: OPTIONS 204, POST 200,
+  hero card prose is real Anthropic output (sample headline: "Your
+  cash cushion is solid but still building"), no console errors,
+  no error UI
+- Per-call cost surface live: ~346 input + ~184 output tokens at
+  Haiku 4.5 list price. CORS allowlist is the only auth boundary;
+  any actor with `Origin: https://wcpeixoto.github.io` can incur
+  Anthropic spend via curl. Documented accepted risk per May 9
+  architecture.
+- Working tree: clean. Branch `claude/loving-borg-6fc924` and its
+  worktree removed.
+
+### Next step
+
+Two follow-ups in Notion:
+
+- `35bad957-9339-81d5-8c1e-df2110b274c2` (P2, Next) — AI prose copy
+  refinements. Production smoke surfaced two formatting drifts:
+  exact dollar amounts ($14,091) instead of operator-rounded ($14K),
+  and multiplier units (0.59x) in body prose despite percentage in
+  headline (59%). Fix is SYSTEM_PROMPT edit. Coordinate with cache
+  prompt's invalidation strategy.
+- `35bad957-9339-819a-bfbe-eef014637cb5` (P3, Next) — Worktree/branch
+  sweep. Five carry-over `claude/*` worktrees and four orphan
+  branches remain from prior sessions. Out of scope for this close;
+  audit when convenient.
+
+Cache prompt (`35aad957-9339-818c-a8fa-ccc27e07879c`) is unblocked.
+Latency is the implicit promotion trigger — if real-use feedback
+shows hero feels sluggish, escalate from Later to Next.
+
+### Lessons
+
+- Markdown fence stripping at the parser site is load-bearing, not
+  hypothetical. Live smoke against the V1 proxy showed Haiku 4.5
+  wraps JSON output in ` ```json ... ``` ` fences even under a
+  SYSTEM_PROMPT that explicitly forbids it. Without the
+  `stripJsonFences` defense in depth, every prose render would
+  silently 100%-fall-back to deterministic copy with no user-visible
+  error and no obvious diagnostic — exactly the silent-failure mode
+  CLAUDE.md flags as the worst kind. Belt and suspenders earned its
+  keep.
+- Production-origin browser preflight is not interchangeable with
+  curl from an allowlisted origin. Curl proves wire shape; only a
+  real browser proves the deployed bundle's preflight + render path.
+  Reviewer note 1 from the merge-prep review correctly insisted on
+  the browser smoke before declaring V1 shipped.
+- Sandboxed agent reports of "site is 404" need grounding before
+  conclusions. The deployed Pages URL was `/wx-cfo-scorecard/`, not
+  the user-site root — Codex hit 404 at the wrong URL and inferred
+  the site was down. The deploy was fine; the smoke instructions
+  were the broken thing.
