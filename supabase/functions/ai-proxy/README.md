@@ -35,8 +35,12 @@ supabase login
 supabase link --project-ref <your-project-ref>
 
 # Deploy:
-supabase functions deploy ai-proxy
+supabase functions deploy ai-proxy --no-verify-jwt
 ```
+
+`--no-verify-jwt` is required: V1 threat model is CORS allowlist only
+(no JWT check in source). Without the flag, the platform's default JWT
+verification 401s every request before it reaches `index.ts`.
 
 `supabase link` writes the project ref into `supabase/.temp/` which is
 gitignored — the link is per-developer-machine, not committed.
