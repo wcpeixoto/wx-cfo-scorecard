@@ -1,6 +1,6 @@
 # Wx CFO Scorecard — Project State Summary
 *Technical context for Claude. Start every new conversation by reading this file.*
-*Last updated: May 5, 2026 (Phase 5.1 Branch 5 shipped — renewal pipeline complete)*
+*Last updated: May 9, 2026 (Trigger B mechanic switched to GitHub Sync now)*
 
 ---
 
@@ -69,6 +69,42 @@ preserved but no UI surface in V1.
   backend writes for one-time async effects.
 - Stale-bundle / wrong-port can produce false-positive bug reports.
   Hard-reload + port verification before capturing wire evidence.
+
+---
+
+### May 9, 2026 — Trigger B mechanic: GitHub Sync now replaces re-upload
+
+**What changed**
+- `94e0789` docs: switch Trigger B from re-upload to GitHub Sync now
+  (CLAUDE.md, SESSION_CLOSE_WORKFLOW.md, PROJECT_CONFIG.md)
+
+**Why it matters**
+- The live Claude project is now connected to `wcpeixoto/wx-cfo-scorecard`
+  on branch `main` via the GitHub connector, with the 9 snapshot-refresh
+  files explicitly selected. Trigger B closes now flag a single "Sync now"
+  click instead of a multi-file drag into project settings. Faster per
+  close, same discipline.
+
+**Current state**
+- main HEAD: `94e0789`. Working tree clean.
+- Live project GitHub-connected; manual uploads of snapshot-refresh files
+  removed; auxiliary references (Nubank, TailAdmin CSS, retention .docx)
+  preserved as separate manual uploads.
+- Throwaway test project used to verify the mechanic; safe to delete.
+
+**Next step**
+- Click "Sync now" after this commit (narrative entry touches a
+  snapshot-refresh file → second Trigger B fire of the session).
+- Delete the throwaway test project.
+
+**Lessons**
+- Supersedes the earlier "Project-snapshot upload, not chat-upload"
+  lesson. The October 2025 "connected-but-stale" bug did not reproduce.
+- GitHub-connected files are reachable by name and search but are NOT
+  returned by the "list project files" tool — only manually-uploaded
+  files appear there. Read snapshot-refresh files by name; do not rely
+  on enumeration.
+- Sync is manual, not auto-on-push. Pushing alone does not refresh.
 
 ---
 
