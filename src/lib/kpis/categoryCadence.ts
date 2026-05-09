@@ -379,7 +379,17 @@ export function projectCategoryCadenceScenario(
   // `categoryCadenceForecast` treats `monthOf(asOfDate)` as horizon month 1,
   // so an as-of date in the next month yields the same first projected
   // month as projectScenario.
-  const startMonth = addMonths(model.latestMonth, 1);
+  //
+  // Source the anchor from forecastCashRollups (which excludes the in-progress
+  // current calendar month, per compute.ts:1737) rather than monthlyRollups.
+  // model.latestMonth tracks monthlyRollups and includes partial months —
+  // using it would shift the cadence start one month past projectScenario's
+  // start whenever the latest import contains same-day partial-month rows,
+  // breaking composeConservativeFloor's index-aligned month invariant.
+  // Fallback to model.latestMonth preserves the empty-rollup edge case.
+  const lastForecastRollup =
+    model.forecastCashRollups[model.forecastCashRollups.length - 1];
+  const startMonth = addMonths(lastForecastRollup?.month ?? model.latestMonth, 1);
   const asOfDate = `${startMonth}-01`;
 
   // Production has no historical anchor file; pass [] and let the comparator
