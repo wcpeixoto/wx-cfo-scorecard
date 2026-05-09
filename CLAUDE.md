@@ -581,10 +581,22 @@ it when the user signals close (“close session,” “wrap,” “handoff,” 
 similar). Do not run a close when no trigger fires.
 
 Any session that **commits** a change to a documentation file in the
-repo root must re-upload that file to the Codex/Claude project snapshot
-before closing. This is Trigger B in `SESSION_CLOSE_WORKFLOW.md`.
+repo root must refresh the Claude project snapshot before closing.
+This is Trigger B in `SESSION_CLOSE_WORKFLOW.md`.
 
-Documentation files that must stay in sync with the Codex/Claude project:
+The Claude project is connected to `wcpeixoto/wx-cfo-scorecard` on
+branch `main` via the GitHub connector, with the snapshot-refresh
+files explicitly selected. Refresh is performed by clicking
+**"Sync now"** in the project's GitHub connector. Sync is manual,
+not automatic — pushing to `origin/main` alone does not refresh
+the snapshot.
+
+GitHub-connected files are reachable via search and direct read by
+name, but they are **not** returned by the "list project files"
+tool — only manually-uploaded files appear there. Read snapshot-refresh
+files by name; do not rely on file enumeration to confirm they exist.
+
+Documentation files that must stay in sync with the Claude project:
 - `CLAUDE.md`
 - `UI_RULES.md`
 - `UI_CARDS.md`
@@ -596,14 +608,14 @@ Documentation files that must stay in sync with the Codex/Claude project:
 - `README_SESSION_WORKFLOWS.md`
 
 Checklist before closing any session that committed a doc-file change:
-□ Re-upload changed .md files to the Codex/Claude project (project → files)
-□ Confirm project files match repo state
-□ Do not close the session until the upload is confirmed
+□ Commit pushed to `origin/main`
+□ Click "Sync now" in the project's GitHub connector
+□ Do not close the session until sync is confirmed
 
 Why this exists: project files are snapshots, not live repo files.
-Every commit that changes a doc file makes the project snapshot stale.
-Stale project files cause future agents to read outdated specs and produce
-wrong guidance.
+Every commit that changes a doc file makes the project snapshot stale
+until "Sync now" is clicked. Stale project files cause future agents
+to read outdated specs and produce wrong guidance.
 
 ---
 

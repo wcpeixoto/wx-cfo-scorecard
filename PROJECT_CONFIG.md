@@ -54,8 +54,9 @@ Flag it before acting.
 
 ## Snapshot-refresh files
 
-Changes to these files trigger project-file re-upload to the
-Codex/Claude project after commit. This list is independent of
+Changes to these files trigger a GitHub "Sync now" refresh of the
+Claude project snapshot after the commit lands on `origin/main`.
+This list is independent of
 the spec-vs-narrative commit cadence in CLAUDE.md — files of
 either kind appear here because both kinds inform receiving
 chats.

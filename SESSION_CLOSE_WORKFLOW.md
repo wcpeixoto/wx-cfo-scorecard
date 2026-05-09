@@ -71,7 +71,7 @@ Run close logic only if a trigger fires.
 | Trigger | Detection | Action |
 |---|---|---|
 | A — Code shipped to main | New commit on main since session start | Confirm clean tree, report push state, ask before pushing |
-| B — Snapshot-refresh file committed | A file listed in `PROJECT_CONFIG.md` snapshot-refresh files was committed during this session (`git log --since=<session-start> --name-only` includes it) | Flag project-file re-upload |
+| B — Snapshot-refresh file committed | A file listed in `PROJECT_CONFIG.md` snapshot-refresh files was committed during this session (`git log --since=<session-start> --name-only` includes it) | Flag GitHub "Sync now" |
 | C — Worktree/branch changed | New worktree exists vs. session start, OR `git branch --merged main` shows a non-main branch | Classify and dispose/track |
 | D — Arc shipped | Configured arc signal fired | Write short narrative entry, after C/E complete |
 | E — Workspace not clean | Dirty/untracked files, failed/skipped checks, or background process remains | Classify, resolve, preserve, or note |
@@ -124,7 +124,7 @@ When multiple triggers fire, run them in this order:
 
 1. A — push state
 2. C — worktree/branch disposition
-3. B — project-file re-upload flagging
+3. B — GitHub "Sync now" flagging
 4. E — workspace cleanup/classification
 5. D — narrative entry
 
@@ -179,17 +179,27 @@ git log --since=<session-start> --name-only -- <snapshot-refresh-paths>
 Steps:
 
 1. List committed files (with their commit hashes).
-2. Add re-upload action.
+2. Confirm the commits are pushed to `origin/main`.
+3. Add the Sync now action.
 
 Output:
 
 ```text
 User action items
-- Re-upload [filename] to the project files via project settings.
+- Click "Sync now" in the project's GitHub connector to refresh
+  [filename] in the project files.
+  Sync only runs after the commit is pushed to origin/main.
   Dragging into the current chat is not enough.
 ```
 
 Only include this when snapshot/project-read files actually changed.
+
+The live Wx CFO Scorecard Claude project is connected to
+`wcpeixoto/wx-cfo-scorecard` on branch `main` with the
+snapshot-refresh files explicitly selected. "Sync now" replaces
+the prior "re-upload via project settings" mechanic. Sync is
+manual, not automatic — pushing alone does not refresh the
+project snapshot.
 
 ---
 
@@ -461,7 +471,7 @@ Before responding:
 - main HEAD: [sha] — [subject]
 - Working tree: clean / dirty
 - Branches/worktrees: [list or "main only"]
-- Snapshot freshness: [current / files needing re-upload]
+- Snapshot freshness: [current / files needing Sync now]
 
 ## Next entry point
 - [one line]
@@ -548,7 +558,7 @@ Check:
 - active branches/worktrees
 - obvious orphan/untracked state
 - docs/Notion freshness
-- project-file re-upload needs
+- project-file Sync now needs
 - unresolved dirty state
 
 This replaces five heavy closes with one targeted sweep.
@@ -594,11 +604,12 @@ Continuation close
 
 ```text
 Close type: trigger B — UI_RULES.md changed.
-Steps to run: flag project-file re-upload.
+Steps to run: flag GitHub Sync now.
 Estimated time: 1 min.
 
 User action items
-- Re-upload UI_RULES.md through project settings. Dragging into this chat is not enough.
+- Click "Sync now" in the project's GitHub connector to refresh
+  UI_RULES.md. Sync only runs after the commit is pushed to origin/main.
 ```
 
 ### Trigger E
@@ -623,7 +634,7 @@ Queued for next session
 
 ```text
 Close type: triggers A + B + C + D.
-Steps to run: A push state → C dispose worktree → B flag re-upload → D narrative entry.
+Steps to run: A push state → C dispose worktree → B flag Sync now → D narrative entry.
 Estimated time: 10 min.
 ```
 
