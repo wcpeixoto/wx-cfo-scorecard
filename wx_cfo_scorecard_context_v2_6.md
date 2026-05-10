@@ -3235,3 +3235,100 @@ shows hero feels sluggish, escalate from Later to Next.
   the user-site root — Codex hit 404 at the wrong URL and inferred
   the site was down. The deploy was fine; the smoke instructions
   were the broken thing.
+
+## May 9, 2026 — AI prose cache Steps 1–4 implemented
+
+### What changed
+
+Five-step implementation of the AI prose cache locked in the May 8 architecture. Steps 1–4 landed on feature branch `claude/infallible-nightingale-a67687` over the course of the session; Step 5 (end-to-end verification) was deferred to May 10 after a verification incident surfaced a methodology gap.
+
+- Step 1 — `priority_prose_cache` table created in `wx-cfo-scorecard-test`. RLS mirrors `priority_history`. Manual Supabase migration, not in repo.
+- `36a488a` — feat(priorities/cache): cache key + prompt version. `buildPriorityProseCacheKey` and `AI_PROSE_PROMPT_VERSION` in `src/lib/priorities/cacheKey.ts`. 25 vitest tests covering every `SignalType` and every G4 quantization rule.
+- `e041016` — feat(priorities/ai): extend `AIProse` shape. Step 3 diagnosis surfaced that the `priority_prose_cache` row shape required `signalType` and `severity` on `AIProse`, which the Step 2 cache-key work had not anticipated. Inserted Step 2.5 mid-implementation: extended the interface, updated the validator, updated `getFallbackCopy` to populate both fields from the source `Signal`. Locked-file scoped edit. No prose-field logic changed.
+- `acd793f` — feat(persistence): `getCachedProse` and `saveCachedProse`. Locked-file scoped edit to `src/lib/data/sharedPersistence.ts`. Both helpers take `workspaceId` as a parameter — first helper pair in this file to do so. Upsert uses explicit `updated_at = new Date().toISOString()` on conflict, no DB trigger. `getCachedProse` does not throw — read errors degrade as cache miss.
+- `d51b8a8` — feat(priorities): wire AI prose cache into `getAIProse`. Read seam inside the outer try/catch (defensive against future regression in `getCachedProse`). Write seam fires `saveCachedProse` after `savePriorityHistory` on AI success only, fire-and-forget. Fallback control flow unchanged except for the added identity fields from Step 2.5.
+
+### Why it matters
+
+The cache architecture is end-to-end implemented but not yet shipped. Every AI failure mode still collapses to deterministic copy. When the cache hits, the user-facing return value is identical to the AI-generated prose with no provider call. The May 8 architectural invariants (G1–G8) are all satisfied in code.
+
+### Decisions locked
+
+- Cache read placement inside the outer try/catch, not above it. Two safety nets: the Step 3 contract that `getCachedProse` doesn't throw, and the outer try/catch in `getAIProse`. Per G8, missing-table or read errors degrade as cache miss and never break the hero card.
+- Cache writes are fire-and-forget. Awaiting them would couple the user-facing return value to a write that has no effect on what the user sees. `saveCachedProse` swallows its own errors internally.
+- Step 2.5 inserted mid-implementation rather than retrofitted. Once Step 3 diagnosis surfaced the type-shape gap, fixing it upstream was cleaner than threading a `Signal` parameter through the persistence helper.
+
+### Verification incident
+
+Step 4 verification ran a smoke that called `getAIProse` with a mock `cash_flow_negative` signal against the default `workspace_id`. `savePriorityHistory` PATCHes existing rows within a 7-day dedupe window when `signal_type` matches, so the smoke mutated a real production fire row from earlier the same day. The cleanup step then deleted that mutated row by `ai_headline` pattern.
+
+Lost permanently from the original production row: `ai_headline`, `severity`, `metric_value`, `target_value`, `gap_amount`, `recommended_action`, `category_flagged`. Preserved: `signal_type`, `fired_at` (`2026-05-09 22:44:02.036875+00`), `workspace_id`. Functional impact bounded — the next `cash_flow_negative` fire restores the row functionally; no UI surface or financial calculation broken.
+
+Methodology fix recorded as Notion `35bad957-9339-811b-adb6-e1c215591cda`. Future AI-layer smokes must isolate from production data via dedicated test `workspace_id`. Step 5 prompt to be drafted next session with the requirement explicit.
+
+### Current state
+
+- Feature branch `claude/infallible-nightingale-a67687`, HEAD `d51b8a8`, four commits ahead of `origin/main`, unpushed pending Step 5.
+- Working tree clean.
+- Production data loss bounded and documented.
+- Notion `35aad957-9339-818c-a8fa-ccc27e07879c` (cache item) status: Now. Implementation status synced in the Why field with all four commit SHAs.
+
+### Next step
+
+Step 5 — end-to-end verification on dev with isolated `workspace_id = 'verify'`. Then push, open PR, two-AI review for merge to main per `PROJECT_CONFIG.md`.
+
+### Lessons
+
+- Diagnosis-first caught real spec drift twice in the same implementation. Step 3 diagnosis surfaced the missing `signalType`/`severity` fields on `AIProse` before Codex wrote any persistence code — would have produced an invalid-row write otherwise. Step 4 diagnosis caught that the Step 4 spec's pseudocode had glossed over the inner try/catch around `savePriorityHistory`, which had to be preserved exactly. Both surfaces caught before code was written. The phase-gate discipline pays for itself the first time it surfaces a finding that would have produced wrong code.
+- JSONB byte-equal vs value-equal. PostgreSQL JSONB stores parsed key-value pairs and reserializes on read, so byte-stable output through a JSONB round-trip is not achievable. The Step 3 spec said "byte-for-byte"; Codex correctly flagged the impedance mismatch and used deep-equal. Future cache specs say value-equal.
+- Locked-file scoped authorization works as a discipline. Three separate locked-file edits this implementation (`ai.ts` for Step 2.5, `sharedPersistence.ts` for Step 3, `ai.ts` for Step 4). Each scoped to a specific change with diagnosis surfacing every proposed line range before edits. Zero scope creep across all three.
+- Working state is not storage. The verification incident lost recoverable detail because the smoke ran against the live workspace. Methodology fix is a dedicated test `workspace_id` enforced via env-launched runner. The discipline must be implemented as a process boundary, not a code convention — `WORKSPACE_ID` is a module-level constant resolved at import, so the env override has to be set before the runner starts.
+
+---
+
+## May 10, 2026 — AI prose cache shipped to main as `190c295`
+
+### Shipped to main
+
+- `190c295` — squash merge of PR #20 ("AI prose cache read path (Steps 1–5)"). Six feature-branch commits collapsed to a single SHA on main: `36a488a`, `e041016`, `acd793f`, `d51b8a8`, `78111ed`, `9a7e35c`. Remote branch deleted on merge. Local worktree and branch removed post-merge. Merged at `2026-05-10T02:37:32Z`.
+
+### What changed
+
+- Step 5 — end-to-end verification with isolated `workspace_id = 'verify'`. Throwaway script under `scripts/`, env-launched via `vite-node` (`VITE_SHARED_WORKSPACE_ID=verify npx vite-node scripts/verifyProseCache.ts`), deleted after run. Four scenarios passed: empty-cache miss, cache hit on reload, second-bucket miss, fallback path on proxy 500. Production rows untouched.
+- `78111ed` — fix(priorities/cache): add prior-direction dimension to cache key. Two-AI review (ChatGPT, first pass) caught a determinism gap: `getAIProse` fed `priorHistory` into the prompt via `buildUserMessage`, but `buildPriorityProseCacheKey(signal)` keyed only on the current signal. Prose generated under prior-history context A could be served to readers under context B. Fix extracted direction classification into `src/lib/priorities/direction.ts` (single source of truth for both prompt path and cache key). New `classifyPriorDirection` wrapper maps null prior to `p_none` before any signal-type logic — `steady_state` with null prior maps to `p_none`, not `p_unchanged`. Cache key signature: `buildPriorityProseCacheKey(signal, priorDirection)`. `AI_PROSE_PROMPT_VERSION` bumped `v1` → `v2`. Identity-field safety comment in `ai.ts` corrected to credit `validateProseResponse` filtering, not spread order.
+- `9a7e35c` — fix(priorities/cache): restore SEP + remove raw prior fields from prompt. Two-AI review (ChatGPT, second pass) caught two blocking findings. First, `cacheKey.ts` had `SEP = ''` (likely an editor-strip during the `78111ed` edit); existing 31 cache-key tests silently passed because they asserted round-trip determinism. Restored to `'\x1f'` and added a structural test asserting `key.split('\x1f')` returns exactly the expected five-part array with `length === 5` regression guard. Second, `buildUserMessage` still emitted raw `priorHistory.fired_at` and `priorHistory.metric_value` into the prompt; both were materially prose-shaping (magnitude/intensity, recency) and were not in the cache key. Removed both. Direction-only prior-history context is sufficient for owner-level decision support and matches the cache-key contract: every prior-history-dependent prompt branch is now represented by the cache key.
+
+### Why it matters
+
+The hero card now caches AI prose by signal shape and prior-direction. Repeat renders skip the provider call and return identical prose. Cache determinism is provable: every input that varies the prompt is represented in the cache key. The verification methodology that emerged from the May 9 incident is documented and reusable.
+
+### Decisions locked
+
+- Prior-history context in the AI prompt is direction-only. Raw `fired_at` and exact `metric_value` are not emitted. The five-bucket direction token (`p_none`, `p_improved`, `p_worsened`, `p_unchanged`, `p_unknown`) captures all prose-relevant prior-history semantics.
+- Cache and prompt cannot drift. Both consume direction output from `direction.ts`. The prompt path uses the raw direction string; the cache-key path uses the bucket token. One source, two consumers.
+- `v1` cache rows are abandoned, not migrated. The unique constraint `(workspace_id, cache_key, prompt_version)` prevents collision; stale rows are inert.
+- Cache-key tests must include structural assertions, not only round-trip determinism. Round-trip determinism tests silently pass on regressions where both sides change identically (the `SEP = ''` regression is the canonical example). Future cache-format work includes structural assertions on key parts.
+
+### Current state
+
+- main HEAD: `190c295`, pushed.
+- AI prose cache live in production architecture. First production cache-write happens on the next hero card render against a fresh signal shape.
+- Working tree clean. No worktrees. No `claude/*` branches.
+- Test counts: 32 cache-key tests (including the structural separator test), 13 direction tests, 84 total tests passing.
+- Notion `35aad957-9339-818c-a8fa-ccc27e07879c` (cache item) ready to move from Now → Done.
+
+### Next step
+
+Three Notion items remain open from this work:
+
+- `35bad957-9339-811b-adb6-e1c215591cda` (P2, Later) — Verification methodology — isolate AI cache/history smokes from production data. The validated Step 5 methodology is captured in the Why field. Stays open as durable methodology reference.
+- `35cad957-9339-814f-aa0a-f3e453ba31a8` (P3, Later) — AI proxy enforces Origin allowlist — Node-based smokes must inject Origin header. Discovered during Step 5; documented for future verification work.
+- `35bad957-9339-81d5-8c1e-df2110b274c2` (P2, Next) — AI prose copy refinements. Carried forward from May 9. The cache-contract bump to `v2` invalidates existing cache rows, so any SYSTEM_PROMPT change can land without coordination on cache invalidation — `v1` rows are already unreachable.
+
+### Lessons
+
+- Two-AI review caught two architectural gaps that single-pass review missed. First-pass review caught the cache-key/input mismatch; second-pass review caught the SEP regression and the residual raw-field emissions in `buildUserMessage`. Both findings were real and material. The discipline of routing every irreversible action through an independent reviewer paid for itself twice on a single PR.
+- Round-trip determinism tests can silently mask structural regressions. The `SEP = ''` regression survived 31 cache-key tests because every test built a key and built it again — both sides changed identically. Structural tests (split on the separator, assert exact parts and count) are the load-bearing complement.
+- Diagnosis-first phase-gating works at the review boundary too, not only at the implementation boundary. Each of the two ChatGPT reviews returned findings *before* the merge could happen, in time to fix and re-route. The same phase-gate discipline that catches drift in implementation prompts catches drift in approval flows.
+- `WORKSPACE_ID` resolved at module load means env-launched isolation is the only correct way to route writes to a non-default workspace. `process.env` mutations inside the runner script are no-ops by the time the constant is read. The methodology fix from May 9's incident encodes this as a process boundary, not a code convention.
+- Editor strips of low-byte characters are real. The original Step 2 commit likely stored `SEP` as a raw `\x1f` byte literal, which is invisible in most editors and trivially lost on a paste or save. The grep-visible escape form `'\x1f'` survives copy-paste, source control, and editor configurations that strip control characters. Future low-byte constants in the codebase should use the escape form, not the raw byte.
