@@ -432,6 +432,7 @@ Continuation close
 - HEAD: [sha] — [subject]
 - Working tree: clean / dirty
 - Resuming: [one line]
+- Next chat name: wxcfo / YYMMDD HHMM / [workstream] — [topic]
 ```
 
 No formal handoff.
@@ -461,6 +462,36 @@ Queued for next session
 ```
 
 Do not write “None.”
+
+### Suggested name for next chat
+
+Every close that hands work to a future chat must end with one line:
+
+```text
+Next chat name: wxcfo / YYMMDD HHMM / [workstream] — [topic]
+```
+
+Convention:
+
+- project-slug: `wxcfo` (always)
+- timestamp: `YYMMDD HHMM` (24-hour, local time at handoff)
+- workstream: one word when possible — e.g. `persistence`, `ai`, `gymops`, `docs`, `forecast`, `ui`
+- topic: ≤2 words
+
+Examples:
+
+- `wxcfo / 250510 0915 / ai — cache`
+- `wxcfo / 250510 1340 / persistence — diagnosis`
+- `wxcfo / 250510 2210 / gymops — signins`
+
+This rule applies to:
+
+- Continuation breadcrumbs (§13)
+- Triggered closing messages (§14)
+- Cross-agent stubs (§16)
+- Any prose handoff written outside these templates
+
+The closing chat fills it in; the new chat is named exactly as written. Without this line, future-chat naming reverts to whatever the user types in the moment, breaking sortability and workstream grouping.
 
 ---
 
@@ -525,14 +556,7 @@ Examples:
 
 That is the full cross-agent handoff. Do not add role-aware blocks unless the user explicitly asks.
 
-The **Suggested name for new chat** line is mandatory in every handoff. Convention:
-
-- project-slug: `wxcfo` (always)
-- timestamp: `YYMMDD HHMM` (24-hour, local time at handoff)
-- workstream: one word when possible — e.g. `persistence`, `ai`, `gymops`, `docs`, `forecast`, `ui`
-- topic: ≤2 words
-
-This keeps chats sortable chronologically and groupable by workstream in sidebars. The closing chat fills this in; the new chat is named exactly as written.
+The **Suggested name for new chat** line is mandatory. Convention defined in §14 → **Suggested name for next chat**.
 
 ---
 
