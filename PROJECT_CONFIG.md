@@ -180,10 +180,10 @@ Every prompt must clearly state which AI system it is for.
 
 | Role | Responsibility |
 |---|---|
-| Claude Chat | Creates prompts and plans |
-| ChatGPT | Reviews and improves prompts before execution |
+| Claude Chat | Plans work, drafts prompts, manages session state |
+| ChatGPT | Reviews and improves prompts before execution; reviews irreversible actions |
 | Claude Code | Executes approved prompts in the codebase |
-| ChatGPT Codex | Supervises, validates, and verifies execution when requested |
+| ChatGPT Codex | Executes approved prompts in the codebase, or reviews execution when directed |
 
 Every drafted prompt must include the `Target AI:` header defined in
 `TASK_PROMPT_TEMPLATE.md`. Prompts without a `Target AI:` header are

@@ -55,7 +55,7 @@ Copy everything below the start marker.
 
 ### --- TASK PROMPT START ---
 
-# Codex Task — [MODEL] — [TASK TITLE]
+# Task Prompt — [MODEL] — [TASK TITLE]
 
 Target AI: [Claude Chat / ChatGPT / Claude Code / ChatGPT Codex]
 
