@@ -4,6 +4,11 @@ import {
   AI_PROSE_PROMPT_VERSION,
   buildPriorityProseCacheKey,
 } from './cacheKey';
+import type { PriorDirectionBucket } from './direction';
+
+// Default direction bucket used by tests that aren't exercising the
+// prior-history dimension. p_none mirrors the "no prior on record" case.
+const NONE: PriorDirectionBucket = 'p_none';
 
 // Builder helpers. Defaults give a valid signal of each type; tests
 // override only the fields they care about.
@@ -72,8 +77,8 @@ function steady(overrides: Partial<Signal> = {}): Signal {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 describe('AI_PROSE_PROMPT_VERSION', () => {
-  it('is "v1"', () => {
-    expect(AI_PROSE_PROMPT_VERSION).toBe('v1');
+  it('is "v2"', () => {
+    expect(AI_PROSE_PROMPT_VERSION).toBe('v2');
   });
 });
 
@@ -82,12 +87,12 @@ describe('AI_PROSE_PROMPT_VERSION', () => {
 describe('buildPriorityProseCacheKey — stability', () => {
   it('same signal → same key', () => {
     const s = reserve();
-    expect(buildPriorityProseCacheKey(s)).toBe(buildPriorityProseCacheKey(s));
+    expect(buildPriorityProseCacheKey(s, NONE)).toBe(buildPriorityProseCacheKey(s, NONE));
   });
 
   it('two separately constructed identical signals → same key', () => {
-    expect(buildPriorityProseCacheKey(reserve())).toBe(
-      buildPriorityProseCacheKey(reserve())
+    expect(buildPriorityProseCacheKey(reserve(), NONE)).toBe(
+      buildPriorityProseCacheKey(reserve(), NONE)
     );
   });
 });
@@ -98,16 +103,16 @@ describe('buildPriorityProseCacheKey — sensitivity', () => {
   it('changing severity changes the key', () => {
     const a = reserve({ severity: 'warning' });
     const b = reserve({ severity: 'critical' });
-    expect(buildPriorityProseCacheKey(a)).not.toBe(
-      buildPriorityProseCacheKey(b)
+    expect(buildPriorityProseCacheKey(a, NONE)).not.toBe(
+      buildPriorityProseCacheKey(b, NONE)
     );
   });
 
   it('changing signal type changes the key', () => {
     const a = reserve({ type: 'reserve_warning' });
     const b = reserve({ type: 'reserve_critical' });
-    expect(buildPriorityProseCacheKey(a)).not.toBe(
-      buildPriorityProseCacheKey(b)
+    expect(buildPriorityProseCacheKey(a, NONE)).not.toBe(
+      buildPriorityProseCacheKey(b, NONE)
     );
   });
 
@@ -124,11 +129,14 @@ describe('buildPriorityProseCacheKey — sensitivity', () => {
     ];
     const keys = new Set(
       types.map((t) =>
-        buildPriorityProseCacheKey({
-          type: t,
-          severity: 'warning' as Severity,
-          weight: 1,
-        })
+        buildPriorityProseCacheKey(
+          {
+            type: t,
+            severity: 'warning' as Severity,
+            weight: 1,
+          },
+          NONE,
+        )
       )
     );
     expect(keys.size).toBe(types.length);
@@ -141,29 +149,29 @@ describe('buildPriorityProseCacheKey — reserve ratio 5% band', () => {
   it('ratios in same 5% band → same key (55% band)', () => {
     const a = reserve({ metricValue: 5500, targetValue: 10000 }); // 55.00%
     const b = reserve({ metricValue: 5999, targetValue: 10000 }); // 59.99%
-    expect(buildPriorityProseCacheKey(a)).toBe(buildPriorityProseCacheKey(b));
+    expect(buildPriorityProseCacheKey(a, NONE)).toBe(buildPriorityProseCacheKey(b, NONE));
   });
 
   it('ratios in adjacent 5% bands → different keys', () => {
     const a = reserve({ metricValue: 5499, targetValue: 10000 }); // 54.99% → 50 band
     const b = reserve({ metricValue: 5500, targetValue: 10000 }); // 55.00% → 55 band
-    expect(buildPriorityProseCacheKey(a)).not.toBe(
-      buildPriorityProseCacheKey(b)
+    expect(buildPriorityProseCacheKey(a, NONE)).not.toBe(
+      buildPriorityProseCacheKey(b, NONE)
     );
   });
 
   it('exact band boundary floors down', () => {
     const onBoundary = reserve({ metricValue: 6000, targetValue: 10000 }); // 60.00%
     const justBelow = reserve({ metricValue: 5999, targetValue: 10000 }); // 59.99%
-    expect(buildPriorityProseCacheKey(onBoundary)).not.toBe(
-      buildPriorityProseCacheKey(justBelow)
+    expect(buildPriorityProseCacheKey(onBoundary, NONE)).not.toBe(
+      buildPriorityProseCacheKey(justBelow, NONE)
     );
   });
 
   it('quantizes ratio AFTER division (same ratio from different metric/target → same key)', () => {
     const a = reserve({ metricValue: 5500, targetValue: 10000 }); // 0.55
     const b = reserve({ metricValue: 11000, targetValue: 20000 }); // 0.55
-    expect(buildPriorityProseCacheKey(a)).toBe(buildPriorityProseCacheKey(b));
+    expect(buildPriorityProseCacheKey(a, NONE)).toBe(buildPriorityProseCacheKey(b, NONE));
   });
 
   it('does not quantize numerator/denominator independently (sanity)', () => {
@@ -172,15 +180,15 @@ describe('buildPriorityProseCacheKey — reserve ratio 5% band', () => {
     // quantization, they fall in different 5% bands.
     const a = reserve({ metricValue: 5500, targetValue: 10000 }); // 55%
     const b = reserve({ metricValue: 6000, targetValue: 11000 }); // 54.5% → 50 band
-    expect(buildPriorityProseCacheKey(a)).not.toBe(
-      buildPriorityProseCacheKey(b)
+    expect(buildPriorityProseCacheKey(a, NONE)).not.toBe(
+      buildPriorityProseCacheKey(b, NONE)
     );
   });
 
   it('handles zero target gracefully (no NaN, no throw)', () => {
     const s = reserve({ metricValue: 5000, targetValue: 0 });
-    expect(() => buildPriorityProseCacheKey(s)).not.toThrow();
-    expect(buildPriorityProseCacheKey(s)).toContain('reserve_warning');
+    expect(() => buildPriorityProseCacheKey(s, NONE)).not.toThrow();
+    expect(buildPriorityProseCacheKey(s, NONE)).toContain('reserve_warning');
   });
 });
 
@@ -190,60 +198,60 @@ describe('buildPriorityProseCacheKey — $1K dollar bands', () => {
   it('cash_flow_negative: same $1K band → same key', () => {
     const a = cashFlowNeg({ metricValue: 14091 });
     const b = cashFlowNeg({ metricValue: 14999 });
-    expect(buildPriorityProseCacheKey(a)).toBe(buildPriorityProseCacheKey(b));
+    expect(buildPriorityProseCacheKey(a, NONE)).toBe(buildPriorityProseCacheKey(b, NONE));
   });
 
   it('cash_flow_negative: adjacent $1K bands → different keys', () => {
     const a = cashFlowNeg({ metricValue: 13999 });
     const b = cashFlowNeg({ metricValue: 14000 });
-    expect(buildPriorityProseCacheKey(a)).not.toBe(
-      buildPriorityProseCacheKey(b)
+    expect(buildPriorityProseCacheKey(a, NONE)).not.toBe(
+      buildPriorityProseCacheKey(b, NONE)
     );
   });
 
   it('cash_flow_negative: floors absolute value (sign-insensitive)', () => {
     const a = cashFlowNeg({ metricValue: -14091 });
     const b = cashFlowNeg({ metricValue: 14091 });
-    expect(buildPriorityProseCacheKey(a)).toBe(buildPriorityProseCacheKey(b));
+    expect(buildPriorityProseCacheKey(a, NONE)).toBe(buildPriorityProseCacheKey(b, NONE));
   });
 
   it('cash_flow_tight: $1K band on metricValue', () => {
     const a = cashFlowNeg({ type: 'cash_flow_tight', metricValue: 7200 });
     const b = cashFlowNeg({ type: 'cash_flow_tight', metricValue: 7999 });
-    expect(buildPriorityProseCacheKey(a)).toBe(buildPriorityProseCacheKey(b));
+    expect(buildPriorityProseCacheKey(a, NONE)).toBe(buildPriorityProseCacheKey(b, NONE));
   });
 
   it('expense_surge: $1K band on metricValue', () => {
     const a = expenseSurge({ metricValue: 3200 });
     const b = expenseSurge({ metricValue: 3999 });
-    expect(buildPriorityProseCacheKey(a)).toBe(buildPriorityProseCacheKey(b));
+    expect(buildPriorityProseCacheKey(a, NONE)).toBe(buildPriorityProseCacheKey(b, NONE));
   });
 
   it('revenue_decline: $1K band on metricValue', () => {
     const a = revenueDecline({ metricValue: 8200 });
     const b = revenueDecline({ metricValue: 8999 });
-    expect(buildPriorityProseCacheKey(a)).toBe(buildPriorityProseCacheKey(b));
+    expect(buildPriorityProseCacheKey(a, NONE)).toBe(buildPriorityProseCacheKey(b, NONE));
   });
 
   it('revenue_decline: adjacent bands differ', () => {
     const a = revenueDecline({ metricValue: 7999 });
     const b = revenueDecline({ metricValue: 8000 });
-    expect(buildPriorityProseCacheKey(a)).not.toBe(
-      buildPriorityProseCacheKey(b)
+    expect(buildPriorityProseCacheKey(a, NONE)).not.toBe(
+      buildPriorityProseCacheKey(b, NONE)
     );
   });
 
   it('owner_distributions_high: $1K band on gapAmount', () => {
     const a = ownerDistHigh({ gapAmount: 2200 });
     const b = ownerDistHigh({ gapAmount: 2999 });
-    expect(buildPriorityProseCacheKey(a)).toBe(buildPriorityProseCacheKey(b));
+    expect(buildPriorityProseCacheKey(a, NONE)).toBe(buildPriorityProseCacheKey(b, NONE));
   });
 
   it('owner_distributions_high: adjacent bands differ', () => {
     const a = ownerDistHigh({ gapAmount: 1999 });
     const b = ownerDistHigh({ gapAmount: 2000 });
-    expect(buildPriorityProseCacheKey(a)).not.toBe(
-      buildPriorityProseCacheKey(b)
+    expect(buildPriorityProseCacheKey(a, NONE)).not.toBe(
+      buildPriorityProseCacheKey(b, NONE)
     );
   });
 });
@@ -254,16 +262,16 @@ describe('buildPriorityProseCacheKey — exact-value components', () => {
   it('cash_flow_negative: differing troughMonth → different keys', () => {
     const a = cashFlowNeg({ troughMonth: '2026-06' });
     const b = cashFlowNeg({ troughMonth: '2026-07' });
-    expect(buildPriorityProseCacheKey(a)).not.toBe(
-      buildPriorityProseCacheKey(b)
+    expect(buildPriorityProseCacheKey(a, NONE)).not.toBe(
+      buildPriorityProseCacheKey(b, NONE)
     );
   });
 
   it('expense_surge: differing categoryFlagged → different keys', () => {
     const a = expenseSurge({ categoryFlagged: 'Rent' });
     const b = expenseSurge({ categoryFlagged: 'Insurance' });
-    expect(buildPriorityProseCacheKey(a)).not.toBe(
-      buildPriorityProseCacheKey(b)
+    expect(buildPriorityProseCacheKey(a, NONE)).not.toBe(
+      buildPriorityProseCacheKey(b, NONE)
     );
   });
 });
@@ -274,14 +282,83 @@ describe('buildPriorityProseCacheKey — steady_state minimality', () => {
   it('key does not depend on metric fields', () => {
     const a = steady({ metricValue: 100 });
     const b = steady({ metricValue: 9999, gapAmount: 500, targetValue: 1234 });
-    expect(buildPriorityProseCacheKey(a)).toBe(buildPriorityProseCacheKey(b));
+    expect(buildPriorityProseCacheKey(a, NONE)).toBe(buildPriorityProseCacheKey(b, NONE));
   });
 
   it('key still distinguishes severity', () => {
     const a = steady({ severity: 'healthy' });
     const b = steady({ severity: 'warning' });
-    expect(buildPriorityProseCacheKey(a)).not.toBe(
-      buildPriorityProseCacheKey(b)
+    expect(buildPriorityProseCacheKey(a, NONE)).not.toBe(
+      buildPriorityProseCacheKey(b, NONE)
     );
+  });
+});
+
+// ─── Prior-direction dimension ───────────────────────────────────────────────
+
+describe('buildPriorityProseCacheKey — prior-direction bucket', () => {
+  const allBuckets: PriorDirectionBucket[] = [
+    'p_none',
+    'p_improved',
+    'p_worsened',
+    'p_unchanged',
+    'p_unknown',
+  ];
+
+  it('identical signal + same bucket → same key', () => {
+    const s = cashFlowNeg();
+    expect(buildPriorityProseCacheKey(s, 'p_improved')).toBe(
+      buildPriorityProseCacheKey(s, 'p_improved')
+    );
+  });
+
+  it('identical signal + different buckets → different keys', () => {
+    const s = cashFlowNeg();
+    expect(buildPriorityProseCacheKey(s, 'p_improved')).not.toBe(
+      buildPriorityProseCacheKey(s, 'p_worsened')
+    );
+  });
+
+  it('all five buckets produce distinct keys for the same signal', () => {
+    const s = cashFlowNeg();
+    const keys = new Set(allBuckets.map((b) => buildPriorityProseCacheKey(s, b)));
+    expect(keys.size).toBe(allBuckets.length);
+  });
+
+  it('bucket dimension applies to every SignalType (steady_state included)', () => {
+    const types: SignalType[] = [
+      'reserve_critical',
+      'reserve_warning',
+      'cash_flow_negative',
+      'cash_flow_tight',
+      'expense_surge',
+      'revenue_decline',
+      'owner_distributions_high',
+      'steady_state',
+    ];
+    for (const t of types) {
+      const s: Signal = { type: t, severity: 'warning', weight: 1 };
+      expect(buildPriorityProseCacheKey(s, 'p_none')).not.toBe(
+        buildPriorityProseCacheKey(s, 'p_improved')
+      );
+    }
+  });
+
+  it('bucket token is appended at end of key (not prefixed)', () => {
+    const s = cashFlowNeg();
+    expect(buildPriorityProseCacheKey(s, 'p_improved')).toMatch(/p_improved$/);
+    expect(buildPriorityProseCacheKey(s, 'p_none')).toMatch(/p_none$/);
+  });
+});
+
+// ─── Prompt-version invalidation regression ──────────────────────────────────
+
+describe('AI_PROSE_PROMPT_VERSION — invalidation contract', () => {
+  it('is exposed for use in the unique constraint (workspace_id, cache_key, prompt_version)', () => {
+    // This value is what gets paired with the cache key on every write.
+    // Bumping it invalidates all prior cached prose without colliding,
+    // because the unique constraint includes prompt_version.
+    expect(typeof AI_PROSE_PROMPT_VERSION).toBe('string');
+    expect(AI_PROSE_PROMPT_VERSION.length).toBeGreaterThan(0);
   });
 });

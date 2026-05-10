@@ -7,6 +7,7 @@ import {
   getSharedPersistenceWorkspaceId,
 } from '../data/sharedPersistence';
 import { AI_PROSE_PROMPT_VERSION, buildPriorityProseCacheKey } from './cacheKey';
+import { classifyPriorDirection, computeMetricDirection } from './direction';
 
 export interface AIProse {
   signalType: SignalType;
@@ -18,8 +19,6 @@ export interface AIProse {
   alternative: string;
   followupNote: string;
 }
-
-type MetricDirection = 'worsened' | 'improved' | 'unchanged' | 'unknown';
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
@@ -50,45 +49,6 @@ Return a single JSON object with exactly these six string fields. Output only th
 
 const AI_PROXY_URL = 'https://gzgxcvjvoivlwaksnmxy.supabase.co/functions/v1/ai-proxy';
 const AI_PROXY_TIMEOUT_MS = 5000;
-
-// ─── Metric direction ─────────────────────────────────────────────────────────
-
-const WORSE_WHEN_HIGHER: ReadonlySet<SignalType> = new Set<SignalType>([
-  'expense_surge',
-  'owner_distributions_high',
-]);
-
-const WORSE_WHEN_LOWER: ReadonlySet<SignalType> = new Set<SignalType>([
-  'reserve_critical',
-  'reserve_warning',
-  'cash_flow_negative',
-  'cash_flow_tight',
-  'revenue_decline',
-]);
-
-function computeMetricDirection(
-  signal: Signal,
-  priorHistory?: PriorityHistoryRow
-): MetricDirection {
-  if (signal.type === 'steady_state') return 'unchanged';
-  if (!priorHistory) return 'unknown';
-  if (signal.metricValue === undefined || priorHistory.metric_value === undefined) {
-    return 'unknown';
-  }
-
-  const now = signal.metricValue;
-  const prior = priorHistory.metric_value;
-
-  if (now === prior) return 'unchanged';
-
-  if (WORSE_WHEN_HIGHER.has(signal.type)) {
-    return now > prior ? 'worsened' : 'improved';
-  }
-  if (WORSE_WHEN_LOWER.has(signal.type)) {
-    return now < prior ? 'worsened' : 'improved';
-  }
-  return 'unknown';
-}
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
@@ -260,9 +220,12 @@ function validateProseResponse(parsed: unknown, signal: Signal): AIProse {
     }
     prose[field as ProseField] = v;
   }
-  // Identity fields come from the source Signal, not the AI response, so
-  // the AI cannot influence them. Spread order guarantees prose can never
-  // overwrite signalType / severity.
+  // Identity fields come from the source Signal, not the AI response.
+  // Safety is enforced by validateProseResponse: it iterates only
+  // REQUIRED_FIELDS (which excludes signalType and severity) and types
+  // the local prose object as Record<ProseField, ...> where ProseField
+  // is Exclude<keyof AIProse, 'signalType' | 'severity'>. The provider
+  // cannot inject these keys; the spread is just object composition.
   return {
     signalType: signal.type,
     severity: signal.severity,
@@ -285,7 +248,8 @@ export async function getAIProse(
     // does throw (regression, network edge) — a thrown read degrades to
     // the deterministic fallback rather than breaking the hero card.
     const workspaceId = getSharedPersistenceWorkspaceId();
-    const cacheKey = buildPriorityProseCacheKey(signal);
+    const priorDirection = classifyPriorDirection(signal, priorHistory);
+    const cacheKey = buildPriorityProseCacheKey(signal, priorDirection);
     const cached = await getCachedProse(workspaceId, cacheKey, AI_PROSE_PROMPT_VERSION);
     if (cached !== null) {
       return cached;
