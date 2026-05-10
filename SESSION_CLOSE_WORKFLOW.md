@@ -272,6 +272,31 @@ Narrative entry:
 - Runs after Trigger C and Trigger E
 - Default length: 30 lines or less
 
+### Drafting and approval
+
+The narrative entry must be drafted by the executor (Claude Code or
+Codex), not by the planning chat. Rationale: the executor has live
+access to the file, commits, diffs, and working-tree state. Planning
+chats drafting from secondhand context have produced wrong SHAs and
+mis-attributed events.
+
+Workflow:
+
+1. Planning chat instructs the executor: "Read the live
+   `wx_cfo_scorecard_context_v2_6.md`, the merged PR(s), and the
+   commit log. Draft an entry in the existing format for [date(s)].
+   **Do not append yet. Report the draft.**"
+2. Executor reports the draft text.
+3. Planning chat reviews against project conventions and proposes
+   edits if needed.
+4. Once approved, executor appends to the file and commits in a
+   single follow-up — no second prompt round-trip required.
+
+The Target AI for the drafting step is always an executor — Claude
+Code or ChatGPT Codex. Planning chats (Claude Chat, ChatGPT Chat) do
+not draft narrative entries, even when the executor is unavailable.
+If no executor is available, defer the entry to the next session.
+
 Use five short sections:
 
 ```markdown
