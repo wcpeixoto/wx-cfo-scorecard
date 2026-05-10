@@ -16,7 +16,7 @@ export const AI_PROSE_PROMPT_VERSION = 'v2';
 // because it is a non-printable control character that does not appear
 // in any user-supplied component value (categoryFlagged, troughMonth)
 // reaching this helper from the import pipeline.
-const SEP = '';
+const SEP = '\x1f';
 
 const DOLLAR_BAND = 1000;
 const RESERVE_RATIO_PCT_BAND = 5;

@@ -77,10 +77,6 @@ function buildUserMessage(signal: Signal, priorHistory?: PriorityHistoryRow): st
 
   if (priorHistory) {
     lines.push('');
-    lines.push(`Prior occurrence fired at: ${priorHistory.fired_at}`);
-    if (priorHistory.metric_value !== undefined) {
-      lines.push(`Prior metric value: ${priorHistory.metric_value}`);
-    }
     lines.push(`Direction since last time: ${direction}`);
   } else {
     lines.push('');

@@ -351,6 +351,32 @@ describe('buildPriorityProseCacheKey — prior-direction bucket', () => {
   });
 });
 
+// ─── Structural separator (SEP regression guard) ────────────────────────────
+
+describe('buildPriorityProseCacheKey — separator structure', () => {
+  it('separates key parts with ASCII Unit Separator (0x1f)', () => {
+    // cashFlowNeg() defaults: type=cash_flow_negative, severity=critical,
+    // metricValue=14091 (→ floored to 14000), troughMonth='2026-06'.
+    // Bucket appended at end. Five parts total.
+    const key = buildPriorityProseCacheKey(cashFlowNeg(), 'p_none');
+    const parts = key.split('\x1f');
+
+    // Positive: exact part-by-part match against current key construction.
+    expect(parts).toEqual([
+      'cash_flow_negative',
+      'critical',
+      'm14000',
+      't2026-06',
+      'p_none',
+    ]);
+
+    // Negative regression guard: an empty SEP would collapse the key into
+    // a single concatenated string, so split('\x1f').length would be 1.
+    // This explicit length assertion fails fast if SEP ever regresses to ''.
+    expect(parts.length).toBe(5);
+  });
+});
+
 // ─── Prompt-version invalidation regression ──────────────────────────────────
 
 describe('AI_PROSE_PROMPT_VERSION — invalidation contract', () => {
