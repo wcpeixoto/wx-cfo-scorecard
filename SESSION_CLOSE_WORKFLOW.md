@@ -503,9 +503,26 @@ Before responding:
 
 ## Open question
 - [omit if none]
+
+## Suggested name for new chat
+wxcfo / YYMMDD HHMM / [workstream] — [topic]
+
+Examples:
+- wxcfo / 250510 0915 / ai — cache
+- wxcfo / 250510 1340 / persistence — diagnosis
+- wxcfo / 250510 2210 / gymops — signins
 ```
 
 That is the full cross-agent handoff. Do not add role-aware blocks unless the user explicitly asks.
+
+The **Suggested name for new chat** line is mandatory in every handoff. Convention:
+
+- project-slug: `wxcfo` (always)
+- timestamp: `YYMMDD HHMM` (24-hour, local time at handoff)
+- workstream: one word when possible — e.g. `persistence`, `ai`, `gymops`, `docs`, `forecast`, `ui`
+- topic: ≤2 words
+
+This keeps chats sortable chronologically and groupable by workstream in sidebars. The closing chat fills this in; the new chat is named exactly as written.
 
 ---
 
