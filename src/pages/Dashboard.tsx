@@ -727,6 +727,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [lastImportSummary, setLastImportSummary] = useState<TransactionImportSummary | null>(null);
   const [importExamples, setImportExamples] = useState<{
+    importId: string;
     possibleDuplicateExamples: TransactionImportIssue[];
     parseFailureExamples: TransactionImportIssue[];
   } | null>(null);
@@ -850,14 +851,28 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   // Lazy-load JSONB example arrays for the Settings → Data Imported Data
   // panel. Excluded from the boot projection in getSharedImportedStoreSnapshot
   // to reduce egress; fetched on demand here when the operator opens the panel.
+  // Local-mode summaries already carry the example arrays directly, so the
+  // Supabase fetch is skipped entirely in that mode.
   useEffect(() => {
     if (activeTab !== 'settings' || activeSection !== 'data') return;
     if (!lastImportSummary?.importId) return;
+
+    if (lastImportSummary.storageScope === 'local') {
+      setImportExamples(null);
+      return;
+    }
+
+    // Reset stale examples synchronously before fetching so the prior
+    // batch's examples never render against the new batch's metadata.
+    setImportExamples(null);
+
+    const targetImportId = lastImportSummary.importId;
     let cancelled = false;
-    getSharedImportBatchById(lastImportSummary.importId)
+    getSharedImportBatchById(targetImportId)
       .then((full) => {
         if (cancelled || !full) return;
         setImportExamples({
+          importId: targetImportId,
           possibleDuplicateExamples: full.possibleDuplicateExamples ?? [],
           parseFailureExamples: full.parseFailureExamples ?? [],
         });
@@ -868,7 +883,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     return () => {
       cancelled = true;
     };
-  }, [activeTab, activeSection, lastImportSummary?.importId]);
+  }, [activeTab, activeSection, lastImportSummary?.importId, lastImportSummary?.storageScope]);
 
   // [BOOT] App mount baseline
   useEffect(() => {
@@ -2699,6 +2714,24 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
       ? 'No shared imported dataset is available. Import a Quicken CSV to begin.'
       : 'No browser-local imported dataset is available. Import a Quicken CSV to begin.';
   const importModeLabel = lastImportSummary?.importMode === 'replace-all' ? 'Replace-all shared dataset' : 'Append to local dataset';
+  // Render-time fallback chain for Settings example arrays.
+  // Local mode: read directly from lastImportSummary (IndexedDB carries them).
+  // Shared mode: use lazy-fetched importExamples only when its importId
+  // matches the current lastImportSummary; mismatched/null renders empty
+  // until the lazy fetch completes — stale prior-batch data must never
+  // render against new batch metadata.
+  const renderedDuplicateExamples =
+    lastImportSummary?.storageScope === 'local'
+      ? (lastImportSummary.possibleDuplicateExamples ?? [])
+      : importExamples?.importId === lastImportSummary?.importId
+        ? importExamples?.possibleDuplicateExamples ?? []
+        : [];
+  const renderedParseFailureExamples =
+    lastImportSummary?.storageScope === 'local'
+      ? (lastImportSummary.parseFailureExamples ?? [])
+      : importExamples?.importId === lastImportSummary?.importId
+        ? importExamples?.parseFailureExamples ?? []
+        : [];
   const accountSettingsSourceLabel = sharedPersistenceEnabled
     ? sharedAccountSettingsHasRemoteData
       ? 'Shared account settings'
@@ -3795,11 +3828,11 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                             </div>
                           </div>
 
-                          {(importExamples?.possibleDuplicateExamples ?? []).length > 0 ? (
+                          {renderedDuplicateExamples.length > 0 ? (
                             <div className="import-summary-section">
                               <h4>Possible duplicates</h4>
                               <ul className="import-issue-list">
-                                {(importExamples?.possibleDuplicateExamples ?? []).map((issue) => (
+                                {renderedDuplicateExamples.map((issue) => (
                                   <li key={`dup-${issue.lineNumber}`}>
                                     <strong>Line {issue.lineNumber}.</strong> {issue.message}
                                   </li>
@@ -3808,11 +3841,11 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                             </div>
                           ) : null}
 
-                          {(importExamples?.parseFailureExamples ?? []).length > 0 ? (
+                          {renderedParseFailureExamples.length > 0 ? (
                             <div className="import-summary-section">
                               <h4>Parse failures</h4>
                               <ul className="import-issue-list">
-                                {(importExamples?.parseFailureExamples ?? []).map((issue) => (
+                                {renderedParseFailureExamples.map((issue) => (
                                   <li key={`parse-${issue.lineNumber}`}>
                                     <strong>{issue.lineNumber > 0 ? `Line ${issue.lineNumber}.` : 'Import error.'}</strong> {issue.message}
                                   </li>
