@@ -292,6 +292,16 @@ Workflow:
 4. Once approved, executor appends to the file and commits in a
    single follow-up — no second prompt round-trip required.
 
+**Prompt brevity.** The instruction in step 1 IS the prompt. Do not
+expand it into a `TASK_PROMPT_TEMPLATE.md`-style prompt with required
+reads beyond the three already named, coverage hints, lessons-to-
+capture, format specs, or hard rules. Pre-loading coverage biases the
+executor's draft toward what the planning chat thinks matters, which
+defeats the point of executor-led drafting. The format lives in the
+live file; the executor pattern-matches existing entries. If
+something material is missing from the draft, name it in the review
+pass (step 3), not in the prompt.
+
 The Target AI for the drafting step is always Claude Code. Planning
 chats (Claude Chat, ChatGPT) and supervisors (ChatGPT Codex) do not
 draft narrative entries, even when the executor is unavailable. If
