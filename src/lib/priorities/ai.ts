@@ -1,8 +1,17 @@
-import type { Signal, SignalType, PriorityHistoryRow } from './types';
+import type { Signal, SignalType, Severity, PriorityHistoryRow } from './types';
 import { getFallbackCopy } from './copy';
-import { savePriorityHistory } from '../data/sharedPersistence';
+import {
+  savePriorityHistory,
+  getCachedProse,
+  saveCachedProse,
+  getSharedPersistenceWorkspaceId,
+} from '../data/sharedPersistence';
+import { AI_PROSE_PROMPT_VERSION, buildPriorityProseCacheKey } from './cacheKey';
+import { classifyPriorDirection, computeMetricDirection } from './direction';
 
 export interface AIProse {
+  signalType: SignalType;
+  severity: Severity;
   headline: string;
   why: string;
   currentState: string;
@@ -10,8 +19,6 @@ export interface AIProse {
   alternative: string;
   followupNote: string;
 }
-
-type MetricDirection = 'worsened' | 'improved' | 'unchanged' | 'unknown';
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
@@ -43,45 +50,6 @@ Return a single JSON object with exactly these six string fields. Output only th
 const AI_PROXY_URL = 'https://gzgxcvjvoivlwaksnmxy.supabase.co/functions/v1/ai-proxy';
 const AI_PROXY_TIMEOUT_MS = 5000;
 
-// ─── Metric direction ─────────────────────────────────────────────────────────
-
-const WORSE_WHEN_HIGHER: ReadonlySet<SignalType> = new Set<SignalType>([
-  'expense_surge',
-  'owner_distributions_high',
-]);
-
-const WORSE_WHEN_LOWER: ReadonlySet<SignalType> = new Set<SignalType>([
-  'reserve_critical',
-  'reserve_warning',
-  'cash_flow_negative',
-  'cash_flow_tight',
-  'revenue_decline',
-]);
-
-function computeMetricDirection(
-  signal: Signal,
-  priorHistory?: PriorityHistoryRow
-): MetricDirection {
-  if (signal.type === 'steady_state') return 'unchanged';
-  if (!priorHistory) return 'unknown';
-  if (signal.metricValue === undefined || priorHistory.metric_value === undefined) {
-    return 'unknown';
-  }
-
-  const now = signal.metricValue;
-  const prior = priorHistory.metric_value;
-
-  if (now === prior) return 'unchanged';
-
-  if (WORSE_WHEN_HIGHER.has(signal.type)) {
-    return now > prior ? 'worsened' : 'improved';
-  }
-  if (WORSE_WHEN_LOWER.has(signal.type)) {
-    return now < prior ? 'worsened' : 'improved';
-  }
-  return 'unknown';
-}
-
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
 function buildUserMessage(signal: Signal, priorHistory?: PriorityHistoryRow): string {
@@ -109,10 +77,6 @@ function buildUserMessage(signal: Signal, priorHistory?: PriorityHistoryRow): st
 
   if (priorHistory) {
     lines.push('');
-    lines.push(`Prior occurrence fired at: ${priorHistory.fired_at}`);
-    if (priorHistory.metric_value !== undefined) {
-      lines.push(`Prior metric value: ${priorHistory.metric_value}`);
-    }
     lines.push(`Direction since last time: ${direction}`);
   } else {
     lines.push('');
@@ -235,12 +199,13 @@ const REQUIRED_FIELDS: readonly (keyof AIProse)[] = [
   'followupNote',
 ];
 
-function validateProseResponse(parsed: unknown): AIProse {
+function validateProseResponse(parsed: unknown, signal: Signal): AIProse {
   if (parsed === null || typeof parsed !== 'object') {
     throw new Error('AI response is not an object');
   }
   const obj = parsed as Record<string, unknown>;
-  const out: Partial<AIProse> = {};
+  type ProseField = Exclude<keyof AIProse, 'signalType' | 'severity'>;
+  const prose: Partial<Record<ProseField, string>> = {};
   for (const field of REQUIRED_FIELDS) {
     const v = obj[field];
     if (typeof v !== 'string') {
@@ -249,9 +214,19 @@ function validateProseResponse(parsed: unknown): AIProse {
     if (v.trim().length === 0) {
       throw new Error(`AI response field "${field}" is empty`);
     }
-    out[field] = v;
+    prose[field as ProseField] = v;
   }
-  return out as AIProse;
+  // Identity fields come from the source Signal, not the AI response.
+  // Safety is enforced by validateProseResponse: it iterates only
+  // REQUIRED_FIELDS (which excludes signalType and severity) and types
+  // the local prose object as Record<ProseField, ...> where ProseField
+  // is Exclude<keyof AIProse, 'signalType' | 'severity'>. The provider
+  // cannot inject these keys; the spread is just object composition.
+  return {
+    signalType: signal.type,
+    severity: signal.severity,
+    ...(prose as Record<ProseField, string>),
+  };
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -261,10 +236,25 @@ export async function getAIProse(
   priorHistory?: PriorityHistoryRow
 ): Promise<AIProse> {
   try {
+    // Cache read — inside outer try/catch. getCachedProse is contracted
+    // not to throw (Step 3 degrades every error class to null), so a hit
+    // returns the prior AI-generated prose for this exact signal shape
+    // immediately: no provider call, no priority_history write, no cache
+    // write. The outer catch is the defensive net if getCachedProse ever
+    // does throw (regression, network edge) — a thrown read degrades to
+    // the deterministic fallback rather than breaking the hero card.
+    const workspaceId = getSharedPersistenceWorkspaceId();
+    const priorDirection = classifyPriorDirection(signal, priorHistory);
+    const cacheKey = buildPriorityProseCacheKey(signal, priorDirection);
+    const cached = await getCachedProse(workspaceId, cacheKey, AI_PROSE_PROMPT_VERSION);
+    if (cached !== null) {
+      return cached;
+    }
+
     const userMessage = buildUserMessage(signal, priorHistory);
     const raw = await callAIProvider(SYSTEM_PROMPT, userMessage);
     const parsed = JSON.parse(stripJsonFences(raw));
-    const prose = validateProseResponse(parsed);
+    const prose = validateProseResponse(parsed, signal);
 
     // Write-back stub: only on AI success, never on fallback.
     try {
@@ -281,6 +271,11 @@ export async function getAIProse(
     } catch (writeErr) {
       console.error('[priorities/ai] write-back failed:', writeErr);
     }
+
+    // Cache write — fire-and-forget. Runs only on AI success, after
+    // savePriorityHistory. saveCachedProse swallows its own errors;
+    // the unawaited promise rejection cannot reach the user path.
+    void saveCachedProse(workspaceId, cacheKey, AI_PROSE_PROMPT_VERSION, prose);
 
     return prose;
   } catch (err) {

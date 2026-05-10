@@ -8,6 +8,7 @@ import type {
   TransactionImportSummary,
 } from './contract';
 import type { SignalType, PriorityHistoryRow } from '../priorities/types';
+import type { AIProse } from '../priorities/ai';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
 const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
@@ -19,6 +20,7 @@ const WORKSPACE_SETTINGS_TABLE = 'shared_workspace_settings';
 const PRIORITY_HISTORY_TABLE = 'priority_history';
 const FORECAST_EVENTS_TABLE = 'forecast_events';
 const RENEWAL_CONTRACTS_TABLE = 'renewal_contracts';
+const PRIORITY_PROSE_CACHE_TABLE = 'priority_prose_cache';
 
 // TRANSACTION_FETCH_COLUMNS: explicit select list to minimize Supabase egress.
 // Only the `txn` jsonb payload is used by any downstream consumer on the read
@@ -1006,5 +1008,75 @@ export async function savePriorityHistory(
     }
   } catch (err) {
     console.error('[priority-history] Write failed:', err);
+  }
+}
+
+// AI prose cache — backs priority_prose_cache. Both helpers take
+// workspaceId as a parameter (the Step 4 caller in ai.ts sources it from
+// getSharedPersistenceWorkspaceId()), so withWorkspaceFilter()'s hardcoded
+// WORKSPACE_ID is not used here. Read errors degrade to a cache miss; write
+// errors degrade silently. The caller is expected to handle the absence of
+// a cached value by invoking the AI provider directly.
+export async function getCachedProse(
+  workspaceId: string,
+  cacheKey: string,
+  promptVersion: string,
+): Promise<AIProse | null> {
+  if (!isConfigured()) return null;
+
+  try {
+    const path =
+      `${PRIORITY_PROSE_CACHE_TABLE}?select=prose_json` +
+      `&workspace_id=eq.${encodeURIComponent(workspaceId)}` +
+      `&cache_key=eq.${encodeURIComponent(cacheKey)}` +
+      `&prompt_version=eq.${encodeURIComponent(promptVersion)}` +
+      `&limit=1`;
+    const rows = await request<Array<{ prose_json: AIProse }>>(path);
+    if (!rows || rows.length === 0) return null;
+    return rows[0].prose_json;
+  } catch (err) {
+    // Table-missing, network, or JSON-parse failure: degrade as a cache miss.
+    console.warn('[priority-prose-cache] Read failed (table may not exist yet):', err);
+    return null;
+  }
+}
+
+export async function saveCachedProse(
+  workspaceId: string,
+  cacheKey: string,
+  promptVersion: string,
+  prose: AIProse,
+): Promise<void> {
+  if (!isConfigured()) return;
+
+  try {
+    // signal_type and severity are sourced from the prose payload itself
+    // (populated by Step 2.5's validator and fallback paths), so the
+    // persistence helper does not need a Signal parameter. updated_at is
+    // set explicitly on every write so the conflict path refreshes it
+    // without relying on a DB trigger; created_at is omitted so the DB
+    // default fires on insert and the existing value is preserved on
+    // conflict (PostgREST upsert SET only includes columns in the body).
+    await request<unknown>(
+      `${PRIORITY_PROSE_CACHE_TABLE}?on_conflict=workspace_id,cache_key,prompt_version`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal,resolution=merge-duplicates',
+        },
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          cache_key: cacheKey,
+          prompt_version: promptVersion,
+          signal_type: prose.signalType,
+          severity: prose.severity,
+          prose_json: prose,
+          updated_at: new Date().toISOString(),
+        }),
+      }
+    );
+  } catch (err) {
+    console.error('[priority-prose-cache] Write failed:', err);
   }
 }

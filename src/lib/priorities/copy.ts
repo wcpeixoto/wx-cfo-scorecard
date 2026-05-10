@@ -1,4 +1,5 @@
 import type { Signal, PriorityHistoryRow } from './types';
+import type { AIProse } from './ai';
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -53,14 +54,7 @@ function metricWorsened(signal: Signal, prior: PriorityHistoryRow | undefined): 
 export function getFallbackCopy(
   signal: Signal,
   priorHistory?: PriorityHistoryRow
-): {
-  headline: string;
-  why: string;
-  currentState: string;
-  action: string;
-  alternative: string;
-  followupNote: string;
-} {
+): AIProse {
   const worsened = metricWorsened(signal, priorHistory);
 
   switch (signal.type) {
@@ -69,6 +63,8 @@ export function getFallbackCopy(
       const fundedPct = pct(signal.metricValue);
       const gap = fmt(signal.gapAmount);
       return {
+        signalType: signal.type,
+        severity: signal.severity,
         headline: `Reserve is ${gap} short — below the safety floor`,
         why: worsened
           ? `Your reserve has dropped further — now at ${fundedPct} of where it needs to be. Right now there's not much between you and a real squeeze if something unexpected hits.`
@@ -84,6 +80,8 @@ export function getFallbackCopy(
       const fundedPct = pct(signal.metricValue);
       const gap = fmt(signal.gapAmount);
       return {
+        signalType: signal.type,
+        severity: signal.severity,
         headline: `Cash Reserve is at ${fundedPct} — still short of target`,
         why: worsened
           ? `Your reserve slipped to ${fundedPct} — the direction reversed since last time. Small surprises are manageable, but bigger ones would squeeze you.`
@@ -100,6 +98,8 @@ export function getFallbackCopy(
       const gap = fmt(signal.gapAmount);
       const troughMonth = formatTroughMonth(signal.troughMonth);
       return {
+        signalType: signal.type,
+        severity: signal.severity,
         headline: `Cash is projected to go negative by ${gap}`,
         why: worsened
           ? `The forward outlook has gotten worse since last time — your projected low point is now ${lowest}. This needs attention before it becomes a real constraint.`
@@ -116,6 +116,8 @@ export function getFallbackCopy(
       const gap = fmt(signal.gapAmount);
       const troughMonth = formatTroughMonth(signal.troughMonth);
       return {
+        signalType: signal.type,
+        severity: signal.severity,
         headline: `Cash floor drops to ${lowest} in ${troughMonth}`,
         why: worsened
           ? `The forward picture has tightened since last check — your lowest projected balance is ${lowest}. You won't run dry, but the cushion is thinner.`
@@ -134,6 +136,8 @@ export function getFallbackCopy(
       const delta = fmt(signal.gapAmount);
       if (signal.severity === 'critical') {
         return {
+          signalType: signal.type,
+          severity: signal.severity,
           headline: `${category} spending is up ${delta} vs normal`,
           why: worsened
             ? `${category} spending hit ${surgeTotal} last month — and it's gone up again since the last time we flagged it. This is becoming a pattern worth addressing.`
@@ -145,6 +149,8 @@ export function getFallbackCopy(
         };
       }
       return {
+        signalType: signal.type,
+        severity: signal.severity,
         headline: `${category} spending is running above normal`,
         why: worsened
           ? `${category} spending came in at ${surgeTotal} again — up from last time. Two months in a row breaks the pattern.`
@@ -164,6 +170,8 @@ export function getFallbackCopy(
         : 'some';
       if (signal.severity === 'critical') {
         return {
+          signalType: signal.type,
+          severity: signal.severity,
           headline: `Revenue is down ${declineRate} vs the prior period`,
           why: worsened
             ? `Revenue has slipped further — your trailing average is now ${trailing}, down from ${prior} the prior period. This trend needs a direct response.`
@@ -175,6 +183,8 @@ export function getFallbackCopy(
         };
       }
       return {
+        signalType: signal.type,
+        severity: signal.severity,
         headline: `Revenue is down ${declineRate} — watch the trend`,
         why: worsened
           ? `Revenue softened further since last check — average is now ${trailing}, down ${declineRate} from ${prior}. Worth watching closely.`
@@ -190,6 +200,8 @@ export function getFallbackCopy(
       const annualized = fmt(signal.metricValue);
       const baseline = fmt(signal.targetValue);
       return {
+        signalType: signal.type,
+        severity: signal.severity,
         headline: `Distributions are running ahead of last year`,
         why: worsened
           ? `Your draw pace has increased since last check — you're now on track for ${annualized} annualized, compared to ${baseline} last year.`
@@ -204,6 +216,8 @@ export function getFallbackCopy(
     case 'steady_state':
     default: {
       return {
+        signalType: signal.type,
+        severity: signal.severity,
         headline: 'Business is running clean — no urgent signals',
         why: 'No urgent signals are firing across your reserve, cash flow, or expenses. The business looks stable.',
         currentState: 'Reserve is healthy, the forward cash picture looks solid, and nothing unusual has surfaced.',
