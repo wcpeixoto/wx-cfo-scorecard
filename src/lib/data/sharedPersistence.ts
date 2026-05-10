@@ -158,6 +158,23 @@ function isConfigured(): boolean {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
 
+export class SharedPersistenceTruncationError extends Error {
+  constructor(
+    public readonly table: string,
+    public readonly received: number,
+    public readonly expected: number | null,
+  ) {
+    const detail = expected === null
+      ? `Content-Range missing or unparseable on first page; cannot verify completeness.`
+      : `Received ${received} of ${expected} rows.`;
+    super(
+      `Truncated read from ${table}: ${detail} ` +
+      `Check Supabase Data API max_rows setting.`
+    );
+    this.name = 'SharedPersistenceTruncationError';
+  }
+}
+
 function buildHeaders(extra?: HeadersInit): Headers {
   const headers = new Headers(extra);
   headers.set('apikey', SUPABASE_ANON_KEY);
@@ -170,6 +187,11 @@ async function requestAllRows<T>(path: string): Promise<T[]> {
   const all: T[] = [];
   let from = 0;
   let serverTotal: number | null = null;
+  let firstPageContentRangeParsed = false;
+
+  // Extract table name from REST path for error messages; fall back to the
+  // raw path if the URL shape changes.
+  const tableName = path.split('/rest/v1/')[1]?.split('?')[0] ?? path.split('?')[0];
 
   for (;;) {
     // Inline fetch so we can read Content-Range for truncation detection.
@@ -186,12 +208,17 @@ async function requestAllRows<T>(path: string): Promise<T[]> {
       throw new Error(message || `Shared persistence request failed (${response.status}).`);
     }
 
-    // Parse server total from first page: "Content-Range: 0-999/4843"
-    if (serverTotal === null) {
+    // Parse server total from the first page only: "Content-Range: 0-999/4843".
+    // The first-page total is the safety anchor; subsequent pages are bounded
+    // by the loop logic.
+    if (from === 0) {
       const contentRange = response.headers.get('Content-Range');
       if (contentRange) {
         const match = contentRange.match(/\/(\d+)$/);
-        if (match) serverTotal = parseInt(match[1], 10);
+        if (match) {
+          serverTotal = Number(match[1]);
+          firstPageContentRangeParsed = true;
+        }
       }
     }
 
@@ -204,22 +231,17 @@ async function requestAllRows<T>(path: string): Promise<T[]> {
     from += PAGE_SIZE;
   }
 
-  // Detect silent truncation: server told us the total but we received fewer.
-  // This happens when Supabase max_rows < PAGE_SIZE. Fix: raise max_rows in
-  // Supabase Dashboard → Settings → Data API → Max Rows.
+  // Fail fast on detected truncation: the server told us the total but we
+  // received fewer rows. This typically means Supabase max_rows < dataset
+  // size. Fix: raise max_rows in Supabase Dashboard → Settings → Data API.
   if (serverTotal !== null && all.length < serverTotal) {
-    console.error(
-      `[sharedPersistence] requestAllRows: fetched ${all.length} rows but server total is ${serverTotal}. ` +
-      `Silent data truncation is active. Raise max_rows in Supabase Dashboard (Settings → Data API) to at least ${serverTotal}.`
-    );
+    throw new SharedPersistenceTruncationError(tableName, all.length, serverTotal);
   }
 
-  // Warn when approaching the limit so the issue is caught before it bites.
-  if (all.length > PAGE_SIZE * 0.8) {
-    console.warn(
-      `[sharedPersistence] requestAllRows: ${all.length} rows fetched — within 20% of PAGE_SIZE (${PAGE_SIZE}). ` +
-      `Plan to raise max_rows before the dataset crosses ${PAGE_SIZE} rows.`
-    );
+  // Fail fast when the first-page Content-Range was missing or unparseable —
+  // the safety contract depends on Prefer: count=exact producing a total.
+  if (!firstPageContentRangeParsed) {
+    throw new SharedPersistenceTruncationError(tableName, all.length, null);
   }
 
   return all;
