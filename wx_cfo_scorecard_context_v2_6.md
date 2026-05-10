@@ -3377,3 +3377,33 @@ Three Notion items created from this work and one carried in:
 - Codex/Claude Code role nomenclature drift surfaced mid-session. `PROJECT_CONFIG.md` describes Codex as supervisor, but `TASK_PROMPT_TEMPLATE.md` and `userPreferences` describe Codex as executor. The mismatch caused several rounds of confusion about which AI should run which prompt. Doc fix is queued separately; the operating principle holds — `Target AI:` header is the routing source of truth per `TASK_PROMPT_TEMPLATE.md`, but the template's own title line (`# Codex Task — ...`) contradicts it and reinforces the drift. Fix the title line when the doc fix lands.
 - Diagnosis-first phase-gating worked again at the planning→implementation boundary. The Track A implementation prompt required diagnosis + line-by-line edit proposal before any code change. The proposal surfaced two design refinements before the editor opened — `expected: number | null` instead of a `-1` sentinel, and `from === 0` instead of `serverTotal === null` for the first-page gate. Both adjustments cleaner than the prompt's original draft; both caught at the diagnosis gate, not at the diff-review gate.
 - Handoff state can drift before the next session opens. The prior handoff named AI prose copy refinements as the next active work, but the underlying Notion item had been moved to Done in the same May 9 session that shipped the cache. Drift catch ran at session open by reading Notion before acting on the handoff's recommendation. Cost was one extra read; benefit was avoiding a session spent re-shipping work that already shipped.
+
+### May 10, 2026 — Role nomenclature reconciled, Track B boot projection shipped
+
+**What changed**
+
+- `a8b89ca` — PR #23 merged via rebase (replay of `bd46f29`; new committer/timestamp, content-identical). Spec-doc reconciliation: `PROJECT_CONFIG.md` AI Roles table reframed Codex symmetrically as executor; `TASK_PROMPT_TEMPLATE.md` Universal Task Prompt title `# Codex Task — ...` → `# Task Prompt — ...`. Closed Notion `35cad957-9339-816d-9106-c8dd3a23e451`.
+- `53c81cd` — PR #24 squash-merged on main, aggregating `b8c4b8c` (boot projection + lazy-fetch helper) and `3bd4cf2` (round-2 finding remediation). Squash produces a new SHA on main; the merged content is the union of the two reviewed branch commits. Track B: boot fetch in `getSharedImportedStoreSnapshot` narrowed from `select=*` to 11 scalar columns; new `getSharedImportBatchById` lazy-loads JSONB example arrays when Settings → Data renders. Closed Notion `35cad957-9339-81de-aec4-c350851b9098`.
+
+**Why it matters**
+
+The role-nomenclature fix closes a real cross-doc contradiction the May 10 Track A Lessons section flagged: `Target AI:` is the routing source of truth, but the template title undercut it. Future prompt-drafting rides on clean canonical text.
+
+Track B is the egress reduction Track A was the safety floor for. Boot payload drops from JSONB-bearing rows to ~370-byte scalar rows on a fetch that always runs at boot. Narrowing was only safe because Track A's hard-throw on truncation closes the silent-partial-read window — without that, a projection-induced shape regression could have been masked.
+
+**Current state**
+
+- main HEAD `53c81cd`, pushed.
+- Working tree clean.
+- Worktrees: `/Users/wesley/Code/wx-cfo-scorecard` (cross-session orphan on `claude/jovial-wing-87949d` at `23ef85d`, flagged for disposal at session close per the May 10 Track A entry) and `/Users/wesley/Code/wx-cfo-scorecard/.claude/worktrees/funny-dirac-f8b9a4` (this session's worktree, on `main`).
+- Notion items closed this session: `35cad957-9339-816d-9106-c8dd3a23e451` and `35cad957-9339-81de-aec4-c350851b9098`.
+
+**Next step**
+
+Top-priority `Next` or `Now` items in the Notion backlog are not currently set; the open work shifts to P3 follow-ups (`35cad957-9339-81c2-a94e-e0541246cef1` Today-level data-load error UI, and `35cad957-9339-8111-9331-cc4b20f68aa0` remote branch sweep). Next session opener selects.
+
+**Lessons**
+
+- Two-AI review round-2 mechanics. ChatGPT correctly STOPped on PR #24 for a local-mode regression and a stale-`importId` render bug. The fix landed as a follow-up commit on the same branch (`3bd4cf2`); the same PR was re-reviewed and approved on round 2. Pattern: when round-1 findings are code-level (not workflow-level), iterate on the same branch and re-review the same PR — new-branch overhead isn't warranted for clean iteration.
+- Local-mode runtime verification gap, named not papered over. Track B's local-mode render path is verified statically (TypeScript closed `'local' | 'shared'` union plus traceable IDB write → read → render) but not at runtime — seeding a minimal IDB record crashed unrelated KPI/forecast pipelines. The minimal-dataset crash is its own observability surface; flagged for the planning chat to consider as a future Notion item.
+- Snapshot-refresh checklist drift caught in a review packet. The "Sync now" bullet was carried forward from a spec-doc PR's checklist into Track B's, but neither Track B file is in the snapshot-refresh list. Pattern: review-packet checklists drafted from prior packets need per-file confirmation against the snapshot-refresh list each time.
