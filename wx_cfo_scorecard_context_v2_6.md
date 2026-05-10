@@ -3332,3 +3332,48 @@ Three Notion items remain open from this work:
 - Diagnosis-first phase-gating works at the review boundary too, not only at the implementation boundary. Each of the two ChatGPT reviews returned findings *before* the merge could happen, in time to fix and re-route. The same phase-gate discipline that catches drift in implementation prompts catches drift in approval flows.
 - `WORKSPACE_ID` resolved at module load means env-launched isolation is the only correct way to route writes to a non-default workspace. `process.env` mutations inside the runner script are no-ops by the time the constant is read. The methodology fix from May 9's incident encodes this as a process boundary, not a code convention.
 - Editor strips of low-byte characters are real. The original Step 2 commit likely stored `SEP` as a raw `\x1f` byte literal, which is invisible in most editors and trivially lost on a paste or save. The grep-visible escape form `'\x1f'` survives copy-paste, source control, and editor configurations that strip control characters. Future low-byte constants in the codebase should use the escape form, not the raw byte.
+
+## May 10, 2026 — Track A truncation fail-fast shipped to main as `f3625e0`
+
+### Shipped to main
+
+- `f3625e0` — rebase merge of PR #22 ("feat(persistence): throw on truncated requestAllRows reads"). Single feature-branch commit `5af365a` rebased onto main; new SHA reflects GitHub's rebase-replay (new committer/timestamp), but commit message and diff are byte-identical to the reviewed artifact. Remote branch `feature/persistence-truncation-fail-fast` deleted on merge; stale remote-tracking ref pruned. Merged at `2026-05-10T12:46:30Z`.
+
+### What changed
+
+- `requestAllRows` in `src/lib/data/sharedPersistence.ts:168` previously detected PostgREST truncation (via `Prefer: count=exact` + `Content-Range` parse) and logged `console.error` plus an 80%-of-`PAGE_SIZE` `console.warn`, but still returned the partial array. Single boot caller `getSharedImportedStoreSnapshot` fed the result into the Today model — every signal, forecast, reserve calc, and owner distribution was downstream of that one fetch. User-visible failure mode under truncation: dashboard rendered plausible-but-wrong numbers from a partial ledger. Replaced with fail-fast: `SharedPersistenceTruncationError` (exported, `expected: number | null` to distinguish known-mismatch from missing-`Content-Range` modes) is thrown at both detection sites. The 80% `console.warn` was deleted — fail-fast supersedes its safety role. Caller behavior unchanged: `loadImportedState()` already catches thrown errors, populates `importError`, and skips `setImportedDataSet`, so truncation now surfaces through the Settings error surface instead of producing a misleading dashboard.
+
+### Why it matters
+
+Silent wrong-but-plausible numbers in a CFO dashboard violate the project's "Trust is non-negotiable" principle directly. A "safe" or "healthy" Today screen rendered from a partial ledger is the worst failure class the project tracks. Track A closes the gap: detected truncation now blocks the boot path, and missing `Content-Range` (which would invalidate the safety contract) also throws. The diagnosis reaffirmed that the detection code already existed — the missing piece was escalation from log to throw.
+
+### Decisions locked
+
+- Missing or unparseable first-page `Content-Range` is a fatal error, not a warning. The safety contract depends on `Prefer: count=exact` producing a total; without it, completeness cannot be verified. Stricter than prior behavior, intentional.
+- The 80% PAGE_SIZE warning is removed permanently. Fail-fast handles the actual safety case; the early warning was a "catch it before it bites" log that loses its role once detection-with-throw exists.
+- Two-AI review gate applies to the irreversible action (merge), not to feature-branch commits. Feature-branch commits are reversible. But the review packet must describe artifact state honestly — describing a committed branch when only a working-tree diff exists is the failure mode that produced the first-pass STOP this session.
+- Track A and Track B are separate PRs. Track B (`shared_import_batches` boot projection) depends on Track A's fail-fast semantics and ships next. Mixing safety with optimization in one PR makes review and rollback harder.
+
+### Current state
+
+- main HEAD: `f3625e0`, pushed. GitHub Actions deploy triggered automatically.
+- Working tree clean on main.
+- Worktree at session level: main plus `jovial-wing-87949d` (this session's spawn worktree, classified abandoned-and-removable for Phase 2 disposal at session close — same pattern applied to `jolly-shirley-1e271c` earlier in the session).
+- Notion `35cad957-9339-81e0-b4a9-c44ad88778be` (Track A) ready to move from Now → Done.
+
+### Next step
+
+Three Notion items created from this work and one carried in:
+
+- `35cad957-9339-81de-aec4-c350851b9098` (P2, Next) — Track B `shared_import_batches` boot projection. Lowest-risk egress win identified in the diagnosis. Depends on Track A's fail-fast semantics being live, which is now true.
+- `35cad957-9339-81c2-a94e-e0541246cef1` (P3, Later) — Today-level data-load error UI. Follow-up to Track A; surfaces truncation in the primary surface where the operator looks, instead of only the Settings tab.
+- `35cad957-9339-8111-9331-cc4b20f68aa0` (P3, Later) — Remote branch sweep. 15 stale remote `claude/*`, `docs/*`, and `feature/*` branches surfaced during merge cleanup. Out of scope for this session, queued separately.
+- `35bad957-9339-81d5-8c1e-df2110b274c2` (Done) — AI prose copy refinements. The prior handoff recommended this as the next-move; drift catch at session open found the item was already Done from May 9. Included here only because the catch shaped the session's opening sequence.
+
+### Lessons
+
+- Two-AI review packets must describe the artifact state honestly. The first-pass review packet for Track A described a committed branch diff (`git diff main..feature/...`), but the implementation was held at working-tree state per the original prompt's "do not commit" rule. ChatGPT correctly STOPped because the described artifact didn't exist. Fix was an explicit out-of-cycle commit-and-push step, then re-issuing the same packet against the now-real branch diff. The two-AI gate is for the irreversible action (merge), but it can only do its job if the packet matches reality.
+- Rebase merge for single-commit PRs preserves diff and commit message but not SHA. GitHub's `gh pr merge --rebase` replays the commit with a new committer identity and timestamp, producing a new SHA even when nothing else changes. SHA divergence ≠ content divergence — the merge report must call this out explicitly so future audits don't read it as a deviation from the reviewed artifact.
+- Codex/Claude Code role nomenclature drift surfaced mid-session. `PROJECT_CONFIG.md` describes Codex as supervisor, but `TASK_PROMPT_TEMPLATE.md` and `userPreferences` describe Codex as executor. The mismatch caused several rounds of confusion about which AI should run which prompt. Doc fix is queued separately; the operating principle holds — `Target AI:` header is the routing source of truth per `TASK_PROMPT_TEMPLATE.md`, but the template's own title line (`# Codex Task — ...`) contradicts it and reinforces the drift. Fix the title line when the doc fix lands.
+- Diagnosis-first phase-gating worked again at the planning→implementation boundary. The Track A implementation prompt required diagnosis + line-by-line edit proposal before any code change. The proposal surfaced two design refinements before the editor opened — `expected: number | null` instead of a `-1` sentinel, and `from === 0` instead of `serverTotal === null` for the first-page gate. Both adjustments cleaner than the prompt's original draft; both caught at the diagnosis gate, not at the diff-review gate.
+- Handoff state can drift before the next session opens. The prior handoff named AI prose copy refinements as the next active work, but the underlying Notion item had been moved to Done in the same May 9 session that shipped the cache. Drift catch ran at session open by reading Notion before acting on the handoff's recommendation. Cost was one extra read; benefit was avoiding a session spent re-shipping work that already shipped.
