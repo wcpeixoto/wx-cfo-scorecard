@@ -35,6 +35,7 @@ import {
   deleteSharedRenewalContract,
   getSharedAccountSettings,
   getSharedForecastEvents,
+  getSharedImportBatchById,
   getSharedRenewalContracts,
   getSharedWorkspaceSettings,
   isSharedPersistenceConfigured,
@@ -79,6 +80,7 @@ import type {
   RenewalContract,
   ScenarioInput,
   ScenarioPoint,
+  TransactionImportIssue,
   TransactionImportSummary,
   TrendPoint,
   Txn,
@@ -724,6 +726,10 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [lastImportSummary, setLastImportSummary] = useState<TransactionImportSummary | null>(null);
+  const [importExamples, setImportExamples] = useState<{
+    possibleDuplicateExamples: TransactionImportIssue[];
+    parseFailureExamples: TransactionImportIssue[];
+  } | null>(null);
   const [storedImportedTransactionCount, setStoredImportedTransactionCount] = useState(0);
   const [accountRecords, setAccountRecords] = useState<AccountRecord[]>(getStoredAccountSettings);
   const [selectedScenarioKey, setSelectedScenarioKey] = useState<ForecastScenarioKey>('base');
@@ -840,6 +846,29 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   useEffect(() => {
     void loadImportedState();
   }, [loadImportedState]);
+
+  // Lazy-load JSONB example arrays for the Settings → Data Imported Data
+  // panel. Excluded from the boot projection in getSharedImportedStoreSnapshot
+  // to reduce egress; fetched on demand here when the operator opens the panel.
+  useEffect(() => {
+    if (activeTab !== 'settings' || activeSection !== 'data') return;
+    if (!lastImportSummary?.importId) return;
+    let cancelled = false;
+    getSharedImportBatchById(lastImportSummary.importId)
+      .then((full) => {
+        if (cancelled || !full) return;
+        setImportExamples({
+          possibleDuplicateExamples: full.possibleDuplicateExamples ?? [],
+          parseFailureExamples: full.parseFailureExamples ?? [],
+        });
+      })
+      .catch(() => {
+        // Fail-soft: examples remain empty, counters still render correctly.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, activeSection, lastImportSummary?.importId]);
 
   // [BOOT] App mount baseline
   useEffect(() => {
@@ -3766,11 +3795,11 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                             </div>
                           </div>
 
-                          {lastImportSummary.possibleDuplicateExamples.length > 0 ? (
+                          {(importExamples?.possibleDuplicateExamples ?? []).length > 0 ? (
                             <div className="import-summary-section">
                               <h4>Possible duplicates</h4>
                               <ul className="import-issue-list">
-                                {lastImportSummary.possibleDuplicateExamples.map((issue) => (
+                                {(importExamples?.possibleDuplicateExamples ?? []).map((issue) => (
                                   <li key={`dup-${issue.lineNumber}`}>
                                     <strong>Line {issue.lineNumber}.</strong> {issue.message}
                                   </li>
@@ -3779,11 +3808,11 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                             </div>
                           ) : null}
 
-                          {lastImportSummary.parseFailureExamples.length > 0 ? (
+                          {(importExamples?.parseFailureExamples ?? []).length > 0 ? (
                             <div className="import-summary-section">
                               <h4>Parse failures</h4>
                               <ul className="import-issue-list">
-                                {lastImportSummary.parseFailureExamples.map((issue) => (
+                                {(importExamples?.parseFailureExamples ?? []).map((issue) => (
                                   <li key={`parse-${issue.lineNumber}`}>
                                     <strong>{issue.lineNumber > 0 ? `Line ${issue.lineNumber}.` : 'Import error.'}</strong> {issue.message}
                                   </li>

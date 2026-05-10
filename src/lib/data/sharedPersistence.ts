@@ -345,6 +345,26 @@ function fromSharedBatchRow(row: SharedImportBatchRow): TransactionImportSummary
   };
 }
 
+/**
+ * Fetches a single import batch row including JSONB example arrays.
+ * Used by the Settings Imported Data panel to lazy-load examples
+ * that are excluded from the boot projection. Returns null if the
+ * batch is not found or import_id is empty.
+ */
+export async function getSharedImportBatchById(
+  importId: string
+): Promise<TransactionImportSummary | null> {
+  if (!importId) return null;
+  const rows = await request<SharedImportBatchRow[]>(
+    withWorkspaceFilter(
+      `${IMPORT_BATCHES_TABLE}?import_id=eq.${encodeURIComponent(importId)}&select=*&limit=1`
+    )
+  );
+  const first = rows[0];
+  if (!first) return null;
+  return fromSharedBatchRow(first);
+}
+
 function toSharedAccountSettingRow(record: AccountRecord): SharedAccountSettingRow {
   return {
     workspace_id: WORKSPACE_ID,
@@ -500,8 +520,14 @@ export async function getSharedImportedStoreSnapshot(): Promise<{
     })(),
     (async () => {
       const t0 = performance.now();
+      // Boot projection: scalar columns only. JSONB example arrays
+      // (possible_duplicate_examples, parse_failure_examples) are
+      // fetched on demand by getSharedImportBatchById when Settings
+      // expands the Imported Data panel.
       const rows = await request<SharedImportBatchRow[]>(
-        withWorkspaceFilter(`${IMPORT_BATCHES_TABLE}?select=*&order=imported_at_iso.desc`)
+        withWorkspaceFilter(
+          `${IMPORT_BATCHES_TABLE}?select=import_id,source_file_name,imported_at_iso,latest_txn_month,storage_scope,import_mode,new_imported,exact_duplicates_skipped,possible_duplicates_flagged,parse_failures,stored_transaction_count&order=imported_at_iso.desc`
+        )
       );
       batchFetchMs = Math.round(performance.now() - t0);
       return rows;
