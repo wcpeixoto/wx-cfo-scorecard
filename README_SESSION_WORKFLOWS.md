@@ -20,7 +20,7 @@ Use for:
 
 ### `TASK_PROMPT_TEMPLATE.md`
 
-Use when drafting implementation prompts for Codex, Claude Code, or another coding agent.
+Use when drafting implementation prompts for Claude Code (the executor). See `PROJECT_CONFIG.md` → **AI Roles and Prompt Routing**.
 
 Contains:
 

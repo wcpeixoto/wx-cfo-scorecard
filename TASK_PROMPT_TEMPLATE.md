@@ -1,6 +1,6 @@
 # TASK_PROMPT_TEMPLATE.md
 
-Use this file when drafting scoped implementation prompts for Codex, Claude Code, or another coding agent.
+Use this file when drafting scoped implementation prompts for Claude Code (the executor). See `PROJECT_CONFIG.md` → **AI Roles and Prompt Routing** for the full role list.
 
 Shared project configuration lives in:
 
@@ -55,9 +55,9 @@ Copy everything below the start marker.
 
 ### --- TASK PROMPT START ---
 
-# Codex Task — [MODEL] — [TASK TITLE]
+# Task — [TARGET AI] — [TASK TITLE]
 
-Target AI: [Claude Chat / ChatGPT / Claude Code / ChatGPT Codex]
+Target AI: Claude Code
 
 See `PROJECT_CONFIG.md` → **AI Roles and Prompt Routing** for role
 definitions. Prompts without a `Target AI:` header are treated as

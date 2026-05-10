@@ -274,10 +274,10 @@ Narrative entry:
 
 ### Drafting and approval
 
-The narrative entry must be drafted by the executor (Claude Code or
-Codex), not by the planning chat. Rationale: the executor has live
-access to the file, commits, diffs, and working-tree state. Planning
-chats drafting from secondhand context have produced wrong SHAs and
+The narrative entry must be drafted by the executor (Claude Code),
+not by the planning chat. Rationale: the executor has live access
+to the file, commits, diffs, and working-tree state. Planning chats
+drafting from secondhand context have produced wrong SHAs and
 mis-attributed events.
 
 Workflow:
@@ -292,10 +292,10 @@ Workflow:
 4. Once approved, executor appends to the file and commits in a
    single follow-up — no second prompt round-trip required.
 
-The Target AI for the drafting step is always an executor — Claude
-Code or ChatGPT Codex. Planning chats (Claude Chat, ChatGPT Chat) do
-not draft narrative entries, even when the executor is unavailable.
-If no executor is available, defer the entry to the next session.
+The Target AI for the drafting step is always Claude Code. Planning
+chats (Claude Chat, ChatGPT) and supervisors (ChatGPT Codex) do not
+draft narrative entries, even when the executor is unavailable. If
+the executor is unavailable, defer the entry to the next session.
 
 Use five short sections:
 
