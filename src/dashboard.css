@@ -3135,15 +3135,6 @@ body {
   font-size: 1.06rem;
   font-weight: 700;
   color: #101828;
-  min-width: 0;
-}
-
-/* Left-side stack — title with Export CSV button beneath it */
-.projection-header-left {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
   flex: 1;
   min-width: 0;
 }
@@ -3242,6 +3233,9 @@ body {
   }
   .projection-compare-toggle {
     flex-wrap: wrap;
+  }
+  .projection-export-btn {
+    align-self: center;
   }
   .projection-table-card .projection-table-scroll {
     margin-top: 24px;
