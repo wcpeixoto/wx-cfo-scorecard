@@ -3486,3 +3486,27 @@ been stress-tested creates an escape hatch.
 - Recommended next session: workflow-doc pass v2 bundling
   `35dad957…8181` + `35dad957…81eb`. Same root cause, single-purpose
   docs PR.
+
+---
+
+### May 11, 2026 — Workflow doc pass v2: harness visibility + handoff pre-flight (PR #27)
+
+**What changed**
+- `0c3fec7` — PR #27 squash-merged. New `SESSION_HANDOFF_TEMPLATE.md` (canonical handoff structure with worktree pre-flight as Step 1 of receiving-chat instructions, before any file reads). `SESSION_CLOSE_WORKFLOW.md` Trigger C gained `### Self-hosting harness worktrees` subsection — visibility rule, not a fourth disposition state; three-state classification untouched. `PROJECT_CONFIG.md` snapshot-refresh list and `README.md` workflow-docs index updated.
+
+**Why it matters**
+Harness worktree survival across sessions had repeated three times (`funny-dirac-f8b9a4` → `magical-mclean-706e59` → `quirky-swanson-13a577`). Cause: workflow docs treated harness state as implicit. Fix codifies two rules — harnesses must be flagged in close output, and receiving chats must run worktree pre-flight before file reads. Closes the gap surfaced in May 11 close audit. Notion items `35dad957…8181` and `35dad957…81eb` resolved.
+
+**Current state**
+- main HEAD `0c3fec7`, pushed.
+- Working tree clean.
+- Worktrees: primary clone on main; harness `claude/hardcore-elbakyan-3427d4` at `.claude/worktrees/hardcore-elbakyan-3427d4` — first live exercise of the visibility rule that just merged. Flagged for disposal at session close.
+- No open PRs.
+
+**Next step**
+- Click "Sync now" — four snapshot-refresh files updated (`SESSION_HANDOFF_TEMPLATE.md` new; `SESSION_CLOSE_WORKFLOW.md`, `PROJECT_CONFIG.md`, this entry).
+- Dispose harness worktree + local branch at session close per new rule.
+
+**Lessons**
+- `gh pr merge --delete-branch` is not atomic across local/remote when a worktree holds the branch. Local-delete failure short-circuits remote-delete silently; merge succeeds, both branches survive. Manual `gh api -X DELETE repos/<owner>/<repo>/git/refs/heads/<branch>` cleaned up the remote ref. Pattern worth a Notion item if it recurs.
+- Compressed two-AI path validated for low-stakes docs PRs. Skipped the intermediate ChatGPT review on the diff-on-disk; kept Codex range-diff at the merge gate. Range-diff caught no drift; merge gate held without the extra round-trip. The independent-review gate is irreversibility-shaped, not change-size-shaped — sized review effort to the gate, not to ceremony.
