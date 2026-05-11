@@ -364,6 +364,22 @@ static-site architecture principle, they extend it safely.
 
 ---
 
+## Adjacent discoveries
+
+When diagnosis surfaces work outside the user's explicit task, default
+to capture, not expansion.
+
+Capture means:
+- name the finding in the report
+- create or update the relevant Notion item when appropriate
+- continue the original task
+
+Fix the adjacent issue in the same session only when the user
+explicitly authorizes it, or when deferring it would make the current
+task unsafe, misleading, or materially more expensive.
+
+---
+
 ## Development priorities
 
 When making decisions, prioritize in this order:
