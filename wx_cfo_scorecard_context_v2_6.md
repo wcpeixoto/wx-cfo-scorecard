@@ -3410,3 +3410,29 @@ Top-priority `Next` or `Now` items in the Notion backlog are not currently set; 
 - Worktree disposal requires verifying which worktree is primary. The prior Track A entry mis-attributed `claude/jovial-wing-87949d` as Track A's spawn worktree without verifying the live worktree topology. The branch was actually a separate workflow-doc draft thread; the disposal pass discovered four commits unrelated to Track A. Three were a coherent `SESSION_CLOSE_WORKFLOW.md` improvement that shipped today as PR #25 (`064f3b6`, `aa366de`, `b4c1e46`) under rebase-replay SHAs; the fourth (`1efe082`) was intentionally dropped because PR #23 reversed its direction. Branch deleted after patch-id/content verification.
 - Reviewer findings can themselves be incomplete. The disposal prompt was reviewed by both ChatGPT and Codex; Codex correctly flagged a nested-path hazard, but neither reviewer caught that the "orphan" path was actually the primary clone of the repo, not a secondary worktree. The technically-correct hazard fix was operating on the wrong mental model. Two reviewers passing an incorrect framing is a real failure mode; this addendum is the example. Future disposal prompts must verify primary/secondary status from `git worktree list --porcelain` output and repo layout, not from path naming conventions or narrative attribution.
 - Narrative entries are load-bearing. The Track A entry's wrong attribution propagated forward by a full session before being caught at the disposal verification gate. Candidate rule for `SESSION_CLOSE_WORKFLOW.md`: narrative-entry drafts must be verified against live `git worktree list --porcelain` and `git log` output at draft-time, not just against the executor's running understanding. Logged as a future Notion item candidate.
+
+---
+
+### May 11, 2026 — Projection Table V2 shipped (clears May 6 backlog)
+
+**What changed**
+
+- `cee610f` — PR #7 squash-merged to main. Five commits collapsed: original feature + spec docs (`89a3857`, `0be482e`), and three pre-rebase fixes (`564f5a0` scope legacy `width: 90%` to fallback; `c1d7053` em-dash placeholder addendum; `4eb23a8` undo header restructure for Pattern G). A fourth pre-rebase fix (context-doc strip) was auto-dropped during rebase as patch-already-upstream once the conflict resolved by taking main.
+
+**Why it matters**
+
+V2 is now the default Projection Table on `/forecast` — left-aligned headers + cells, full-width row dividers, blank trailing total cell, locale en-US negative format. Legacy fallback preserved behind DEV-only `?oldProjectionTable=1`. Three reusable doc sections shipped alongside: `UI_RULES.md` "TailAdmin-style Data Table", `UI_CARDS.md` "Edge-to-edge Data Table Card", `CLAUDE.md` "UI replacement rollout pattern". Future data tables follow the same spec without re-deriving it.
+
+**Current state**
+
+- main HEAD `cee610f`. Working tree clean. Remote + local feature branches deleted. Safety tag deleted post-verification. Worktrees: 2 (primary on main, harness).
+
+**Next step**
+
+- Click "Sync now" — `CLAUDE.md`, `UI_RULES.md`, `UI_CARDS.md`, and this `wx_cfo_scorecard_context_v2_6.md` entry are all snapshot-refresh files (Trigger B).
+- File two Notion follow-ups not yet created: mobile-wrap behavior of `.projection-table-actions` at ~375px (P3); lint script doc-drift between `PROJECT_CONFIG.md` (says "no lint runner") and project preferences (claims `npm run lint`) — `package.json` has `test` (vitest) and no `lint` (P3).
+
+**Lessons**
+
+- Pre-rebase fixes on a stale PR > rebase-then-fix. Four sub-task fixes landed as single-purpose commits on the feature branch before rebase; the rebase collapsed cleanly with Sub-task D auto-dropping. Reviewing each fix in isolation kept the surface tractable; rebase-first would have buried the same fixes inside conflict-resolution noise.
+- Range-diff at the irreversible-action gate catches intended divergences that name-status diffs hide. Pair 2 of the pre-push range-diff showed Sub-task D's effect as content shrinkage within commit 2's patch — strict STOP-trigger reading halted; user confirmation cleared.
