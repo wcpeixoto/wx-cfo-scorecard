@@ -3436,3 +3436,53 @@ V2 is now the default Projection Table on `/forecast` — left-aligned headers +
 
 - Pre-rebase fixes on a stale PR > rebase-then-fix. Four sub-task fixes landed as single-purpose commits on the feature branch before rebase; the rebase collapsed cleanly with Sub-task D auto-dropping. Reviewing each fix in isolation kept the surface tractable; rebase-first would have buried the same fixes inside conflict-resolution noise.
 - Range-diff at the irreversible-action gate catches intended divergences that name-status diffs hide. Pair 2 of the pre-push range-diff showed Sub-task D's effect as content shrinkage within commit 2's patch — strict STOP-trigger reading halted; user confirmation cleared.
+
+---
+
+## 2026-05-11 — Capture-default workflow rule shipped (PR #26) + repo hygiene reset
+
+**Shipped:**
+- `CLAUDE.md` gained `## Adjacent discoveries` section. When diagnosis
+  surfaces out-of-scope work, default action is capture, not expansion.
+  Override requires explicit user authorization or material cost-of-
+  deferral.
+- Repo hygiene reset: two stale harness worktrees + three stale local
+  branches disposed; one stale origin ref pruned. Single-worktree
+  baseline restored.
+
+**Commits:** `5d735bf docs(claude): add adjacent-discoveries capture default`
+
+**Spec:** Notion `35cad957-9339-8126-b348-dc5b8b5057a5` (Done).
+
+**Deferred:** Change B (micro-lane exception with bright-line criteria)
+held back deliberately. Risk: adding a lighter review path before A has
+been stress-tested creates an escape hatch.
+
+**Process notes:**
+- Executor proposed both Changes A and B during implementation despite
+  scope being A-only. Caught at verification gate via diff inspection,
+  reverted before commit. Confirms value of the diff-stat + full-diff
+  verification step in the executor wrapper.
+- Repo hygiene phase exposed that disposal prompts drafted from planner
+  state (vs live `git worktree list --porcelain` output) can be stale.
+  This session's first disposal prompt assumed one harness; live state
+  had two. Claude Code's STOP-and-report discipline caught the drift
+  before any command ran. Two adjacent-discovery items filed to land
+  this lesson into the workflow itself: `35dad957…8181` (close-flag
+  rule for active harnesses) and `35dad957…81eb` (live worktree
+  verification at handoff pre-flight).
+- Three filings during repo hygiene reset all followed the
+  capture-default rule that PR #26 just shipped. First in-flight
+  application of the new rule confirmed it works as designed.
+
+**Current state**
+
+- main HEAD `5d735bf`. Working tree clean. Single worktree: primary
+  clone on main. No open PRs. Local and remote branches: `main` only.
+
+**Next step**
+
+- Click "Sync now" — `CLAUDE.md` updated since last snapshot (Trigger B).
+- Recommended next session: workflow-doc pass v2 bundling
+  `35dad957…8181` + `35dad957…81eb`. Same root cause, single-purpose
+  docs PR.
