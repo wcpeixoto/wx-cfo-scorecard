@@ -230,4 +230,5 @@ files at the repo root. Read these directly; do not rely on summaries.
 | [PROJECT_CONFIG.md](PROJECT_CONFIG.md) | Shared workflow/config source of truth: required reads, locked files, spec-doc list, arc signals, irreversible-action rules |
 | [TASK_PROMPT_TEMPLATE.md](TASK_PROMPT_TEMPLATE.md) | Required template when drafting an implementation prompt for Codex, Claude Code, or another coding agent |
 | [SESSION_CLOSE_WORKFLOW.md](SESSION_CLOSE_WORKFLOW.md) | Trigger model and behavior for closing a session |
+| [SESSION_HANDOFF_TEMPLATE.md](SESSION_HANDOFF_TEMPLATE.md) | Required template when handing off a session to a new chat (Trigger D closes or cross-platform handoffs) |
 | [README_SESSION_WORKFLOWS.md](README_SESSION_WORKFLOWS.md) | Map of the workflow docs above |
