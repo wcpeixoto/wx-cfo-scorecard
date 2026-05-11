@@ -525,6 +525,53 @@ Every task must follow this sequence:
 
 ---
 
+## UI replacement rollout pattern
+
+For substantial UI replacements (a card, a table, a chart, or any
+component swap that the user will visually compare), follow this
+rollout pattern instead of deleting the old implementation immediately.
+
+1. **Prototype in UI Lab first.** Build the new version in isolation in
+   the UI Lab section of the app, where it has no production
+   responsibility and the operator can compare it to the live one.
+2. **Get explicit approval on the prototype** before promoting it into
+   production code. Approval applies to the layout, density, alignment,
+   typography, and behavior together — do not split approval across
+   sessions.
+3. **Promote behind a DEV-only rollback flag**, not by deleting the old
+   code. Use a URL query param (e.g., `?oldXyz=1` or `?xyzV2=1`) gated
+   by `import.meta.env.DEV` so production builds are unaffected.
+4. **Make the flag hash-aware.** This project uses hash routing
+   (`/#/forecast?...`). The flag check must read **both**
+   `window.location.search` AND the query portion of
+   `window.location.hash`. A flag that only reads `search` will
+   silently fail in the main app and waste a debugging cycle.
+5. **Keep the old implementation as a fallback** while the new one is
+   validated under live data. Do not remove the duplicate code until a
+   later cleanup pass.
+6. **Tag a checkpoint commit** when the new version ships behind the
+   flag (e.g., `git tag <feature>-v2-checkpoint`). This makes the
+   rollback / "what was approved" point unambiguous.
+7. **Open a Notion backlog item** for the cleanup before final project
+   close. Include the acceptance criteria for removing the old code,
+   the old flag, unused CSS/imports, and any stale prototypes.
+8. **Verify the running Vite server is serving the same repo path you
+   are editing.** When working in a worktree (`.claude/worktrees/...`),
+   the user's browser hits the main repo path, not the worktree —
+   edits in a worktree will appear to "do nothing" locally. Run `pwd`,
+   `git branch --show-current`, and `grep -R '<new-symbol>' -n src` in
+   the user's main repo path before debugging "it doesn't show up
+   locally" symptoms.
+9. **Once stable**, remove the fallback flag, the duplicate code, the
+   prototype, and any temporary CSS scope markers in a single cleanup
+   commit.
+
+Components that are still in this rollout (not yet locked) should NOT
+be added to the "Locked files" list above. Add them only after the
+fallback and prototype are removed.
+
+---
+
 ## Definition of a good next step
 
 A good next step improves confidence or removes real friction:

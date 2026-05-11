@@ -3350,9 +3350,68 @@ body {
   border-bottom: 1px solid var(--bg-muted);
 }
 
+/* V2 left-align scope. The .ui-lab-projection-table-shell class is set on the
+   V2 component's root div; it serves as a CSS scope marker so left-align rules
+   only fire inside V2 and don't bleed into the old table. The prefix is needed
+   to beat the shared .table-card td:nth-child(n+2) right-align rule (spec 0,2,1). */
+.ui-lab-projection-table-shell .projection-table:not(.comparison-mode) thead th,
+.ui-lab-projection-table-shell .projection-table:not(.comparison-mode) tbody td,
+.ui-lab-projection-table-shell .projection-table:not(.comparison-mode) tfoot td {
+  text-align: left;
+}
+
+/* V2 width override. The shared .projection-table:not(.comparison-mode) rule
+   sets width: 90% (legacy from old design). V2 must span the full card width
+   so row dividers and the total-row line reach the same right edge as
+   comparison mode. Scoped to .ui-lab-projection-table-shell so the old
+   fallback keeps its 90% width unchanged. Spec 0,3,0 beats the existing
+   0,2,0 rule. Mobile rule below preserves horizontal-scroll behavior. */
+.ui-lab-projection-table-shell .projection-table:not(.comparison-mode) {
+  width: 100%;
+  min-width: 100%;
+}
+
 /* Drop the last body-row divider — tfoot border-top takes over */
 .projection-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+/* Controlled column widths in simple mode — legacy fallback only.
+   Scoped under .projection-table-legacy-shell so the V2 render (which uses
+   .ui-lab-projection-table-shell) is unaffected and matches the new UI_RULES
+   "TailAdmin-style Data Table" anti-pattern that forbids width: 90%.
+   Month gets ~28% to anchor the layout; four numeric columns share the
+   remaining ~72% evenly (~18% each). The table itself is constrained to 90%
+   of the card content area for the legacy look. Comparison mode keeps its
+   native auto layout. */
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) {
+  width: 90%;
+  table-layout: fixed;
+}
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) thead th:first-child,
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) tbody td:first-child,
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) tfoot td:first-child {
+  width: 28%;
+}
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) thead th:nth-child(n+2),
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) tbody td:nth-child(n+2),
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) tfoot td:nth-child(n+2) {
+  width: 18%;
+  white-space: nowrap;
+}
+
+/* Mobile: drop fixed layout and the 90% width constraint so the legacy table
+   can use the full mobile card width (and scroll horizontally if needed). The
+   existing .projection-table-scroll wrapper provides horizontal scroll. */
+@media (max-width: 767px) {
+  .projection-table-legacy-shell .projection-table:not(.comparison-mode) {
+    width: 100%;
+    table-layout: auto;
+  }
+  .projection-table-legacy-shell .projection-table:not(.comparison-mode) th,
+  .projection-table-legacy-shell .projection-table:not(.comparison-mode) td {
+    width: auto;
+  }
 }
 
 /* Subtle row hover for scanning long projection rows */

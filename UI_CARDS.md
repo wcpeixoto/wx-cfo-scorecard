@@ -1681,6 +1681,78 @@ The UI should make that story obvious, compact, and calm.
 
 ---
 
+# Part 3 — Edge-to-edge Data Table Card
+
+This is the canonical **TARGET** card variant for **dense tabular data** (projection tables, transaction lists, account ledgers). It composes a card shell with a full-width table whose row dividers, header band, and total row reach the card's left and right edges. The full visual specification (tokens, padding, typography, alignment, negative-number rules) lives in `UI_RULES.md` → "TailAdmin-style Data Table / Projection Table V2 Pattern". This section is the **card-anatomy half** of that pattern.
+
+> **Read this first — shipped vs. target.** The Forecast Projection Table V2 shipped in commit `1e07af0` ships the V2 *component structure* (full-width table, left-aligned cells, blank trailing total cell) but `src/dashboard.css` still uses legacy values for several card-anatomy properties (`.projection-table-card { padding: 24px }`, no `overflow: hidden`, smaller cell padding, no header-band background, smaller title). The live Forecast table is therefore a partial implementation of this card variant. The full TARGET rhythm is reconciled during the cleanup pass for the old fallback. See `UI_RULES.md` → "Implementation status" for the gap table, and `wx_cfo_scorecard_context_v2_6.md` → "May 6, 2026 — Forecast Projection Table V2 shipped" for project context. Use this section as the authoritative spec for **new** tables; do not assume the live Forecast table already matches every value below.
+
+## When to use
+
+- New data tables in this project — projection tables, transaction tables, account ledgers
+- Forecast Projection Table V2 (currently a partial implementation; full reconciliation queued with the old-fallback cleanup)
+- Any data table where row dividers, header band, and total row should visually integrate with the card shell rather than float inside it
+
+## When not to use
+
+- KPI / signal cards (use Part 1 — Universal CFO Signal Card)
+- Narrative cards, mixed-content cards, forms, profile cards
+- Cards where the content should sit inside a uniformly padded container
+- Charts (use the chart-card patterns in `UI_RULES.md` Part 4)
+
+## Composition
+
+```
+card / article (.projection-table-card pattern)
+├── header / control row [padding: 20px 24px 16px]
+│   ├── title (left-aligned, 18px / 600 / #101828)
+│   └── controls (right-aligned: Compare year toggle, Export CSV, etc.)
+└── table wrapper [.projection-table-scroll — overflow-x: auto]
+    └── table [width: 100%]
+        ├── thead (full-width band, var(--bg-main) background)
+        ├── tbody (cells own the 24px horizontal padding)
+        └── tfoot (full-width total row)
+```
+
+## Critical rules
+
+- **Outer card owns** `border`, `border-radius: 16px`, `background`, and `overflow: hidden` (so the table band clips to the rounded corners)
+- **Card horizontal padding is `0`** — the table runs edge-to-edge
+- **Header / control row sits inside the card** and carries its own `24px` horizontal padding so the title is inset while the table band reaches the card border
+- **Table cells provide the horizontal content gutter** via `padding: 20px 24px` (header) / `20px 24px` (body) / `12px 24px` (header band, lighter vertical) — see `UI_RULES.md` for exact values per row type
+- **Header band, row dividers, and total row run edge-to-edge** inside the shell — they do not stop short of the card border
+- **Do not** put a full-width table inside a standard padded card and then try to fix the "floating table" feel with table-level width or alignment tweaks. The card itself must be zero-horizontal-padding for this pattern.
+
+## Variant scoping
+
+When you build a new table variant under this pattern, **scope its CSS via a component-specific class on the wrapper element** rather than modifying shared rules. The Projection Table V2 implementation uses `.ui-lab-projection-table-shell` on the wrapper div as a CSS scope marker:
+
+```css
+.ui-lab-projection-table-shell .projection-table:not(.comparison-mode) {
+  width: 100%;
+  text-align: left; /* etc. */
+}
+```
+
+This keeps variant rules from bleeding into other tables on the page (e.g., Top Payees) and from being overridden by the shared `.table-card td:nth-child(n+2)` right-align rule.
+
+**Do not modify** the shared `.table-card` ruleset for variant-specific behavior — it governs unrelated tables and may regress those.
+
+## Approved reference
+
+- **Production component:** `src/components/ProjectionTableV2.tsx` (table-only — `<thead>`, `<tbody>`, `<tfoot>`; card shell + title + Compare/Export controls live in `src/pages/Dashboard.tsx`). Note: the V2 component structure is shipped, but `dashboard.css` does not yet match every TARGET value listed in `UI_RULES.md`. See "Implementation status" there for the gap.
+- **Visual prototype (full TARGET rhythm):** UI Lab → "Projection Table — TailAdmin Prototype" — canonical visual reference for the complete pattern until the old Projection Table fallback is removed (Notion item: "Remove old Forecast Projection Table fallback")
+
+## Relationship to `UI_RULES.md`
+
+For the exact visual specification — tokens, padding values, typography, header band styling, total row rules, alignment rules, negative-number format, mobile behavior, anti-patterns — see:
+
+> `UI_RULES.md` → **TailAdmin-style Data Table / Projection Table V2 Pattern**
+
+That section is the source of truth. This card variant must follow it.
+
+---
+
 ## Card Height & Pairing Behavior
 
 This section governs how cards behave in height when placed alongside other cards in a grid or flex row.
