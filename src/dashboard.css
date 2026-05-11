@@ -3382,37 +3382,40 @@ body {
   border-bottom: none;
 }
 
-/* Controlled column widths in simple mode — Month gets ~28% to anchor the layout,
-   four numeric columns share the remaining ~72% evenly (~18% each). The table
-   itself is constrained to 90% of the card content area (left-anchored, so Month
-   column aligns with the title above), giving the Balance column visible breathing
-   room from the card's right edge. Comparison mode keeps its native auto layout. */
-.projection-table:not(.comparison-mode) {
+/* Controlled column widths in simple mode — legacy fallback only.
+   Scoped under .projection-table-legacy-shell so the V2 render (which uses
+   .ui-lab-projection-table-shell) is unaffected and matches the new UI_RULES
+   "TailAdmin-style Data Table" anti-pattern that forbids width: 90%.
+   Month gets ~28% to anchor the layout; four numeric columns share the
+   remaining ~72% evenly (~18% each). The table itself is constrained to 90%
+   of the card content area for the legacy look. Comparison mode keeps its
+   native auto layout. */
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) {
   width: 90%;
   table-layout: fixed;
 }
-.projection-table:not(.comparison-mode) thead th:first-child,
-.projection-table:not(.comparison-mode) tbody td:first-child,
-.projection-table:not(.comparison-mode) tfoot td:first-child {
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) thead th:first-child,
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) tbody td:first-child,
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) tfoot td:first-child {
   width: 28%;
 }
-.projection-table:not(.comparison-mode) thead th:nth-child(n+2),
-.projection-table:not(.comparison-mode) tbody td:nth-child(n+2),
-.projection-table:not(.comparison-mode) tfoot td:nth-child(n+2) {
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) thead th:nth-child(n+2),
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) tbody td:nth-child(n+2),
+.projection-table-legacy-shell .projection-table:not(.comparison-mode) tfoot td:nth-child(n+2) {
   width: 18%;
   white-space: nowrap;
 }
 
-/* Mobile: drop fixed layout and the 90% width constraint so the table can use
-   the full mobile card width (and scroll horizontally if needed). The existing
-   .projection-table-scroll wrapper provides horizontal scroll. */
+/* Mobile: drop fixed layout and the 90% width constraint so the legacy table
+   can use the full mobile card width (and scroll horizontally if needed). The
+   existing .projection-table-scroll wrapper provides horizontal scroll. */
 @media (max-width: 767px) {
-  .projection-table:not(.comparison-mode) {
+  .projection-table-legacy-shell .projection-table:not(.comparison-mode) {
     width: 100%;
     table-layout: auto;
   }
-  .projection-table:not(.comparison-mode) th,
-  .projection-table:not(.comparison-mode) td {
+  .projection-table-legacy-shell .projection-table:not(.comparison-mode) th,
+  .projection-table-legacy-shell .projection-table:not(.comparison-mode) td {
     width: auto;
   }
 }

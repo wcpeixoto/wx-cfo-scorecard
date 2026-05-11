@@ -3360,7 +3360,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 </div>
               </div>
               {useOldProjectionTable ? (
-              <div className="projection-table-scroll">
+              <div className="projection-table-scroll projection-table-legacy-shell">
                 {(() => {
                   const sortedActiveDesc = [...projectionActiveYears].sort((a, b) => b - a);
                   const hasActive = sortedActiveDesc.length > 0;
