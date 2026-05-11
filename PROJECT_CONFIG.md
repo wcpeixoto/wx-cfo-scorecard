@@ -67,6 +67,7 @@ chats.
 - `UI_Verification_Rules.md`
 - `wx_cfo_scorecard_context_v2_6.md`
 - `SESSION_CLOSE_WORKFLOW.md`
+- `SESSION_HANDOFF_TEMPLATE.md`
 - `TASK_PROMPT_TEMPLATE.md`
 - `PROJECT_CONFIG.md`
 - `README_SESSION_WORKFLOWS.md`

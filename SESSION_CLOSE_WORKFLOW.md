@@ -215,6 +215,21 @@ Classify each in-scope item as one of three states (matches CLAUDE.md worktree h
 
 A worktree whose own session is not closing this turn is out of scope for that close — do not classify it. Sibling worktrees are not "Active"; they are simply not yours to dispose of.
 
+### Self-hosting harness worktrees
+
+A harness worktree that the closing session is itself running inside cannot self-dispose — the running process holds the working directory open. This is a mechanical limit, not a policy choice.
+
+These worktrees must still appear explicitly in close output. Either inside the handoff "Repo state" section or in "Queued for next session," include:
+
+- worktree path
+- branch name
+- current HEAD sha
+- the annotation: **dispose at next session pre-flight**
+
+This is a visibility step, not a disposition step. The three-state classification above governs disposable worktrees. A self-hosting harness is a separate concern — it survives this close by necessity, but the next session must see it explicitly so it gets disposed before new work begins.
+
+Pattern of harness survival across sessions has now repeated three times (`funny-dirac-f8b9a4` → `magical-mclean-706e59` → `quirky-swanson-13a577`). Auto-flagging at close prevents recurrence; do not rely on the closing chat noticing on its own.
+
 Invalid classifications:
 
 ```text
