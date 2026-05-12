@@ -726,6 +726,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [importedDataSet, setImportedDataSet] = useState<DataSet | null>(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [bootLoadError, setBootLoadError] = useState<string | null>(null);
   const [lastImportSummary, setLastImportSummary] = useState<TransactionImportSummary | null>(null);
   const [importExamples, setImportExamples] = useState<{
     importId: string;
@@ -851,7 +852,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
       setStoredImportedTransactionCount(snapshot.transactionCount);
     } catch (importStateError) {
       const message = importStateError instanceof Error ? importStateError.message : 'Could not load imported transactions.';
-      setImportError(message);
+      setBootLoadError(message);
     } finally {
       setIsInitializing(false);
     }
@@ -2889,6 +2890,27 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
           </div>
         </header>}
 
+        {bootLoadError && (
+          <div className="dashboard-load-error" role="alert">
+            <div className="dashboard-load-error-body">
+              <p className="dashboard-load-error-headline">Some recent activity may be missing.</p>
+              <p className="dashboard-load-error-detail">
+                The last data load didn't complete. Numbers below may be out of date.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="dashboard-load-error-cta"
+              onClick={() => {
+                setActiveSection('data');
+                navigateToTab('settings');
+              }}
+            >
+              Open Settings → Data
+            </button>
+          </div>
+        )}
+
         {!hasImportedData && (
           <article className="card settings-card">
             <div className="card-head">
@@ -3787,6 +3809,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                         </button>
                       </div>
 
+                      {bootLoadError ? <p className="settings-error">{bootLoadError}</p> : null}
                       {importError ? <p className="settings-error">{importError}</p> : null}
 
                       <div className="settings-meta">
