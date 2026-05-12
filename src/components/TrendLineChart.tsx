@@ -998,7 +998,11 @@ export default function TrendLineChart({
           {trendInterpretation && (
             <span className={`kpi-badge ${trendInterpretation.badgeClass}`}>
               <span aria-hidden="true" className="kpi-change-arrow">{trendInterpretation.icon}</span>
-              <span className="kpi-change-percent">{trendInterpretation.direction} {trendInterpretation.pctText}</span>
+              <span className="kpi-change-percent">
+                {trendInterpretation.direction === 'Flat'
+                  ? trendInterpretation.direction
+                  : `${trendInterpretation.direction} ${trendInterpretation.pctText}`}
+              </span>
             </span>
           )}
           {(enableTimeframeControl || showForecastRangeControl || showRevenueMarginControl || showExpenseMarginControl || showSuggestedMargins) && (

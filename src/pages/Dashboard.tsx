@@ -2915,12 +2915,9 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
           <article className="card settings-card">
             <div className="card-head">
               <h3>Imported Transactions Required</h3>
-              <p className="subtle">
-                Imported Quicken transactions are now the only runtime source of truth. Google Sheets fallback has been removed.
-              </p>
             </div>
             <p className="empty-state">
-              No imported transactions are available in {sharedPersistenceEnabled ? 'shared' : 'browser-local'} storage. Import a Quicken CSV to begin analysis.
+              Import a Quicken CSV to begin.
             </p>
             <div className="settings-actions">
               <button type="button" onClick={() => importFileInputRef.current?.click()} disabled={importLoading}>
@@ -3034,9 +3031,9 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
           let bannerText: string;
           if (opportunities.length >= 2) {
-            bannerText = `${formatCategoryLabel(opportunities[0].title)} and ${formatCategoryLabel(opportunities[1].title)} are your biggest opportunities to improve cash this month.`;
+            bannerText = `“${formatCategoryLabel(opportunities[0].title)}” and “${formatCategoryLabel(opportunities[1].title)}” are your biggest opportunities to improve cash this month.`;
           } else if (opportunities.length === 1) {
-            bannerText = `${formatCategoryLabel(opportunities[0].title)} is the main driver of higher costs this month.`;
+            bannerText = `“${formatCategoryLabel(opportunities[0].title)}” is the main driver of higher costs this month.`;
           } else {
             bannerText = "You're in control this month. No major cost overruns detected.";
           }
