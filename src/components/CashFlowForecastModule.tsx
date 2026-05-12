@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { FiCheck, FiSlash } from 'react-icons/fi';
+import { FiBarChart2, FiCheck, FiSlash } from 'react-icons/fi';
 import ProjectedCashBalanceChart from './ProjectedCashBalanceChart';
 import type {
   CashFlowForecastStatus,
@@ -7,11 +7,13 @@ import type {
   ForecastEvent,
   ForecastScenarioKey,
   ForecastSeasonalityMeta,
+  MonthlyRollup,
   RenewalContract,
   ScenarioPoint,
   TrendPoint,
 } from '../lib/data/contract';
 import { toMonthLabel } from '../lib/kpis/compute';
+import { buildPriorPeriodSeries } from '../lib/forecast/priorPeriodSeries';
 
 type SelectOption = { value: string; label: string; months: number };
 
@@ -124,6 +126,8 @@ const DEFAULT_TARGET_NET_MARGIN = 0.25;
 
 type CashFlowForecastModuleProps = {
   data: TrendPoint[];
+  /** Historical monthly actuals — drives the optional prior-period overlay. */
+  monthlyRollups: MonthlyRollup[];
   fullForecast: ScenarioPoint[];
   reserveTarget: number;
   /** Optional: override the computed reserve target with a fixed amount from settings. */
@@ -381,6 +385,7 @@ function ForecastSliderControl({
 
 export default function CashFlowForecastModule({
   data,
+  monthlyRollups,
   fullForecast,
   reserveTarget,
   fixedReserveAmount,
@@ -561,6 +566,24 @@ export default function CashFlowForecastModule({
   const granularity: 'month' | 'week' = forecastRangeMonths < 6 ? 'week' : 'month';
   const startingCashBalance = Number.isFinite(currentCashBalance) ? currentCashBalance : 0;
 
+  // Prior-period overlay. Helper returns monthly NET-change series + a prior
+  // starting balance; we accumulate at the displayed granularity (monthly or
+  // expanded-weekly) using the same logic the forecast itself applies to
+  // `data`. Available at any horizon as long as coverage is complete.
+  const [compareEnabled, setCompareEnabled] = useState(false);
+  const priorPeriodInput = useMemo(() => {
+    const forecastMonths = data.map((d) => d.month);
+    return buildPriorPeriodSeries(monthlyRollups, startingCashBalance, forecastMonths);
+  }, [data, monthlyRollups, startingCashBalance]);
+  const priorPeriodAvailable = priorPeriodInput !== null;
+  const priorPeriodActive = compareEnabled && priorPeriodAvailable;
+  // Auto-collapse if availability is lost (e.g. user moves to a horizon with
+  // insufficient prior coverage), so re-entering a supported horizon does not
+  // silently re-enable the overlay.
+  useEffect(() => {
+    if (!priorPeriodAvailable && compareEnabled) setCompareEnabled(false);
+  }, [priorPeriodAvailable, compareEnabled]);
+
   const cumulativeSeries = useMemo<TrendPoint[]>(() => {
     let running = startingCashBalance;
     return data.map((point) => {
@@ -583,8 +606,45 @@ export default function CashFlowForecastModule({
       };
     });
   }, [startingCashBalance, weeklySeries]);
+
+  // Prior series accumulated at the displayed granularity. Monthly path
+  // accumulates the raw monthly nets; weekly path runs the same
+  // expandMonthlyToWeekly transform the forecast uses, so prior and forecast
+  // weeks line up identically.
+  const priorMonthlyCumulative = useMemo<TrendPoint[]>(() => {
+    if (!priorPeriodInput) return [];
+    let running = priorPeriodInput.startingBalance;
+    return priorPeriodInput.netSeries.map((point) => {
+      running += point.net;
+      return { ...point, net: roundCurrency(running) };
+    });
+  }, [priorPeriodInput]);
+  const priorWeeklyExpanded = useMemo(
+    () => (priorPeriodInput ? expandMonthlyToWeekly(priorPeriodInput.netSeries) : []),
+    [priorPeriodInput],
+  );
+  const priorWeeklyCumulative = useMemo<TrendPoint[]>(() => {
+    if (!priorPeriodInput) return [];
+    let running = priorPeriodInput.startingBalance;
+    return priorWeeklyExpanded.map((point) => {
+      running += point.net;
+      return { ...point, net: roundCurrency(running) };
+    });
+  }, [priorPeriodInput, priorWeeklyExpanded]);
   const monthlyRangeLabel = data.length > 0 ? `${toMonthLabel(data[0].month)} – ${toMonthLabel(data[data.length - 1].month)}` : '';
+  const priorPeriodRangeLabel = useMemo(() => {
+    if (!priorPeriodInput) return '';
+    const shift = (m: string) => {
+      const [y, mm] = m.split('-');
+      return `${Number(y) - 1}-${mm}`;
+    };
+    const first = data[0]?.month;
+    const last = data[data.length - 1]?.month;
+    if (!first || !last) return '';
+    return `${toMonthLabel(shift(first))} – ${toMonthLabel(shift(last))}`;
+  }, [data, priorPeriodInput]);
   const displaySeries = granularity === 'week' ? weeklyCumulativeSeries : cumulativeSeries;
+  const priorDisplaySeries = granularity === 'week' ? priorWeeklyCumulative : priorMonthlyCumulative;
   const reserveBreached = !!decisionSignals.reserveBreachMonth;
   const hasNegativeCash = !!decisionSignals.negativeCashMonth;
   const cashRiskState: 'safe' | 'warning' | 'critical' = hasNegativeCash ? 'critical' : reserveBreached ? 'warning' : 'safe';
@@ -948,6 +1008,7 @@ export default function CashFlowForecastModule({
                 )}
               </div>
               <div className="projected-cash-timeline">
+                <div className="projected-cash-timeline-row">
                 <div
                   className="segmented-toggle"
                   role="radiogroup"
@@ -1007,6 +1068,30 @@ export default function CashFlowForecastModule({
                     )}
                   </div>
                 </div>
+                <button
+                  type="button"
+                  className={`forecast-compare-btn${priorPeriodActive ? ' is-active' : ''}`}
+                  onClick={() => setCompareEnabled((c) => !c)}
+                  disabled={!priorPeriodAvailable}
+                  aria-pressed={priorPeriodActive}
+                  aria-label={
+                    priorPeriodAvailable
+                      ? `Compare with prior period${priorPeriodRangeLabel ? ` (${priorPeriodRangeLabel})` : ''}`
+                      : 'Compare unavailable — insufficient prior-period history'
+                  }
+                  title={
+                    priorPeriodAvailable
+                      ? undefined
+                      : 'Need actual history covering the same calendar range one year earlier'
+                  }
+                >
+                  <FiBarChart2 aria-hidden="true" focusable="false" />
+                  <span>Compare</span>
+                </button>
+                </div>
+                {priorPeriodActive && priorPeriodRangeLabel && (
+                  <p className="projected-cash-compare-subtitle">Compared with {priorPeriodRangeLabel}</p>
+                )}
               </div>
             </div>
           );
@@ -1017,6 +1102,8 @@ export default function CashFlowForecastModule({
             data={displaySeries}
             granularity={granularity}
             knownEvents={forecastEvents}
+            priorSeries={priorPeriodActive ? priorDisplaySeries : null}
+            priorSeriesLabel="Prior Year"
           />
         </div>
 

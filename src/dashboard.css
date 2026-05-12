@@ -1366,7 +1366,69 @@ body {
 /* Timeline control — now a header right-side child, no centering */
 .projected-cash-timeline {
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
   flex-shrink: 0;
+}
+
+.projected-cash-timeline-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Compare-with-prior-period toggle. TailAdmin filter-button style: white
+   surface, gray-200 border, 36px tall to match the segmented-toggle inner
+   button. Active state inverts to the brand fill, mirroring the prior-period
+   line color (chartTokens.brand). Disabled when monthly granularity is
+   unavailable or there's not enough history. */
+.forecast-compare-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 8px 12px;
+  border: 1px solid #E4E7EC;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+  white-space: nowrap;
+}
+.forecast-compare-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.forecast-compare-btn:hover:not(:disabled) {
+  background: #F9FAFB;
+  color: #101828;
+}
+.forecast-compare-btn.is-active {
+  background: #465FFF;
+  border-color: #465FFF;
+  color: #FFFFFF;
+}
+.forecast-compare-btn.is-active:hover {
+  background: #3A50DB;
+  border-color: #3A50DB;
+  color: #FFFFFF;
+}
+.forecast-compare-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Subtitle shown under the date range when the prior-period overlay is
+   active. Smaller, muted; mirrors TailAdmin secondary-text pattern. */
+.projected-cash-compare-subtitle {
+  margin: 2px 0 0 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: #667085;
 }
 
 /* Chart body — breathing room from the header */

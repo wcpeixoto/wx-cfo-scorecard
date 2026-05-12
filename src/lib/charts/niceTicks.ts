@@ -100,12 +100,6 @@ function generateTicks(min: number, max: number, step: number): number[] {
  * `max` so the rendered labels align with the plot area.
  */
 export function niceTicks(dataMin: number, dataMax: number): NiceTicks {
-  // Guard: no positive data — return a small visible band rather than
-  // collapsing to a single tick or descending into negative territory.
-  if (dataMax <= 0) {
-    return { min: 0, max: 5_000, step: 5_000, ticks: [0, 5_000] };
-  }
-
   // Flat-data guard: expand by one step on each side so the data point
   // sits in the middle of a visible band. Then proceed normally.
   if (dataMin === dataMax) {
@@ -115,6 +109,45 @@ export function niceTicks(dataMin: number, dataMax: number): NiceTicks {
 
   const range = dataMax - dataMin;
   const zeroWouldFlatten = dataMin > 0 && range / dataMax < FLATTEN_THRESHOLD;
+  // Mixed-sign data (e.g. cash balance trajectory dipping below zero):
+  // symmetric local axis around the data range. Zero falls naturally on
+  // the snapped tick grid since min and max are both step-aligned.
+  // Checked before the "no positive data" guard so a series whose range
+  // is entirely or partly negative still gets a real axis.
+  const hasNegative = dataMin < 0;
+
+  // Guard: no positive data AND no negative data — return a small visible
+  // band rather than collapsing to a single tick. Only fires when the
+  // entire data range is non-positive AND non-negative (i.e. all zero).
+  if (!hasNegative && dataMax <= 0) {
+    return { min: 0, max: 5_000, step: 5_000, ticks: [0, 5_000] };
+  }
+
+  if (hasNegative) {
+    let step = Math.max(MIN_STEP, roundToNiceStep(range / TARGET_TICKS));
+    let niceMin = Math.floor(dataMin / step) * step;
+    let niceMax = Math.ceil(dataMax / step) * step;
+    let ticks = generateTicks(niceMin, niceMax, step);
+
+    while (ticks.length > MAX_TICKS_LOCAL) {
+      step = nextCoarserStep(step);
+      niceMin = Math.floor(dataMin / step) * step;
+      niceMax = Math.ceil(dataMax / step) * step;
+      ticks = generateTicks(niceMin, niceMax, step);
+    }
+
+    // Pad alternately on whichever side is closer to the data, to keep
+    // the chart visually balanced around the data range.
+    while (ticks.length < TARGET_TICKS) {
+      const topSlack = niceMax - dataMax;
+      const bottomSlack = dataMin - niceMin;
+      if (bottomSlack <= topSlack) niceMin -= step;
+      else niceMax += step;
+      ticks = generateTicks(niceMin, niceMax, step);
+    }
+
+    return { min: niceMin, max: niceMax, step, ticks };
+  }
 
   if (zeroWouldFlatten) {
     // ─── BRANCH A: local axis ─────────────────────────────────────────
