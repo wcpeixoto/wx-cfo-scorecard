@@ -111,7 +111,7 @@ Verification floor:
 npm run build
 ```
 
-There is no project-level lint/test runner unless one is added later.
+There is no project-level lint runner. Tests run via Vitest (`npm test`).
 
 ---
 
