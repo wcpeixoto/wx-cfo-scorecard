@@ -3155,8 +3155,8 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
         {hasImportedData && activeTab === 'trends' && (
           <div className="stack-grid">
             <div className="trend-charts-pair">
-              <TrendLineChart data={model.trend} metric="income" title="Revenue Trend" hideDots hideActualLine hideAxisLines useEma hideHover trendWindowOverride={trendsMaWindow} displayWindow={trendsMaWindow} rangeLabelOverride={trendsRangeLabel} showInterpretation interpretationVariant="revenue" showTrendTooltip yTickLabelStep={2} />
-              <TrendLineChart data={model.trend} metric="expense" title="Expense Trend" hideDots hideActualLine hideAxisLines useEma hideHover trendWindowOverride={trendsMaWindow} displayWindow={trendsMaWindow} rangeLabelOverride={trendsRangeLabel} showInterpretation interpretationVariant="expense" showTrendTooltip yTickLabelStep={2} />
+              <TrendLineChart data={model.trend} metric="income" title="Revenue Trend" trendWindowOverride={trendsMaWindow} displayWindow={trendsMaWindow} rangeLabelOverride={trendsRangeLabel} interpretationVariant="revenue" yTickLabelStep={2} />
+              <TrendLineChart data={model.trend} metric="expense" title="Expense Trend" trendWindowOverride={trendsMaWindow} displayWindow={trendsMaWindow} rangeLabelOverride={trendsRangeLabel} interpretationVariant="expense" yTickLabelStep={2} />
             </div>
 
             {(() => {
