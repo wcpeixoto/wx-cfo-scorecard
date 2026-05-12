@@ -22,9 +22,10 @@ Token drift and structure drift are equally harmful. Both are prevented here.
 
 ## Card design
 
-For reusable dashboard card anatomy, fixed and optional card elements, the TailAdmin typography scale for cards, the spacing rhythm rules, and the CashTrendHero implementation contract, see `UI_CARDS.md`.
+For card patterns, follow the components already present in
+`src/dashboard.css` and existing card components.
 
-`UI_RULES.md` covers global design tokens, CSS conventions, and project-wide visual rules. `UI_CARDS.md` is the dedicated reference for building dashboard cards.
+`UI_RULES.md` covers global design tokens, CSS conventions, and project-wide visual rules.
 
 ---
 
@@ -314,8 +315,6 @@ browser default `normal` (which resolves to stretch in a grid context).
 |--------|------|
 | Cards hug their own content | `align-items: flex-start` |
 | Cards match each other's height | `align-items: stretch` |
-
-See `UI_CARDS.md` — Card Height & Pairing Behavior for classification criteria.
 
 TailAdmin relies on default stretch. Wx CFO does not.
 
@@ -1610,13 +1609,13 @@ parses as UTC midnight and shifts the window one month early in US timezones.
 
 Canonical **target** visual spec for dense financial data tables in this project. Reuse this pattern for any new tabular data view (projection tables, transaction lists, account ledgers, etc.).
 
-> **Read this first — shipped vs. target.** This section describes the canonical TARGET spec — the TailAdmin row rhythm that was prototyped in UI Lab and visually approved. Several of the values below (card horizontal padding `0`, body cell padding `20px 24px`, header band background `#F9FAFB`, title `18px / 28px`, card `overflow: hidden`) are **not yet present in `src/dashboard.css`** as of commit `1e07af0`. The shipped V2 ships a smaller subset of the rhythm (left alignment, full-width table, blank trailing total cell, V2 component structure) on top of legacy `.projection-table-card` padding. Reconciling `dashboard.css` to this spec is queued as part of the **"Remove old Forecast Projection Table fallback"** cleanup item — see "Implementation status" at the bottom of this section, and `wx_cfo_scorecard_context_v2_6.md` → "May 6, 2026 — Forecast Projection Table V2 shipped" for the full gap table. Use this section as the authoritative spec for **new** tables and for closing the V2 polish gap; do not assume the live Forecast table already matches every value below.
+> **Read this first — shipped vs. target.** This section describes the canonical TARGET spec — the TailAdmin row rhythm that was prototyped in UI Lab and visually approved. Several of the values below (card horizontal padding `0`, body cell padding `20px 24px`, header band background `#F9FAFB`, title `18px / 28px`, card `overflow: hidden`) are **not yet present in `src/dashboard.css`** as of commit `1e07af0`. The shipped V2 ships a smaller subset of the rhythm (left alignment, full-width table, blank trailing total cell, V2 component structure) on top of legacy `.projection-table-card` padding. Reconciling `dashboard.css` to this spec is queued as a cleanup pass that removes the old Projection Table fallback — see "Implementation status" at the bottom of this section for the full gap table. Use this section as the authoritative spec for **new** tables and for closing the V2 polish gap; do not assume the live Forecast table already matches every value below.
 
 ### Purpose
 
 Use this pattern when the table should feel **integrated into the card** — row dividers, header band, and total row span the full card width; the table is part of the card surface, not a floating mini-table inside a padded container.
 
-Do not use for narrative cards, KPI cards, mixed-content cards, or tables where content should sit inside a uniformly padded container — see `UI_CARDS.md` for those patterns.
+Do not use for narrative cards, KPI cards, mixed-content cards, or tables where content should sit inside a uniformly padded container — follow the existing card patterns in `src/dashboard.css` for those.
 
 ### Card / table width — non-negotiable
 
@@ -1723,7 +1722,6 @@ When extending or scoping width / alignment / typography rules to a specific tab
 
 - Production component: `src/components/ProjectionTableV2.tsx` (table-only — renders the `<thead>`, `<tbody>`, and `<tfoot>`; card shell, title, Compare year toggle, and Export CSV button live in `src/pages/Dashboard.tsx`)
 - Visual prototype: UI Lab → "Projection Table — TailAdmin Prototype" — canonical visual reference for the full TARGET rhythm; remains in place until the old Projection Table fallback is removed
-- See `UI_CARDS.md` → "Edge-to-edge Data Table Card" for the card-anatomy half of this pattern
 
 ### Implementation status — shipped vs. target (as of commit `1e07af0`)
 
@@ -1766,9 +1764,9 @@ calendar-year bars creates an implicit contradiction if the badge uses
 trailing 12 months. The user sees two numbers about the same thing that
 don't reconcile. This breaks trust faster than any visual defect.
 
-Time window consistency is a specific application of this rule and is
-governed by the Time Window Rules in `wx_cfo_scorecard_context_v2_6.md`.
-Both rules must be respected together.
+Time window consistency is a specific application of this rule: every
+card must use a single, explicitly-labeled time basis (YTD, trailing-N,
+calendar period). Cards mixing bases must label each element.
 
 ---
 

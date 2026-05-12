@@ -12,9 +12,7 @@ import type { ForecastProjectionResult, ScenarioPoint } from '../data/contract';
  * Forecast**. Reality Forecast is the main/default forecast for the
  * product. The internal module name (`conservativeFloor`) describes the
  * mathematical construction; the product name describes how the operator
- * sees it. See `wx_cfo_scorecard_context_v2_6.md` section "May 2, 2026 —
- * Reality Forecast locked as main/default" for the locked product
- * decision and rationale.
+ * sees it.
  *
  * Reality Forecast is intentionally cautious by construction. In
  * retrospective backtests across five 1-year windows, it under-projected

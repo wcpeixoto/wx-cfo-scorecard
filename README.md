@@ -72,7 +72,7 @@ A subset of files in `src/` is **locked** — the forecast engine,
 operating-cash classification rules, the data contract, and the
 Supabase fetch layer. Locked files must not be modified without
 explicit instruction. The authoritative locked-file list is in
-[CLAUDE.md](CLAUDE.md).
+[AGENTS.md](AGENTS.md).
 
 ---
 
@@ -182,7 +182,7 @@ npm run preview   # preview the production build locally
 
 - **Supabase URL + anon key** — required at runtime for primary
   persistence. Configure via Vite env variables (see `src/config.ts`
-  and [CLAUDE.md](CLAUDE.md) for the data layer contract). `VITE_*`
+  and [AGENTS.md](AGENTS.md) for the data layer contract). `VITE_*`
   variables are client-exposed by design; never put secret keys here.
 - **Anthropic API key** — required for the Today page AI prose layer.
   Routed through a secure proxy (Supabase Edge Function or Cloudflare
@@ -203,32 +203,15 @@ locked — do not modify casually.
 
 ## Documentation index
 
-This README is orientation only. Authoritative documentation lives in:
+Active root docs:
 
 | File | Purpose |
 |---|---|
-| [CLAUDE.md](CLAUDE.md) | Project rules, source-of-truth hierarchy, key files, locked files, dev rules, prompt discipline |
-| [UI_RULES.md](UI_RULES.md) | Design system tokens, primitives, page compositions, project overlay |
-| [UI_CARDS.md](UI_CARDS.md) | Card anatomy, height behavior, pairing classification |
-| [wx_cfo_scorecard_context_v2_6.md](wx_cfo_scorecard_context_v2_6.md) | Current project state, architecture, queued roadmap |
+| [AGENTS.md](AGENTS.md) | Agent workflow, locked files, project gotchas |
+| [UI_RULES.md](UI_RULES.md) | Visual tokens and styling rules |
+| [README.md](README.md) | App overview, local setup, deployment |
 | [scripts/backtest/README.md](scripts/backtest/README.md) | Backtest harness internals |
 | [backtest-results/fixtures/README.md](backtest-results/fixtures/README.md) | Fixture refresh procedure |
 
-Backlog state lives in Notion (single source of truth):
-<https://www.notion.so/084420fff00444de9413a542db3dddf0>. There is no
-`BACKLOG.md` in this repo.
-
----
-
-## Workflow docs
-
-Session-close, task-prompt, and shared-config doctrine live in dedicated
-files at the repo root. Read these directly; do not rely on summaries.
-
-| File | Purpose |
-|---|---|
-| [PROJECT_CONFIG.md](PROJECT_CONFIG.md) | Shared workflow/config source of truth: required reads, locked files, spec-doc list, arc signals, irreversible-action rules |
-| [TASK_PROMPT_TEMPLATE.md](TASK_PROMPT_TEMPLATE.md) | Required template when drafting an implementation prompt for Codex, Claude Code, or another coding agent |
-| [SESSION_CLOSE_WORKFLOW.md](SESSION_CLOSE_WORKFLOW.md) | Trigger model and behavior for closing a session |
-| [SESSION_HANDOFF_TEMPLATE.md](SESSION_HANDOFF_TEMPLATE.md) | Required template when handing off a session to a new chat (Trigger D closes or cross-platform handoffs) |
-| [README_SESSION_WORKFLOWS.md](README_SESSION_WORKFLOWS.md) | Map of the workflow docs above |
+`CLAUDE.md` exists as a bridge that points to `AGENTS.md` (Claude Code
+auto-loads it).

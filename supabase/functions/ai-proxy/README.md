@@ -5,9 +5,10 @@ V1 thin forwarder to `api.anthropic.com/v1/messages`. Holds the
 request shape, and forwards Anthropic's status and JSON body verbatim
 with CORS headers added.
 
-See the May 9, 2026 entry in `wx_cfo_scorecard_context_v2_6.md` at the
-repo root for the locked V1 architecture, six locked decisions, and
-why the proxy is intentionally thin.
+V1 is intentionally thin: holds the `ANTHROPIC_API_KEY` server-side,
+pins the model, validates request shape, forwards verbatim. No prompt
+shaping, no caching, no retry logic — those belong client-side or in
+a later layer.
 
 ## Behavior
 
@@ -145,6 +146,3 @@ override.
 - Caching (browser-side, separate Notion item)
 - Retry logic (one upstream attempt; failures forwarded)
 
-See the "May 9, 2026 — AI proxy V1 architecture locked" entry in
-`wx_cfo_scorecard_context_v2_6.md` for the full architecture and
-the six locked decisions.

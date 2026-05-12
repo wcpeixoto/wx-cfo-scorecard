@@ -1292,7 +1292,7 @@ body {
 
 /* ── Projected Cash Balance — TailAdmin-aligned analytics card ── */
 
-/* Card shell — 24px padding + 16px radius per UI_CARDS card system */
+/* Card shell — 24px padding + 16px radius */
 .forecast-chart-shell {
   padding: 24px;
   border-radius: 16px;
@@ -3248,7 +3248,7 @@ body {
 }
 
 /* Table breathing room — distance from header to first table row.
-   32px follows UI_CARDS spacing scale; the header is dense (title + Compare + Export). */
+   32px gap; the header is dense (title + Compare + Export). */
 .projection-table-card .projection-table-scroll {
   margin-top: 32px;
   overflow-x: auto;
