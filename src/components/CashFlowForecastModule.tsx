@@ -998,9 +998,6 @@ export default function CashFlowForecastModule({
                 {monthlyRangeLabel && (
                   <p className="projected-cash-date-range">{monthlyRangeLabel}</p>
                 )}
-                {priorPeriodActive && priorPeriodRangeLabel && (
-                  <p className="projected-cash-compare-subtitle">Compared with {priorPeriodRangeLabel}</p>
-                )}
                 {hasSeries && (
                   <p className="projected-cash-net-change">
                     <span className={`projected-cash-net-change-value ${netColor}`}>
@@ -1011,6 +1008,7 @@ export default function CashFlowForecastModule({
                 )}
               </div>
               <div className="projected-cash-timeline">
+                <div className="projected-cash-timeline-row">
                 <div
                   className="segmented-toggle"
                   role="radiogroup"
@@ -1090,6 +1088,10 @@ export default function CashFlowForecastModule({
                   <FiBarChart2 aria-hidden="true" focusable="false" />
                   <span>Compare</span>
                 </button>
+                </div>
+                {priorPeriodActive && priorPeriodRangeLabel && (
+                  <p className="projected-cash-compare-subtitle">Compared with {priorPeriodRangeLabel}</p>
+                )}
               </div>
             </div>
           );
