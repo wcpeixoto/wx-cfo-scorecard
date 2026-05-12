@@ -1664,19 +1664,13 @@ Use this pattern when the table is the primary content of its card — header, r
 
 ### Alignment rules
 
-Headers and body/total cells must align to the **same edge** within each column. Choose one alignment strategy per table:
+All columns are **left-aligned** — headers, body cells, and total cells all `text-align: left`. This is the universal default; **UI Lab cards are the source of truth for alignment**, and they ship left-aligned (the Projection Table V2 simple-mode `.ui-lab-projection-table-shell` scope is the reference).
 
-- **Left-aligned** (Projection Table V2 simple mode):
-  - Headers, body cells, and total cells all `text-align: left`
-  - Use when readability and label proximity matter more than vertical numeric scanning
-- **Right-aligned numeric** (financial-table convention):
-  - Headers AND values both right-aligned for numeric columns
-  - First column (label) stays left-aligned
-  - Use when vertical numeric scanning is the primary affordance (typical for ≥4 numeric columns)
+Right-aligned numeric ("financial-table convention") is **not used** in this project. It was considered earlier for tables with many numeric columns but caused implementation-vs-docs drift on PR #41; the spec was simplified to one rule.
 
-**Forbidden:** mixing left-aligned headers with right-aligned values in the same column. The header label must sit directly above its values.
+**Forbidden:** mixing left-aligned headers with right-aligned values, or vice versa. The header label must sit directly above its values — left-aligned on both.
 
-When scoping width / alignment / typography to a specific table variant, scope via a component-specific class on the wrapper (the V2 simple-mode left-align scope uses `.ui-lab-projection-table-shell`; the Monthly Rollups variant uses `.rollups-table-card` / `.rollups-table`). Do not modify shared `.table-card` rules — they govern unrelated tables and may regress those.
+When implementing a new table, scope the alignment override (and any width/typography rules) via a component-specific class on the wrapper (e.g., `.ui-lab-projection-table-shell` for the V2 simple mode, `.rollups-table-card` for Monthly Rollups). The shared `.table-card td:nth-child(n+2)` rule right-aligns from the second column on; any new table must override this via a scoped left-align rule. Do not modify the shared `.table-card` rules — they govern unrelated surfaces.
 
 ### Negative number format
 
@@ -1706,7 +1700,7 @@ When scoping width / alignment / typography to a specific table variant, scope v
 ### Reference implementations
 
 - Forecast Projection Table V2 (left-aligned simple mode): `src/components/ProjectionTableV2.tsx` — table-only; card shell, title, Compare toggle, and Export CSV live in `src/pages/Dashboard.tsx`. CSS: `.projection-table-card`, `.projection-table`, `.ui-lab-projection-table-shell`.
-- Trends Monthly Rollups (right-aligned numeric): inline in `src/pages/Dashboard.tsx` ("Monthly Rollups" section). CSS: `.rollups-table-card`, `.rollups-table`.
+- Trends Monthly Rollups (left-aligned): inline in `src/pages/Dashboard.tsx` ("Monthly Rollups" section). CSS: `.rollups-table-card`, `.rollups-table`.
 
 ---
 
