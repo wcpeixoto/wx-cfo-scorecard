@@ -854,7 +854,7 @@ export default function CashFlowForecastModule({
               <>
                 <span className="forecast-decision-label">To stay above your safety line</span>
                 <strong className="forecast-decision-value forecast-decision-value--md">{formatCurrencyCompactNode(shortfall)}</strong>
-                <span className="forecast-decision-detail">To reach your 1-month reserve</span>
+                <span className="forecast-decision-detail">To reach your safety line</span>
               </>
             )}
             {bufferState === 'at-risk' && shortfall === null && (
@@ -870,7 +870,7 @@ export default function CashFlowForecastModule({
           <article className="forecast-decision-card">
             <span className="forecast-decision-label">Safety line</span>
             <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
-            <span className="forecast-decision-detail">No reserve target set</span>
+            <span className="forecast-decision-detail">No safety line set</span>
           </article>
         )}
 

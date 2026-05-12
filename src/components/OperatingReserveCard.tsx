@@ -160,7 +160,7 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
           <span className="reserve-stat-card-value">{formatCurrency(currentCashBalance)}</span>
         </div>
         <div className="reserve-stat-card">
-          <span className="reserve-stat-card-label">Reserve floor</span>
+          <span className="reserve-stat-card-label">Safety line</span>
           <span className="reserve-stat-card-value">{reserveTarget > EPSILON ? formatCurrency(reserveTarget) : '—'}</span>
         </div>
       </div>
