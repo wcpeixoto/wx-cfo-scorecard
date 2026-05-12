@@ -4155,13 +4155,13 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                           </div>
                         </div>
 
-                        {/* Rule 2 — Safety reserve */}
+                        {/* Rule 2 — Safety line */}
                         <div className="rules-row">
                           <div className="rules-row-info">
-                            <span className="rules-row-label">Safety reserve</span>
+                            <span className="rules-row-label">Safety line</span>
                             <span className="rules-row-sub">
                               {businessRules.safetyReserveMethod === 'fixed'
-                                ? 'Fixed reserve amount used as the safety floor'
+                                ? 'Fixed reserve amount used as your safety line'
                                 : '1 month of average operating expenses'}
                             </span>
                           </div>
@@ -4190,7 +4190,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                                   type="number"
                                   min="0"
                                   step="1000"
-                                  aria-label="Reserve target amount"
+                                  aria-label="Safety line amount"
                                   placeholder="40000"
                                   value={businessRules.safetyReserveAmount === 0 ? '' : businessRules.safetyReserveAmount}
                                   onChange={(event) => {

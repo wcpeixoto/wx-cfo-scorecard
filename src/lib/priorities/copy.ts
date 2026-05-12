@@ -65,7 +65,7 @@ export function getFallbackCopy(
       return {
         signalType: signal.type,
         severity: signal.severity,
-        headline: `Reserve is ${gap} short — below the safety floor`,
+        headline: `Reserve is ${gap} short — below your safety line`,
         why: worsened
           ? `Your reserve has dropped further — now at ${fundedPct} of where it needs to be. Right now there's not much between you and a real squeeze if something unexpected hits.`
           : `Your reserve is at ${fundedPct} — below the level that keeps you safe when something unexpected hits. Right now, there's not much buffer between you and a real squeeze.`,
