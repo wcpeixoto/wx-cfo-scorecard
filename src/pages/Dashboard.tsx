@@ -3189,8 +3189,8 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                           <td>{toMonthLabel(rollup.month)}</td>
                           <td>{formatCurrency(rollup.revenue)}</td>
                           <td>{formatCurrency(rollup.expenses)}</td>
-                          <td>{formatCurrency(rollup.netCashFlow)}</td>
-                          <td>{rollup.savingsRate.toFixed(1)}%</td>
+                          <td className={rollup.netCashFlow < 0 ? 'is-negative' : undefined}>{formatCurrency(rollup.netCashFlow)}</td>
+                          <td className={rollup.savingsRate < 0 ? 'is-negative' : undefined}>{rollup.savingsRate.toFixed(1)}%</td>
                         </tr>
                       ))}
                     </tbody>
@@ -3199,8 +3199,8 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                         <td>Period total</td>
                         <td>{formatCurrency(totalRevenue)}</td>
                         <td>{formatCurrency(totalExpenses)}</td>
-                        <td>{formatCurrency(totalNet)}</td>
-                        <td>{periodMargin.toFixed(1)}%</td>
+                        <td className={totalNet < 0 ? 'is-negative' : undefined}>{formatCurrency(totalNet)}</td>
+                        <td className={periodMargin < 0 ? 'is-negative' : undefined}>{periodMargin.toFixed(1)}%</td>
                       </tr>
                     </tfoot>
                   </table>
