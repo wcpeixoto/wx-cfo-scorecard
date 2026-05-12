@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router';
-import { FiGrid, FiTarget, FiTrendingUp, FiSliders, FiSettings, FiLayout, FiChevronLeft, FiX, FiClock } from 'react-icons/fi';
+import { FiGrid, FiTarget, FiTrendingUp, FiSliders, FiSettings, FiLayout, FiX, FiClock } from 'react-icons/fi';
 import gracieSportsLogo from '../assets/gracie-sports-logo.svg';
 import { useSidebar } from '../context/SidebarContext';
 
@@ -20,7 +20,7 @@ const PRIMARY_ITEMS: SidebarItem[] = [
 ];
 
 export function AppSidebar() {
-  const { isCollapsed, isMobileOpen, toggleCollapsed, setMobileOpen } = useSidebar();
+  const { isCollapsed, isMobileOpen, setMobileOpen } = useSidebar();
 
   const classes = ['app-sidebar'];
   if (isCollapsed) classes.push('is-collapsed');
@@ -80,16 +80,6 @@ export function AppSidebar() {
             )}
           </ul>
         </nav>
-
-        <button
-          type="button"
-          className="app-sidebar-collapse"
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          onClick={toggleCollapsed}
-        >
-          <FiChevronLeft className="app-sidebar-icon" aria-hidden="true" />
-          {!isCollapsed && <span className="app-sidebar-label">Collapse</span>}
-        </button>
       </aside>
     </>
   );

@@ -6104,35 +6104,6 @@ body {
   padding: 10px 0;
 }
 
-.app-sidebar-collapse {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  color: #667085;
-  background: transparent;
-  border: 1px solid #E4E7EC;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  margin-top: 8px;
-}
-
-.app-sidebar-collapse:hover {
-  background: #F2F4F7;
-  color: #101828;
-}
-
-.app-sidebar.is-collapsed .app-sidebar-collapse {
-  justify-content: center;
-  padding: 10px 0;
-}
-
-.app-sidebar.is-collapsed .app-sidebar-collapse .app-sidebar-icon {
-  transform: rotate(180deg);
-}
-
 .app-sidebar-scrim {
   display: none;
 }
