@@ -3591,6 +3591,49 @@ body {
   font-weight: 500;
 }
 
+/* ─── Monthly Rollups table (Trends page) ───────────────────────────────────
+   Adopts the canonical Data Table Pattern (see UI_RULES.md). Self-contained
+   block — does not piggyback on .projection-table selectors so changes to
+   either variant stay independent. Keeps right-aligned numeric columns via
+   the inherited .table-card td:nth-child(n+2) rule (financial convention). */
+.rollups-table-card {
+  padding: 24px;
+  border-radius: 16px;
+}
+
+.rollups-table-card .card-head h3 {
+  font-size: 1.06rem;
+  font-weight: 700;
+  color: #101828;
+  margin: 0;
+}
+
+.rollups-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rollups-table thead th {
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: none;
+  letter-spacing: normal;
+  border-top: 1px solid var(--bg-muted);
+  border-bottom: 1px solid var(--bg-muted);
+}
+
+.rollups-table tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--bg-muted);
+  font-size: 14px;
+}
+
+.rollups-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .settings-field {
   display: grid;
   gap: 8px;

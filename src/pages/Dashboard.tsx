@@ -3159,11 +3159,11 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               <TrendLineChart data={model.trend} metric="expense" title="Expense Trend" hideDots hideActualLine hideAxisLines useEma hideHover trendWindowOverride={trendsMaWindow} displayWindow={trendsMaWindow} rangeLabelOverride={trendsRangeLabel} showInterpretation interpretationVariant="expense" showTrendTooltip yTickLabelStep={2} />
             </div>
 
-            <article className="card table-card">
+            <article className="card table-card rollups-table-card">
               <div className="card-head">
                 <h3>Monthly Rollups</h3>
               </div>
-              <table>
+              <table className="rollups-table">
                 <thead>
                   <tr>
                     <th>Month</th>
