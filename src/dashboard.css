@@ -461,7 +461,7 @@ body {
 .top-bar-freshness-mobile {
   margin-top: 6px;
 }
-@media (min-width: 1024px) {
+@media (min-width: 560px) {
   .top-bar-freshness-mobile { display: none; }
 }
 
@@ -6099,6 +6099,10 @@ body {
   display: none;
 }
 
+.app-sidebar.is-collapsed .app-sidebar-brand-title {
+  display: none;
+}
+
 .app-sidebar.is-collapsed .app-sidebar-link {
   justify-content: center;
   padding: 10px 0;
@@ -6187,13 +6191,29 @@ body {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: 'main';
   }
+  .finance-app:has(.app-sidebar.is-collapsed) {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .app-sidebar {
     position: fixed;
     top: 0;
     left: 0;
+    width: 260px;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
     box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+  }
+  .app-sidebar.is-collapsed {
+    width: 260px;
+    padding: 20px 16px;
+  }
+  .app-sidebar.is-collapsed .app-sidebar-brand-title,
+  .app-sidebar.is-collapsed .app-sidebar-label {
+    display: inline;
+  }
+  .app-sidebar.is-collapsed .app-sidebar-link {
+    justify-content: flex-start;
+    padding: 10px 12px;
   }
   .app-sidebar.is-mobile-open {
     transform: translateX(0);
@@ -6224,6 +6244,7 @@ body {
   display: grid;
   grid-template-columns: 40px 1fr 40px;
   align-items: center;
+  column-gap: 8px;
   width: 100%;
   padding: 12px;
   border-bottom: 1px solid #E4E7EC;
@@ -6250,6 +6271,34 @@ body {
   font-weight: 600;
   color: #101828;
   text-align: center;
+}
+
+.app-header-compact-updated {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.15;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.app-header-compact-updated:hover {
+  opacity: 1;
+}
+
+@media (min-width: 560px) and (max-width: 1023px) {
+  .app-header-compact-updated {
+    display: inline-flex;
+  }
 }
 
 /* Search icon button (right cell) */

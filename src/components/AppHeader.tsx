@@ -50,7 +50,19 @@ export function AppHeader({ query, onQueryChange, updatedLabel, onUpdatedClick }
             </svg>
           )}
         </button>
-        <span className="app-header-mobile-brand" aria-hidden="true" />
+        {updatedLabel ? (
+          <button
+            type="button"
+            className="app-header-compact-updated"
+            onClick={onUpdatedClick}
+            aria-label={`${updatedLabel}. Open Settings.`}
+          >
+            <FiRefreshCw className="app-header-updated-icon" aria-hidden="true" />
+            <span>{updatedLabel}</span>
+          </button>
+        ) : (
+          <span className="app-header-mobile-brand" aria-hidden="true" />
+        )}
         <button
           type="button"
           className="app-header-search-icon-btn"

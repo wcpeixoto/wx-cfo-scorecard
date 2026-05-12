@@ -36,7 +36,7 @@ export function AppSidebar() {
       <aside className={classes.join(' ')} aria-label="Primary navigation">
         <div className="app-sidebar-brand">
           <img className="app-sidebar-logo" src={gracieSportsLogo} alt="Gracie Sports logo" />
-          {!isCollapsed && <span className="app-sidebar-brand-title">Financial Dashboard</span>}
+          <span className="app-sidebar-brand-title">Financial Dashboard</span>
           <button
             type="button"
             className="app-sidebar-mobile-close"
