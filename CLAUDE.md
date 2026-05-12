@@ -32,7 +32,7 @@ Notion is the sole source of truth for backlog state.
 - Backlog database: Wx CFO Scorecard — Backlog
   https://www.notion.so/084420fff00444de9413a542db3dddf0
 - Data source ID: bc0648c6-c8df-4496-84ba-4c1b860ae51d
-- Schema: Name (title), Status (Now / Next / Later / Done),
+- Schema: Name (title), Status (defined by Notion backlog schema),
   Priority (P1–P5), Why (text)
 
 There is no BACKLOG.md. If a prior conversation, memory summary,
