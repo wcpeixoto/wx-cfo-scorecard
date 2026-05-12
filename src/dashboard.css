@@ -444,6 +444,15 @@ body {
   flex: 0 0 auto;
 }
 
+/* Mobile-only freshness label under the page subtitle.
+   Desktop renders the freshness label in the top app bar instead. */
+.top-bar-freshness-mobile {
+  margin-top: 6px;
+}
+@media (min-width: 1024px) {
+  .top-bar-freshness-mobile { display: none; }
+}
+
 .top-controls {
   width: fit-content;
   max-width: 100%;
@@ -6308,6 +6317,37 @@ body {
     gap: 16px;
     flex: 1;
   }
+}
+
+/* Updated-message in desktop top bar, far right. Hidden on mobile. */
+.app-header-updated {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .app-header-updated {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #667085;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.15;
+    white-space: nowrap;
+    cursor: pointer;
+    opacity: 0.85;
+  }
+  .app-header-updated:hover {
+    opacity: 1;
+  }
+}
+.app-header-updated-icon {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
 }
 
 /* === Settings: subnav, width constraint, section visibility === */
