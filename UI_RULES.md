@@ -1654,7 +1654,10 @@ Use this pattern when the table is the primary content of its card — header, r
 
 ### Total row
 
-- No special background — the row is distinguished by `font-weight: 600` and the divider rhythm
+- Background: `var(--bg-main)` — subtle fill distinguishes the totals row from body rows
+- Top divider: `border-top: 1px solid var(--line)` (slightly heavier than the `--bg-muted` body dividers — anchors the row visually)
+- Cell borders: `border-top: none; border-bottom: none` on tfoot cells so the row reads as a single band
+- `font-weight: 600`
 - Same `12px 16px` cell padding as body rows
 - **Trailing-cell rule:** when no aggregation applies to the trailing column (e.g., per-month "Cumulative Net" or "Balance"), render the cell as **blank** (`<td />`). Do not insert an `&mdash;` or any other placeholder unless explicitly designed and verified — a centered placeholder will misalign with right- or left-aligned values above it.
 - **Comparison-mode placeholder exception:** in comparison-mode Change and `%` cells where the prior-year value is `0` or undefined (so the diff or ratio is mathematically meaningless), render `&mdash;` instead of leaving the cell blank or printing `NaN`/`Infinity`. The em-dash signals "no comparison available," not "no value." This is the only context where `&mdash;` is permitted; the blank-trailing-cell rule above still governs simple-mode total cells.

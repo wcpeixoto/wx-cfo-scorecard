@@ -3159,35 +3159,54 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               <TrendLineChart data={model.trend} metric="expense" title="Expense Trend" hideDots hideActualLine hideAxisLines useEma hideHover trendWindowOverride={trendsMaWindow} displayWindow={trendsMaWindow} rangeLabelOverride={trendsRangeLabel} showInterpretation interpretationVariant="expense" showTrendTooltip yTickLabelStep={2} />
             </div>
 
-            <article className="card table-card rollups-table-card">
-              <div className="card-head">
-                <h3>Monthly Rollups</h3>
-              </div>
-              <table className="rollups-table">
-                <thead>
-                  <tr>
-                    <th>Month</th>
-                    <th>Revenue</th>
-                    <th>Expenses</th>
-                    <th>Net Cash Flow</th>
-                    <th>Profit Margin</th>
-                    <th>Txns</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {model.monthlyRollups.filter((r) => r.month < currentCalendarMonth).slice(-trendsMaWindow).reverse().map((rollup) => (
-                    <tr key={rollup.month}>
-                      <td>{toMonthLabel(rollup.month)}</td>
-                      <td>{formatCurrency(rollup.revenue)}</td>
-                      <td>{formatCurrency(rollup.expenses)}</td>
-                      <td>{formatCurrency(rollup.netCashFlow)}</td>
-                      <td>{rollup.savingsRate.toFixed(1)}%</td>
-                      <td>{rollup.transactionCount}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </article>
+            {(() => {
+              const rollupRows = model.monthlyRollups
+                .filter((r) => r.month < currentCalendarMonth)
+                .slice(-trendsMaWindow)
+                .reverse();
+              const totalRevenue = rollupRows.reduce((s, r) => s + r.revenue, 0);
+              const totalExpenses = rollupRows.reduce((s, r) => s + r.expenses, 0);
+              const totalNet = rollupRows.reduce((s, r) => s + r.netCashFlow, 0);
+              const periodMargin = totalRevenue > 0 ? (totalNet / totalRevenue) * 100 : 0;
+              return (
+                <article className="card table-card rollups-table-card">
+                  <div className="card-head">
+                    <h3>Monthly Rollups</h3>
+                  </div>
+                  <table className="rollups-table">
+                    <thead>
+                      <tr>
+                        <th>Month</th>
+                        <th>Revenue</th>
+                        <th>Expenses</th>
+                        <th>Net Cash Flow</th>
+                        <th>Profit Margin</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rollupRows.map((rollup) => (
+                        <tr key={rollup.month}>
+                          <td>{toMonthLabel(rollup.month)}</td>
+                          <td>{formatCurrency(rollup.revenue)}</td>
+                          <td>{formatCurrency(rollup.expenses)}</td>
+                          <td>{formatCurrency(rollup.netCashFlow)}</td>
+                          <td>{rollup.savingsRate.toFixed(1)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td>Period total</td>
+                        <td>{formatCurrency(totalRevenue)}</td>
+                        <td>{formatCurrency(totalExpenses)}</td>
+                        <td>{formatCurrency(totalNet)}</td>
+                        <td>{periodMargin.toFixed(1)}%</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </article>
+              );
+            })()}
           </div>
         )}
 
