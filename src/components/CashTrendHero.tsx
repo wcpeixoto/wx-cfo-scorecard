@@ -90,9 +90,10 @@ export default function CashTrendHero({ result, negativeMonthsAsSubtitle = false
       </button>
       <div id={tooltipId} role="tooltip" className="db-tooltip-panel is-wide">
         <ul className="db-tooltip-list">
-          <li>Cash Trend shows whether the business is building cash or operating too close to the edge.</li>
-          <li>If this card shows pressure, look below for cost spikes and efficiency gaps.</li>
-          <li>Net cash shows how much cash the business accumulated in the last 6 complete months. Margin shows that cash as a percent of revenue over the same period.</li>
+          <li><strong>What it shows</strong></li>
+          <li className="db-tooltip-body">Whether the business is building cash or operating too close to the edge.</li>
+          <li><strong>How it's calculated</strong></li>
+          <li className="db-tooltip-body">Net cash accumulated over the last 6 complete months; margin is that cash as a percent of revenue.</li>
         </ul>
       </div>
     </div>

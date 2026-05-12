@@ -220,9 +220,9 @@ export default function TrendLineChartApex({
               <div id={trendTooltipId} role="tooltip" className="cashflow-tooltip-panel trend-tooltip-panel">
                 <ul className="cashflow-tooltip-list trend-tooltip-list">
                   <li><strong>How this trend works</strong></li>
-                  <li>This line smooths the last few months of results so you can see the direction more clearly without getting distracted by normal month-to-month swings.</li>
+                  <li className="cashflow-tooltip-body">This line smooths the last few months of results so you can see the direction more clearly without getting distracted by normal month-to-month swings.</li>
                   <li><strong>Method used</strong></li>
-                  <li>We use an exponential moving average (EMA), which gives more weight to recent months and less weight to older months.</li>
+                  <li className="cashflow-tooltip-body">We use an exponential moving average (EMA) — more weight to recent months, less to older months.</li>
                 </ul>
               </div>
             </div>

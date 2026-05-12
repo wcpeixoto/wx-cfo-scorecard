@@ -324,7 +324,10 @@ export default function NetCashFlowChart({
             </button>
             <div id={cashflowTooltipId} role="tooltip" className="cashflow-tooltip-panel">
               <ul className="cashflow-tooltip-list">
-                <li><strong>Operating</strong> excludes capital distribution</li>
+                <li><strong>Operating</strong></li>
+                <li className="cashflow-tooltip-body">Excludes capital distributions — shows the cash your business produces.</li>
+                <li><strong>Total</strong></li>
+                <li className="cashflow-tooltip-body">Includes capital distributions — the full cash movement in and out.</li>
               </ul>
             </div>
           </div>

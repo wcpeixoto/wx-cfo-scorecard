@@ -599,28 +599,35 @@ body {
   z-index: 30;
 }
 
+/* Tooltip content layout — Projected Cash Balance pattern is the standard.
+   Each section is a title row (small bullet + bold title) followed by an
+   indented body line (no bullet). Body sits tight under its title; the
+   8px section break only appears between sections. */
 .cashflow-tooltip-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 6px;
+  display: block;
 }
 
 .cashflow-tooltip-list li {
   margin: 0;
   position: relative;
   padding-left: 12px;
-  white-space: nowrap;
+  text-align: left;
+}
+
+.cashflow-tooltip-list li + li {
+  margin-top: 1px;
 }
 
 .cashflow-tooltip-list li::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 0.45em;
-  width: 5px;
-  height: 5px;
+  top: 0.55em;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: #98A2B3;
 }
@@ -630,33 +637,23 @@ body {
   font-weight: 600;
 }
 
-/* Body lines under a section title — no leading dot. Padding kept so the
-   text aligns with the dotted section-title text above it. */
+/* Body line under a section title — no leading dot, sits tight under
+   the title, takes the muted body color. */
+.cashflow-tooltip-list li.cashflow-tooltip-body {
+  color: var(--tooltip-text);
+}
 .cashflow-tooltip-list li.cashflow-tooltip-body::before {
   display: none;
 }
 
-/* Forecast "How this forecast works" — width + spacing only.
-   Surface styling is inherited from .cashflow-tooltip-panel. */
-.forecast-info-tooltip-panel.cashflow-tooltip-panel {
-  max-width: 300px;
-}
-.forecast-info-tooltip-panel .cashflow-tooltip-list {
-  display: block;
-  gap: 0;
-}
-.forecast-info-tooltip-panel .cashflow-tooltip-list li {
-  margin: 0;
-  padding-left: 12px;
-}
-.forecast-info-tooltip-panel .cashflow-tooltip-list li + li {
-  margin-top: 1px;
-}
-.forecast-info-tooltip-panel .cashflow-tooltip-list li.cashflow-tooltip-body + li:not(.cashflow-tooltip-body) {
+/* Section break — title following a body line gets the gap. */
+.cashflow-tooltip-list li.cashflow-tooltip-body + li:not(.cashflow-tooltip-body) {
   margin-top: 8px;
 }
-.forecast-info-tooltip-panel .cashflow-tooltip-list li.cashflow-tooltip-body {
-  color: var(--tooltip-text);
+
+/* Single-section tooltips that don't use the body class still wrap. */
+.cashflow-tooltip-list li:not(.cashflow-tooltip-body) {
+  white-space: normal;
 }
 
 .cashflow-help:hover .cashflow-tooltip-panel,
@@ -741,29 +738,28 @@ body {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 6px;
+  display: block;
 }
 
 .db-tooltip-list li {
   margin: 0;
   position: relative;
   padding-left: 12px;
-  white-space: nowrap;
+  text-align: left;
+  white-space: normal;
 }
 
-/* Wide variant overrides nowrap for paragraph items */
-.db-tooltip-panel.is-wide .db-tooltip-list li {
-  white-space: normal;
+.db-tooltip-list li + li {
+  margin-top: 1px;
 }
 
 .db-tooltip-list li::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 0.45em;
-  width: 5px;
-  height: 5px;
+  top: 0.55em;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: #98A2B3;
 }
@@ -771,6 +767,16 @@ body {
 .db-tooltip-list strong {
   color: var(--tooltip-title);
   font-weight: 600;
+}
+
+.db-tooltip-list li.db-tooltip-body {
+  color: var(--tooltip-text);
+}
+.db-tooltip-list li.db-tooltip-body::before {
+  display: none;
+}
+.db-tooltip-list li.db-tooltip-body + li:not(.db-tooltip-body) {
+  margin-top: 8px;
 }
 
 /* Show on hover or keyboard focus */
@@ -785,10 +791,6 @@ body {
   left: 0;
   min-width: 240px;
   max-width: 320px;
-}
-
-.trend-tooltip-list li {
-  white-space: normal;
 }
 
 .error-banner {
