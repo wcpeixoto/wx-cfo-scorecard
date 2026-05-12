@@ -13,6 +13,7 @@
  * Interaction model: ⓘ tooltip only.
  */
 
+import { useId } from 'react';
 import type {
   CashTrendResult,
   CashTrendStatus,
@@ -53,6 +54,7 @@ export function CashTrendPlaceholder() {
 }
 
 export default function CashTrendHero({ result, negativeMonthsAsSubtitle = false }: Props) {
+  const tooltipId = useId();
   if (result.noData) {
     return (
       <div className="cth-card cth-card--treading">
@@ -82,10 +84,11 @@ export default function CashTrendHero({ result, negativeMonthsAsSubtitle = false
         type="button"
         className="db-tooltip-btn cth-info-icon"
         aria-label="Cash Trend explanation"
+        aria-describedby={tooltipId}
       >
         &#9432;
       </button>
-      <div role="tooltip" className="db-tooltip-panel is-wide">
+      <div id={tooltipId} role="tooltip" className="db-tooltip-panel is-wide">
         <ul className="db-tooltip-list">
           <li>Cash Trend shows whether the business is building cash or operating too close to the edge.</li>
           <li>If this card shows pressure, look below for cost spikes and efficiency gaps.</li>

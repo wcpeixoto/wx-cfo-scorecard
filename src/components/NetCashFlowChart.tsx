@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import { toMonthLabel } from '../lib/kpis/compute';
@@ -106,6 +106,7 @@ export default function NetCashFlowChart({
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const cashflowTooltipId = useId();
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -313,10 +314,15 @@ export default function NetCashFlowChart({
             </button>
           </div>
           <div className="cashflow-help">
-            <button type="button" className="cashflow-tooltip" aria-label="Cash flow mode help">
+            <button
+              type="button"
+              className="cashflow-tooltip"
+              aria-label="Cash flow mode help"
+              aria-describedby={cashflowTooltipId}
+            >
               &#9432;
             </button>
-            <div role="tooltip" className="cashflow-tooltip-panel">
+            <div id={cashflowTooltipId} role="tooltip" className="cashflow-tooltip-panel">
               <ul className="cashflow-tooltip-list">
                 <li><strong>Operating</strong> excludes capital distribution</li>
               </ul>
