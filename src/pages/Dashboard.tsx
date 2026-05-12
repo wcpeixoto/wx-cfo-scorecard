@@ -3238,6 +3238,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
           <div className="stack-grid">
             <CashFlowForecastModule
               data={cashFlowForecastTrend}
+              monthlyRollups={model.monthlyRollups}
               fullForecast={scenarioProjection}
               reserveTarget={model.runway.reserveTarget}
               fixedReserveAmount={

@@ -10,6 +10,10 @@ type ProjectedCashBalanceChartProps = {
   granularity?: 'month' | 'week';
   knownEvents?: ForecastEvent[];
   height?: number;
+  /** Optional prior-period series aligned 1:1 to `data` for "Compare" overlay. */
+  priorSeries?: TrendPoint[] | null;
+  /** Label shown in the tooltip for the prior series. Defaults to "Prior Year". */
+  priorSeriesLabel?: string;
 };
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -115,7 +119,10 @@ export default function ProjectedCashBalanceChart({
   granularity = 'month',
   knownEvents,
   height = 310,
+  priorSeries = null,
+  priorSeriesLabel = 'Prior Year',
 }: ProjectedCashBalanceChartProps) {
+  const hasPrior = !!priorSeries && priorSeries.length === data.length && priorSeries.length > 0;
   // Axis categories (short labels for display on x-axis)
   const categories = useMemo(
     () =>
@@ -192,8 +199,10 @@ export default function ProjectedCashBalanceChart({
   // so the chart fits the data without padding tricks; the helper applies
   // a hybrid local/zero-based axis — see niceTicks.ts.
   const initialBalance = data.length > 0 ? data[0].net : 0;
-  const dataMin = data.length > 0 ? Math.min(initialBalance, ...values) : 0;
-  const dataMax = data.length > 0 ? Math.max(initialBalance, ...values) : 0;
+  const priorValues = hasPrior ? priorSeries!.map((d) => d.net) : [];
+  const combinedValues = hasPrior ? [...values, ...priorValues] : values;
+  const dataMin = data.length > 0 ? Math.min(initialBalance, ...combinedValues) : 0;
+  const dataMax = data.length > 0 ? Math.max(initialBalance, ...combinedValues) : 0;
   const { min: yAxisMin, max: yAxisMax, ticks: yAxisTicks } = useMemo(
     () => niceTicks(dataMin, dataMax),
     [dataMin, dataMax],
@@ -211,21 +220,24 @@ export default function ProjectedCashBalanceChart({
         sparkline: { enabled: false },
         animations: { enabled: true },
       },
-      colors: [chartTokens.brand],
+      colors: hasPrior
+        ? [chartTokens.brand, chartTokens.brandSecondary]
+        : [chartTokens.brand],
       fill: {
         type: 'gradient',
         gradient: {
           shade: 'light',
           type: 'vertical',
-          opacityFrom: 0.55,
+          opacityFrom: hasPrior ? [0.55, 0.12] : 0.55,
           opacityTo: 0,
           stops: [0, 100],
         },
       },
       stroke: {
-        width: 2,
+        width: hasPrior ? [2, 2] : 2,
         curve: 'smooth',
         lineCap: 'butt',
+        dashArray: hasPrior ? [0, 4] : 0,
       },
       dataLabels: { enabled: false },
       markers: {
@@ -296,8 +308,10 @@ export default function ProjectedCashBalanceChart({
         },
         y: {
           formatter: formatCurrency,
-          // Suppress the "Cash Balance:" series-name prefix on the value row
-          title: { formatter: () => '' },
+          // Suppress series-name prefix on the value row when only the primary
+          // series renders; when the prior-period overlay is active, keep the
+          // series name so the two rows are distinguishable.
+          title: hasPrior ? undefined : { formatter: () => '' },
         },
         marker: { show: true },
       },
@@ -306,12 +320,18 @@ export default function ProjectedCashBalanceChart({
       },
       legend: { show: false },
     }),
-    [categories, tooltipLabels, xAxisTickAmount, eventAnnotationPoints, height, yAxisMin, yAxisMax, yAxisTickAmount]
+    [categories, tooltipLabels, xAxisTickAmount, eventAnnotationPoints, height, yAxisMin, yAxisMax, yAxisTickAmount, hasPrior]
   );
 
   const series = useMemo(
-    () => [{ name: 'Cash Balance', data: values }],
-    [values]
+    () =>
+      hasPrior
+        ? [
+            { name: 'Cash Balance', data: values },
+            { name: priorSeriesLabel, data: priorValues },
+          ]
+        : [{ name: 'Cash Balance', data: values }],
+    [values, hasPrior, priorValues, priorSeriesLabel]
   );
 
   return (
