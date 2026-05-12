@@ -58,7 +58,7 @@ export function detectSignals(
         metricValue: percentFunded,
         targetValue: RESERVE_FUNDED_TARGET,
         gapAmount: (RESERVE_FUNDED_TARGET - percentFunded) * reserveTarget,
-        recommendedAction: 'Build your operating reserve — current level is below the minimum safe floor.',
+        recommendedAction: 'Build your operating reserve — current level is below your safety line.',
       });
     } else if (percentFunded < RESERVE_FUNDED_TARGET) {
       signals.push({

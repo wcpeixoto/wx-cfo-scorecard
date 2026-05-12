@@ -65,7 +65,7 @@ export function getFallbackCopy(
       return {
         signalType: signal.type,
         severity: signal.severity,
-        headline: `Reserve is ${gap} short — below the safety floor`,
+        headline: `Reserve is ${gap} short — below your safety line`,
         why: worsened
           ? `Your reserve has dropped further — now at ${fundedPct} of where it needs to be. Right now there's not much between you and a real squeeze if something unexpected hits.`
           : `Your reserve is at ${fundedPct} — below the level that keeps you safe when something unexpected hits. Right now, there's not much buffer between you and a real squeeze.`,
@@ -121,7 +121,7 @@ export function getFallbackCopy(
         headline: `Cash floor drops to ${lowest} in ${troughMonth}`,
         why: worsened
           ? `The forward picture has tightened since last check — your lowest projected balance is ${lowest}. You won't run dry, but the cushion is thinner.`
-          : `Your projected cash stays positive, but could fall ${gap} below your reserve target. You're not in danger, but you'd be cutting it close.`,
+          : `Your projected cash stays positive, but could fall ${gap} below your safety line. You're not in danger, but you'd be cutting it close.`,
         currentState: `The lowest your balance gets is ${lowest} in ${troughMonth} — just below the safety line you've set.`,
         action: 'Identify any payment that can shift out 2–4 weeks, or one revenue item you can pull forward.',
         alternative: 'Even smoothing out when bills are paid can help — timing matters as much as amount.',
@@ -207,7 +207,7 @@ export function getFallbackCopy(
           ? `Your draw pace has increased since last check — you're now on track for ${annualized} annualized, compared to ${baseline} last year.`
           : `At your current pace, you're on track to take out ${annualized} this year — compared to ${baseline} last year. That's above the 120% benchmark.`,
         currentState: 'The business can sustain this if cash flow is strong, but it tightens the cushion for surprises.',
-        action: 'Compare your current reserve balance to the reserve target — if it\'s below target, level your draw rate until it recovers.',
+        action: 'Compare your current reserve balance to your safety line — if it\'s below, level your draw rate until it recovers.',
         alternative: 'If the increase is planned — personal investment or a one-time need — log it so the forward cash picture stays accurate.',
         followupNote: 'This isn\'t a red flag on its own — it\'s a calibration check to keep the business healthy as you grow.',
       };
