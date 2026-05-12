@@ -566,20 +566,20 @@ export default function CashFlowForecastModule({
   const granularity: 'month' | 'week' = forecastRangeMonths < 6 ? 'week' : 'month';
   const startingCashBalance = Number.isFinite(currentCashBalance) ? currentCashBalance : 0;
 
-  // Prior-period overlay: only meaningful when the displayed series is monthly.
-  // Spec gates on granularity (not horizon length) so the toggle stays correct
-  // if the weekly-cutoff threshold ever moves.
+  // Prior-period overlay. Helper returns monthly NET-change series + a prior
+  // starting balance; we accumulate at the displayed granularity (monthly or
+  // expanded-weekly) using the same logic the forecast itself applies to
+  // `data`. Available at any horizon as long as coverage is complete.
   const [compareEnabled, setCompareEnabled] = useState(false);
-  const priorPeriodSeries = useMemo<TrendPoint[] | null>(() => {
-    if (granularity !== 'month') return null;
+  const priorPeriodInput = useMemo(() => {
     const forecastMonths = data.map((d) => d.month);
     return buildPriorPeriodSeries(monthlyRollups, startingCashBalance, forecastMonths);
-  }, [granularity, data, monthlyRollups, startingCashBalance]);
-  const priorPeriodAvailable = priorPeriodSeries !== null;
+  }, [data, monthlyRollups, startingCashBalance]);
+  const priorPeriodAvailable = priorPeriodInput !== null;
   const priorPeriodActive = compareEnabled && priorPeriodAvailable;
-  // Auto-collapse the toggle to "off" if the user moves to a horizon where
-  // comparison is unavailable, so toggling back into a supported horizon does
-  // not silently re-enable the overlay.
+  // Auto-collapse if availability is lost (e.g. user moves to a horizon with
+  // insufficient prior coverage), so re-entering a supported horizon does not
+  // silently re-enable the overlay.
   useEffect(() => {
     if (!priorPeriodAvailable && compareEnabled) setCompareEnabled(false);
   }, [priorPeriodAvailable, compareEnabled]);
@@ -606,9 +606,34 @@ export default function CashFlowForecastModule({
       };
     });
   }, [startingCashBalance, weeklySeries]);
+
+  // Prior series accumulated at the displayed granularity. Monthly path
+  // accumulates the raw monthly nets; weekly path runs the same
+  // expandMonthlyToWeekly transform the forecast uses, so prior and forecast
+  // weeks line up identically.
+  const priorMonthlyCumulative = useMemo<TrendPoint[]>(() => {
+    if (!priorPeriodInput) return [];
+    let running = priorPeriodInput.startingBalance;
+    return priorPeriodInput.netSeries.map((point) => {
+      running += point.net;
+      return { ...point, net: roundCurrency(running) };
+    });
+  }, [priorPeriodInput]);
+  const priorWeeklyExpanded = useMemo(
+    () => (priorPeriodInput ? expandMonthlyToWeekly(priorPeriodInput.netSeries) : []),
+    [priorPeriodInput],
+  );
+  const priorWeeklyCumulative = useMemo<TrendPoint[]>(() => {
+    if (!priorPeriodInput) return [];
+    let running = priorPeriodInput.startingBalance;
+    return priorWeeklyExpanded.map((point) => {
+      running += point.net;
+      return { ...point, net: roundCurrency(running) };
+    });
+  }, [priorPeriodInput, priorWeeklyExpanded]);
   const monthlyRangeLabel = data.length > 0 ? `${toMonthLabel(data[0].month)} – ${toMonthLabel(data[data.length - 1].month)}` : '';
   const priorPeriodRangeLabel = useMemo(() => {
-    if (!priorPeriodSeries || priorPeriodSeries.length === 0) return '';
+    if (!priorPeriodInput) return '';
     const shift = (m: string) => {
       const [y, mm] = m.split('-');
       return `${Number(y) - 1}-${mm}`;
@@ -617,8 +642,9 @@ export default function CashFlowForecastModule({
     const last = data[data.length - 1]?.month;
     if (!first || !last) return '';
     return `${toMonthLabel(shift(first))} – ${toMonthLabel(shift(last))}`;
-  }, [data, priorPeriodSeries]);
+  }, [data, priorPeriodInput]);
   const displaySeries = granularity === 'week' ? weeklyCumulativeSeries : cumulativeSeries;
+  const priorDisplaySeries = granularity === 'week' ? priorWeeklyCumulative : priorMonthlyCumulative;
   const reserveBreached = !!decisionSignals.reserveBreachMonth;
   const hasNegativeCash = !!decisionSignals.negativeCashMonth;
   const cashRiskState: 'safe' | 'warning' | 'critical' = hasNegativeCash ? 'critical' : reserveBreached ? 'warning' : 'safe';
@@ -1053,16 +1079,12 @@ export default function CashFlowForecastModule({
                   aria-label={
                     priorPeriodAvailable
                       ? `Compare with prior period${priorPeriodRangeLabel ? ` (${priorPeriodRangeLabel})` : ''}`
-                      : granularity !== 'month'
-                        ? 'Compare unavailable for weekly forecasts'
-                        : 'Compare unavailable — insufficient prior-period history'
+                      : 'Compare unavailable — insufficient prior-period history'
                   }
                   title={
                     priorPeriodAvailable
                       ? undefined
-                      : granularity !== 'month'
-                        ? 'Available for 6-month or longer horizons'
-                        : 'Need 12+ months of history covering the same calendar range'
+                      : 'Need actual history covering the same calendar range one year earlier'
                   }
                 >
                   <FiBarChart2 aria-hidden="true" focusable="false" />
@@ -1078,7 +1100,7 @@ export default function CashFlowForecastModule({
             data={displaySeries}
             granularity={granularity}
             knownEvents={forecastEvents}
-            priorSeries={priorPeriodActive ? priorPeriodSeries : null}
+            priorSeries={priorPeriodActive ? priorDisplaySeries : null}
             priorSeriesLabel={priorPeriodRangeLabel || 'Prior Year'}
           />
         </div>

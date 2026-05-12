@@ -115,6 +115,36 @@ export function niceTicks(dataMin: number, dataMax: number): NiceTicks {
 
   const range = dataMax - dataMin;
   const zeroWouldFlatten = dataMin > 0 && range / dataMax < FLATTEN_THRESHOLD;
+  // Mixed-sign data (e.g. cash balance trajectory dipping below zero):
+  // symmetric local axis around the data range. Zero falls naturally on
+  // the snapped tick grid since min and max are both step-aligned.
+  const hasNegative = dataMin < 0;
+
+  if (hasNegative) {
+    let step = Math.max(MIN_STEP, roundToNiceStep(range / TARGET_TICKS));
+    let niceMin = Math.floor(dataMin / step) * step;
+    let niceMax = Math.ceil(dataMax / step) * step;
+    let ticks = generateTicks(niceMin, niceMax, step);
+
+    while (ticks.length > MAX_TICKS_LOCAL) {
+      step = nextCoarserStep(step);
+      niceMin = Math.floor(dataMin / step) * step;
+      niceMax = Math.ceil(dataMax / step) * step;
+      ticks = generateTicks(niceMin, niceMax, step);
+    }
+
+    // Pad alternately on whichever side is closer to the data, to keep
+    // the chart visually balanced around the data range.
+    while (ticks.length < TARGET_TICKS) {
+      const topSlack = niceMax - dataMax;
+      const bottomSlack = dataMin - niceMin;
+      if (bottomSlack <= topSlack) niceMin -= step;
+      else niceMax += step;
+      ticks = generateTicks(niceMin, niceMax, step);
+    }
+
+    return { min: niceMin, max: niceMax, step, ticks };
+  }
 
   if (zeroWouldFlatten) {
     // ─── BRANCH A: local axis ─────────────────────────────────────────
