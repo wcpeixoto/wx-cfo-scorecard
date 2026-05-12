@@ -101,8 +101,8 @@ function ReserveGauge({
         {clampedPercent > 0 && (
           <path d={fillPath} fill="none" className={`reserve-gauge-arc ${toneClass}`} strokeWidth={strokeWidth} strokeLinecap="round" />
         )}
-        <text x={trackStart.x} y={labelY} textAnchor="start" className="reserve-gauge-end-label">$0</text>
-        <text x={trackEnd.x} y={labelY} textAnchor="end" className="reserve-gauge-end-label">{maxLabel}</text>
+        <text x={trackStart.x - strokeWidth / 2} y={labelY} textAnchor="start" className="reserve-gauge-end-label">$0</text>
+        <text x={trackEnd.x + strokeWidth / 2} y={labelY} textAnchor="end" className="reserve-gauge-end-label">{maxLabel}</text>
       </svg>
       <div className="reserve-gauge-center">
         <span className="reserve-gauge-value">{percentLabel}</span>
