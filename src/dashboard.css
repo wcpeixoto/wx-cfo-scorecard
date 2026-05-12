@@ -598,6 +598,47 @@ body {
   font-weight: 700;
 }
 
+/* Body lines under a section title — no leading dot. Padding kept so the
+   text aligns with the dotted section-title text above it. */
+.cashflow-tooltip-list li.cashflow-tooltip-body::before {
+  display: none;
+}
+
+/* Lighter variant of the cashflow tooltip — TailAdmin-native surface.
+   Used by the Projected Cash Balance "How this forecast works" tooltip.
+   Keeps the blue section-title dots but drops the blue gradient + heavy
+   card chrome, and tightens vertical rhythm under each heading. */
+.forecast-info-tooltip-panel.cashflow-tooltip-panel {
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+  color: #344054;
+  min-width: 260px;
+  max-width: 300px;
+  padding: 10px 12px;
+}
+.forecast-info-tooltip-panel .cashflow-tooltip-list {
+  display: block;
+  gap: 0;
+}
+.forecast-info-tooltip-panel .cashflow-tooltip-list li {
+  margin: 0;
+  padding-left: 12px;
+}
+.forecast-info-tooltip-panel .cashflow-tooltip-list li + li {
+  margin-top: 1px;
+}
+.forecast-info-tooltip-panel .cashflow-tooltip-list li.cashflow-tooltip-body + li:not(.cashflow-tooltip-body) {
+  margin-top: 8px;
+}
+.forecast-info-tooltip-panel .cashflow-tooltip-list strong {
+  color: #101828;
+  font-weight: 600;
+}
+.forecast-info-tooltip-panel .cashflow-tooltip-list li.cashflow-tooltip-body {
+  color: #667085;
+}
+
 .cashflow-help:hover .cashflow-tooltip-panel,
 .cashflow-help:focus-within .cashflow-tooltip-panel {
   display: block;
@@ -1151,76 +1192,6 @@ body {
   gap: 6px;
 }
 
-.forecast-info-help {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.forecast-info-icon {
-  appearance: none;
-  border: 1px solid #E4E7EC;
-  display: inline-grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  color: #98A2B3;
-  background: #F9FAFB;
-  font-size: 0.75rem;
-  cursor: pointer;
-  user-select: none;
-  line-height: 1;
-  padding: 0;
-}
-
-.forecast-info-icon:focus-visible {
-  outline: 2px solid #465FFF;
-  outline-offset: 2px;
-}
-
-.forecast-info-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  width: 296px;
-  background: #FFFFFF;
-  border: 1px solid #E4E7EC;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
-  padding: 12px 14px;
-  display: none;
-  pointer-events: none;
-  z-index: 30;
-}
-
-.forecast-info-help:hover .forecast-info-panel,
-.forecast-info-help:focus-within .forecast-info-panel {
-  display: block;
-}
-
-.forecast-info-title {
-  margin: 0 0 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #101828;
-}
-
-.forecast-info-body {
-  margin: 0 0 6px;
-  font-size: 12px;
-  font-weight: 400;
-  color: #667085;
-  line-height: 1.5;
-}
-
-.forecast-info-important {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 400;
-  color: #667085;
-  line-height: 1.5;
-}
 
 .forecast-chart-title {
   margin: 0;

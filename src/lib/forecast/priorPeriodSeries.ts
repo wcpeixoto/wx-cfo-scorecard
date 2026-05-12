@@ -1,12 +1,16 @@
 import type { MonthlyRollup, TrendPoint } from '../data/contract';
 
-function shiftMonthByYears(month: string, years: number): string | null {
+function shiftMonthByMonths(month: string, offset: number): string | null {
   const match = month.match(/^(\d{4})-(\d{2})$/);
   if (!match) return null;
   const y = Number.parseInt(match[1], 10);
-  if (!Number.isFinite(y)) return null;
-  return `${y + years}-${match[2]}`;
+  const m = Number.parseInt(match[2], 10);
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return null;
+  const date = new Date(Date.UTC(y, m - 1 + offset, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
+
+export { shiftMonthByMonths };
 
 export type PriorPeriodInput = {
   /** Monthly NET-change TrendPoints aligned to forecast months (same `month` keys
@@ -22,10 +26,15 @@ export type PriorPeriodInput = {
 /**
  * Build the prior-period inputs aligned 1:1 to the forecast horizon.
  *
- * Returns null when coverage is partial: every prior month (same MM, year − 1)
- * for each forecast bucket must be present in `monthlyRollups`, AND the latest
- * prior month must be ≤ the latest fully-rolled-up actual month. We never
- * render a comparison line that drops off mid-chart.
+ * Comparison rule (hybrid: momentum for short horizons, seasonality for long):
+ *   prior = same length as forecast, shifted backward by the forecast's own
+ *   length, fully historical. The two framings collapse to one math: a 1-month
+ *   forecast compares to the immediately preceding month; a 12-month forecast
+ *   compares to the equivalent calendar year; a 24-month forecast compares to
+ *   the equivalent 24-month calendar span. Coverage must be complete — we
+ *   never render a line that drops off mid-chart, and we never shift backward
+ *   by a fixed year offset that would push the prior window into months that
+ *   haven't happened yet.
  *
  * Returns net-change series + starting balance rather than an accumulated
  * balance series, so the caller can apply the same monthly-or-weekly
@@ -38,9 +47,10 @@ export function buildPriorPeriodSeries(
 ): PriorPeriodInput | null {
   if (monthlyRollups.length === 0 || forecastMonths.length === 0) return null;
 
+  const offset = -forecastMonths.length;
   const priorMonths: string[] = [];
   for (const m of forecastMonths) {
-    const prior = shiftMonthByYears(m, -1);
+    const prior = shiftMonthByMonths(m, offset);
     if (!prior) return null;
     priorMonths.push(prior);
   }

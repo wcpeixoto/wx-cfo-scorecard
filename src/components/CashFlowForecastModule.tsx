@@ -13,7 +13,7 @@ import type {
   TrendPoint,
 } from '../lib/data/contract';
 import { toMonthLabel } from '../lib/kpis/compute';
-import { buildPriorPeriodSeries } from '../lib/forecast/priorPeriodSeries';
+import { buildPriorPeriodSeries, shiftMonthByMonths } from '../lib/forecast/priorPeriodSeries';
 
 type SelectOption = { value: string; label: string; months: number };
 
@@ -634,14 +634,15 @@ export default function CashFlowForecastModule({
   const monthlyRangeLabel = data.length > 0 ? `${toMonthLabel(data[0].month)} – ${toMonthLabel(data[data.length - 1].month)}` : '';
   const priorPeriodRangeLabel = useMemo(() => {
     if (!priorPeriodInput) return '';
-    const shift = (m: string) => {
-      const [y, mm] = m.split('-');
-      return `${Number(y) - 1}-${mm}`;
-    };
+    const offset = -data.length;
     const first = data[0]?.month;
     const last = data[data.length - 1]?.month;
     if (!first || !last) return '';
-    return `${toMonthLabel(shift(first))} – ${toMonthLabel(shift(last))}`;
+    const priorFirst = shiftMonthByMonths(first, offset);
+    const priorLast = shiftMonthByMonths(last, offset);
+    if (!priorFirst || !priorLast) return '';
+    if (priorFirst === priorLast) return toMonthLabel(priorFirst);
+    return `${toMonthLabel(priorFirst)} – ${toMonthLabel(priorLast)}`;
   }, [data, priorPeriodInput]);
   const displaySeries = granularity === 'week' ? weeklyCumulativeSeries : cumulativeSeries;
   const priorDisplaySeries = granularity === 'week' ? priorWeeklyCumulative : priorMonthlyCumulative;
@@ -988,10 +989,16 @@ export default function CashFlowForecastModule({
               <div className="projected-cash-heading">
                 <div className="projected-cash-title-row">
                   <h3 className="forecast-chart-title">Projected Cash Balance</h3>
-                  <div className="forecast-info-help">
-                    <button type="button" className="forecast-info-icon" aria-label="How this forecast works">&#9432;</button>
-                    <div role="tooltip" className="forecast-info-panel">
-                      <p className="forecast-info-body">A directional view of where your cash is heading, based on recent activity and seasonal patterns &mdash; adjust the sliders to test scenarios.</p>
+                  <div className="cashflow-help">
+                    <button type="button" className="cashflow-tooltip" aria-label="How this forecast works">&#9432;</button>
+                    <div role="tooltip" className="cashflow-tooltip-panel trend-tooltip-panel forecast-info-tooltip-panel">
+                      <ul className="cashflow-tooltip-list trend-tooltip-list">
+                        <li><strong>How this forecast works</strong></li>
+                        <li className="cashflow-tooltip-body">A directional view of where your cash is heading, based on recent activity and seasonal patterns &mdash; adjust the sliders to test scenarios.</li>
+                        <li><strong>Comparison mode</strong></li>
+                        <li className="cashflow-tooltip-body">Short ranges compare momentum.</li>
+                        <li className="cashflow-tooltip-body">Long ranges compare seasonality.</li>
+                      </ul>
                     </div>
                   </div>
                 </div>
@@ -1103,7 +1110,7 @@ export default function CashFlowForecastModule({
             granularity={granularity}
             knownEvents={forecastEvents}
             priorSeries={priorPeriodActive ? priorDisplaySeries : null}
-            priorSeriesLabel="Prior Year"
+            priorSeriesLabel="Prior Period"
           />
         </div>
 
