@@ -3591,6 +3591,86 @@ body {
   font-weight: 500;
 }
 
+/* ─── Monthly Rollups table (Trends page) ───────────────────────────────────
+   Adopts the canonical Data Table Pattern (see UI_RULES.md). Self-contained
+   block — does not piggyback on .projection-table selectors so changes to
+   either variant stay independent. Left-aligned across all columns per the
+   UI Lab card source-of-truth (matches Projection Table V2 simple mode);
+   overrides the inherited .table-card td:nth-child(n+2) right-align rule
+   via the .rollups-table-card scope (spec 0,3,1 beats 0,2,1). */
+.rollups-table-card {
+  padding: 24px;
+  border-radius: 16px;
+}
+
+.rollups-table-card .card-head h3 {
+  font-size: 1.06rem;
+  font-weight: 700;
+  color: #101828;
+  margin: 0;
+}
+
+.rollups-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+/* Even column rhythm — Month anchors the layout, four numeric columns share the
+   remainder evenly so values don't bunch on the right. */
+.rollups-table th:first-child,
+.rollups-table td:first-child {
+  width: 24%;
+}
+.rollups-table th:nth-child(n + 2),
+.rollups-table td:nth-child(n + 2) {
+  width: 19%;
+}
+
+/* Left-align all columns — UI Lab cards are the canonical alignment source.
+   Scoped under .rollups-table-card (spec 0,3,1) to beat the inherited
+   .table-card th/td:nth-child(n+2) right-align rule (spec 0,2,1). */
+.rollups-table-card .rollups-table th,
+.rollups-table-card .rollups-table td {
+  text-align: left;
+}
+
+.rollups-table thead th {
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: none;
+  letter-spacing: normal;
+  border-top: 1px solid var(--bg-muted);
+  border-bottom: 1px solid var(--bg-muted);
+}
+
+.rollups-table tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--bg-muted);
+  font-size: 14px;
+}
+
+.rollups-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Period total — mirrors the Projection Table V2 total-row rhythm
+   (bg-main fill, top divider, 600 weight). */
+.rollups-table tfoot tr {
+  background-color: var(--bg-main);
+  border-top: 1px solid var(--line);
+}
+
+.rollups-table tfoot td {
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-top: none;
+  border-bottom: none;
+}
+
 .settings-field {
   display: grid;
   gap: 8px;
