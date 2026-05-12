@@ -3510,3 +3510,30 @@ Harness worktree survival across sessions had repeated three times (`funny-dirac
 **Lessons**
 - `gh pr merge --delete-branch` is not atomic across local/remote when a worktree holds the branch. Local-delete failure short-circuits remote-delete silently; merge succeeds, both branches survive. Manual `gh api -X DELETE repos/<owner>/<repo>/git/refs/heads/<branch>` cleaned up the remote ref. Pattern worth a Notion item if it recurs.
 - Compressed two-AI path validated for low-stakes docs PRs. Skipped the intermediate ChatGPT review on the diff-on-disk; kept Codex range-diff at the merge gate. Range-diff caught no drift; merge gate held without the extra round-trip. The independent-review gate is irreversibility-shaped, not change-size-shaped — sized review effort to the gate, not to ceremony.
+
+---
+
+### May 11, 2026 (late) — Boot-load error banner shipped (PR #30) + multi-worktree hazard surface
+
+**What changed**
+- `b662b31` — PR #30 squash-merged. Two commits: `e2a1357` (round-1 feature: split `importError` into `bootLoadError` for boot-time persistence failures from `loadImportedState` vs `importError` for CSV-import actions; dashboard-wide banner above tab content with CTA to Settings → Data) and `1b2a650` (round-2 token compliance: `var(--text-primary)`, `var(--bg-panel)`, `--warning` via `color-mix` per `.forecast-warning-callout` precedent; 12px alert and 8px input radii from UI_RULES.md table).
+- Notion `35cad957…81c2` (Today-level data-load error UI) → Done.
+
+**Why it matters**
+Boot-time `requestAllRows` truncation throw was operator-visible only via Settings — invisible on Today, the default landing surface. Dashboard-wide banner placement (not Today-scoped, per design pushback during implementation) keeps the signal present across every tab when boot load fails. Copy leads with consequence ("Some recent activity may be missing.") not mechanics, per owner-operator clarity standard.
+
+**Current state**
+- main HEAD `b662b31`, pushed.
+- Working tree clean in primary clone; remote feature branch deleted.
+- Worktree: harness `heuristic-cartwright-931223` survives this close (self-hosting). Local branch `claude/heuristic-cartwright-931223` queued for disposal at next session pre-flight from primary clone.
+- Open PRs: none.
+
+**Next step**
+- Click "Sync now" — this entry updates `wx_cfo_scorecard_context_v2_6.md` (Trigger B).
+- Next session pre-flight: dispose harness worktree + local branch from primary clone. Then assess Notion `35dad957…814a` (mobile wrap @ ~375px) for promotion — PR #30 banner inherits the issue at narrow viewport — and reconcile `35dad957…f86f` (older P5 gh atomicity) against `35ead957…b3d1` (this session's P3 capture).
+- Recommended product pick after disposal: `35cad957…814f` (AI proxy Origin allowlist).
+
+**Lessons**
+- **Multi-worktree workflows expose assumptions baked into git tooling and macOS filesystem semantics.** Two facets surfaced this session: (1) `/Users/wesley/Code/` and `/Users/wesley/code/` resolve as equivalent in shell (case-insensitive HFS+) but git treats them as distinct worktrees — Edit calls intended for the harness silently landed in the primary clone mid-implementation. Verification cascaded: banner failed to render in DOM check, dev-server source fetch returned no edits, worktree grep confirmed the file unchanged — then path-string review exposed the case-variant `/Users/wesley/Code/` resolving to the primary clone instead of the worktree's lowercase path. Recovered with `git -C <primary> checkout --` + `git -C <worktree> apply`. Captured as Notion `35ead957…3290`. (2) `gh pr merge --delete-branch` failed at the post-merge worktree-switch step (`fatal: 'main' is already used by worktree at primary`) when invoked from the harness; remote merge succeeded, remote-branch delete short-circuited. Manual `gh api -X DELETE` cleanup. Second occurrence with a different mechanism than the May 11 PR #29 precedent. Captured as Notion `35ead957…b3d1` (with `35ead957…660d0` deduped to it). Both stem from workflows designed around single-clone-on-main assumptions failing under harness execution — same root, different surfaces.
+- **Token discipline drift on a different axis.** Codex round-1 caught `#7a3b00` and `#fff` literals plus 14px/10px radii in the new `.dashboard-load-error` block. Same violation class persists in `.error-banner` (legacy, `src/dashboard.css:724`) — pre-existing. Captured as Notion `35ead957…8130` for separate cleanup. The `.forecast-warning-callout` precedent used as the round-2 reference is itself partially non-compliant (text token correct, background still `#fff` literal) — copying a precedent in full is not safe; verify token compliance per element.
+- **Two-AI round-2 pattern, second clean execution.** Codex flagged real CSS-token violations on round-1 head `e2a1357`; builder fixed on same branch (`1b2a650`); range-diff at round-2 approved without further findings. Confirms the May 10 PR #24 precedent: when round-1 findings are code-level not workflow-level, iterate on the same branch and re-review the same PR — new-branch overhead isn't warranted. Now pattern, not coincidence.
