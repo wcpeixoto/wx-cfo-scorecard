@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { FiSearch } from 'react-icons/fi';
+import { FiRefreshCw, FiSearch } from 'react-icons/fi';
 import { useSidebar } from '../context/SidebarContext';
 
 type AppHeaderProps = {
   query: string;
   onQueryChange: (value: string) => void;
+  updatedLabel?: string | null;
+  onUpdatedClick?: () => void;
 };
 
-export function AppHeader({ query, onQueryChange }: AppHeaderProps) {
+export function AppHeader({ query, onQueryChange, updatedLabel, onUpdatedClick }: AppHeaderProps) {
   const { toggleMobile, isMobileOpen } = useSidebar();
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -48,7 +50,7 @@ export function AppHeader({ query, onQueryChange }: AppHeaderProps) {
             </svg>
           )}
         </button>
-        <span className="app-header-mobile-brand">Wx CFO</span>
+        <span className="app-header-mobile-brand" aria-hidden="true" />
         <button
           type="button"
           className="app-header-search-icon-btn"
@@ -97,6 +99,17 @@ export function AppHeader({ query, onQueryChange }: AppHeaderProps) {
             aria-label="Search transactions"
           />
         </div>
+        {updatedLabel ? (
+          <button
+            type="button"
+            className="app-header-updated"
+            onClick={onUpdatedClick}
+            aria-label={`${updatedLabel}. Open Settings.`}
+          >
+            <FiRefreshCw className="app-header-updated-icon" aria-hidden="true" />
+            <span>{updatedLabel}</span>
+          </button>
+        ) : null}
       </div>
     </header>
   );

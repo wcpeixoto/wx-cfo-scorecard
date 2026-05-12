@@ -2760,7 +2760,12 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     <div className="finance-app">
       <AppSidebar />
       <div className="app-main-column">
-        <AppHeader query={query} onQueryChange={setQuery} />
+        <AppHeader
+          query={query}
+          onQueryChange={setQuery}
+          updatedLabel={lastUpdatedLabel}
+          onUpdatedClick={() => navigateToTab('settings')}
+        />
       <section className="main-zone">
         {activeTab !== 'today' && activeTab !== 'what-if' && activeTab !== 'settings' && activeTab !== 'ui-lab' && <header className="top-bar glass-panel">
           <div className="top-bar-main">
@@ -2773,6 +2778,15 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                   ? "The biggest opportunities to improve your cash right now — and what's driving them"
                   : selectedHeaderComparisonLabel}
               </p>
+              <button
+                type="button"
+                className="top-bar-freshness subtle clickable top-bar-freshness-mobile"
+                onClick={() => navigateToTab('settings')}
+                aria-label={`${lastUpdatedLabel}. Open Settings.`}
+              >
+                <FiRefreshCw className="top-bar-freshness-icon" aria-hidden="true" />
+                <span>{lastUpdatedLabel}</span>
+              </button>
             </div>
 
             <div className="top-controls top-controls-timeframe">
@@ -2877,15 +2891,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                   )}
                 </div>
               )}
-              <button
-                type="button"
-                className="top-bar-freshness subtle clickable"
-                onClick={() => navigateToTab('settings')}
-                aria-label={`${lastUpdatedLabel}. Open Settings.`}
-              >
-                <FiRefreshCw className="top-bar-freshness-icon" aria-hidden="true" />
-                <span>{lastUpdatedLabel}</span>
-              </button>
             </div>
           </div>
         </header>}
@@ -3218,6 +3223,15 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 <p className="top-bar-context">
                   Expected inflows, outflows, and projected balance
                 </p>
+                <button
+                  type="button"
+                  className="top-bar-freshness subtle clickable top-bar-freshness-mobile"
+                  onClick={() => navigateToTab('settings')}
+                  aria-label={`${lastUpdatedLabel}. Open Settings.`}
+                >
+                  <FiRefreshCw className="top-bar-freshness-icon" aria-hidden="true" />
+                  <span>{lastUpdatedLabel}</span>
+                </button>
               </div>
               <div className="top-controls top-controls-timeframe">
                 <div className="segmented-toggle segmented-toggle--wrap" role="group" aria-label="Forecast scenario">
@@ -3239,15 +3253,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                     </button>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  className="top-bar-freshness subtle clickable"
-                  onClick={() => navigateToTab('settings')}
-                  aria-label={`${lastUpdatedLabel}. Open Settings.`}
-                >
-                  <FiRefreshCw className="top-bar-freshness-icon" aria-hidden="true" />
-                  <span>{lastUpdatedLabel}</span>
-                </button>
               </div>
             </div>
           </header>
