@@ -1103,7 +1103,7 @@ export default function CashFlowForecastModule({
             granularity={granularity}
             knownEvents={forecastEvents}
             priorSeries={priorPeriodActive ? priorDisplaySeries : null}
-            priorSeriesLabel={priorPeriodRangeLabel || 'Prior Year'}
+            priorSeriesLabel="Prior Year"
           />
         </div>
 

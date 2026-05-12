@@ -133,10 +133,15 @@ export default function ProjectedCashBalanceChart({
     [data, granularity]
   );
 
-  // Tooltip x-labels — bucket end date as "MMM D, YYYY" (e.g. "May 31, 2026").
-  // Single date, no range, no metric label — see tooltip block below.
+  // Tooltip x-labels.
+  // Monthly: full month + year ("May 2026").
+  // Weekly: bucket end date as "MMM D, YYYY" ("May 31, 2026") so the day is
+  // shown — week buckets only have meaning at day granularity.
   const tooltipLabels = useMemo(
-    () => data.map((d) => formatBucketEndDate(d, granularity)),
+    () =>
+      data.map((d) =>
+        granularity === 'week' ? formatBucketEndDate(d, granularity) : formatFullMonth(d.month),
+      ),
     [data, granularity]
   );
 
@@ -308,10 +313,10 @@ export default function ProjectedCashBalanceChart({
         },
         y: {
           formatter: formatCurrency,
-          // Suppress series-name prefix on the value row when only the primary
-          // series renders; when the prior-period overlay is active, keep the
-          // series name so the two rows are distinguishable.
-          title: hasPrior ? undefined : { formatter: () => '' },
+          // Always show the series name on the value row — matches the
+          // TailAdmin "Users & Revenue Statistics" tooltip pattern (title
+          // = period, then each series labelled with colored dot + name +
+          // value).
         },
         marker: { show: true },
       },
