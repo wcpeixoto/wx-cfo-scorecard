@@ -18,6 +18,18 @@
   --negative: #F04438;
   --line: #E4E7EC;
   --shadow-card: 0 8px 20px rgba(18, 37, 71, 0.07);
+
+  /* Tooltip / popover surface — single design token reused by every
+     hover panel (chart hovers, info popovers, explanation tooltips).
+     Mirrors the ApexCharts hover surface so chart + UI tooltips match. */
+  --tooltip-bg: rgba(255, 255, 255, 0.96);
+  --tooltip-border: #E4E7EC;
+  --tooltip-radius: 8px;
+  --tooltip-pad: 12px;
+  --tooltip-shadow: rgba(16, 24, 40, 0.10) 0px 1px 3px,
+                    rgba(16, 24, 40, 0.06) 0px 1px 2px;
+  --tooltip-text: #475467;
+  --tooltip-title: #101828;
 }
 
 * {
@@ -537,19 +549,30 @@ body {
 
 .cashflow-tooltip {
   appearance: none;
-  border: 1px solid #d5e2f6;
+  border: 1px solid transparent;
   display: inline-grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
-  color: #6a7f98;
-  background: #f7faff;
-  font-size: 0.8rem;
+  color: #98A2B3;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 400;
   cursor: pointer;
   user-select: none;
   line-height: 1;
   padding: 0;
+  vertical-align: middle;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.cashflow-tooltip:hover,
+.cashflow-help:hover .cashflow-tooltip,
+.cashflow-help:focus-within .cashflow-tooltip {
+  color: #475467;
+  background: #F2F4F7;
+  border-color: #E4E7EC;
 }
 
 .cashflow-help {
@@ -562,90 +585,75 @@ body {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  min-width: 320px;
-  border: 1px solid #d4def1;
-  border-radius: 14px;
-  background: linear-gradient(145deg, rgba(248, 251, 255, 0.98) 0%, rgba(238, 244, 255, 0.96) 100%);
-  box-shadow: 0 10px 22px rgba(24, 49, 89, 0.14);
-  color: #2f4a6b;
-  padding: 10px 12px;
-  font-size: 0.78rem;
+  min-width: 260px;
+  border: 1px solid var(--tooltip-border);
+  border-radius: var(--tooltip-radius);
+  background: var(--tooltip-bg);
+  box-shadow: var(--tooltip-shadow);
+  color: var(--tooltip-text);
+  padding: var(--tooltip-pad);
+  font-size: 12px;
   line-height: 1.4;
   display: none;
   pointer-events: none;
   z-index: 30;
 }
 
+/* Tooltip content layout — Projected Cash Balance pattern is the standard.
+   Each section is a title row (small bullet + bold title) followed by an
+   indented body line (no bullet). Body sits tight under its title; the
+   8px section break only appears between sections. */
 .cashflow-tooltip-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 6px;
+  display: block;
 }
 
 .cashflow-tooltip-list li {
   margin: 0;
   position: relative;
   padding-left: 12px;
-  white-space: nowrap;
+  text-align: left;
+}
+
+.cashflow-tooltip-list li + li {
+  margin-top: 1px;
 }
 
 .cashflow-tooltip-list li::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 0.45em;
-  width: 5px;
-  height: 5px;
+  top: 0.55em;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
-  background: #6d8fed;
+  background: #98A2B3;
 }
 
 .cashflow-tooltip-list strong {
-  color: #1f3c80;
-  font-weight: 700;
+  color: var(--tooltip-title);
+  font-weight: 600;
 }
 
-/* Body lines under a section title — no leading dot. Padding kept so the
-   text aligns with the dotted section-title text above it. */
+/* Body line under a section title — no leading dot, sits tight under
+   the title, takes the muted body color. */
+.cashflow-tooltip-list li.cashflow-tooltip-body {
+  color: var(--tooltip-text);
+}
 .cashflow-tooltip-list li.cashflow-tooltip-body::before {
   display: none;
 }
 
-/* Lighter variant of the cashflow tooltip — TailAdmin-native surface.
-   Used by the Projected Cash Balance "How this forecast works" tooltip.
-   Keeps the blue section-title dots but drops the blue gradient + heavy
-   card chrome, and tightens vertical rhythm under each heading. */
-.forecast-info-tooltip-panel.cashflow-tooltip-panel {
-  background: #FFFFFF;
-  border: 1px solid #E4E7EC;
-  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
-  color: #344054;
-  min-width: 260px;
-  max-width: 300px;
-  padding: 10px 12px;
-}
-.forecast-info-tooltip-panel .cashflow-tooltip-list {
-  display: block;
-  gap: 0;
-}
-.forecast-info-tooltip-panel .cashflow-tooltip-list li {
-  margin: 0;
-  padding-left: 12px;
-}
-.forecast-info-tooltip-panel .cashflow-tooltip-list li + li {
-  margin-top: 1px;
-}
-.forecast-info-tooltip-panel .cashflow-tooltip-list li.cashflow-tooltip-body + li:not(.cashflow-tooltip-body) {
+/* Section break — title following a body line gets the gap. */
+.cashflow-tooltip-list li.cashflow-tooltip-body + li:not(.cashflow-tooltip-body) {
   margin-top: 8px;
 }
-.forecast-info-tooltip-panel .cashflow-tooltip-list strong {
-  color: #101828;
-  font-weight: 600;
-}
-.forecast-info-tooltip-panel .cashflow-tooltip-list li.cashflow-tooltip-body {
-  color: #667085;
+
+/* Single-section tooltips that don't use the body class still wrap. */
+.cashflow-tooltip-list li:not(.cashflow-tooltip-body) {
+  white-space: normal;
 }
 
 .cashflow-help:hover .cashflow-tooltip-panel,
@@ -654,11 +662,15 @@ body {
 }
 
 .cashflow-tooltip:focus-visible {
-  outline: 2px solid #6a8eef;
+  outline: 2px solid #98A2B3;
   outline-offset: 2px;
 }
 
-/* ─── Global Blue-Tinted Tooltip System ─────────────────────────── */
+/* ─── Global Tooltip System ──────────────────────────────────────
+   Shared info-popover surface. Mirrors the ApexCharts chart-hover
+   tooltip (rgba white, neutral border, soft shadow) via the
+   --tooltip-* tokens at :root, so chart and informational tooltips
+   read as one system. */
 
 .db-tooltip-wrap {
   position: relative;
@@ -668,23 +680,32 @@ body {
 
 .db-tooltip-btn {
   appearance: none;
-  border: 1px solid #d5e2f6;
+  border: 1px solid transparent;
   display: inline-grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
-  color: #6a7f98;
-  background: #f7faff;
-  font-size: 0.8rem;
+  color: #98A2B3;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 400;
   cursor: pointer;
   user-select: none;
   line-height: 1;
   padding: 0;
+  vertical-align: middle;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.db-tooltip-btn:hover {
+  color: #475467;
+  background: #F2F4F7;
+  border-color: #E4E7EC;
 }
 
 .db-tooltip-btn:focus-visible {
-  outline: 2px solid #6a8eef;
+  outline: 2px solid #98A2B3;
   outline-offset: 2px;
 }
 
@@ -692,18 +713,14 @@ body {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  min-width: 320px;
-  border: 1px solid #d4def1;
-  border-radius: 14px;
-  background: linear-gradient(
-    145deg,
-    rgba(248, 251, 255, 0.98) 0%,
-    rgba(238, 244, 255, 0.96) 100%
-  );
-  box-shadow: 0 10px 22px rgba(24, 49, 89, 0.14);
-  color: #2f4a6b;
-  padding: 10px 12px;
-  font-size: 0.78rem;
+  min-width: 260px;
+  border: 1px solid var(--tooltip-border);
+  border-radius: var(--tooltip-radius);
+  background: var(--tooltip-bg);
+  box-shadow: var(--tooltip-shadow);
+  color: var(--tooltip-text);
+  padding: var(--tooltip-pad);
+  font-size: 12px;
   line-height: 1.4;
   display: none;
   pointer-events: none;
@@ -721,36 +738,45 @@ body {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 6px;
+  display: block;
 }
 
 .db-tooltip-list li {
   margin: 0;
   position: relative;
   padding-left: 12px;
-  white-space: nowrap;
+  text-align: left;
+  white-space: normal;
 }
 
-/* Wide variant overrides nowrap for paragraph items */
-.db-tooltip-panel.is-wide .db-tooltip-list li {
-  white-space: normal;
+.db-tooltip-list li + li {
+  margin-top: 1px;
 }
 
 .db-tooltip-list li::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 0.45em;
-  width: 5px;
-  height: 5px;
+  top: 0.55em;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
-  background: #6d8fed;
+  background: #98A2B3;
 }
 
 .db-tooltip-list strong {
-  color: #1f3c80;
-  font-weight: 700;
+  color: var(--tooltip-title);
+  font-weight: 600;
+}
+
+.db-tooltip-list li.db-tooltip-body {
+  color: var(--tooltip-text);
+}
+.db-tooltip-list li.db-tooltip-body::before {
+  display: none;
+}
+.db-tooltip-list li.db-tooltip-body + li:not(.db-tooltip-body) {
+  margin-top: 8px;
 }
 
 /* Show on hover or keyboard focus */
@@ -765,10 +791,6 @@ body {
   left: 0;
   min-width: 240px;
   max-width: 320px;
-}
-
-.trend-tooltip-list li {
-  white-space: normal;
 }
 
 .error-banner {
@@ -1072,12 +1094,11 @@ body {
 }
 
 .apexcharts-tooltip .ec-donut-tooltip {
-  background: rgba(255, 255, 255, 0.96) !important;
-  border: 1px solid #E4E7EC !important;
-  border-radius: 8px !important;
-  padding: 12px !important;
-  box-shadow: rgba(16, 24, 40, 0.10) 0px 1px 3px,
-              rgba(16, 24, 40, 0.06) 0px 1px 2px !important;
+  background: var(--tooltip-bg) !important;
+  border: 1px solid var(--tooltip-border) !important;
+  border-radius: var(--tooltip-radius) !important;
+  padding: var(--tooltip-pad) !important;
+  box-shadow: var(--tooltip-shadow) !important;
   max-width: 160px !important;
   white-space: nowrap !important;
   font-family: Outfit, sans-serif !important;
@@ -2713,12 +2734,11 @@ body {
 
 /* ── ApexCharts tooltip standard ───────────────────────── */
 .apexcharts-tooltip.apexcharts-theme-light {
-  background: rgba(255, 255, 255, 0.96) !important;
-  border: 1px solid #E4E7EC !important;
-  border-radius: 8px !important;
-  padding: 12px !important;
-  box-shadow: rgba(16, 24, 40, 0.10) 0px 1px 3px,
-              rgba(16, 24, 40, 0.06) 0px 1px 2px !important;
+  background: var(--tooltip-bg) !important;
+  border: 1px solid var(--tooltip-border) !important;
+  border-radius: var(--tooltip-radius) !important;
+  padding: var(--tooltip-pad) !important;
+  box-shadow: var(--tooltip-shadow) !important;
   white-space: nowrap;
   max-width: 200px;
 }
@@ -6084,35 +6104,6 @@ body {
   padding: 10px 0;
 }
 
-.app-sidebar-collapse {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  color: #667085;
-  background: transparent;
-  border: 1px solid #E4E7EC;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  margin-top: 8px;
-}
-
-.app-sidebar-collapse:hover {
-  background: #F2F4F7;
-  color: #101828;
-}
-
-.app-sidebar.is-collapsed .app-sidebar-collapse {
-  justify-content: center;
-  padding: 10px 0;
-}
-
-.app-sidebar.is-collapsed .app-sidebar-collapse .app-sidebar-icon {
-  transform: rotate(180deg);
-}
-
 .app-sidebar-scrim {
   display: none;
 }
@@ -7576,16 +7567,15 @@ body {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid #E4E7EC;
-  border-radius: 8px;
-  padding: 12px 14px;
-  box-shadow: rgba(16, 24, 40, 0.10) 0px 1px 3px,
-              rgba(16, 24, 40, 0.06) 0px 1px 2px;
+  background: var(--tooltip-bg);
+  border: 1px solid var(--tooltip-border);
+  border-radius: var(--tooltip-radius);
+  padding: var(--tooltip-pad);
+  box-shadow: var(--tooltip-shadow);
   max-width: 260px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
-  color: rgb(71, 84, 103);
+  color: var(--tooltip-text);
   font-family: 'Outfit', sans-serif;
   line-height: 1.5;
   z-index: 20;
