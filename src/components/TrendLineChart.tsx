@@ -70,9 +70,17 @@ export default function TrendLineChartApex({
 }: TrendLineChartApexProps) {
   const trendTooltipId = useId();
 
-  const { categories, seriesValues, rangeLabel, signal } = useMemo(() => {
+  const { categories, seriesValues, rangeLabel, signal, yMin, yMax, yTickAmount } = useMemo(() => {
     if (data.length === 0) {
-      return { categories: [] as string[], seriesValues: [] as number[], rangeLabel: '', signal: null as TrendSignal | null };
+      return {
+        categories: [] as string[],
+        seriesValues: [] as number[],
+        rangeLabel: '',
+        signal: null as TrendSignal | null,
+        yMin: 0,
+        yMax: 10000,
+        yTickAmount: 1,
+      };
     }
     const values = data.map((item) => {
       const numeric = Number(item[metric]);
@@ -85,11 +93,27 @@ export default function TrendLineChartApex({
     const slicedData = data.slice(-sliceN);
     const slicedEma = emaFull.slice(-sliceN);
 
+    // Anchor y-axis at 0 and round max up to the nearest $10k step, matching
+    // the old custom-SVG buildPositiveAxis. Without this, Apex auto-fits to
+    // the EMA's narrow band and amplifies tiny month-to-month wiggle.
+    const yStep = 10000;
+    const maxRaw = Math.max(...slicedEma, 0);
+    const computedYMax = Math.max(yStep, Math.ceil(maxRaw / yStep) * yStep);
+    const computedTickAmount = computedYMax / yStep;
+
     const cats = slicedData.map((item) => formatShortMonth(item.month));
     const rl =
       rangeLabelOverride ??
       `${toMonthLabel(slicedData[0].month)} – ${toMonthLabel(slicedData[slicedData.length - 1].month)}`;
-    return { categories: cats, seriesValues: slicedEma, rangeLabel: rl, signal: sig };
+    return {
+      categories: cats,
+      seriesValues: slicedEma,
+      rangeLabel: rl,
+      signal: sig,
+      yMin: 0,
+      yMax: computedYMax,
+      yTickAmount: computedTickAmount,
+    };
   }, [data, metric, trendWindowOverride, displayWindow, rangeLabelOverride]);
 
   const seriesColor = metric === 'expense' ? chartTokens.error : chartTokens.brand;
@@ -135,6 +159,9 @@ export default function TrendLineChartApex({
       tooltip: { enabled: false },
     },
     yaxis: {
+      min: yMin,
+      max: yMax,
+      tickAmount: yTickAmount,
       labels: {
         style: { fontSize: '11px', fontWeight: 400, colors: chartTokens.axisTextSales },
         // Runtime signature is (val, tickIndex); Apex types declare (val, opts).
@@ -145,7 +172,7 @@ export default function TrendLineChartApex({
       },
     },
     tooltip: { enabled: false },
-  }), [categories, height, seriesColor, yTickLabelStep]);
+  }), [categories, height, seriesColor, yTickLabelStep, yMin, yMax, yTickAmount]);
 
   const series = useMemo(
     () => [{ name: title, data: seriesValues }],
