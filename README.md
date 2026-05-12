@@ -107,18 +107,18 @@ public/                         — static assets
 
 ## Forecast track
 
-Four selectable forecast models live alongside the production toggle on
-the What-If page:
+Multiple forecast models live under `src/lib/kpis/`:
 
-| Model | Source file | Role |
-|---|---|---|
-| **Engine** | `src/lib/kpis/compute.ts` | Locked legacy engine. Uses aggregate baselines and seasonality weighting. Current production default. Tends to under-project expenses. |
-| **Category-Cadence** | `src/lib/kpis/categoryCadence.ts` | Per-category cadence-aware projection (STABLE → trailing-3, PERIODIC/EVENT → same-month-last-year, Sales → 50/50 trailing-12 + 2-year YoY). Best on expenses; opt-in production-visible. |
-| **Split Conservative** | `src/lib/kpis/splitConservative.ts` | Engine `operatingCashIn` + Cadence `operatingCashOut`, month-aligned. Calibrated expected-case hybrid. Leads retrospective accuracy at 30d and 1y; near-zero signed bias at 90d. |
-| **Conservative Floor** | _diagnostic only_ — see `backtest-results/conservativeFloorReport.md` | `min(Engine, Cadence)` cash-in / `max(Engine, Cadence)` cash-out. Deliberately pessimistic stress view. **Not yet implemented in production**; lives only in the backtest diagnostic. |
+| Model | Source file |
+|---|---|
+| Engine | `src/lib/kpis/compute.ts` (locked) |
+| Category-Cadence | `src/lib/kpis/categoryCadence.ts` |
+| Split Conservative | `src/lib/kpis/splitConservative.ts` |
+| Conservative Floor | `src/lib/kpis/conservativeFloor.ts` |
 
-Engine remains the default on every page load. The toggle is
-session-only React state — no persistence, no URL parameter.
+For the active model roles (which is the user-facing default, which
+is an alternate posture, which are diagnostic comparators), see
+[AGENTS.md](AGENTS.md) → Gotchas → Forecast model roles.
 
 ---
 
