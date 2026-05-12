@@ -3031,9 +3031,9 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
           let bannerText: string;
           if (opportunities.length >= 2) {
-            bannerText = `${formatCategoryLabel(opportunities[0].title)} and ${formatCategoryLabel(opportunities[1].title)} are your biggest opportunities to improve cash this month.`;
+            bannerText = `“${formatCategoryLabel(opportunities[0].title)}” and “${formatCategoryLabel(opportunities[1].title)}” are your biggest opportunities to improve cash this month.`;
           } else if (opportunities.length === 1) {
-            bannerText = `${formatCategoryLabel(opportunities[0].title)} is the main driver of higher costs this month.`;
+            bannerText = `“${formatCategoryLabel(opportunities[0].title)}” is the main driver of higher costs this month.`;
           } else {
             bannerText = "You're in control this month. No major cost overruns detected.";
           }
