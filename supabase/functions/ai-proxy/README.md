@@ -98,6 +98,30 @@ ANTHROPIC_API_KEY=placeholder \
 # (then re-run scenario 3's curl)
 ```
 
+### Node-based smokes must inject Origin
+
+Browsers attach the `Origin` header automatically on cross-origin
+requests; Node's `fetch` does not. The proxy enforces an Origin
+allowlist (see CORS allowlist below) and a bare Node POST without an
+explicit `Origin` header returns `403` even when the calling host
+matches the allowlist:
+
+```js
+await fetch(url, {
+  method: 'POST',
+  headers: {
+    'Origin': 'http://localhost:5173', // required from Node
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify(payload),
+});
+```
+
+Production browser code in `src/lib/priorities/ai.ts` does not set
+`Origin` manually because the browser already does. The injection
+pattern is a Node-environment requirement only, but it must be reused
+in any future Node-based verification or smoke run.
+
 ## CORS allowlist
 
 Locked to two origins:
