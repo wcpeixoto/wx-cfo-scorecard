@@ -1972,7 +1972,7 @@ body {
 }
 
 .reserve-gauge-arc {
-  stroke: var(--warning);
+  stroke: var(--accent);
 }
 
 .reserve-gauge-arc.is-positive {
@@ -1980,7 +1980,7 @@ body {
 }
 
 .reserve-gauge-arc.is-caution {
-  stroke: var(--warning);
+  stroke: var(--accent);
 }
 
 .reserve-gauge-arc.is-low {
@@ -2068,7 +2068,7 @@ body {
 }
 
 .reserve-coverage-fill.is-caution {
-  background: var(--warning);
+  background: var(--accent);
 }
 
 .reserve-coverage-fill.is-neutral {
