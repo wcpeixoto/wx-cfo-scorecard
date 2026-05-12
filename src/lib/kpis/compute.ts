@@ -1871,9 +1871,12 @@ export function computeDashboardModel(
     movers: buildMovers(contextCurrentTxns, contextPreviousTxns, cashFlowMode),
     opportunityTotal,
     opportunities,
-    // Anchor the narrative to contextMonth (the displayed period), not to the
-    // raw last rollup — which would include a partial in-flight month and read
-    // "through May 2026" while the period selector shows Apr 2026.
+    // summaryLatest/summaryPrevious anchor to contextMonth so the narrative
+    // matches the displayed period — the raw last rollup includes the partial
+    // in-flight month and would read "through May 2026" while the period
+    // selector shows Apr 2026. If a future caller bypasses contextMonth and
+    // passes a different period to buildSummary directly, the narrative will
+    // drift again — keep these aligned.
     summaryBullets: (() => {
       const summaryLatest = monthlyRollups.find((rollup) => rollup.month === contextMonth) ?? latest;
       const summaryPrevious = monthlyRollups.find((rollup) => rollup.month === previousContextMonth) ?? previous;
