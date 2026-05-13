@@ -1366,6 +1366,62 @@ body {
   cursor: not-allowed;
 }
 
+/* Split-button caret. The compare control is two adjacent buttons that
+   visually read as one: the label button toggles compare off when a mode
+   is active (or opens the menu when off); the caret button always opens
+   the menu so the user can switch between Past Data and Cash Reserve
+   without leaving the active mode. */
+.forecast-compare-dropdown {
+  display: inline-flex;
+  position: relative;
+}
+.forecast-compare-dropdown .forecast-compare-btn {
+  /* Tighten the right side so the gap between label text and caret matches
+     the 6px gap inside the canonical .action-dropdown-trigger (Base Case
+     button). The caret button supplies the right-side padding. */
+  padding-right: 6px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right-width: 0;
+}
+.forecast-compare-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 10px 0 0;
+  border: 1px solid #E4E7EC;
+  border-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+  background: #FFFFFF;
+  color: #344054;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.forecast-compare-caret svg {
+  width: 16px;
+  height: 16px;
+}
+.forecast-compare-caret:hover {
+  background: #F9FAFB;
+  color: #101828;
+}
+.forecast-compare-btn.is-active + .forecast-compare-caret {
+  background: #465FFF;
+  border-color: #465FFF;
+  color: #FFFFFF;
+}
+.forecast-compare-btn.is-active + .forecast-compare-caret:hover {
+  background: #3A50DB;
+  border-color: #3A50DB;
+}
+.projected-cash-timeline-row .forecast-compare-caret {
+  height: 44px;
+}
+
 /* Action dropdown — canonical card-action dropdown trigger.
    Spec: TailAdmin June 2025 Total Balance card dropdown.
    Trigger: 36px tall, transparent bg, 1px #D0D5DD border, 8px radius,
@@ -2923,6 +2979,23 @@ body {
 
 .tooltip-row-value-net.is-negative {
   fill: #f04438;
+}
+
+/* Reserve overlay tooltip — third row shows above/below-reserve delta.
+   Negative variant uses the same danger red as tooltip-row-value-net. */
+.apex-reserve-delta {
+  border-top: 1px solid #e4e7eb;
+  margin-top: 4px;
+  padding-top: 4px !important;
+}
+
+.apex-reserve-delta .apexcharts-tooltip-text-y-value {
+  font-weight: 600 !important;
+}
+
+.apex-reserve-delta-negative .apexcharts-tooltip-text-y-label,
+.apex-reserve-delta-negative .apexcharts-tooltip-text-y-value {
+  color: #f04438 !important;
 }
 
 .axis-label {
