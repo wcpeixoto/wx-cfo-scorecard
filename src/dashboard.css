@@ -903,7 +903,7 @@ body {
 }
 
 .kpi-change-arrow {
-  font-size: 0.65rem;
+  font-size: 10px;
   line-height: 1;
 }
 
@@ -1837,7 +1837,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.67rem;
+  font-size: 10px;
   color: rgba(18, 32, 52, 0.56);
   line-height: 1;
   letter-spacing: 0.01em;
@@ -2325,8 +2325,8 @@ body {
   border: 1px solid #d8e5f8;
   background: #eef5ff;
   color: #315993;
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 500;
   letter-spacing: 0.01em;
   line-height: 1;
   white-space: nowrap;
@@ -4832,7 +4832,7 @@ body {
 }
 
 .event-form-helper {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -7951,7 +7951,7 @@ body {
 }
 
 .cth-stat-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #667085;
   margin-top: 2px;
@@ -8131,7 +8131,7 @@ body {
   align-items: center;
   height: 20px;
   padding: 0 8px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   border-radius: 999px;
   letter-spacing: 0.02em;
