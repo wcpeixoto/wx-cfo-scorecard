@@ -1177,24 +1177,43 @@ export default function CashFlowForecastModule({
                 <div className="action-dropdown forecast-compare-dropdown" ref={compareMenuRef}>
                   {(() => {
                     const isActive = compareMode !== 'off';
-                    const selectedLabel =
+                    const buttonLabel =
                       compareMode === 'past'
-                        ? 'Compare: Past Data'
+                        ? 'Past Data'
                         : compareMode === 'reserve'
-                          ? 'Compare: Cash Reserve'
+                          ? 'Cash Reserve'
                           : 'Compare';
                     return (
                       <>
                         <button
                           type="button"
-                          className={`forecast-compare-btn action-dropdown-trigger${isActive ? ' is-active' : ''}`}
-                          aria-haspopup="menu"
-                          aria-expanded={compareMenuOpen}
-                          aria-label={selectedLabel}
-                          onClick={() => setCompareMenuOpen((c) => !c)}
+                          className={`forecast-compare-btn${isActive ? ' is-active' : ''}`}
+                          aria-pressed={isActive}
+                          aria-label={
+                            isActive
+                              ? `Turn off compare (${buttonLabel})`
+                              : 'Open compare options'
+                          }
+                          onClick={() => {
+                            if (isActive) {
+                              setCompareMode('off');
+                              setCompareMenuOpen(false);
+                            } else {
+                              setCompareMenuOpen((c) => !c);
+                            }
+                          }}
                         >
                           <FiBarChart2 aria-hidden="true" focusable="false" />
-                          <span className="action-dropdown-label">{selectedLabel}</span>
+                          <span className="action-dropdown-label">{buttonLabel}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="forecast-compare-caret"
+                          aria-haspopup="menu"
+                          aria-expanded={compareMenuOpen}
+                          aria-label="Compare options"
+                          onClick={() => setCompareMenuOpen((c) => !c)}
+                        >
                           <FiChevronDown
                             className={`action-dropdown-caret${compareMenuOpen ? ' is-open' : ''}`}
                             aria-hidden="true"
@@ -1202,20 +1221,6 @@ export default function CashFlowForecastModule({
                         </button>
                         {compareMenuOpen && (
                           <ul className="action-dropdown-menu" role="menu" aria-label="Compare overlay">
-                            <li>
-                              <button
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={compareMode === 'off'}
-                                className={compareMode === 'off' ? 'is-active' : ''}
-                                onClick={() => {
-                                  setCompareMode('off');
-                                  setCompareMenuOpen(false);
-                                }}
-                              >
-                                Off
-                              </button>
-                            </li>
                             <li>
                               <button
                                 type="button"
@@ -1265,9 +1270,6 @@ export default function CashFlowForecastModule({
                   })()}
                 </div>
                 </div>
-                {priorPeriodActive && priorPeriodRangeLabel && (
-                  <p className="projected-cash-compare-subtitle">Compared with {priorPeriodRangeLabel}</p>
-                )}
                 {reserveActive && (
                   <p className="projected-cash-compare-subtitle">Rolling 30-day required reserve</p>
                 )}
