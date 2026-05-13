@@ -14,6 +14,7 @@ import type {
 } from '../lib/data/contract';
 import { toMonthLabel } from '../lib/kpis/compute';
 import { buildPriorPeriodSeries } from '../lib/forecast/priorPeriodSeries';
+import { buildReserveSeries } from '../lib/forecast/reserveSeries';
 
 type SelectOption = { value: string; label: string; months: number };
 
@@ -593,19 +594,16 @@ export default function CashFlowForecastModule({
   // starting balance; we accumulate at the displayed granularity (monthly or
   // expanded-weekly) using the same logic the forecast itself applies to
   // `data`. Available at any horizon as long as coverage is complete.
-  const [compareEnabled, setCompareEnabled] = useState(false);
+  type CompareMode = 'off' | 'past' | 'reserve';
+  const [compareMode, setCompareMode] = useState<CompareMode>('off');
+  const [compareMenuOpen, setCompareMenuOpen] = useState(false);
+  const compareMenuRef = useRef<HTMLDivElement>(null);
   const priorPeriodInput = useMemo(() => {
     const forecastMonths = data.map((d) => d.month);
     return buildPriorPeriodSeries(monthlyRollups, startingCashBalance, forecastMonths);
   }, [data, monthlyRollups, startingCashBalance]);
   const priorPeriodAvailable = priorPeriodInput !== null;
-  const priorPeriodActive = compareEnabled && priorPeriodAvailable;
-  // Auto-collapse if availability is lost (e.g. user moves to a horizon with
-  // insufficient prior coverage), so re-entering a supported horizon does not
-  // silently re-enable the overlay.
-  useEffect(() => {
-    if (!priorPeriodAvailable && compareEnabled) setCompareEnabled(false);
-  }, [priorPeriodAvailable, compareEnabled]);
+  const priorPeriodActive = compareMode === 'past' && priorPeriodAvailable;
 
   const cumulativeSeries = useMemo<TrendPoint[]>(() => {
     let running = startingCashBalance;
@@ -666,6 +664,31 @@ export default function CashFlowForecastModule({
   }, [priorPeriodInput]);
   const displaySeries = granularity === 'week' ? weeklyCumulativeSeries : cumulativeSeries;
   const priorDisplaySeries = granularity === 'week' ? priorWeeklyCumulative : priorMonthlyCumulative;
+  const reserveSeries = useMemo(
+    () => buildReserveSeries(fullForecast, displaySeries, granularity),
+    [fullForecast, displaySeries, granularity],
+  );
+  const reserveAvailable = reserveSeries !== null;
+  const reserveActive = compareMode === 'reserve' && reserveAvailable;
+  // Auto-collapse if the selected compare mode becomes unavailable (e.g. user
+  // moves to a horizon with insufficient history or no full 30-day forward
+  // windows). Re-entering a supported horizon does not silently re-enable
+  // the overlay.
+  useEffect(() => {
+    if (compareMode === 'past' && !priorPeriodAvailable) setCompareMode('off');
+    if (compareMode === 'reserve' && !reserveAvailable) setCompareMode('off');
+  }, [compareMode, priorPeriodAvailable, reserveAvailable]);
+  // Close compare menu on outside click.
+  useEffect(() => {
+    if (!compareMenuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (compareMenuRef.current && !compareMenuRef.current.contains(e.target as Node)) {
+        setCompareMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [compareMenuOpen]);
   const reserveBreached = !!decisionSignals.reserveBreachMonth;
   const hasNegativeCash = !!decisionSignals.negativeCashMonth;
   const cashRiskState: 'safe' | 'warning' | 'critical' = hasNegativeCash ? 'critical' : reserveBreached ? 'warning' : 'safe';
@@ -1151,29 +1174,102 @@ export default function CashFlowForecastModule({
                     );
                   })()}
                 </div>
-                <button
-                  type="button"
-                  className={`forecast-compare-btn${priorPeriodActive ? ' is-active' : ''}`}
-                  onClick={() => setCompareEnabled((c) => !c)}
-                  disabled={!priorPeriodAvailable}
-                  aria-pressed={priorPeriodActive}
-                  aria-label={
-                    priorPeriodAvailable
-                      ? `Compare with prior period${priorPeriodRangeLabel ? ` (${priorPeriodRangeLabel})` : ''}`
-                      : 'Compare unavailable — insufficient prior-period history'
-                  }
-                  title={
-                    priorPeriodAvailable
-                      ? undefined
-                      : 'Need actual history covering the same calendar range one year earlier'
-                  }
-                >
-                  <FiBarChart2 aria-hidden="true" focusable="false" />
-                  <span>Compare</span>
-                </button>
+                <div className="action-dropdown forecast-compare-dropdown" ref={compareMenuRef}>
+                  {(() => {
+                    const isActive = compareMode !== 'off';
+                    const selectedLabel =
+                      compareMode === 'past'
+                        ? 'Compare: Past Data'
+                        : compareMode === 'reserve'
+                          ? 'Compare: Cash Reserve'
+                          : 'Compare';
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          className={`forecast-compare-btn action-dropdown-trigger${isActive ? ' is-active' : ''}`}
+                          aria-haspopup="menu"
+                          aria-expanded={compareMenuOpen}
+                          aria-label={selectedLabel}
+                          onClick={() => setCompareMenuOpen((c) => !c)}
+                        >
+                          <FiBarChart2 aria-hidden="true" focusable="false" />
+                          <span className="action-dropdown-label">{selectedLabel}</span>
+                          <FiChevronDown
+                            className={`action-dropdown-caret${compareMenuOpen ? ' is-open' : ''}`}
+                            aria-hidden="true"
+                          />
+                        </button>
+                        {compareMenuOpen && (
+                          <ul className="action-dropdown-menu" role="menu" aria-label="Compare overlay">
+                            <li>
+                              <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={compareMode === 'off'}
+                                className={compareMode === 'off' ? 'is-active' : ''}
+                                onClick={() => {
+                                  setCompareMode('off');
+                                  setCompareMenuOpen(false);
+                                }}
+                              >
+                                Off
+                              </button>
+                            </li>
+                            <li>
+                              <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={compareMode === 'past'}
+                                aria-disabled={!priorPeriodAvailable}
+                                className={compareMode === 'past' ? 'is-active' : ''}
+                                title={
+                                  priorPeriodAvailable
+                                    ? undefined
+                                    : 'Need actual history covering the same calendar range one year earlier'
+                                }
+                                onClick={() => {
+                                  if (!priorPeriodAvailable) return;
+                                  setCompareMode('past');
+                                  setCompareMenuOpen(false);
+                                }}
+                              >
+                                Past Data
+                              </button>
+                            </li>
+                            <li>
+                              <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={compareMode === 'reserve'}
+                                aria-disabled={!reserveAvailable}
+                                className={compareMode === 'reserve' ? 'is-active' : ''}
+                                title={
+                                  reserveAvailable
+                                    ? undefined
+                                    : 'Cash Reserve requires at least one chart point with a full 30-day forward window'
+                                }
+                                onClick={() => {
+                                  if (!reserveAvailable) return;
+                                  setCompareMode('reserve');
+                                  setCompareMenuOpen(false);
+                                }}
+                              >
+                                Cash Reserve
+                              </button>
+                            </li>
+                          </ul>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
                 </div>
                 {priorPeriodActive && priorPeriodRangeLabel && (
                   <p className="projected-cash-compare-subtitle">Compared with {priorPeriodRangeLabel}</p>
+                )}
+                {reserveActive && (
+                  <p className="projected-cash-compare-subtitle">Rolling 30-day required reserve</p>
                 )}
               </div>
             </div>
@@ -1187,6 +1283,7 @@ export default function CashFlowForecastModule({
             knownEvents={forecastEvents}
             priorSeries={priorPeriodActive ? priorDisplaySeries : null}
             priorSeriesLabel="Prior Period"
+            reserveSeries={reserveActive ? reserveSeries : null}
           />
         </div>
 

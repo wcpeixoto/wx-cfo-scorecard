@@ -14,6 +14,11 @@ type ProjectedCashBalanceChartProps = {
   priorSeries?: TrendPoint[] | null;
   /** Label shown in the tooltip for the prior series. Defaults to "Prior Year". */
   priorSeriesLabel?: string;
+  /** Optional rolling 30-day reserve series aligned 1:1 to `data` for the
+   *  "Cash Reserve" compare overlay. `null` entries mark truncated tail
+   *  points (no full 30-day forward window available); the chart renders
+   *  those as gaps in the dashed line. Mutually exclusive with priorSeries. */
+  reserveSeries?: (number | null)[] | null;
 };
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -105,8 +110,12 @@ export default function ProjectedCashBalanceChart({
   height = 310,
   priorSeries = null,
   priorSeriesLabel = 'Prior Year',
+  reserveSeries = null,
 }: ProjectedCashBalanceChartProps) {
   const hasPrior = !!priorSeries && priorSeries.length === data.length && priorSeries.length > 0;
+  const hasReserve =
+    !hasPrior && !!reserveSeries && reserveSeries.length === data.length && reserveSeries.some((v) => v !== null);
+  const hasOverlay = hasPrior || hasReserve;
 
   // Axis categories (short labels for display on x-axis)
   const categories = useMemo(
@@ -173,7 +182,15 @@ export default function ProjectedCashBalanceChart({
   // a hybrid local/zero-based axis — see niceTicks.ts.
   const initialBalance = data.length > 0 ? data[0].net : 0;
   const priorValues = hasPrior ? priorSeries!.map((d) => d.net) : [];
-  const combinedValues = hasPrior ? [...values, ...priorValues] : values;
+  // Apex renders `null` entries as gaps in the series — exactly the tail
+  // truncation we want when a reserve point lacks 30 forward days.
+  const reserveValues: (number | null)[] = hasReserve ? reserveSeries! : [];
+  const reserveValuesForRange = reserveValues.filter((v): v is number => v !== null);
+  const combinedValues = hasPrior
+    ? [...values, ...priorValues]
+    : hasReserve
+      ? [...values, ...reserveValuesForRange]
+      : values;
   const dataMin = data.length > 0 ? Math.min(initialBalance, ...combinedValues) : 0;
   const dataMax = data.length > 0 ? Math.max(initialBalance, ...combinedValues) : 0;
   const { min: yAxisMin, max: yAxisMax, ticks: yAxisTicks } = useMemo(
@@ -193,7 +210,7 @@ export default function ProjectedCashBalanceChart({
         sparkline: { enabled: false },
         animations: { enabled: true },
       },
-      colors: hasPrior
+      colors: hasOverlay
         ? [chartTokens.brand, chartTokens.brandSecondary]
         : [chartTokens.brand],
       fill: {
@@ -201,16 +218,16 @@ export default function ProjectedCashBalanceChart({
         gradient: {
           shade: 'light',
           type: 'vertical',
-          opacityFrom: hasPrior ? [0.55, 0.12] : 0.55,
+          opacityFrom: hasOverlay ? [0.55, 0.12] : 0.55,
           opacityTo: 0,
           stops: [0, 100],
         },
       },
       stroke: {
-        width: hasPrior ? [2, 2] : 2,
+        width: hasOverlay ? [2, 2] : 2,
         curve: 'smooth',
         lineCap: 'butt',
-        dashArray: hasPrior ? [0, 4] : 0,
+        dashArray: hasOverlay ? [0, 4] : 0,
       },
       dataLabels: { enabled: false },
       markers: {
@@ -267,33 +284,54 @@ export default function ProjectedCashBalanceChart({
           },
         },
       },
-      tooltip: {
-        theme: 'light',
-        shared: true,
-        intersect: false,
-        style: { fontSize: '12px', fontFamily: 'Outfit, sans-serif' },
-        x: {
-          formatter: (value: string, opts?: { dataPointIndex?: number }) => {
-            const idx = opts?.dataPointIndex ?? -1;
-            if (idx >= 0 && idx < tooltipLabels.length) return tooltipLabels[idx];
-            return value;
+      // Reserve mode uses a 3-row custom layout (balance + reserve + delta).
+      // All other modes use Apex's standard labeled rows — the chart is
+      // remounted via a `key` change in the JSX below so Apex can't carry
+      // a stale `custom` renderer across mode switches.
+      tooltip: hasReserve
+        ? {
+            theme: 'light',
+            shared: true,
+            intersect: false,
+            style: { fontSize: '12px', fontFamily: 'Outfit, sans-serif' },
+            custom: ({ dataPointIndex }: { dataPointIndex: number }) => {
+              const balance = values[dataPointIndex];
+              const reserve = reserveValues[dataPointIndex] ?? null;
+              const label = tooltipLabels[dataPointIndex] ?? '';
+              const balanceRow = `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;"><span class="apexcharts-tooltip-marker" style="background-color:${chartTokens.brand}"></span><span class="apexcharts-tooltip-text"><span class="apexcharts-tooltip-text-y-label">Cash Balance: </span><span class="apexcharts-tooltip-text-y-value">${formatCurrency(balance)}</span></span></div>`;
+              if (reserve === null) {
+                return `<div class="apexcharts-tooltip-title">${label}</div>${balanceRow}`;
+              }
+              const reserveRow = `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;"><span class="apexcharts-tooltip-marker" style="background-color:${chartTokens.brandSecondary}"></span><span class="apexcharts-tooltip-text"><span class="apexcharts-tooltip-text-y-label">Cash Reserve: </span><span class="apexcharts-tooltip-text-y-value">${formatCurrency(reserve)}</span></span></div>`;
+              const delta = balance - reserve;
+              const deltaLabel = delta >= 0 ? 'Above reserve' : 'Below reserve';
+              const deltaClass = delta < 0 ? ' apex-reserve-delta-negative' : '';
+              const deltaRow = `<div class="apexcharts-tooltip-series-group apex-reserve-delta${deltaClass}" style="display:flex;align-items:center;"><span class="apexcharts-tooltip-text"><span class="apexcharts-tooltip-text-y-label">${deltaLabel}: </span><span class="apexcharts-tooltip-text-y-value">${formatCurrency(Math.abs(delta))}</span></span></div>`;
+              return `<div class="apexcharts-tooltip-title">${label}</div>${balanceRow}${reserveRow}${deltaRow}`;
+            },
+            marker: { show: true },
+          }
+        : {
+            theme: 'light',
+            shared: true,
+            intersect: false,
+            style: { fontSize: '12px', fontFamily: 'Outfit, sans-serif' },
+            x: {
+              formatter: (value: string, opts?: { dataPointIndex?: number }) => {
+                const idx = opts?.dataPointIndex ?? -1;
+                if (idx >= 0 && idx < tooltipLabels.length) return tooltipLabels[idx];
+                return value;
+              },
+            },
+            y: { formatter: formatCurrency },
+            marker: { show: true },
           },
-        },
-        y: {
-          formatter: formatCurrency,
-          // Always show the series name on the value row — matches the
-          // TailAdmin "Users & Revenue Statistics" tooltip pattern (title
-          // = period, then each series labelled with colored dot + name +
-          // value).
-        },
-        marker: { show: true },
-      },
       annotations: {
         points: eventAnnotationPoints,
       },
       legend: { show: false },
     }),
-    [categories, tooltipLabels, xAxisTickAmount, eventAnnotationPoints, height, yAxisMin, yAxisMax, yAxisTickAmount, hasPrior]
+    [categories, tooltipLabels, xAxisTickAmount, eventAnnotationPoints, height, yAxisMin, yAxisMax, yAxisTickAmount, hasOverlay, hasReserve, values, reserveValues]
   );
 
   const series = useMemo(
@@ -303,11 +341,21 @@ export default function ProjectedCashBalanceChart({
             { name: 'Cash Balance', data: values },
             { name: priorSeriesLabel, data: priorValues },
           ]
-        : [{ name: 'Cash Balance', data: values }],
-    [values, hasPrior, priorValues, priorSeriesLabel]
+        : hasReserve
+          ? [
+              { name: 'Cash Balance', data: values },
+              { name: 'Cash Reserve', data: reserveValues },
+            ]
+          : [{ name: 'Cash Balance', data: values }],
+    [values, hasPrior, hasReserve, priorValues, priorSeriesLabel, reserveValues]
   );
 
+  // Remount the chart when the overlay mode changes. Apex retains a
+  // tooltip `custom` callback internally and does not always release it
+  // when options are replaced, so flipping reserve→past would otherwise
+  // continue invoking the reserve renderer.
+  const overlayMode = hasReserve ? 'reserve' : hasPrior ? 'past' : 'off';
   return (
-    <ReactApexChart options={options} series={series} type="area" height={height} />
+    <ReactApexChart key={overlayMode} options={options} series={series} type="area" height={height} />
   );
 }

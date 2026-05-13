@@ -2925,6 +2925,23 @@ body {
   fill: #f04438;
 }
 
+/* Reserve overlay tooltip — third row shows above/below-reserve delta.
+   Negative variant uses the same danger red as tooltip-row-value-net. */
+.apex-reserve-delta {
+  border-top: 1px solid #e4e7eb;
+  margin-top: 4px;
+  padding-top: 4px !important;
+}
+
+.apex-reserve-delta .apexcharts-tooltip-text-y-value {
+  font-weight: 600 !important;
+}
+
+.apex-reserve-delta-negative .apexcharts-tooltip-text-y-label,
+.apex-reserve-delta-negative .apexcharts-tooltip-text-y-value {
+  color: #f04438 !important;
+}
+
 .axis-label {
   fill: #6b7280;
   font-size: 11px;
