@@ -6793,18 +6793,6 @@ body {
     text-align: center;
   }
 
-  /* Segmented toggle wrap modifier — used by 4-button toggles
-     that should wrap to 2×2 on narrow viewports (Forecast scenario). */
-  .segmented-toggle--wrap {
-    width: 100%;
-    flex-wrap: wrap;
-    height: auto;
-  }
-  .segmented-toggle--wrap .segmented-toggle-btn {
-    flex: 1 1 40%;
-    text-align: center;
-  }
-
   /* Big Picture — categories donut shrinks to fit 309px card interior */
   .top-categories-donut-wrap {
     width: 130px;
