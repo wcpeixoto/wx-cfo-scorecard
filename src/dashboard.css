@@ -1320,18 +1320,18 @@ body {
   height: 44px;
 }
 
-/* Compare-with-prior-period toggle. TailAdmin filter-button style: white
-   surface, gray-200 border, 40px tall to match the segmented-toggle inner
-   button. Active state inverts to the brand fill, mirroring the prior-period
-   line color (chartTokens.brand). Disabled when monthly granularity is
-   unavailable or there's not enough history. */
+/* Compare-with-prior-period toggle. Canonical action-dropdown trigger
+   border (#D0D5DD) per UI_RULES.md Part 6 — Action dropdown. Active state
+   inverts to the brand fill, mirroring the prior-period line color
+   (chartTokens.brand). Disabled when monthly granularity is unavailable
+   or there's not enough history. */
 .forecast-compare-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 40px;
   padding: 10px 12px;
-  border: 1px solid #E4E7EC;
+  border: 1px solid #D0D5DD;
   border-radius: 8px;
   background: #FFFFFF;
   color: #344054;
@@ -1390,7 +1390,7 @@ body {
   justify-content: center;
   height: 40px;
   padding: 0 10px 0 0;
-  border: 1px solid #E4E7EC;
+  border: 1px solid #D0D5DD;
   border-left: 0;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
@@ -4524,8 +4524,9 @@ body {
   align-items: start;
 }
 
-/* ─── Known Events — Add button (TailAdmin filter-button sizing,
-   matches .forecast-compare-btn so finance-page actions read uniform). */
+/* ─── Known Events — Add button. Canonical action-dropdown trigger
+   border (#D0D5DD) per UI_RULES.md Part 6 — Action dropdown, matching
+   .forecast-compare-btn so finance-page actions read uniform. */
 .forecast-event-add-btn {
   display: inline-flex;
   align-items: center;
@@ -4537,7 +4538,7 @@ body {
   font-weight: 500;
   color: #344054;
   background: #FFFFFF;
-  border: 1px solid #E4E7EC;
+  border: 1px solid #D0D5DD;
   border-radius: 8px;
   cursor: pointer;
   white-space: nowrap;
