@@ -1418,7 +1418,7 @@ don't need to all be visible at rest).
 
 | Element | Token | Value |
 |---------|-------|-------|
-| Height | `h-9` | 36px |
+| Height | per role | 44 / 40 / 36px — see Part 1 "Button height taxonomy" |
 | Padding | `px-2.5` | 0px vertical, 10px horizontal |
 | Gap (label ↔ chevron) | `gap-1.5` | 6px |
 | Border | `border border-gray-300` | 1px solid #D0D5DD (uniform on all 4 sides) |
