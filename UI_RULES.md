@@ -875,17 +875,13 @@ Always in header-right column or above chart. Never below chart.
 
 > **Implementation note:** This project implements Pattern E as `.segmented-toggle` in `dashboard.css`.
 > There is no `.chart-tab` class in this codebase — that is the TailAdmin source class name and
-> is not used here. Three toggle scales coexist (all use the same visual structure, different sizes):
+> is not used here. A single canonical scale applies everywhere: 44px track / 40px buttons /
+> 10px×12px padding / 8px+6px radii. The chart-card class `.statistics-card__tab*` uses the
+> same spec, locally scoped so it can sit inside a chart card without inheriting layout overrides.
+> Deprecated patterns (chart-style blue pill, outlined button-group) are scheduled for replacement;
+> do not replicate.
 >
-> 1. **Global `.segmented-toggle`** — 40px track / 36px buttons / 8px padding — timeframe and mode
->    selectors throughout the dashboard. This is the default for new work.
-> 2. **Chart-card locally scoped** (e.g. `.statistics-card__tab*`) — 44px track / 40px buttons /
->    10px padding — used only on large chart-cards where the toggle sits at full card width.
->    Do NOT consolidate with the global scale; the two scales coexist deliberately.
-> 3. **Deprecated patterns** — chart-style blue pill, outlined button-group — scheduled for
->    replacement; do not replicate in new work.
->
-> See Part 6 — Segmented toggle for the full spec and guidance on which scale to use when.
+> See Part 6 — Segmented toggle for the full spec.
 
 ---
 
@@ -1114,7 +1110,7 @@ exception section in Part 6 for the full policy.
 9. **Modal state via raw useState.** Use `useModal()`.
 10. **Shadow added to card or panel without justification.** Pattern F is the only valid exception.
 11. **`rounded-md` or `rounded-sm` on cards.** Cards are always `rounded-2xl`.
-12. **Toggle pattern other than the standard segmented control.** For new toggle work, use `.segmented-toggle` (global 40/36/8 scale) or the chart-card locally scoped variant (44/40/10) — see Part 6 Segmented toggle for when to use each. The existing outlined button-group toggle (e.g. Big Picture "This Month / Last Month") is deprecated; do not replicate it. Note: there is no `.chart-tab` class in this codebase — the TailAdmin source component is named ChartTab.tsx but the project implementation is `.segmented-toggle`. Do not introduce `.chart-tab` as a new class.
+12. **Toggle pattern other than the standard segmented control.** For new toggle work, use `.segmented-toggle` — the single canonical 44/40/10 scale (chart-card consumers use the locally scoped `.statistics-card__tab*` class with the same spec). See Part 6 Segmented toggle for the spec. The existing outlined button-group toggle (e.g. Big Picture "This Month / Last Month") is deprecated; do not replicate it. Note: there is no `.chart-tab` class in this codebase — the TailAdmin source component is named ChartTab.tsx but the project implementation is `.segmented-toggle`. Do not introduce `.chart-tab` as a new class.
 
 ---
 
@@ -1284,61 +1280,39 @@ Use whenever the user must choose exactly one of 2–5 options that are views of
 - A single on/off control — use a Switch (Part 3 — Switch / Toggle)
 - Navigation between pages — use the sidebar
 
-### Scale 1 — Global `.segmented-toggle` (default for new work)
+### Canonical spec (single scale)
+
+Implemented as `.segmented-toggle` (global) and `.statistics-card__tab*` (locally scoped inside
+chart cards). Both use the same visual spec — no exceptions, no second scale.
 
 | Element | Token | Value |
 |---------|-------|-------|
 | Track background | `bg-gray-100` | #F2F4F7 |
 | Track border radius | `rounded-lg` | 8px |
 | Track internal padding | `p-0.5` | 2px |
-| Track height | — | 40px |
+| Track gap between segments | `gap-0.5` | 2px |
+| Track height | — | 44px |
 | Active segment background | `bg-white` | #FFFFFF |
 | Active segment text | `text-gray-900` / `font-medium` | #101828, weight 500 |
-| Active segment shadow | `shadow-theme-xs` | subtle lift |
+| Active segment shadow | `shadow-theme-xs` | 0 1px 2px rgba(16,24,40,.05) |
 | Active segment border radius | `rounded-md` | 6px |
 | Inactive segment background | none | — |
 | Inactive segment text | `text-gray-500` / `font-medium` | #667085, weight 500 |
-| Inactive segment hover text | `text-gray-700` | #344054 |
-| Segment height | — | 36px |
-| Segment padding | `px-3 py-2` | 12px horizontal, 8px vertical |
-| Font size | `text-theme-sm` | 14px |
+| Segment height | — | 40px |
+| Segment padding | — | 10px vertical, 12px horizontal |
+| Font family / size | Outfit | 14px |
+| Hover / focus / transition | none | matches TailAdmin source |
 | Layout | single row, horizontal, no wrapping | — |
 
-No border on the track. No shadow on the track. Shadow on the active pill only.
+No border on the track. No shadow on the track. Shadow on the active pill only. No hover state,
+no focus ring, no transition — matches the TailAdmin Analytics card Monthly/Quarterly/Annually
+toggle exactly.
 
-Matches the TailAdmin Analytics card Monthly/Quarterly/Annually toggle. This is the default for
-all new segmented toggle work outside large chart-cards.
-
-**Reference implementation:** Settings page (`#/settings`) Data / Accounts / Rules control.
-
-### Scale 2 — Chart-card locally scoped (`.statistics-card__tab*` pattern)
-
-Used only on large chart-cards (250px+ chart area) where the toggle sits at the full width of the
-card header and the larger touch target matches the visual weight of the chart below it.
-
-| Element | Value |
-|---------|-------|
-| Track height | 44px |
-| Segment height | 40px |
-| Segment padding | 10px horizontal, 10px vertical (`padding: 10px 12px`) |
-| Font size | 14px |
-| Everything else | Same as Scale 1 (colors, radius, shadow, border rules) |
-
-**Do NOT consolidate Scale 1 and Scale 2.** The global `.segmented-toggle` is calibrated for
-compact header usage (7+ consumers across the dashboard). Chart-card toggles are locally scoped
-per card. Both scales coexist deliberately and must not be normalized into a single class.
-
-### Which scale to use
-
-| Context | Scale |
-|---------|-------|
-| Timeframe selector on any card header (compact) | Scale 1 — global `.segmented-toggle` |
-| View mode selector on a signal card | Scale 1 — global `.segmented-toggle` |
-| Section tab selector (Settings, etc.) | Scale 1 — global `.segmented-toggle` |
-| Series toggle inside a large chart-card (250px+ chart) | Scale 2 — locally scoped |
-
-When uncertain: use Scale 1. Only use Scale 2 when the card is a full chart-card and the toggle
-visually needs to match the weight of the chart area.
+**Reference implementation:** UI Lab `.statistics-card__tabs/__tab/__tab--active`
+([src/dashboard.css](src/dashboard.css) `.statistics-card__tabs` rule block).
+Global consumers: Settings page (`#/settings`) Data / Accounts / Rules; Forecast horizon
+toggle; Trends timeframe; Contracts cadence; Net Cash Flow chart mode; Rules-row controls;
+Forecast Compare button (filter-button styling, same 40px height).
 
 ### Deprecated patterns
 
@@ -1346,7 +1320,74 @@ The following patterns exist in the codebase and are scheduled for replacement. 
 
 - **Chart-style blue pill** — e.g. Operating / Total toggle on Monthly Net Cash Flow.
 - **Outlined button-group toggle** — e.g. This Month / Last Month on Big Picture.
-- Any toggle that uses a different visual treatment from Scale 1 or Scale 2 above.
+- Any toggle that uses a different visual treatment from the canonical spec above.
+
+---
+
+## Action dropdown (standard pattern)
+
+A single compact dropdown trigger that opens a small menu — used for card- or page-header
+actions where a segmented toggle is too heavy (e.g. 4+ mutually-exclusive options that
+don't need to all be visible at rest).
+
+**Source spec:** TailAdmin June 2025 Total Balance card dropdown.
+**Reference implementation:** Forecast header scenario selector — `.action-dropdown`
+(see [src/dashboard.css](src/dashboard.css)).
+
+### When to use
+
+- Card- or page-header control with 3–8 mutually-exclusive options where only the
+  selected one needs to be visible at rest.
+- Replacing a segmented toggle that has grown crowded or is competing visually with the
+  card title.
+
+### When not to use
+
+- 2–4 always-visible options where comparison matters at a glance → use the segmented
+  toggle (above).
+- More than ~8 options or hierarchical menus → use a full dialog or sidebar nav.
+- Single on/off → use a Switch.
+
+### Trigger spec
+
+| Element | Token | Value |
+|---------|-------|-------|
+| Height | `h-9` | 36px |
+| Padding | `px-2.5` | 0px vertical, 10px horizontal |
+| Gap (label ↔ chevron) | `gap-1.5` | 6px |
+| Border | `border border-gray-300` | 1px solid #D0D5DD |
+| Border radius | `rounded-lg` | 8px |
+| Background | none | transparent (light mode) |
+| Text color | `text-gray-700` | #344054 |
+| Font family / size / weight | Outfit | 14px / 500 |
+| Line height | — | 20px |
+| Layout | `flex items-center justify-center` | row, centered |
+| Chevron icon | `FiChevronDown` (or equivalent) | 16px, #667085, rotates 180° when open |
+| Min width | none | auto-sized to content |
+| Hover / open state | optional soft-gray fill | #F9FAFB (subtle, light-mode only) |
+
+### Menu spec
+
+| Element | Value |
+|---------|-------|
+| Anchor | absolute, `top: calc(100% + 6px)`, `right: 0` |
+| Background | #FFFFFF |
+| Border | 1px solid #E4E7EC |
+| Border radius | 8px |
+| Shadow | `0 4px 16px rgba(16, 24, 40, .08)` |
+| Padding | 4px |
+| z-index | 200 |
+| Row | 8px×12px padding, 6px radius, Outfit 14/500, color #344054 |
+| Row hover | bg #F2F4F7, color #101828 |
+| Row active (current selection) | bg #F2F4F7, color #101828 |
+
+### Behavior
+
+- Click trigger toggles the menu open/closed.
+- Click a row: applies the selection and closes the menu.
+- Outside-click closes the menu.
+- Escape closes the menu.
+- Mobile (`<768px`): trigger fills row width.
 
 ---
 

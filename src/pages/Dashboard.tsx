@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react';
 import { STORAGE_KEYS } from '../config';
 import { useLocation, useNavigate } from 'react-router';
-import { FiRefreshCw } from 'react-icons/fi';
+import { FiRefreshCw, FiChevronDown } from 'react-icons/fi';
 import { AppSidebar } from '../components/AppSidebar';
 import { AppHeader } from '../components/AppHeader';
 import { useSidebar } from '../context/SidebarContext';
@@ -737,6 +737,8 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [storedImportedTransactionCount, setStoredImportedTransactionCount] = useState(0);
   const [accountRecords, setAccountRecords] = useState<AccountRecord[]>(getStoredAccountSettings);
   const [selectedScenarioKey, setSelectedScenarioKey] = useState<ForecastScenarioKey>('base');
+  const [scenarioMenuOpen, setScenarioMenuOpen] = useState(false);
+  const scenarioMenuRef = useRef<HTMLDivElement | null>(null);
   // Stage 3 production wiring: opt-in switch between the locked engine,
   // category-cadence comparator, and split-conservative composition.
   // Session-only — defaults to 'engine' on every page load.
@@ -2406,6 +2408,24 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     };
   }, [isBigPictureFilterOpen]);
 
+  useEffect(() => {
+    if (!scenarioMenuOpen) return;
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!scenarioMenuRef.current?.contains(event.target as Node)) {
+        setScenarioMenuOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setScenarioMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [scenarioMenuOpen]);
+
   const writeDashboardUrlState = useCallback(
     (
       next: {
@@ -3244,33 +3264,62 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 </button>
               </div>
               <div className="top-controls top-controls-timeframe">
-                <div className="segmented-toggle segmented-toggle--wrap" role="group" aria-label="Forecast scenario">
-                  {(
-                    [
+                <div className="action-dropdown" ref={scenarioMenuRef}>
+                  {(() => {
+                    const scenarioOptions = [
                       { key: 'base' as ForecastScenarioKey, label: 'Base Case' },
                       { key: 'best' as ForecastScenarioKey, label: 'Best Case' },
                       { key: 'worst' as ForecastScenarioKey, label: 'Worst Case' },
                       { key: 'custom' as ForecastScenarioKey, label: 'Custom Case' },
-                    ] as const
-                  ).map((option) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      className={`segmented-toggle-btn${selectedScenarioKey === option.key ? ' is-active' : ''}`}
-                      onClick={() => {
-                        setSelectedScenarioKey(option.key);
-                        if (option.key === 'custom') {
-                          setTimeout(() => {
-                            document
-                              .getElementById('forecast-custom-controls')
-                              ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          }, 50);
-                        }
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                    ] as const;
+                    const selectedLabel =
+                      scenarioOptions.find((o) => o.key === selectedScenarioKey)?.label ?? 'Base Case';
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          className="action-dropdown-trigger"
+                          aria-haspopup="menu"
+                          aria-expanded={scenarioMenuOpen}
+                          aria-label={`Forecast scenario: ${selectedLabel}`}
+                          onClick={() => setScenarioMenuOpen((c) => !c)}
+                        >
+                          <span className="action-dropdown-label">{selectedLabel}</span>
+                          <FiChevronDown
+                            className={`action-dropdown-caret${scenarioMenuOpen ? ' is-open' : ''}`}
+                            aria-hidden="true"
+                          />
+                        </button>
+                        {scenarioMenuOpen && (
+                          <ul className="action-dropdown-menu" role="menu" aria-label="Forecast scenario">
+                            {scenarioOptions.map((option) => (
+                              <li key={option.key}>
+                                <button
+                                  type="button"
+                                  role="menuitemradio"
+                                  aria-checked={selectedScenarioKey === option.key}
+                                  className={selectedScenarioKey === option.key ? 'is-active' : ''}
+                                  onClick={() => {
+                                    setSelectedScenarioKey(option.key);
+                                    setScenarioMenuOpen(false);
+                                    if (option.key === 'custom') {
+                                      setTimeout(() => {
+                                        document
+                                          .getElementById('forecast-custom-controls')
+                                          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                      }, 50);
+                                    }
+                                  }}
+                                >
+                                  {option.label}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

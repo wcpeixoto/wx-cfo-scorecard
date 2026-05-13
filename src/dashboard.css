@@ -1383,7 +1383,7 @@ body {
 }
 
 /* Compare-with-prior-period toggle. TailAdmin filter-button style: white
-   surface, gray-200 border, 36px tall to match the segmented-toggle inner
+   surface, gray-200 border, 40px tall to match the segmented-toggle inner
    button. Active state inverts to the brand fill, mirroring the prior-period
    line color (chartTokens.brand). Disabled when monthly granularity is
    unavailable or there's not enough history. */
@@ -1391,8 +1391,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 36px;
-  padding: 8px 12px;
+  height: 40px;
+  padding: 10px 12px;
   border: 1px solid #E4E7EC;
   border-radius: 8px;
   background: #FFFFFF;
@@ -1424,6 +1424,109 @@ body {
 .forecast-compare-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Action dropdown — canonical card-action dropdown trigger.
+   Spec: TailAdmin June 2025 Total Balance card dropdown.
+   Trigger: 36px tall, transparent bg, 1px #D0D5DD border, 8px radius,
+   0×10 padding, 6px gap, Outfit 14/500/20, #344054, center-justified.
+   Menu: white panel, #E4E7EC border, 8px radius, soft-gray (#F2F4F7)
+   hover/active rows.
+   See UI_RULES.md Part 6 — Action dropdown (standard pattern).
+   Use this for any "single-button dropdown that triggers a small menu
+   from a card or page header." Do not deviate. */
+.action-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+.action-dropdown-trigger {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  background: transparent;
+  color: #344054;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.action-dropdown-trigger:hover {
+  background: #F9FAFB;
+  color: #101828;
+}
+.action-dropdown-trigger[aria-expanded="true"] {
+  background: #F9FAFB;
+  color: #101828;
+}
+.action-dropdown-label {
+  display: inline-block;
+}
+.action-dropdown-caret {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #667085;
+  transition: transform 150ms ease;
+}
+.action-dropdown-caret.is-open {
+  transform: rotate(180deg);
+}
+.action-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 200;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(16, 24, 40, 0.08);
+}
+.action-dropdown-menu li {
+  margin: 0;
+}
+.action-dropdown-menu button {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #344054;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.action-dropdown-menu button:hover {
+  background: #F2F4F7;
+  color: #101828;
+}
+.action-dropdown-menu button.is-active {
+  background: #F2F4F7;
+  color: #101828;
+}
+
+@media (max-width: 767px) {
+  .action-dropdown {
+    width: 100%;
+  }
+  .action-dropdown-trigger {
+    width: 100%;
+  }
 }
 
 /* Subtitle shown under the date range when the prior-period overlay is
@@ -5584,7 +5687,7 @@ body {
    Source: TailAdmin demo /sales "Users & Revenue Statistics"
    Spec extracted: 2026-05-06
    Tabs are locally scoped (.statistics-card__tabs/__tab/--active)
-   to avoid conflicts with global .segmented-toggle (40/36/8 scale).
+   but share the canonical 44/40/10 scale with global .segmented-toggle.
    ============================================================ */
 
 .statistics-card {
@@ -6436,9 +6539,11 @@ body {
   margin-bottom: 24px;
 }
 
-/* Segmented toggle — Wx CFO standard pattern.
-   Dimensions match the TailAdmin Analytics card
-   Monthly/Quarterly/Annually toggle. Do not deviate.
+/* Segmented toggle — Wx CFO standard pattern (single canonical scale).
+   Source spec: .statistics-card__tabs (TailAdmin Analytics card,
+   UI Lab canonical). 44px track / 40px button / 2px gap / 2px track
+   padding / 10px×12px button padding / 8px+6px radii. No transition,
+   no hover, no :focus — matches TailAdmin source.
    See UI_RULES.md Part 6 — Segmented toggle (standard pattern).
    .settings-subnav is the original Settings page consumer; .segmented-toggle
    is the shared class used by every other replaced toggle. Visual rules
@@ -6451,29 +6556,26 @@ body {
   background: #F2F4F7;
   border-radius: 8px;
   padding: 2px;
-  height: 40px;
+  height: 44px;
   /* no border on track — matches TailAdmin Analytics card */
 }
 
-/* Button base — 36px tall, 12px horizontal padding, weight 500 */
+/* Button base — 40px tall, 10px×12px padding, weight 500 */
 .segmented-toggle-btn,
 .settings-subnav-btn {
   border: none;
   background: transparent;
   color: #667085;
   border-radius: 6px;
-  height: 36px;
-  padding: 8px 12px;
-  font: inherit;
+  height: 40px;
+  padding: 10px 12px;
+  font-family: 'Outfit', sans-serif;
   font-size: 14px;
   font-weight: 500;
+  line-height: normal;
+  box-shadow: none;
   cursor: pointer;
-  transition: all 150ms ease;
   white-space: nowrap;
-}
-.segmented-toggle-btn:hover,
-.settings-subnav-btn:hover {
-  color: #344054;
 }
 
 /* Active button — weight stays 500 (matches TailAdmin Analytics card) */
