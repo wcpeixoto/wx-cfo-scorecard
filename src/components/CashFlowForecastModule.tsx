@@ -155,6 +155,7 @@ type CashFlowForecastModuleProps = {
   contracts?: RenewalContract[];
   onAddEvent?: (events: ForecastEvent[]) => void;
   onUpdateEvent?: (event: ForecastEvent) => void;
+  onReplaceGroup?: (groupId: string, events: ForecastEvent[]) => void;
   onDeleteEvent?: (groupId: string) => void;
   onToggleEvent?: (groupId: string, enabled: boolean) => void;
 };
@@ -412,6 +413,7 @@ export default function CashFlowForecastModule({
   contracts = [],
   onAddEvent,
   onUpdateEvent,
+  onReplaceGroup,
   onDeleteEvent,
   onToggleEvent,
 }: CashFlowForecastModuleProps) {
@@ -504,9 +506,12 @@ export default function CashFlowForecastModule({
     const cashInImpact = amount >= 0 ? amount : 0;
     const cashOutImpact = amount < 0 ? Math.abs(amount) : 0;
 
-    // Editing: delete old group + re-add with new parameters (works for all frequencies)
+    // Editing: replace the old group with the new occurrences in a single
+    // atomic state+persistence update. Two separate calls (delete + add)
+    // race in the persistence layer — each save's stale-row cleanup can
+    // land out-of-order and wipe freshly-upserted rows. onReplaceGroup
+    // does one setState and one save.
     if (editingGroupId !== null) {
-      onDeleteEvent?.(editingGroupId);
       const newGroupId =
         typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
           ? crypto.randomUUID()
@@ -525,7 +530,7 @@ export default function CashFlowForecastModule({
         cashOutImpact,
         enabled: true,
       }));
-      onAddEvent?.(editEvents);
+      onReplaceGroup?.(editingGroupId, editEvents);
       setEditingEventId(null);
       setEditingGroupId(null);
       setShowAddModal(false);
@@ -1119,7 +1124,7 @@ export default function CashFlowForecastModule({
           />
         </div>
 
-        <div className="forecast-control-stack" aria-label="What-if controls">
+        <div id="forecast-custom-controls" className="forecast-control-stack" aria-label="What-if controls">
           <div className="forecast-slider-grid forecast-slider-grid--main">
             <ForecastSliderControl
               label="Revenue Growth"
