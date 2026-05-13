@@ -1435,22 +1435,23 @@ body {
   display: inline-flex;
 }
 .scenario-dropdown-trigger {
-  display: inline-flex;
+  display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 10px 12px;
-  border: 1px solid #E4E7EC;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #D0D5DD;
   border-radius: 8px;
-  background: #FFFFFF;
+  background: transparent;
   color: #344054;
   font-family: 'Outfit', sans-serif;
   font-size: 14px;
   font-weight: 500;
+  line-height: 20px;
   cursor: pointer;
   white-space: nowrap;
-  min-width: 140px;
-  justify-content: space-between;
 }
 .scenario-dropdown-trigger:hover {
   background: #F9FAFB;
