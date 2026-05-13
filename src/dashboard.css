@@ -1384,10 +1384,11 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  width: 28px;
   height: 40px;
-  padding: 0;
+  padding: 0 8px 0 0;
   border: 1px solid #E4E7EC;
+  border-left: 0;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
   border-top-right-radius: 8px;
