@@ -3264,7 +3264,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 </button>
               </div>
               <div className="top-controls top-controls-timeframe">
-                <div className="scenario-dropdown" ref={scenarioMenuRef}>
+                <div className="action-dropdown" ref={scenarioMenuRef}>
                   {(() => {
                     const scenarioOptions = [
                       { key: 'base' as ForecastScenarioKey, label: 'Base Case' },
@@ -3278,20 +3278,20 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       <>
                         <button
                           type="button"
-                          className="scenario-dropdown-trigger"
+                          className="action-dropdown-trigger"
                           aria-haspopup="menu"
                           aria-expanded={scenarioMenuOpen}
                           aria-label={`Forecast scenario: ${selectedLabel}`}
                           onClick={() => setScenarioMenuOpen((c) => !c)}
                         >
-                          <span className="scenario-dropdown-label">{selectedLabel}</span>
+                          <span className="action-dropdown-label">{selectedLabel}</span>
                           <FiChevronDown
-                            className={`scenario-dropdown-caret${scenarioMenuOpen ? ' is-open' : ''}`}
+                            className={`action-dropdown-caret${scenarioMenuOpen ? ' is-open' : ''}`}
                             aria-hidden="true"
                           />
                         </button>
                         {scenarioMenuOpen && (
-                          <ul className="scenario-dropdown-menu" role="menu" aria-label="Forecast scenario">
+                          <ul className="action-dropdown-menu" role="menu" aria-label="Forecast scenario">
                             {scenarioOptions.map((option) => (
                               <li key={option.key}>
                                 <button

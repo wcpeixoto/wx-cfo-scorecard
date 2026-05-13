@@ -1310,9 +1310,9 @@ toggle exactly.
 
 **Reference implementation:** UI Lab `.statistics-card__tabs/__tab/__tab--active`
 ([src/dashboard.css](src/dashboard.css) `.statistics-card__tabs` rule block).
-Global consumers: Settings page (`#/settings`) Data / Accounts / Rules; Forecast horizon and
-scenario toggles; Trends timeframe; Contracts cadence; Net Cash Flow chart mode; Rules-row
-controls; Forecast Compare button (filter-button styling, same 40px height).
+Global consumers: Settings page (`#/settings`) Data / Accounts / Rules; Forecast horizon
+toggle; Trends timeframe; Contracts cadence; Net Cash Flow chart mode; Rules-row controls;
+Forecast Compare button (filter-button styling, same 40px height).
 
 ### Deprecated patterns
 
@@ -1320,7 +1320,74 @@ The following patterns exist in the codebase and are scheduled for replacement. 
 
 - **Chart-style blue pill** — e.g. Operating / Total toggle on Monthly Net Cash Flow.
 - **Outlined button-group toggle** — e.g. This Month / Last Month on Big Picture.
-- Any toggle that uses a different visual treatment from Scale 1 or Scale 2 above.
+- Any toggle that uses a different visual treatment from the canonical spec above.
+
+---
+
+## Action dropdown (standard pattern)
+
+A single compact dropdown trigger that opens a small menu — used for card- or page-header
+actions where a segmented toggle is too heavy (e.g. 4+ mutually-exclusive options that
+don't need to all be visible at rest).
+
+**Source spec:** TailAdmin June 2025 Total Balance card dropdown.
+**Reference implementation:** Forecast header scenario selector — `.action-dropdown`
+(see [src/dashboard.css](src/dashboard.css)).
+
+### When to use
+
+- Card- or page-header control with 3–8 mutually-exclusive options where only the
+  selected one needs to be visible at rest.
+- Replacing a segmented toggle that has grown crowded or is competing visually with the
+  card title.
+
+### When not to use
+
+- 2–4 always-visible options where comparison matters at a glance → use the segmented
+  toggle (above).
+- More than ~8 options or hierarchical menus → use a full dialog or sidebar nav.
+- Single on/off → use a Switch.
+
+### Trigger spec
+
+| Element | Token | Value |
+|---------|-------|-------|
+| Height | `h-9` | 36px |
+| Padding | `px-2.5` | 0px vertical, 10px horizontal |
+| Gap (label ↔ chevron) | `gap-1.5` | 6px |
+| Border | `border border-gray-300` | 1px solid #D0D5DD |
+| Border radius | `rounded-lg` | 8px |
+| Background | none | transparent (light mode) |
+| Text color | `text-gray-700` | #344054 |
+| Font family / size / weight | Outfit | 14px / 500 |
+| Line height | — | 20px |
+| Layout | `flex items-center justify-center` | row, centered |
+| Chevron icon | `FiChevronDown` (or equivalent) | 16px, #667085, rotates 180° when open |
+| Min width | none | auto-sized to content |
+| Hover / open state | optional soft-gray fill | #F9FAFB (subtle, light-mode only) |
+
+### Menu spec
+
+| Element | Value |
+|---------|-------|
+| Anchor | absolute, `top: calc(100% + 6px)`, `right: 0` |
+| Background | #FFFFFF |
+| Border | 1px solid #E4E7EC |
+| Border radius | 8px |
+| Shadow | `0 4px 16px rgba(16, 24, 40, .08)` |
+| Padding | 4px |
+| z-index | 200 |
+| Row | 8px×12px padding, 6px radius, Outfit 14/500, color #344054 |
+| Row hover | bg #F2F4F7, color #101828 |
+| Row active (current selection) | bg #F2F4F7, color #101828 |
+
+### Behavior
+
+- Click trigger toggles the menu open/closed.
+- Click a row: applies the selection and closes the menu.
+- Outside-click closes the menu.
+- Escape closes the menu.
+- Mobile (`<768px`): trigger fills row width.
 
 ---
 
