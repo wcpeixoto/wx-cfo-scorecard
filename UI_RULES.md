@@ -391,6 +391,52 @@ Shadows appear on specific interactive surfaces only.
 
 ---
 
+## Button height taxonomy (canonical — three sizes only)
+
+**Sourced from** TailAdmin demo dashboards: `demo.tailadmin.com/sales`,
+`demo.tailadmin.com/finance`, and `demo.tailadmin.com/ai`. Verified via
+DevTools computed-style inspection across all visible buttons on those pages.
+
+There are **three approved button heights** in this design system. No
+other heights are allowed for new buttons. Pick the role first, then the
+height follows.
+
+| Height | Role | When to use | TailAdmin reference examples |
+|---|---|---|---|
+| **44px** | Primary action | High-priority, full-weight actions at the top level of a page or card. Page-header actions and card-level primary CTAs. | `Filter` / `Export` (Sales page header); `Transfer` / `Received` (Finance Total Balance card); sidebar/notification/dark-mode header icons |
+| **40px** | Secondary card-level | Supporting actions inside a card — filtering, toggling views, navigating between segments. Sits beside or below a primary action. | `Daily` / `Weekly` / `Monthly` (Users & Revenue Statistics); `Filter` / `See All` (Top Products); `Monthly` / `Quarterly` / `Annually` (AI dashboard chart); `Send Money` / `Filter` (Finance page) |
+| **36px** | Compact selector / dropdown | Space-constrained filter, scope, or configuration controls placed next to a card title. Typically a dropdown trigger. | `USD` / `June 2025` (Total Balance header); `2025` / `3 Month` (Cashflow Overview header); `Add Card` (My Cards) |
+
+### Rules
+
+- **Three sizes, no others.** If a new button would need 38px / 42px / 48px
+  to "fit," redesign the layout — don't invent a fourth size.
+- **Border color follows the action-dropdown trigger spec** (`#D0D5DD`,
+  see Part 6) regardless of which of the three heights is used. `#E4E7EC`
+  is for card / menu / input borders, not trigger buttons.
+- **Border radius is always 8px** for all three sizes.
+- **Icon-only buttons** at 44px are square (44×44); at 40px are square
+  (40×40). 36px icon-only buttons are reserved for dropdown carets within
+  split buttons.
+
+### Required AI behavior — ask before creating a button
+
+When the user asks for a new button to be created (any of: page header
+action, card action, dropdown trigger, segmented toggle option, icon
+button), the assistant **must**:
+
+1. Suggest the best-fit size based on the role table above, with a one-
+   sentence justification ("Sits in the page header next to other primary
+   actions → 44px").
+2. **Ask the user to confirm** which of the three heights — **44px**,
+   **40px**, or **36px** — to use before writing any CSS or JSX.
+3. Only proceed once the user has confirmed.
+
+This applies even when the answer seems obvious. The taxonomy is a hard
+rule; the confirmation step is what keeps it from drifting.
+
+---
+
 # PART 2 — SHELL LAYOUT
 
 ---
