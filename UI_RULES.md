@@ -1637,14 +1637,16 @@ Use this pattern when the table is the primary content of its card — header, r
 
 ### Table header band
 
-- No background fill — visual separation comes from top and bottom borders only
+- Background fill: `#F9FAFB` (Tailwind `gray-50`) — bookends the table with the total row, which uses the same fill
 - Header cells:
   - `padding: 12px 16px`
-  - `font-size: 12px`
-  - `font-weight: 500`
-  - `color: var(--text-secondary)` / `#667085`
+  - `font-size: 14px`
+  - `font-weight: 600`
+  - `color: var(--text-primary)` / `#101828`
+  - `white-space: nowrap`
   - `text-transform: none`, `letter-spacing: normal` (title-case, not uppercase)
   - `border-top: 1px solid var(--bg-muted)` and `border-bottom: 1px solid var(--bg-muted)`
+- Header label padding matches body cell padding (`12px 16px`) so titles sit flush-left over their column data
 
 ### Body cells
 
@@ -1654,7 +1656,7 @@ Use this pattern when the table is the primary content of its card — header, r
 
 ### Total row
 
-- Background: `var(--bg-main)` — subtle fill distinguishes the totals row from body rows
+- Background: `#F9FAFB` (Tailwind `gray-50`) — same fill as the header band so the table is bookended top and bottom
 - Top divider: `border-top: 1px solid var(--line)` (slightly heavier than the `--bg-muted` body dividers — anchors the row visually)
 - Cell borders: `border-top: none; border-bottom: none` on tfoot cells so the row reads as a single band
 - `font-weight: 600`
