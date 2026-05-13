@@ -4,11 +4,12 @@
  * Consumes WhatNeedsAttentionResult from computeWhatNeedsAttention.
  * Visual design: refined category labels, vivid sparklines, inline ⓘ tooltip.
  *
- * Interaction model: the card is non-interactive except for the ⓘ icon
- * which toggles an explanatory tooltip. No row or title click handlers.
+ * Interaction model: the card is non-interactive except for the ⓘ icon,
+ * which reveals an explanatory tooltip on hover/focus via the shared
+ * .db-tooltip-* pattern. No row or title click handlers.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useId } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type {
@@ -56,40 +57,76 @@ function formatRatioPct(ratio: number): string {
   return `${Math.round(ratio * 100)}%`;
 }
 
-function buildTooltip(row: WhatNeedsAttentionRow): string {
-  if (row.bucket === 'fixed') {
-    return (
-      `${row.categoryName} typically runs ~${formatCompact(row.baselineAvgSpend)}/mo. ` +
-      `This month came in ${formatCompact(row.delta)} higher.`
-    );
-  }
+type TooltipContent = { typicalLabel: string; typicalBody: string; thisMonthBody: string };
+
+function CostSpikeRow({ row, isMiddle }: { row: WhatNeedsAttentionRow; isMiddle: boolean }) {
+  const tooltipId = useId();
+  const headline = formatSignedCompact(row.delta);
+  const detail =
+    `${formatCompact(row.currentSpend)} this month vs ${formatCompact(row.expectedSpend)} expected`;
+  const tip = buildTooltip(row);
+
   return (
-    `${row.categoryName} typically runs at ${formatRatioPct(row.baselineRatio)} of revenue. ` +
-    `Based on this month's revenue, ~${formatCompact(row.expectedSpend)} would be expected. ` +
-    `You spent ${formatCompact(row.currentSpend)}.`
+    <div className={`wna-row${isMiddle ? ' wna-row--middle' : ''}`}>
+      <div className="wna-row-left">
+        <div className="wna-label-row">
+          <span className="wna-category wna-category--refined">{row.categoryName}</span>
+        </div>
+        <div className="wna-headline">{headline}</div>
+        <div className="wna-detail wna-detail--sm">
+          {detail}
+          <span className="wna-info-wrap db-tooltip-wrap">
+            <button
+              type="button"
+              className="db-tooltip-btn"
+              aria-label={`Explain ${row.categoryName}`}
+              aria-describedby={tooltipId}
+            >&#9432;</button>
+            <div id={tooltipId} role="tooltip" className="db-tooltip-panel trend-tooltip-panel">
+              <ul className="db-tooltip-list">
+                <li><strong>{tip.typicalLabel}</strong></li>
+                <li className="db-tooltip-body">{tip.typicalBody}</li>
+                <li><strong>This month</strong></li>
+                <li className="db-tooltip-body">{tip.thisMonthBody}</li>
+              </ul>
+            </div>
+          </span>
+        </div>
+      </div>
+      <div className="wna-spark">
+        <ReactApexChart
+          type="area"
+          series={[{ data: row.sparklineData }]}
+          options={SPARK_OPTIONS}
+          width={180}
+          height={56}
+        />
+      </div>
+    </div>
   );
 }
 
+function buildTooltip(row: WhatNeedsAttentionRow): TooltipContent {
+  if (row.bucket === 'fixed') {
+    return {
+      typicalLabel: 'Typical spend',
+      typicalBody: `~${formatCompact(row.baselineAvgSpend)}/mo across the last 6 months.`,
+      thisMonthBody: `${formatCompact(row.delta)} higher than typical.`,
+    };
+  }
+  return {
+    typicalLabel: 'Typical ratio',
+    typicalBody: `${formatRatioPct(row.baselineRatio)} of revenue (6-month baseline).`,
+    thisMonthBody: `${formatCompact(row.currentSpend)} spent vs ~${formatCompact(row.expectedSpend)} expected based on this month's revenue.`,
+  };
+}
+
 export default function DigHereHighlights({ result }: Props) {
-  const [openTooltip, setOpenTooltip] = useState<string | null>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!openTooltip) return;
-    function handleOutside(e: MouseEvent) {
-      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
-        setOpenTooltip(null);
-      }
-    }
-    document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
-  }, [openTooltip]);
-
   const rows = result.rows.slice(0, MAX_ROWS);
   const subtitle = result.currentMonth ? `${result.currentMonth} · vs your 6-month baseline` : '';
 
   return (
-    <div className="wna-card" ref={cardRef}>
+    <div className="wna-card">
 
       {/* ── Header (stacked) ───────────────────────────────────────────── */}
       <div className="wna-header wna-header--stacked">
@@ -107,65 +144,13 @@ export default function DigHereHighlights({ result }: Props) {
           No cost spikes this month. Spending is in line with your 6-month baseline.
         </div>
       ) : (
-        rows.map((row, i) => {
-          const headline = formatSignedCompact(row.delta);
-          const detail =
-            `${formatCompact(row.currentSpend)} this month vs ` +
-            `${formatCompact(row.expectedSpend)} expected`;
-          const isMiddle = i === 1 && rows.length >= 3;
-          const tooltip = buildTooltip(row);
-
-          return (
-            <div
-              key={row.categoryName}
-              className={`wna-row${isMiddle ? ' wna-row--middle' : ''}`}
-            >
-              <div className="wna-row-left">
-
-                <div className="wna-label-row">
-                  <span className="wna-category wna-category--refined">
-                    {row.categoryName}
-                  </span>
-                </div>
-
-                <div className="wna-headline">{headline}</div>
-
-                <div className="wna-detail wna-detail--sm">
-                  {detail}
-                  <span className="wna-info-wrap">
-                    <button
-                      type="button"
-                      className="wna-info-btn"
-                      aria-label={`Explain ${row.categoryName}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenTooltip(
-                          openTooltip === row.categoryName ? null : row.categoryName
-                        );
-                      }}
-                    >ⓘ</button>
-                    {openTooltip === row.categoryName && (
-                      <div className="explain-tooltip" role="tooltip">
-                        {tooltip}
-                      </div>
-                    )}
-                  </span>
-                </div>
-
-              </div>
-
-              <div className="wna-spark">
-                <ReactApexChart
-                  type="area"
-                  series={[{ data: row.sparklineData }]}
-                  options={SPARK_OPTIONS}
-                  width={180}
-                  height={56}
-                />
-              </div>
-            </div>
-          );
-        })
+        rows.map((row, i) => (
+          <CostSpikeRow
+            key={row.categoryName}
+            row={row}
+            isMiddle={i === 1 && rows.length >= 3}
+          />
+        ))
       )}
 
     </div>

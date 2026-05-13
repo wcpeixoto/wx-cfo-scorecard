@@ -1142,7 +1142,6 @@ export default function CashFlowForecastModule({
 
         <div className="forecast-events-section">
           <div className="forecast-events-header">
-            <h4 className="forecast-events-title">Known Events</h4>
             <button type="button" className="forecast-event-add-btn" onClick={openAddModal}>
               + Add Cash Event
             </button>
