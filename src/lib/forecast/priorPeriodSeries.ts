@@ -21,20 +21,28 @@ export type PriorPeriodInput = {
   /** Cash balance at the start of the prior period (= end of the month before
    *  priorMonths[0]). Caller seeds the cumulative running balance with this. */
   startingBalance: number;
+  /** Resolved YYYY-MM list of prior months actually used, in forecast order.
+   *  Caller uses this to label the overlay range, so the comparison data and
+   *  the visible subtitle cannot drift apart. */
+  priorMonths: string[];
 };
 
 /**
  * Build the prior-period inputs aligned 1:1 to the forecast horizon.
  *
- * Comparison rule (hybrid: momentum for short horizons, seasonality for long):
- *   prior = same length as forecast, shifted backward by the forecast's own
- *   length, fully historical. The two framings collapse to one math: a 1-month
- *   forecast compares to the immediately preceding month; a 12-month forecast
- *   compares to the equivalent calendar year; a 24-month forecast compares to
- *   the equivalent 24-month calendar span. Coverage must be complete — we
- *   never render a line that drops off mid-chart, and we never shift backward
- *   by a fixed year offset that would push the prior window into months that
- *   haven't happened yet.
+ * Comparison rule (same-period prior year):
+ *   shift = -12 * ceil(horizon / 12). The prior window is the same calendar
+ *   months as the forecast, pulled from the most recent fully-historical
+ *   year. Sub-year horizons (1/2/3/6 months) compare to the same months one
+ *   year ago; whole-year horizons (12/24/36 months) compare to the matching
+ *   1/2/3-year span ending just before today, which preserves the previous
+ *   behavior for those ranges.
+ *
+ * Coverage must be complete — we never render a line that drops off mid-chart,
+ * and we never shift backward by an offset that would push the prior window
+ * into months that haven't happened yet. Short horizons without ≥1 full prior
+ * year of history degrade to "Compare unavailable" rather than fall back to
+ * an adjacent-period (momentum) overlay.
  *
  * Returns net-change series + starting balance rather than an accumulated
  * balance series, so the caller can apply the same monthly-or-weekly
@@ -47,7 +55,7 @@ export function buildPriorPeriodSeries(
 ): PriorPeriodInput | null {
   if (monthlyRollups.length === 0 || forecastMonths.length === 0) return null;
 
-  const offset = -forecastMonths.length;
+  const offset = -12 * Math.ceil(forecastMonths.length / 12);
   const priorMonths: string[] = [];
   for (const m of forecastMonths) {
     const prior = shiftMonthByMonths(m, offset);
@@ -107,5 +115,5 @@ export function buildPriorPeriodSeries(
     });
   }
 
-  return { netSeries, startingBalance };
+  return { netSeries, startingBalance, priorMonths };
 }

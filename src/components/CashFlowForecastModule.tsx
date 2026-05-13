@@ -13,7 +13,7 @@ import type {
   TrendPoint,
 } from '../lib/data/contract';
 import { toMonthLabel } from '../lib/kpis/compute';
-import { buildPriorPeriodSeries, shiftMonthByMonths } from '../lib/forecast/priorPeriodSeries';
+import { buildPriorPeriodSeries } from '../lib/forecast/priorPeriodSeries';
 
 type SelectOption = { value: string; label: string; months: number };
 
@@ -657,16 +657,13 @@ export default function CashFlowForecastModule({
   const monthlyRangeLabel = data.length > 0 ? `${toMonthLabel(data[0].month)} – ${toMonthLabel(data[data.length - 1].month)}` : '';
   const priorPeriodRangeLabel = useMemo(() => {
     if (!priorPeriodInput) return '';
-    const offset = -data.length;
-    const first = data[0]?.month;
-    const last = data[data.length - 1]?.month;
-    if (!first || !last) return '';
-    const priorFirst = shiftMonthByMonths(first, offset);
-    const priorLast = shiftMonthByMonths(last, offset);
-    if (!priorFirst || !priorLast) return '';
+    const { priorMonths } = priorPeriodInput;
+    if (priorMonths.length === 0) return '';
+    const priorFirst = priorMonths[0];
+    const priorLast = priorMonths[priorMonths.length - 1];
     if (priorFirst === priorLast) return toMonthLabel(priorFirst);
     return `${toMonthLabel(priorFirst)} – ${toMonthLabel(priorLast)}`;
-  }, [data, priorPeriodInput]);
+  }, [priorPeriodInput]);
   const displaySeries = granularity === 'week' ? weeklyCumulativeSeries : cumulativeSeries;
   const priorDisplaySeries = granularity === 'week' ? priorWeeklyCumulative : priorMonthlyCumulative;
   const reserveBreached = !!decisionSignals.reserveBreachMonth;
@@ -1019,8 +1016,7 @@ export default function CashFlowForecastModule({
                         <li><strong>How this forecast works</strong></li>
                         <li className="cashflow-tooltip-body">A directional view of where your cash is heading, based on recent activity and seasonal patterns &mdash; adjust the sliders to test scenarios.</li>
                         <li><strong>Comparison mode</strong></li>
-                        <li className="cashflow-tooltip-body">Short ranges compare momentum.</li>
-                        <li className="cashflow-tooltip-body">Long ranges compare seasonality.</li>
+                        <li className="cashflow-tooltip-body">Past Data compares the projection to the same period from prior-year history.</li>
                       </ul>
                     </div>
                   </div>
