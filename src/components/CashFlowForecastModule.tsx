@@ -1039,63 +1039,6 @@ export default function CashFlowForecastModule({
               </div>
               <div className="projected-cash-timeline">
                 <div className="projected-cash-timeline-row">
-                <div className="action-dropdown" ref={scenarioMenuRef}>
-                  {(() => {
-                    const scenarioOptions = [
-                      { key: 'base' as ForecastScenarioKey, label: 'Base Case' },
-                      { key: 'best' as ForecastScenarioKey, label: 'Best Case' },
-                      { key: 'worst' as ForecastScenarioKey, label: 'Worst Case' },
-                      { key: 'custom' as ForecastScenarioKey, label: 'Custom Case' },
-                    ] as const;
-                    const selectedLabel =
-                      scenarioOptions.find((o) => o.key === scenarioKey)?.label ?? 'Base Case';
-                    return (
-                      <>
-                        <button
-                          type="button"
-                          className="action-dropdown-trigger"
-                          aria-haspopup="menu"
-                          aria-expanded={scenarioMenuOpen}
-                          aria-label={`Forecast scenario: ${selectedLabel}`}
-                          onClick={() => setScenarioMenuOpen((c) => !c)}
-                        >
-                          <span className="action-dropdown-label">{selectedLabel}</span>
-                          <FiChevronDown
-                            className={`action-dropdown-caret${scenarioMenuOpen ? ' is-open' : ''}`}
-                            aria-hidden="true"
-                          />
-                        </button>
-                        {scenarioMenuOpen && (
-                          <ul className="action-dropdown-menu" role="menu" aria-label="Forecast scenario">
-                            {scenarioOptions.map((option) => (
-                              <li key={option.key}>
-                                <button
-                                  type="button"
-                                  role="menuitemradio"
-                                  aria-checked={scenarioKey === option.key}
-                                  className={scenarioKey === option.key ? 'is-active' : ''}
-                                  onClick={() => {
-                                    onScenarioChange(option.key);
-                                    setScenarioMenuOpen(false);
-                                    if (option.key === 'custom') {
-                                      setTimeout(() => {
-                                        document
-                                          .getElementById('forecast-custom-controls')
-                                          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                      }, 50);
-                                    }
-                                  }}
-                                >
-                                  {option.label}
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
                 <div
                   className="segmented-toggle"
                   role="radiogroup"
@@ -1154,6 +1097,63 @@ export default function CashFlowForecastModule({
                       </ul>
                     )}
                   </div>
+                </div>
+                <div className="action-dropdown" ref={scenarioMenuRef}>
+                  {(() => {
+                    const scenarioOptions = [
+                      { key: 'base' as ForecastScenarioKey, label: 'Base Case' },
+                      { key: 'best' as ForecastScenarioKey, label: 'Best Case' },
+                      { key: 'worst' as ForecastScenarioKey, label: 'Worst Case' },
+                      { key: 'custom' as ForecastScenarioKey, label: 'Custom Case' },
+                    ] as const;
+                    const selectedLabel =
+                      scenarioOptions.find((o) => o.key === scenarioKey)?.label ?? 'Base Case';
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          className="action-dropdown-trigger"
+                          aria-haspopup="menu"
+                          aria-expanded={scenarioMenuOpen}
+                          aria-label={`Forecast scenario: ${selectedLabel}`}
+                          onClick={() => setScenarioMenuOpen((c) => !c)}
+                        >
+                          <span className="action-dropdown-label">{selectedLabel}</span>
+                          <FiChevronDown
+                            className={`action-dropdown-caret${scenarioMenuOpen ? ' is-open' : ''}`}
+                            aria-hidden="true"
+                          />
+                        </button>
+                        {scenarioMenuOpen && (
+                          <ul className="action-dropdown-menu" role="menu" aria-label="Forecast scenario">
+                            {scenarioOptions.map((option) => (
+                              <li key={option.key}>
+                                <button
+                                  type="button"
+                                  role="menuitemradio"
+                                  aria-checked={scenarioKey === option.key}
+                                  className={scenarioKey === option.key ? 'is-active' : ''}
+                                  onClick={() => {
+                                    onScenarioChange(option.key);
+                                    setScenarioMenuOpen(false);
+                                    if (option.key === 'custom') {
+                                      setTimeout(() => {
+                                        document
+                                          .getElementById('forecast-custom-controls')
+                                          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                      }, 50);
+                                    }
+                                  }}
+                                >
+                                  {option.label}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <button
                   type="button"

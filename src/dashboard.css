@@ -1382,6 +1382,14 @@ body {
   gap: 8px;
 }
 
+/* In the Projected Cash Balance control cluster the action-dropdown sits
+   beside the 40h segmented toggle inner button and the 40h Compare pill,
+   so we override the canonical 36h trigger height to keep all three
+   controls aligned. Canonical 36h still applies elsewhere. */
+.projected-cash-timeline-row .action-dropdown-trigger {
+  height: 40px;
+}
+
 /* Compare-with-prior-period toggle. TailAdmin filter-button style: white
    surface, gray-200 border, 40px tall to match the segmented-toggle inner
    button. Active state inverts to the brand fill, mirroring the prior-period
@@ -1397,8 +1405,10 @@ body {
   border-radius: 8px;
   background: #FFFFFF;
   color: #344054;
+  font-family: 'Outfit', sans-serif;
   font-size: 14px;
   font-weight: 500;
+  line-height: 20px;
   cursor: pointer;
   transition: all 150ms ease;
   white-space: nowrap;
