@@ -340,7 +340,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       </div>
       {actualYears.length > 0 && (
         <div className="owner-dist-footer">
-          <div className="period-dropdown" ref={dropdownRef}>
+          <div className="action-dropdown" ref={dropdownRef}>
             <button
               className="owner-dist-forecast-action"
               onClick={() => setIsDropdownOpen(prev => !prev)}
@@ -348,7 +348,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
               Compare {currentYear} to a past year
             </button>
             {isDropdownOpen && (
-              <ul className="period-dropdown-menu">
+              <ul className="action-dropdown-menu">
                 {actualYears.map(year => (
                   <li key={year}>
                     <button onClick={() => handleYearSelect(year)}>{year}</button>

@@ -161,25 +161,47 @@ const DEFAULT_CUSTOM_SCENARIO: ScenarioInput = {
   ...DEFAULT_SCENARIO,
   scenarioKey: 'custom',
 };
-const FORECAST_SCENARIO_PRESETS: Record<Exclude<ForecastScenarioKey, 'custom'>, ScenarioInput> = {
-  base: DEFAULT_SCENARIO,
-  best: {
-    scenarioKey: 'best',
-    revenueGrowthPct: 4,
-    expenseChangePct: -3,
-    receivableDays: 3,
-    payableDays: 3,
-    months: 12,
-  },
-  worst: {
-    scenarioKey: 'worst',
-    revenueGrowthPct: -5,
-    expenseChangePct: 4,
-    receivableDays: 3,
-    payableDays: 3,
-    months: 12,
-  },
-};
+// Presets derive their revenue/expense % from editable workspace settings
+// (Settings → Rules → Forecast Scenario Assumptions). Other slider fields
+// remain canonical defaults shared across scenarios.
+function getForecastScenarioPresets(
+  settings: Pick<
+    BusinessRules,
+    | 'scenarioBaseRevenueGrowthPct'
+    | 'scenarioBaseExpenseChangePct'
+    | 'scenarioBestRevenueGrowthPct'
+    | 'scenarioBestExpenseChangePct'
+    | 'scenarioWorstRevenueGrowthPct'
+    | 'scenarioWorstExpenseChangePct'
+  >
+): Record<Exclude<ForecastScenarioKey, 'custom'>, ScenarioInput> {
+  return {
+    base: {
+      scenarioKey: 'base',
+      revenueGrowthPct: settings.scenarioBaseRevenueGrowthPct,
+      expenseChangePct: settings.scenarioBaseExpenseChangePct,
+      receivableDays: 3,
+      payableDays: 3,
+      months: 12,
+    },
+    best: {
+      scenarioKey: 'best',
+      revenueGrowthPct: settings.scenarioBestRevenueGrowthPct,
+      expenseChangePct: settings.scenarioBestExpenseChangePct,
+      receivableDays: 3,
+      payableDays: 3,
+      months: 12,
+    },
+    worst: {
+      scenarioKey: 'worst',
+      revenueGrowthPct: settings.scenarioWorstRevenueGrowthPct,
+      expenseChangePct: settings.scenarioWorstExpenseChangePct,
+      receivableDays: 3,
+      payableDays: 3,
+      months: 12,
+    },
+  };
+}
 const BIG_PICTURE_FRAME_OPTIONS: KpiFrameOption[] = [
   { value: 'thisMonth', label: 'This Month' },
   { value: 'lastMonth', label: 'Last Month' },
@@ -812,15 +834,26 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [sharedAccountSettingsReady, setSharedAccountSettingsReady] = useState(!sharedPersistenceEnabled);
   const [sharedAccountSettingsHasRemoteData, setSharedAccountSettingsHasRemoteData] = useState(false);
   const [businessRules, setBusinessRules] = useState<BusinessRules>(() => ({ ...DEFAULT_BUSINESS_RULES }));
+  const forecastScenarioPresets = useMemo(
+    () => getForecastScenarioPresets(businessRules),
+    [
+      businessRules.scenarioBaseRevenueGrowthPct,
+      businessRules.scenarioBaseExpenseChangePct,
+      businessRules.scenarioBestRevenueGrowthPct,
+      businessRules.scenarioBestExpenseChangePct,
+      businessRules.scenarioWorstRevenueGrowthPct,
+      businessRules.scenarioWorstExpenseChangePct,
+    ]
+  );
   const scenarioInput = useMemo(
-    () => (selectedScenarioKey === 'custom' ? customScenarioInput : FORECAST_SCENARIO_PRESETS[selectedScenarioKey]),
-    [customScenarioInput, selectedScenarioKey]
+    () => (selectedScenarioKey === 'custom' ? customScenarioInput : forecastScenarioPresets[selectedScenarioKey]),
+    [customScenarioInput, selectedScenarioKey, forecastScenarioPresets]
   );
 
   const updateCustomScenario = useCallback(
     (patch: Partial<ScenarioInput>) => {
       const baseScenario =
-        selectedScenarioKey === 'custom' ? customScenarioInput : { ...FORECAST_SCENARIO_PRESETS[selectedScenarioKey], scenarioKey: 'custom' as const };
+        selectedScenarioKey === 'custom' ? customScenarioInput : { ...forecastScenarioPresets[selectedScenarioKey], scenarioKey: 'custom' as const };
       const nextCustomScenario: ScenarioInput = {
         ...baseScenario,
         ...patch,
@@ -829,7 +862,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
       setCustomScenarioInput(nextCustomScenario);
       setSelectedScenarioKey('custom');
     },
-    [customScenarioInput, selectedScenarioKey]
+    [customScenarioInput, selectedScenarioKey, forecastScenarioPresets]
   );
 
   const updateBusinessRules = useCallback((patch: Partial<BusinessRules>) => {
@@ -3311,7 +3344,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 <div className="projection-table-actions">
                   <div className="projection-table-compare-wrap">
                     <span className="projection-table-compare-label">Compare</span>
-                    <div className="projection-compare-toggle" role="group" aria-label="Compare years">
+                    <div className="segmented-toggle projection-compare-toggle" role="group" aria-label="Compare years">
                       {/* Phase 4.11: when compareYear URL param is present on load,
                           use it as the active comparison year for this session only.
                           If the year is outside the default 3, temporarily use it as
@@ -3324,7 +3357,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                             key={year}
                             type="button"
                             aria-pressed={isActive}
-                            className={`projection-compare-toggle-option${isActive ? ' is-active' : ''}`}
+                            className={`segmented-toggle-btn${isActive ? ' is-active' : ''}`}
                             onClick={() =>
                               setProjectionActiveYears((prev) =>
                                 isActive ? prev.filter((y) => y !== year) : [...prev, year]
@@ -4268,6 +4301,90 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                           </div>
                         </div>
 
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="ta-card">
+                    <div className="ta-card-header">
+                      <h3 className="ta-card-title">Forecast Scenario Assumptions</h3>
+                    </div>
+                    <div className="ta-card-body">
+                      <div className="rules-list">
+                        {([
+                          {
+                            key: 'best' as const,
+                            label: 'Best Case',
+                            sub: 'Revenue growth and expense change used by the Best Case scenario',
+                            revKey: 'scenarioBestRevenueGrowthPct' as const,
+                            expKey: 'scenarioBestExpenseChangePct' as const,
+                          },
+                          {
+                            key: 'base' as const,
+                            label: 'Base Case',
+                            sub: 'Revenue growth and expense change used by the Base Case scenario',
+                            revKey: 'scenarioBaseRevenueGrowthPct' as const,
+                            expKey: 'scenarioBaseExpenseChangePct' as const,
+                          },
+                          {
+                            key: 'worst' as const,
+                            label: 'Worst Case',
+                            sub: 'Revenue growth and expense change used by the Worst Case scenario',
+                            revKey: 'scenarioWorstRevenueGrowthPct' as const,
+                            expKey: 'scenarioWorstExpenseChangePct' as const,
+                          },
+                        ]).map((row) => (
+                          <div className="rules-row" key={row.key}>
+                            <div className="rules-row-info">
+                              <span className="rules-row-label">{row.label}</span>
+                              <span className="rules-row-sub">{row.sub}</span>
+                            </div>
+                            <div className="rules-row-control rules-row-control--scenario">
+                              <label className="rules-pct-field">
+                                <span className="rules-pct-field-label">Revenue</span>
+                                <div className="rules-pct-input-wrap">
+                                  <input
+                                    className="rules-pct-input"
+                                    type="number"
+                                    min="-100"
+                                    max="100"
+                                    step="1"
+                                    aria-label={`${row.label} revenue growth percentage`}
+                                    value={Math.round(businessRules[row.revKey])}
+                                    onChange={(event) => {
+                                      const raw = Number.parseFloat(event.target.value);
+                                      if (Number.isFinite(raw) && raw >= -100 && raw <= 100) {
+                                        updateBusinessRules({ [row.revKey]: raw } as Partial<BusinessRules>);
+                                      }
+                                    }}
+                                  />
+                                  <span className="rules-pct-suffix">%</span>
+                                </div>
+                              </label>
+                              <label className="rules-pct-field">
+                                <span className="rules-pct-field-label">Expenses</span>
+                                <div className="rules-pct-input-wrap">
+                                  <input
+                                    className="rules-pct-input"
+                                    type="number"
+                                    min="-100"
+                                    max="100"
+                                    step="1"
+                                    aria-label={`${row.label} expense change percentage`}
+                                    value={Math.round(businessRules[row.expKey])}
+                                    onChange={(event) => {
+                                      const raw = Number.parseFloat(event.target.value);
+                                      if (Number.isFinite(raw) && raw >= -100 && raw <= 100) {
+                                        updateBusinessRules({ [row.expKey]: raw } as Partial<BusinessRules>);
+                                      }
+                                    }}
+                                  />
+                                  <span className="rules-pct-suffix">%</span>
+                                </div>
+                              </label>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>

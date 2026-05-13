@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { FiChevronDown } from 'react-icons/fi';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import { toMonthLabel } from '../lib/kpis/compute';
@@ -334,18 +335,23 @@ export default function NetCashFlowChart({
         </div>
         <div className="chart-head-right">
           <div className="chart-control-row">
-            <div className="timeframe-menu" ref={menuRef}>
+            <div className="action-dropdown" ref={menuRef}>
               <button
                 type="button"
-                className="timeframe-trigger"
+                className="action-dropdown-trigger"
                 onClick={() => setMenuOpen((c) => !c)}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
+                aria-label={`Timeframe: ${timeframeLabel(timeframe)}`}
               >
-                {timeframeLabel(timeframe)} &#9662;
+                <span className="action-dropdown-label">{timeframeLabel(timeframe)}</span>
+                <FiChevronDown
+                  className={`action-dropdown-caret${menuOpen ? ' is-open' : ''}`}
+                  aria-hidden="true"
+                />
               </button>
               {menuOpen && (
-                <ul className="timeframe-list" role="menu" aria-label="Select timeframe">
+                <ul className="action-dropdown-menu" role="menu" aria-label="Select timeframe">
                   {TIMEFRAME_OPTIONS.map((option) => (
                     <li key={option.label}>
                       <button
