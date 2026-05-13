@@ -1685,8 +1685,8 @@ body {
 }
 
 .forecast-decision-value {
-  font-size: 32px;
-  font-weight: 700;
+  font-size: 30px;
+  font-weight: 600;
   color: #101828;
 }
 
@@ -5473,8 +5473,8 @@ body {
 
 .ui-lab-title {
   margin: 0;
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 600;
   color: #101828;
 }
 
@@ -7125,8 +7125,8 @@ body {
 
 .today-constraints-value {
   margin: 0;
-  font-size: 32px;
-  font-weight: 700;
+  font-size: 30px;
+  font-weight: 600;
   color: #101828;
   line-height: 1.15;
 }
@@ -7706,7 +7706,7 @@ body {
 
 /* Line 2 — headline (red signal) */
 .wna-headline {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 600;
   color: #D92D20;
   margin-bottom: 4px;
