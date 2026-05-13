@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { FiBarChart2, FiCheck, FiSlash } from 'react-icons/fi';
+import { FiBarChart2, FiCheck, FiChevronDown, FiSlash } from 'react-icons/fi';
 import ProjectedCashBalanceChart from './ProjectedCashBalanceChart';
 import type {
   CashFlowForecastStatus,
@@ -432,6 +432,8 @@ export default function CashFlowForecastModule({
   // segmented control stays compact while preserving every option.
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  const [scenarioMenuOpen, setScenarioMenuOpen] = useState(false);
+  const scenarioMenuRef = useRef<HTMLDivElement>(null);
 
   // Add Event modal state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -572,6 +574,17 @@ export default function CashFlowForecastModule({
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [moreMenuOpen]);
+
+  useEffect(() => {
+    if (!scenarioMenuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (scenarioMenuRef.current && !scenarioMenuRef.current.contains(e.target as Node)) {
+        setScenarioMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [scenarioMenuOpen]);
 
   const granularity: 'month' | 'week' = forecastRangeMonths < 6 ? 'week' : 'month';
   const startingCashBalance = Number.isFinite(currentCashBalance) ? currentCashBalance : 0;
@@ -1084,6 +1097,63 @@ export default function CashFlowForecastModule({
                       </ul>
                     )}
                   </div>
+                </div>
+                <div className="action-dropdown" ref={scenarioMenuRef}>
+                  {(() => {
+                    const scenarioOptions = [
+                      { key: 'base' as ForecastScenarioKey, label: 'Base Case' },
+                      { key: 'best' as ForecastScenarioKey, label: 'Best Case' },
+                      { key: 'worst' as ForecastScenarioKey, label: 'Worst Case' },
+                      { key: 'custom' as ForecastScenarioKey, label: 'Custom Case' },
+                    ] as const;
+                    const selectedLabel =
+                      scenarioOptions.find((o) => o.key === scenarioKey)?.label ?? 'Base Case';
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          className="action-dropdown-trigger"
+                          aria-haspopup="menu"
+                          aria-expanded={scenarioMenuOpen}
+                          aria-label={`Forecast scenario: ${selectedLabel}`}
+                          onClick={() => setScenarioMenuOpen((c) => !c)}
+                        >
+                          <span className="action-dropdown-label">{selectedLabel}</span>
+                          <FiChevronDown
+                            className={`action-dropdown-caret${scenarioMenuOpen ? ' is-open' : ''}`}
+                            aria-hidden="true"
+                          />
+                        </button>
+                        {scenarioMenuOpen && (
+                          <ul className="action-dropdown-menu" role="menu" aria-label="Forecast scenario">
+                            {scenarioOptions.map((option) => (
+                              <li key={option.key}>
+                                <button
+                                  type="button"
+                                  role="menuitemradio"
+                                  aria-checked={scenarioKey === option.key}
+                                  className={scenarioKey === option.key ? 'is-active' : ''}
+                                  onClick={() => {
+                                    onScenarioChange(option.key);
+                                    setScenarioMenuOpen(false);
+                                    if (option.key === 'custom') {
+                                      setTimeout(() => {
+                                        document
+                                          .getElementById('forecast-custom-controls')
+                                          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                      }, 50);
+                                    }
+                                  }}
+                                >
+                                  {option.label}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <button
                   type="button"

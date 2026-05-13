@@ -1382,6 +1382,17 @@ body {
   gap: 8px;
 }
 
+/* In the Projected Cash Balance control cluster the action-dropdown sits
+   beside the 44h segmented toggle wrapper, so we match the wrapper's full
+   rendered height (not just the inner button) to keep all three controls
+   on the same top/bottom edges. Canonical 36h still applies elsewhere. */
+.projected-cash-timeline-row .action-dropdown-trigger {
+  height: 44px;
+}
+.projected-cash-timeline-row .forecast-compare-btn {
+  height: 44px;
+}
+
 /* Compare-with-prior-period toggle. TailAdmin filter-button style: white
    surface, gray-200 border, 40px tall to match the segmented-toggle inner
    button. Active state inverts to the brand fill, mirroring the prior-period
@@ -1397,8 +1408,10 @@ body {
   border-radius: 8px;
   background: #FFFFFF;
   color: #344054;
+  font-family: 'Outfit', sans-serif;
   font-size: 14px;
   font-weight: 500;
+  line-height: 20px;
   cursor: pointer;
   transition: all 150ms ease;
   white-space: nowrap;
@@ -6777,18 +6790,6 @@ body {
     flex: 1;
     font-size: 0.75rem;
     padding: 6px 4px;
-    text-align: center;
-  }
-
-  /* Segmented toggle wrap modifier — used by 4-button toggles
-     that should wrap to 2×2 on narrow viewports (Forecast scenario). */
-  .segmented-toggle--wrap {
-    width: 100%;
-    flex-wrap: wrap;
-    height: auto;
-  }
-  .segmented-toggle--wrap .segmented-toggle-btn {
-    flex: 1 1 40%;
     text-align: center;
   }
 
