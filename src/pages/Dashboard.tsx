@@ -255,6 +255,7 @@ const UI_LAB_SPARKLINE_OPTIONS: ApexOptions = {
   chart: {
     type: 'area',
     height: 70,
+    fontFamily: 'Outfit, sans-serif',
     sparkline: { enabled: true },
     toolbar: { show: false },
     animations: { enabled: false },

@@ -204,7 +204,7 @@ export default function ProjectedCashBalanceChart({
       chart: {
         type: 'area',
         height,
-        fontFamily: 'inherit',
+        fontFamily: 'Outfit, sans-serif',
         toolbar: { show: false },
         zoom: { enabled: false },
         sparkline: { enabled: false },

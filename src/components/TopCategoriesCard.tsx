@@ -35,6 +35,7 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
   const chartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'donut',
+      fontFamily: 'Outfit, sans-serif',
       toolbar: { show: false },
       animations: { enabled: false },
       background: 'transparent',
