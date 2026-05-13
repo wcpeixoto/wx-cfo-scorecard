@@ -88,6 +88,9 @@ export function TodayPage({ model, txns, forecastProjection, targetNetMargin }: 
           distributionTargetAmount={distributionStatus.targetAmount}
           distributionActualAmount={distributionStatus.actualAmount}
           targetNetMargin={targetNetMargin}
+          forecastProjection={forecastProjection}
+          reserveTarget={model.runway.reserveTarget}
+          currentCashBalance={model.runway.currentCashBalance}
         />
       </div>
     </div>

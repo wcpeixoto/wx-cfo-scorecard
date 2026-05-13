@@ -1223,13 +1223,16 @@ body {
 }
 
 
+/* Card title — matches UI Lab .statistics-card__title (TailAdmin
+   "Users & Revenue Statistics" spec): 18/500/28, near-black. */
 .forecast-chart-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 500;
-  line-height: 20px;
-  color: #667085;
+  line-height: 28px;
+  color: #1D2939;
 }
+
 
 .cash-summary-strip {
   display: flex;
@@ -4289,20 +4292,13 @@ body {
   border-top: 1px solid var(--line);
 }
 
-/* Section header — title left, Add button right (TailAdmin section pattern). */
+/* Section header — Add button anchored top-left, acts as the section action. */
 .forecast-events-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   margin-bottom: 0.75rem;
-}
-
-.forecast-events-title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
 }
 
 .forecast-events-list {
@@ -4317,10 +4313,26 @@ body {
 .forecast-event-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1rem;
   font-size: 0.8125rem;
   line-height: 1.4;
   flex-wrap: wrap;
+}
+
+/* Orange leading dot — visually matches the orange chart marker on
+   Projected Cash Balance so rows read as the same events. */
+.forecast-event-row::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #F79009;
+  flex-shrink: 0;
+}
+
+.forecast-event-row.is-disabled::before {
+  opacity: 0.35;
 }
 
 .forecast-event-month {
@@ -4394,27 +4406,29 @@ body {
   align-items: start;
 }
 
-/* ─── Known Events — Add button ───────────────────────────────────────── */
+/* ─── Known Events — Add button (TailAdmin filter-button sizing,
+   matches .forecast-compare-btn so finance-page actions read uniform). */
 .forecast-event-add-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px 12px;
+  gap: 6px;
+  height: 36px;
+  padding: 8px 12px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
-  color: var(--text-secondary);
-  background: transparent;
-  border: 1.5px solid var(--line);
-  border-radius: 6px;
+  color: #344054;
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 8px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
 .forecast-event-add-btn:hover {
-  background: var(--bg-muted);
-  border-color: #c8cdd6;
+  background: #F9FAFB;
+  color: #101828;
 }
 
 /* ─── Known Events — Edit button ──────────────────────────────────────── */
@@ -7554,30 +7568,10 @@ body {
   color: #344054;
 }
 
-/* ⓘ anchor + tooltip wrapper */
+/* ⓘ anchor — pairs with .db-tooltip-wrap to use the shared tooltip surface. */
 .wna-info-wrap {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
   margin-left: 6px;
-}
-
-.wna-info-btn {
-  appearance: none;
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  font-size: 14px;
-  color: #98A2B3;
-  cursor: pointer;
-  line-height: 1;
-  font-family: inherit;
-  transition: color 0.15s;
-}
-
-.wna-info-btn:hover {
-  color: #667085;
+  vertical-align: middle;
 }
 
 /* Line 2 — headline (red signal) */
@@ -7611,27 +7605,6 @@ body {
 }
 
 
-/* ── Explanatory tooltip ────────────────────────────────── */
-.explain-tooltip {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  background: var(--tooltip-bg);
-  border: 1px solid var(--tooltip-border);
-  border-radius: var(--tooltip-radius);
-  padding: var(--tooltip-pad);
-  box-shadow: var(--tooltip-shadow);
-  max-width: 260px;
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--tooltip-text);
-  font-family: 'Outfit', sans-serif;
-  line-height: 1.5;
-  z-index: 20;
-  white-space: normal;
-  pointer-events: none;
-}
-
 /* ── Dark mode ────────────────────────────────────────────── */
 @media (prefers-color-scheme: dark) {
   .dark .wna-card {
@@ -7660,26 +7633,12 @@ body {
     color: #98A2B3;
   }
 
-  .dark .wna-info-btn {
-    color: #667085;
-  }
-
-  .dark .wna-info-btn:hover {
-    color: #98A2B3;
-  }
-
   .dark .wna-headline {
     color: #F97066;
   }
 
   .dark .wna-detail {
     color: #98A2B3;
-  }
-
-  .dark .explain-tooltip {
-    background: rgba(30, 41, 59, 0.96);
-    border-color: #374151;
-    color: rgba(255, 255, 255, 0.85);
   }
 }
 
@@ -8193,15 +8152,14 @@ body {
 .dark .forecast-event-steer-close { color: #D0D5DD; }
 .dark .forecast-event-steer-close:hover { background: rgba(255, 255, 255, 0.05); }
 
-/* Right-side cluster wrapper. Pinned to the row's right edge with
-   margin-left: auto and given a tight 4px inner gap so amount, badge,
-   and controls read as a single unit instead of five drifting columns.
-   Sibling of the steer panel — not a parent — so the steer's
-   flex-basis: 100% still drops it onto a new flex line below the row. */
+/* Action icons sit immediately after the recurrence badge so they
+   read as part of the event, not a far-right gutter. Sibling of the
+   steer panel — not a parent — so the steer's flex-basis: 100% still
+   drops it onto a new flex line below the row. */
 .forecast-event-controls {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-  margin-left: auto;
+  margin-left: 4px;
 }

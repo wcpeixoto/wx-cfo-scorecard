@@ -57,19 +57,6 @@ function formatEventDate(date: string): string {
   });
 }
 
-// Defensive fallback for in-memory events constructed before persistence
-// has populated `date`. Mirrors fromSharedForecastEventRow's read-time
-// fallback so display behavior is consistent with the row.
-function lastDayOfMonthDate(month: string): string {
-  const match = month.match(/^(\d{4})-(\d{2})$/);
-  if (!match) return month;
-  const year = Number.parseInt(match[1], 10);
-  const monthIndex = Number.parseInt(match[2], 10) - 1;
-  if (!Number.isFinite(year) || monthIndex < 0 || monthIndex > 11) return month;
-  const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
-  return `${match[1]}-${match[2]}-${String(lastDay).padStart(2, '0')}`;
-}
-
 function formatBucketEndDate(d: TrendPoint, granularity: 'month' | 'week'): string {
   if (granularity === 'week') {
     if (d.periodStart) return formatEventDate(d.periodStart);
@@ -92,9 +79,6 @@ function formatCurrency(value: number): string {
   }
   return `${sign}$${Math.round(abs).toLocaleString()}`;
 }
-
-const formatSignedCurrency = (n: number) =>
-  `${n > 0 ? '+' : ''}${formatCurrency(n)}`;
 
 // Density control via Apex `xaxis.tickAmount`, not the formatter.
 // Earlier formatter-based suppression (return '' or '​' for skipped
@@ -123,6 +107,7 @@ export default function ProjectedCashBalanceChart({
   priorSeriesLabel = 'Prior Year',
 }: ProjectedCashBalanceChartProps) {
   const hasPrior = !!priorSeries && priorSeries.length === data.length && priorSeries.length > 0;
+
   // Axis categories (short labels for display on x-axis)
   const categories = useMemo(
     () =>
@@ -152,9 +137,12 @@ export default function ProjectedCashBalanceChart({
     [categories.length, granularity],
   );
 
-  // Known Events → annotation points. Map ForecastEvent fields to annotation shape internally.
-  // Event month is YYYY-MM; match to first data point whose month starts with that prefix
-  // (exact for monthly granularity, first week of month for weekly granularity).
+  // Known Events → orange marker dots only. No tooltip/label: the
+  // dot's correspondence with the Known Events list row (orange leading
+  // dot in CashFlowForecastModule) carries the meaning. Previous
+  // tooltip implementations (SVG annotation label, always-on HTML
+  // overlay, hover-gated HTML overlay) all caused cross-talk with the
+  // chart-line hover tooltip and stacked-duplicate render bugs.
   const eventAnnotationPoints = useMemo(() => {
     if (!knownEvents || knownEvents.length === 0) return [];
     type AnnotationPoint = NonNullable<NonNullable<ApexOptions['annotations']>['points']>[number];
@@ -165,11 +153,6 @@ export default function ProjectedCashBalanceChart({
       if (netImpact === 0) continue;
       const idx = data.findIndex((d) => d.month.startsWith(event.month));
       if (idx < 0) continue;
-      // One annotation per event: visible orange marker dot at the data
-      // point + a single rounded label line above it.
-      // Format: "May 5, 2026  •  Test  +$10K"
-      const eventDate = event.date ?? lastDayOfMonthDate(event.month);
-      const labelText = `${formatEventDate(eventDate)}  •  ${event.title}  ${formatSignedCurrency(netImpact)}`;
       points.push({
         x: categories[idx],
         y: values[idx],
@@ -178,21 +161,6 @@ export default function ProjectedCashBalanceChart({
           fillColor: chartTokens.warning,
           strokeColor: '#FFFFFF',
           strokeWidth: 2,
-        },
-        label: {
-          text: labelText,
-          offsetY: -18,
-          textAnchor: 'middle',
-          borderColor: chartTokens.warning,
-          borderWidth: 1,
-          borderRadius: 6,
-          style: {
-            background: 'rgba(255, 255, 255, 0.96)',
-            color: chartTokens.chartTextStrong,
-            fontSize: '11px',
-            fontFamily: 'Outfit, sans-serif',
-            padding: { left: 8, right: 8, top: 4, bottom: 4 },
-          },
         },
       });
     }

@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import type { Txn } from '../lib/data/contract';
+import type { ScenarioPoint, Txn } from '../lib/data/contract';
 import { classifyTxn } from '../lib/cashFlow';
 import { chartTokens } from '../lib/ui/chartTokens';
 
@@ -16,15 +16,28 @@ function formatCompact(value: number): string {
 type OwnerDistSeries = {
   years: number[];
   actual: number[];
-  annualized: number[];
-  annualizedFullYear: number;
+  forecast: number[];
+  /** Projected full-year distributable capacity for the current year:
+   *  historical YTD actual + current-year forecast surplus. Used by the
+   *  signal pill and target badge. */
+  projectedFullYearCapacity: number;
 };
 
-function buildOwnerDistSeries(transactions: Txn[], today: Date): OwnerDistSeries {
+/** Historical = actual owner-distribution transactions, by year.
+ *  Forecast = incremental distributable surplus above the safety/reserve line,
+ *  derived from the shared operating-cash forecast (ScenarioPoint[]). Owner
+ *  distributions stay out of the operating forecast itself; their projection
+ *  is reconstructed here from "what cash the forecast leaves above reserve." */
+function buildOwnerDistSeries(
+  transactions: Txn[],
+  today: Date,
+  forecastProjection: ScenarioPoint[],
+  reserveTarget: number,
+  currentCashBalance: number
+): OwnerDistSeries {
   const ownerDist = transactions.filter((t) => classifyTxn(t) === 'owner-distribution');
 
   const currentYear = today.getFullYear();
-  const nextYear = currentYear + 1;
 
   const byYear = new Map<number, number>();
   for (const t of ownerDist) {
@@ -32,33 +45,51 @@ function buildOwnerDistSeries(transactions: Txn[], today: Date): OwnerDistSeries
     byYear.set(year, (byYear.get(year) ?? 0) + Math.abs(t.amount));
   }
 
-  const yearSet = new Set<number>([...byYear.keys(), currentYear, nextYear]);
+  // Last forecasted end-of-year cash balance per year inside the horizon.
+  const endOfYearBalance = new Map<number, number>();
+  for (const p of forecastProjection) {
+    const y = Number(p.month.slice(0, 4));
+    if (!Number.isFinite(y)) continue;
+    endOfYearBalance.set(y, p.endingCashBalance);
+  }
+
+  const forecastYears = [...endOfYearBalance.keys()].filter((y) => y >= currentYear);
+  const yearSet = new Set<number>([...byYear.keys(), ...forecastYears]);
   const years = [...yearSet].sort((a, b) => a - b);
 
-  const elapsedMonths = Math.max(1, today.getMonth() + 1);
   const currentYearActual = byYear.get(currentYear) ?? 0;
-  const annualizedFullYear =
-    currentYearActual > 0 ? (currentYearActual / elapsedMonths) * 12 : 0;
+  const reserveFloor = Math.max(reserveTarget, currentCashBalance);
+  const endOfCurrentYear = endOfYearBalance.get(currentYear);
+  const currentYearForecastSurplus =
+    endOfCurrentYear !== undefined ? Math.max(0, endOfCurrentYear - reserveFloor) : 0;
 
   const actual: number[] = [];
-  const annualized: number[] = [];
+  const forecast: number[] = [];
 
   for (const year of years) {
     if (year < currentYear) {
       actual.push(byYear.get(year) ?? 0);
-      annualized.push(0);
+      forecast.push(0);
     } else if (year === currentYear) {
-      const annualizedRemainder =
-        currentYearActual > 0 ? Math.max(0, annualizedFullYear - currentYearActual) : 0;
       actual.push(currentYearActual);
-      annualized.push(annualizedRemainder);
+      forecast.push(currentYearForecastSurplus);
     } else {
-      actual.push(0);
-      annualized.push(annualizedFullYear);
+      const endThis = endOfYearBalance.get(year);
+      const endPrev = endOfYearBalance.get(year - 1);
+      if (endThis === undefined || endPrev === undefined) {
+        actual.push(0);
+        forecast.push(0);
+      } else {
+        // Incremental surplus assumes prior-year surplus was distributed,
+        // so the year starts at the reserve line. Floor negative years at 0.
+        actual.push(0);
+        forecast.push(Math.max(0, endThis - endPrev));
+      }
     }
   }
 
-  return { years, actual, annualized, annualizedFullYear };
+  const projectedFullYearCapacity = currentYearActual + currentYearForecastSurplus;
+  return { years, actual, forecast, projectedFullYearCapacity };
 }
 
 type PillVariant = 'insufficient' | 'above-avg' | 'below-avg' | 'on-track';
@@ -67,7 +98,7 @@ type PillConfig = { label: string; variant: PillVariant };
 function computeSignalPill(
   years: number[],
   actual: number[],
-  annualizedFullYear: number,
+  projectedFullYearCapacity: number,
   currentYear: number
 ): PillConfig {
   const completeIndexes = years.reduce<number[]>((acc, y, i) => {
@@ -82,7 +113,7 @@ function computeSignalPill(
   const priorAvg =
     completeIndexes.reduce((sum, i) => sum + actual[i], 0) / completeIndexes.length;
 
-  const ratio = priorAvg > 0 ? annualizedFullYear / priorAvg : 0;
+  const ratio = priorAvg > 0 ? projectedFullYearCapacity / priorAvg : 0;
 
   if (ratio > 1.1) return { label: '↑ Above avg', variant: 'above-avg' };
   if (ratio < 0.9) return { label: '↓ Below avg', variant: 'below-avg' };
@@ -107,6 +138,9 @@ type Props = {
   distributionTargetAmount?: number;
   distributionActualAmount?: number;
   targetNetMargin?: number;
+  forecastProjection: ScenarioPoint[];
+  reserveTarget: number;
+  currentCashBalance: number;
 };
 
 const TARGET_BADGE_CONFIG: Record<DistributionStatus, { label: string; className: string }> = {
@@ -130,14 +164,17 @@ function getTargetBadgeLabel(
   return TARGET_BADGE_CONFIG[status].label;
 }
 
-export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, distributionActualAmount, targetNetMargin }: Props) {
-  const { years, actual, annualized, annualizedFullYear } = buildOwnerDistSeries(
+export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, distributionActualAmount, targetNetMargin, forecastProjection, reserveTarget, currentCashBalance }: Props) {
+  const { years, actual, forecast, projectedFullYearCapacity } = buildOwnerDistSeries(
     transactions,
-    today
+    today,
+    forecastProjection,
+    reserveTarget,
+    currentCashBalance
   );
 
   const currentYear = today.getFullYear();
-  const pill = computeSignalPill(years, actual, annualizedFullYear, currentYear);
+  const pill = computeSignalPill(years, actual, projectedFullYearCapacity, currentYear);
 
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -267,7 +304,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
 
   const series = [
     { name: 'Actual', data: actual },
-    { name: 'Forecast', data: annualized },
+    { name: 'Forecast', data: forecast },
   ];
 
   return (
@@ -282,7 +319,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
           )}
         </div>
         {distributionStatus
-          ? <span className={TARGET_BADGE_CONFIG[distributionStatus].className}>{getTargetBadgeLabel(distributionStatus, annualizedFullYear, distributionTargetAmount)}</span>
+          ? <span className={TARGET_BADGE_CONFIG[distributionStatus].className}>{getTargetBadgeLabel(distributionStatus, projectedFullYearCapacity, distributionTargetAmount)}</span>
           : <span className={`card-status-badge ${ownerDistBadgeClass(pill.variant)}`}>{pill.label}</span>
         }
       </div>
