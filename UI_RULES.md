@@ -602,6 +602,26 @@ div.relative.inline-block
     └── DropdownItem [flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100]
 ```
 
+### Canonical in-app dropdown menu — `.action-dropdown`
+
+The Forecast **Scenario** picker (Base / Best / Worst / Custom Case) is the
+canonical pattern for any in-app dropdown menu — timeframe pickers, range
+selectors, scope toggles. Use `.action-dropdown-menu` styles for the panel
+and `.action-dropdown-menu button` for options. The shared `.timeframe-list`
+class is aliased to the same styles, so existing timeframe menus
+(Forecast horizon **More ▾**, NetCashFlow timeframe, Big Picture range)
+inherit the canonical look automatically.
+
+Panel: `padding: 4px; min-width: 100%; bg #FFFFFF; border 1px #E4E7EC;
+border-radius: 8px; box-shadow: 0 4px 16px rgba(16,24,40,0.08); z-index: 200`.
+
+Option: `padding: 8px 12px; border-radius: 6px; Outfit 14px/500 #344054;
+hover & active bg #F2F4F7 / color #101828`.
+
+Trigger varies by surface (pill, segmented-toggle-btn, .action-dropdown-trigger);
+only the panel + options are canonicalized here. Any older mismatched
+dropdown menu styles should be migrated to this pattern.
+
 ---
 
 ## Modal

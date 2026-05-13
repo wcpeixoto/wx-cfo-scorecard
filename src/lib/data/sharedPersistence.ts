@@ -134,6 +134,14 @@ type SharedWorkspaceSettingRow = {
   // responses before the Supabase migration adds the column. The
   // row mapper defaults missing/null/unexpected values to 'reality'.
   forecast_posture?: string | null;
+  // Optional scenario assumption columns (added via later migration).
+  // Pre-migration reads default to FORECAST_SCENARIO_PRESETS values.
+  scenario_best_revenue_growth_pct?: number | null;
+  scenario_best_expense_change_pct?: number | null;
+  scenario_base_revenue_growth_pct?: number | null;
+  scenario_base_expense_change_pct?: number | null;
+  scenario_worst_revenue_growth_pct?: number | null;
+  scenario_worst_expense_change_pct?: number | null;
 };
 
 export type WorkspaceSettings = {
@@ -143,6 +151,12 @@ export type WorkspaceSettings = {
   suppressDuplicateWarnings: boolean;
   acknowledgedNoncashAccounts: string[];
   forecastPosture: 'reality' | 'recovery';
+  scenarioBestRevenueGrowthPct: number;
+  scenarioBestExpenseChangePct: number;
+  scenarioBaseRevenueGrowthPct: number;
+  scenarioBaseExpenseChangePct: number;
+  scenarioWorstRevenueGrowthPct: number;
+  scenarioWorstExpenseChangePct: number;
 };
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
@@ -152,6 +166,12 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   suppressDuplicateWarnings: false,
   acknowledgedNoncashAccounts: [],
   forecastPosture: 'reality',
+  scenarioBestRevenueGrowthPct: 4,
+  scenarioBestExpenseChangePct: -3,
+  scenarioBaseRevenueGrowthPct: 0,
+  scenarioBaseExpenseChangePct: 0,
+  scenarioWorstRevenueGrowthPct: -5,
+  scenarioWorstExpenseChangePct: 4,
 };
 
 function isConfigured(): boolean {
@@ -928,6 +948,24 @@ function fromSharedWorkspaceSettingRow(row: SharedWorkspaceSettingRow): Workspac
       row.forecast_posture === 'reality' || row.forecast_posture === 'recovery'
         ? row.forecast_posture
         : 'reality',
+    scenarioBestRevenueGrowthPct: typeof row.scenario_best_revenue_growth_pct === 'number'
+      ? row.scenario_best_revenue_growth_pct
+      : DEFAULT_WORKSPACE_SETTINGS.scenarioBestRevenueGrowthPct,
+    scenarioBestExpenseChangePct: typeof row.scenario_best_expense_change_pct === 'number'
+      ? row.scenario_best_expense_change_pct
+      : DEFAULT_WORKSPACE_SETTINGS.scenarioBestExpenseChangePct,
+    scenarioBaseRevenueGrowthPct: typeof row.scenario_base_revenue_growth_pct === 'number'
+      ? row.scenario_base_revenue_growth_pct
+      : DEFAULT_WORKSPACE_SETTINGS.scenarioBaseRevenueGrowthPct,
+    scenarioBaseExpenseChangePct: typeof row.scenario_base_expense_change_pct === 'number'
+      ? row.scenario_base_expense_change_pct
+      : DEFAULT_WORKSPACE_SETTINGS.scenarioBaseExpenseChangePct,
+    scenarioWorstRevenueGrowthPct: typeof row.scenario_worst_revenue_growth_pct === 'number'
+      ? row.scenario_worst_revenue_growth_pct
+      : DEFAULT_WORKSPACE_SETTINGS.scenarioWorstRevenueGrowthPct,
+    scenarioWorstExpenseChangePct: typeof row.scenario_worst_expense_change_pct === 'number'
+      ? row.scenario_worst_expense_change_pct
+      : DEFAULT_WORKSPACE_SETTINGS.scenarioWorstExpenseChangePct,
   };
 }
 
@@ -944,6 +982,12 @@ function toSharedWorkspaceSettingRow(settings: WorkspaceSettings): SharedWorkspa
     // exercised by user action in Settings UI (sub-phase 2b), so this
     // is not a real risk in practice.
     forecast_posture: settings.forecastPosture,
+    scenario_best_revenue_growth_pct: settings.scenarioBestRevenueGrowthPct,
+    scenario_best_expense_change_pct: settings.scenarioBestExpenseChangePct,
+    scenario_base_revenue_growth_pct: settings.scenarioBaseRevenueGrowthPct,
+    scenario_base_expense_change_pct: settings.scenarioBaseExpenseChangePct,
+    scenario_worst_revenue_growth_pct: settings.scenarioWorstRevenueGrowthPct,
+    scenario_worst_expense_change_pct: settings.scenarioWorstExpenseChangePct,
   };
 }
 

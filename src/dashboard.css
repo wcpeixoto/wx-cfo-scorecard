@@ -346,72 +346,6 @@ body {
 }
 
 /* ── Per-card period dropdown ───────────────────────────────────────────── */
-.period-dropdown {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.period-dropdown-trigger {
-  all: unset;
-  cursor: pointer;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  letter-spacing: 0.01em;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.period-dropdown-trigger:hover {
-  color: var(--text-primary);
-}
-
-.period-dropdown-caret {
-  font-size: 0.65em;
-  opacity: 0.7;
-}
-
-.period-dropdown-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 200;
-  background: #fff;
-  border: 1px solid #e4e7ec;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  padding: 4px;
-  margin: 0;
-  list-style: none;
-  min-width: 130px;
-  white-space: nowrap;
-}
-
-.period-dropdown-menu li {
-  margin: 0;
-}
-
-.period-dropdown-menu button {
-  all: unset;
-  display: block;
-  width: 100%;
-  padding: 6px 10px;
-  font-size: 0.8rem;
-  color: var(--text-primary);
-  border-radius: 5px;
-  cursor: pointer;
-  box-sizing: border-box;
-}
-
-.period-dropdown-menu button:hover {
-  background: #f2f4f7;
-}
-
-.period-dropdown-menu button.is-active {
-  color: var(--primary, #4f6fdd);
-  font-weight: 600;
-}
-
 .top-bar-context {
   margin: 4px 0 0;
   color: var(--text-secondary);
@@ -1382,13 +1316,6 @@ body {
   gap: 8px;
 }
 
-/* In the Projected Cash Balance control cluster the action-dropdown sits
-   beside the 44h segmented toggle wrapper, so we match the wrapper's full
-   rendered height (not just the inner button) to keep all three controls
-   on the same top/bottom edges. Canonical 36h still applies elsewhere. */
-.projected-cash-timeline-row .action-dropdown-trigger {
-  height: 44px;
-}
 .projected-cash-timeline-row .forecast-compare-btn {
   height: 44px;
 }
@@ -1458,7 +1385,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 36px;
+  height: 44px;
   padding: 0 10px;
   border: 1px solid #D0D5DD;
   border-radius: 8px;
@@ -1528,10 +1455,9 @@ body {
   background: #F2F4F7;
   color: #101828;
 }
-.action-dropdown-menu button.is-active {
-  background: #F2F4F7;
-  color: #101828;
-}
+/* No selected-state highlight: the trigger button already shows the
+   current selection, so an .is-active row inside the open panel would
+   double-highlight on hover. Hover is the only feedback inside the menu. */
 
 @media (max-width: 767px) {
   .action-dropdown {
@@ -2655,44 +2581,49 @@ body {
   cursor: pointer;
 }
 
+/* Canonical dropdown menu panel — mirrors .action-dropdown-menu (Scenario
+   dropdown). Use these styles for any timeframe / range / picker menu. */
 .timeframe-list {
   position: absolute;
+  top: calc(100% + 6px);
   right: 0;
-  top: 38px;
-  min-width: 172px;
+  z-index: 200;
   margin: 0;
-  padding: 6px;
+  padding: 4px;
   list-style: none;
-  border: 1px solid #d4e0f5;
-  border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 12px 24px rgba(21, 42, 79, 0.15);
-  z-index: 20;
+  min-width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(16, 24, 40, 0.08);
+}
+
+.timeframe-list li {
+  margin: 0;
 }
 
 .timeframe-list button {
+  display: block;
   width: 100%;
-  text-align: left;
   border: none;
   background: transparent;
-  color: #34506f;
-  border-radius: 8px;
-  min-height: 30px;
-  padding: 4px 8px;
-  font: inherit;
-  font-size: 0.82rem;
+  color: #344054;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .timeframe-list button:hover {
-  background: #eff4ff;
+  background: #F2F4F7;
+  color: #101828;
 }
-
-.timeframe-list button.is-active {
-  background: #e7efff;
-  color: #1d3f84;
-  font-weight: 700;
-}
+/* See .action-dropdown-menu — no selected-state highlight inside the panel. */
 
 .trend-note {
   font-size: 0.78rem;
@@ -3391,43 +3322,6 @@ body {
   white-space: nowrap;
 }
 
-/* Segmented Compare toggle — mirrors TailAdmin ChartTab (.settings-subnav) pattern */
-.projection-compare-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  background: #F2F4F7;
-  border-radius: 8px;
-  padding: 2px;
-  min-height: 36px;
-}
-
-.projection-compare-toggle-option {
-  border: none;
-  background: transparent;
-  color: #667085;
-  border-radius: 6px;
-  min-height: 30px;
-  padding: 0 14px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
-  white-space: nowrap;
-}
-
-.projection-compare-toggle-option:hover {
-  color: #344054;
-}
-
-.projection-compare-toggle-option.is-active {
-  background: #FFFFFF;
-  color: #465FFF;
-  font-weight: 600;
-  box-shadow: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
-}
-
 /* Table breathing room — distance from header to first table row.
    32px gap; the header is dense (title + Compare + Export). */
 .projection-table-card .projection-table-scroll {
@@ -3496,16 +3390,29 @@ body {
   border-color: #465FFF;
 }
 
+/* Export CSV — matches canonical .action-dropdown-trigger spec
+   (44h, Outfit 14/500, transparent fill with #D0D5DD border). */
 .projection-export-btn {
-  padding: 4px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 14px;
   border-radius: 8px;
-  border: 1px solid #E4E7EC;
-  background: #FFFFFF;
-  color: #667085;
-  font-size: 12px;
+  border: 1px solid #D0D5DD;
+  background: transparent;
+  color: #344054;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
   font-weight: 500;
+  line-height: 20px;
   cursor: pointer;
   flex-shrink: 0;
+  white-space: nowrap;
+}
+.projection-export-btn:hover {
+  background: #F9FAFB;
+  color: #101828;
 }
 
 /* Grouped column headers */
@@ -5138,6 +5045,30 @@ body {
   gap: 10px;
 }
 
+/* Scenario assumptions row — two %-input fields side by side. */
+.rules-row-control--scenario {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.rules-pct-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.rules-pct-field-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #667085;
+  letter-spacing: 0.02em;
+}
+
 /* Percentage input */
 .rules-pct-input-wrap {
   display: flex;
@@ -6436,7 +6367,7 @@ body {
   background: transparent;
   color: #667085;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.15;
   white-space: nowrap;
   cursor: pointer;
@@ -6526,7 +6457,7 @@ body {
     background: transparent;
     color: #667085;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.15;
     white-space: nowrap;
     cursor: pointer;
@@ -6732,7 +6663,7 @@ body {
   padding: 8px 20px 12px;
 }
 
-.owner-dist-footer .period-dropdown-menu {
+.owner-dist-footer .action-dropdown-menu {
   top: auto;
   bottom: calc(100% + 6px);
   right: auto;

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { FiChevronDown } from 'react-icons/fi';
 
 export type PeriodOption = { value: string; label: string };
 
@@ -33,18 +34,23 @@ export default function PeriodDropdown({ value, options, onChange }: PeriodDropd
   }, [isOpen]);
 
   return (
-    <div className="period-dropdown" ref={containerRef}>
+    <div className="action-dropdown" ref={containerRef}>
       <button
         type="button"
-        className="period-dropdown-trigger"
+        className="action-dropdown-trigger"
         onClick={() => setIsOpen((c) => !c)}
         aria-haspopup="menu"
         aria-expanded={isOpen}
+        aria-label={`Period: ${selectedLabel}`}
       >
-        {selectedLabel} <span className="period-dropdown-caret" aria-hidden="true">▾</span>
+        <span className="action-dropdown-label">{selectedLabel}</span>
+        <FiChevronDown
+          className={`action-dropdown-caret${isOpen ? ' is-open' : ''}`}
+          aria-hidden="true"
+        />
       </button>
       {isOpen && (
-        <ul className="period-dropdown-menu" role="menu">
+        <ul className="action-dropdown-menu" role="menu">
           {options.map((option) => (
             <li key={option.value}>
               <button
