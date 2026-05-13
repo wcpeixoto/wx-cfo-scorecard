@@ -1426,6 +1426,103 @@ body {
   cursor: not-allowed;
 }
 
+/* Forecast header scenario dropdown — single compact card-action control
+   that replaces the four-button segmented scenario toggle.
+   Trigger: filter-button styling (matches .forecast-compare-btn). 40px tall.
+   Menu: white panel with #E4E7EC border, subtle shadow, hover #F2F4F7. */
+.scenario-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+.scenario-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 10px 12px;
+  border: 1px solid #E4E7EC;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #344054;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  min-width: 140px;
+  justify-content: space-between;
+}
+.scenario-dropdown-trigger:hover {
+  background: #F9FAFB;
+  color: #101828;
+}
+.scenario-dropdown-trigger[aria-expanded="true"] {
+  background: #F9FAFB;
+  color: #101828;
+}
+.scenario-dropdown-label {
+  display: inline-block;
+}
+.scenario-dropdown-caret {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #667085;
+  transition: transform 150ms ease;
+}
+.scenario-dropdown-caret.is-open {
+  transform: rotate(180deg);
+}
+.scenario-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 200;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(16, 24, 40, 0.08);
+}
+.scenario-dropdown-menu li {
+  margin: 0;
+}
+.scenario-dropdown-menu button {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #344054;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.scenario-dropdown-menu button:hover {
+  background: #F2F4F7;
+  color: #101828;
+}
+.scenario-dropdown-menu button.is-active {
+  background: #F2F4F7;
+  color: #101828;
+}
+
+@media (max-width: 767px) {
+  .scenario-dropdown {
+    width: 100%;
+  }
+  .scenario-dropdown-trigger {
+    width: 100%;
+  }
+}
+
 /* Subtitle shown under the date range when the prior-period overlay is
    active. Smaller, muted; mirrors TailAdmin secondary-text pattern. */
 .projected-cash-compare-subtitle {
