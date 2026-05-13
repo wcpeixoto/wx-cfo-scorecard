@@ -1375,8 +1375,10 @@ don't need to all be visible at rest).
 | Height | `h-9` | 36px |
 | Padding | `px-2.5` | 0px vertical, 10px horizontal |
 | Gap (label ↔ chevron) | `gap-1.5` | 6px |
-| Border | `border border-gray-300` | 1px solid #D0D5DD |
-| Border radius | `rounded-lg` | 8px |
+| Border | `border border-gray-300` | 1px solid #D0D5DD (uniform on all 4 sides) |
+| Border radius | `rounded-lg` | 8px (uniform on all 4 corners) |
+| Outline | none rendered | `outline-style: none`; reserved value `1.5px #344054` for focus/interaction states |
+| Box shadow | none | `none` |
 | Background | none | transparent (light mode) |
 | Text color | `text-gray-700` | #344054 |
 | Font family / size / weight | Outfit | 14px / 500 |
@@ -1385,6 +1387,13 @@ don't need to all be visible at rest).
 | Chevron icon | `FiChevronDown` (or equivalent) | 16px, #667085, rotates 180° when open |
 | Min width | none | auto-sized to content |
 | Hover / open state | optional soft-gray fill | #F9FAFB (subtle, light-mode only) |
+
+**Border-color is the load-bearing token.** Any action-button-style trigger
+(card-header action, page-header action, split-button caret, Export, Add,
+Compare, etc.) must use `#D0D5DD` for its 1px border. Do not use `#E4E7EC`
+for trigger borders — that color is reserved for card shells, menu panels,
+and input fields. Verified against the June 2025 Total Balance card "Month"
+button via DevTools computed styles.
 
 ### Menu spec
 
