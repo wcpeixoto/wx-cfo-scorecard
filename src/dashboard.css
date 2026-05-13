@@ -2805,7 +2805,7 @@ body {
 }
 
 .apexcharts-tooltip-series-group {
-  display: flex !important;
+  display: flex;
   align-items: center !important;
   padding: 0 !important;
 }
