@@ -64,6 +64,7 @@ import { composeSplitConservative } from '../lib/kpis/splitConservative';
 import { composeConservativeFloor } from '../lib/kpis/conservativeFloor';
 import { applyEventsOverlay } from '../lib/kpis/applyEventsOverlay';
 import { generateRenewalEvents } from '../lib/forecast/generateRenewalEvents';
+import { expandRecurringEvents } from '../lib/forecast/expandRecurringEvents';
 import type {
   AccountRecord,
   AccountType,
@@ -1957,6 +1958,15 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     [refetchForecastEvents]
   );
 
+  // Re-expand monthly/yearly manual recurring events to the current horizon
+  // so growing the forecast window picks up additional occurrences that
+  // weren't pre-generated at the time the event was created. Storage stays
+  // sparse; this is a view-time fan-out only.
+  const expandedForecastEvents = useMemo(
+    () => expandRecurringEvents(forecastEvents, forecastRangeMonths),
+    [forecastEvents, forecastRangeMonths]
+  );
+
   const forecastProjection = useMemo(
     () => {
       const fcT0 = performance.now();
@@ -2051,14 +2061,14 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
       // sits OUTSIDE all of them and applies once to the final
       // posture-aware horizon. When forecastEvents is empty, the helper
       // returns its input unchanged so math is byte-for-byte identical.
-      result = { points: applyEventsOverlay(result.points, forecastEvents), seasonality: result.seasonality };
+      result = { points: applyEventsOverlay(result.points, expandedForecastEvents), seasonality: result.seasonality };
       if (import.meta.env.DEV && !bootPhaseLoggedRef.current.forecast && model.monthlyRollups.length > 0) {
         bootPhaseLoggedRef.current.forecast = true;
         console.log('[BOOT] Forecast compute:', Math.round(performance.now() - fcT0), 'ms');
       }
       return result;
     },
-    [filteredTxns, forecastCurrentCashBalance, businessRules.forecastPosture, forecastEvents, forecastRangeMonths, model, scenarioInput]
+    [filteredTxns, forecastCurrentCashBalance, businessRules.forecastPosture, expandedForecastEvents, forecastRangeMonths, model, scenarioInput]
   );
   const scenarioProjection = useMemo(() => forecastProjection.points, [forecastProjection.points]);
   const forecastSeasonality = useMemo(() => forecastProjection.seasonality, [forecastProjection.seasonality]);
@@ -3247,7 +3257,16 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       key={option.key}
                       type="button"
                       className={`segmented-toggle-btn${selectedScenarioKey === option.key ? ' is-active' : ''}`}
-                      onClick={() => setSelectedScenarioKey(option.key)}
+                      onClick={() => {
+                        setSelectedScenarioKey(option.key);
+                        if (option.key === 'custom') {
+                          setTimeout(() => {
+                            document
+                              .getElementById('forecast-custom-controls')
+                              ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }, 50);
+                        }
+                      }}
                     >
                       {option.label}
                     </button>
@@ -3296,7 +3315,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               onExpenseChange={(nextValue) => updateCustomScenario({ expenseChangePct: nextValue })}
               onReceivableDaysChange={(nextValue) => updateCustomScenario({ receivableDays: nextValue })}
               onPayableDaysChange={(nextValue) => updateCustomScenario({ payableDays: nextValue })}
-              forecastEvents={forecastEvents}
+              forecastEvents={expandedForecastEvents}
               contracts={forecastContracts}
               onAddEvent={(events) => setForecastEvents((prev) => {
                 const next = [...prev, ...events];
@@ -3305,6 +3324,16 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               })}
               onUpdateEvent={(updated) => setForecastEvents((prev) => {
                 const next = prev.map((e) => (e.id === updated.id ? updated : e));
+                void saveSharedForecastEvents(next);
+                return next;
+              })}
+              onReplaceGroup={(groupId, events) => setForecastEvents((prev) => {
+                const filtered = prev.filter((e) => {
+                  const parts = e.id.split('__');
+                  const eGroupId = parts.length === 3 ? parts[1] : e.id;
+                  return eGroupId !== groupId;
+                });
+                const next = [...filtered, ...events];
                 void saveSharedForecastEvents(next);
                 return next;
               })}
