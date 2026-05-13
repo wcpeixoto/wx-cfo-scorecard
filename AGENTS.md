@@ -53,6 +53,13 @@ npm run preview
 Visual tokens and styling rules live in `UI_RULES.md`. No Tailwind
 utility classes in JSX, no inline styles, no invented hex values.
 
+**Button heights are restricted to three canonical sizes:** 44px
+(primary action), 40px (secondary card-level), 36px (compact
+selector/dropdown). See `UI_RULES.md` Part 1 — "Button height
+taxonomy" for the role-to-size mapping. **Before creating any new
+button, suggest the best-fit size and ask the user to confirm which
+of the three heights to use.** Do not invent a fourth size.
+
 TailAdmin source reference for patterns (replicate, don't reinvent):
 `code/Code Supporting Docs/free-react-tailwind-admin-dashboard-main/`
 
