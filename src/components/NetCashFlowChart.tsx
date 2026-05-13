@@ -181,7 +181,7 @@ export default function NetCashFlowChart({
     chart: {
       type: 'area',
       height: 310,
-      fontFamily: 'inherit',
+      fontFamily: 'Outfit, sans-serif',
       toolbar: { show: false },
       zoom: { enabled: false },
       sparkline: { enabled: false },
