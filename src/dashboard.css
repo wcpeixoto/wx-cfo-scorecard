@@ -1383,7 +1383,7 @@ body {
 }
 
 /* Compare-with-prior-period toggle. TailAdmin filter-button style: white
-   surface, gray-200 border, 36px tall to match the segmented-toggle inner
+   surface, gray-200 border, 40px tall to match the segmented-toggle inner
    button. Active state inverts to the brand fill, mirroring the prior-period
    line color (chartTokens.brand). Disabled when monthly granularity is
    unavailable or there's not enough history. */
@@ -1391,8 +1391,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 36px;
-  padding: 8px 12px;
+  height: 40px;
+  padding: 10px 12px;
   border: 1px solid #E4E7EC;
   border-radius: 8px;
   background: #FFFFFF;
@@ -5584,7 +5584,7 @@ body {
    Source: TailAdmin demo /sales "Users & Revenue Statistics"
    Spec extracted: 2026-05-06
    Tabs are locally scoped (.statistics-card__tabs/__tab/--active)
-   to avoid conflicts with global .segmented-toggle (40/36/8 scale).
+   but share the canonical 44/40/10 scale with global .segmented-toggle.
    ============================================================ */
 
 .statistics-card {
@@ -6436,9 +6436,11 @@ body {
   margin-bottom: 24px;
 }
 
-/* Segmented toggle — Wx CFO standard pattern.
-   Dimensions match the TailAdmin Analytics card
-   Monthly/Quarterly/Annually toggle. Do not deviate.
+/* Segmented toggle — Wx CFO standard pattern (single canonical scale).
+   Source spec: .statistics-card__tabs (TailAdmin Analytics card,
+   UI Lab canonical). 44px track / 40px button / 2px gap / 2px track
+   padding / 10px×12px button padding / 8px+6px radii. No transition,
+   no hover, no :focus — matches TailAdmin source.
    See UI_RULES.md Part 6 — Segmented toggle (standard pattern).
    .settings-subnav is the original Settings page consumer; .segmented-toggle
    is the shared class used by every other replaced toggle. Visual rules
@@ -6451,29 +6453,26 @@ body {
   background: #F2F4F7;
   border-radius: 8px;
   padding: 2px;
-  height: 40px;
+  height: 44px;
   /* no border on track — matches TailAdmin Analytics card */
 }
 
-/* Button base — 36px tall, 12px horizontal padding, weight 500 */
+/* Button base — 40px tall, 10px×12px padding, weight 500 */
 .segmented-toggle-btn,
 .settings-subnav-btn {
   border: none;
   background: transparent;
   color: #667085;
   border-radius: 6px;
-  height: 36px;
-  padding: 8px 12px;
-  font: inherit;
+  height: 40px;
+  padding: 10px 12px;
+  font-family: 'Outfit', sans-serif;
   font-size: 14px;
   font-weight: 500;
+  line-height: normal;
+  box-shadow: none;
   cursor: pointer;
-  transition: all 150ms ease;
   white-space: nowrap;
-}
-.segmented-toggle-btn:hover,
-.settings-subnav-btn:hover {
-  color: #344054;
 }
 
 /* Active button — weight stays 500 (matches TailAdmin Analytics card) */
