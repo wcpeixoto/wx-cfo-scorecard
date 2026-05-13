@@ -1377,8 +1377,7 @@ toggle exactly.
 **Reference implementation:** UI Lab `.statistics-card__tabs/__tab/__tab--active`
 ([src/dashboard.css](src/dashboard.css) `.statistics-card__tabs` rule block).
 Global consumers: Settings page (`#/settings`) Data / Accounts / Rules; Forecast horizon
-toggle; Trends timeframe; Contracts cadence; Net Cash Flow chart mode; Rules-row controls;
-Forecast Compare button (filter-button styling, same 40px height).
+toggle; Trends timeframe; Contracts cadence; Net Cash Flow chart mode; Rules-row controls.
 
 ### Deprecated patterns
 
