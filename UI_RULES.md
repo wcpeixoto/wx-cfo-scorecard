@@ -145,6 +145,11 @@ Every component requires dark variants.
 
 ## Type Scale
 
+**Sourced from** TailAdmin demo dashboards: `demo.tailadmin.com/sales`,
+`demo.tailadmin.com/finance`, and `demo.tailadmin.com/ai`. Font family is
+**Outfit** across all pages. The roles below are the canonical source of
+truth — pick the role first, then the size/weight follows.
+
 | Token | px | Role |
 |-------|----|------|
 | text-title-md | 36px | Hero value, page-level KPI |
@@ -155,6 +160,38 @@ Every component requires dark variants.
 | text-base | 16px | Body text |
 | text-theme-sm / text-sm | 14px | Secondary text, labels, nav items |
 | text-theme-xs | 12px | Metadata, helper text, table headers |
+| (chart y-axis) | 11px | Chart Y-axis numeric scale labels — Regular (400) |
+
+### Roles (TailAdmin source of truth)
+
+Each entry below is a normal tier — not an exception. Choose by role,
+not by visual size.
+
+| Size / Weight | Role | TailAdmin reference examples |
+|---|---|---|
+| **30px / 600 or 500** | Hero metric value (primary KPI inside a stat card) | "$10,590", "1,320" (Sales Total Revenue / Total Sales); "19,857.00" Total Balance hero, "$24,830" stat card (Finance); "10,590", "$90,369" (AI). Use 600 for currency/revenue, 500 for balance/neutral. |
+| **24px / 600 or 500** | Large chart label or secondary hero value (slightly below primary stat) | "13.5M" donut center (AI); "$9,758.00" Total Revenue in Cashflow Overview (Finance). |
+| **20px / 600** | Page title — once per page only | "Sales Dashboard" (Sales). Not used in card bodies. |
+| **18px / 600** | Card title (primary) — standard for major cards/sections | "Top Products", "Recent Transactions", "API Token Usages", "Quick Send", "My Cards", "Spending". Most consistent title style in the system. |
+| **18px / 500** | Card title (secondary) or prominent inline text | "Users & Revenue Statistics", "Sales by Channel", "Sales by Country" (Sales); "User Analytics" (AI); "Virtual Card", "•••• •••• •••• 5332" (Finance). |
+| **16px / 600** | Stat card label or strong sub-section title | "Total Revenue", "Total Sales", "Refund Rate" stat-card labels (Sales). |
+| **16px / 500** | Card sub-title or category label | "Total Balance", "Cashflow Overview" sub-titles (Finance); "GPT", "Gemini", "xAI" model labels (AI). |
+| **16px / 400** | Descriptive inline label paired with a metric | "Total Balance", "Monthly Income", "Total Spent", "Saving Rate" descriptions inside stat cards (Finance). |
+| **14px / 500** | Navigation and UI controls — button labels, nav links, toggle text | Sidebar items "Dashboard", "eCommerce", "Analytics"; toggles "Daily", "Weekly", "Monthly"; period selectors "Monthly", "Quarterly", "Annually". |
+| **14px / 400** | Body and supporting text below titles or beside metrics | "Track revenue, performance, and sales growth in real-time" subtitles (Sales); "Overview of your current funds", "than last month", "Primary Account:" (Finance); "Last 30 Days" metadata (AI). |
+| **12px / 500** | Table column headers and status/badge labels | "Product Name", "Product ID", "Sales", "Earnings" (Sales table); "Order ID", "Activity", "Price", "Date" (Finance table); "Active", "Expired" token status (AI); "New" sidebar badges. |
+| **12px / 400** | Chart axis labels (X-axis), legend labels, section labels, metadata | "Jan", "Feb", "Mar" chart X-axis; "Online Sales", "Offline Sales" legends (Sales); "Users", "Revenue" legends (AI); "MENU" sidebar section header; "Token used", "of total user" card metadata (AI). |
+| **11px / 400** | Chart Y-axis numeric scale labels — the smallest text in the system | "20K", "15K", "10K", "5K" (Sales); "35K", "30K" (AI); "25K", "20K" (Finance). |
+
+**Rule — confirm typographic role before adding new text.** Whenever new
+text is requested (metric, card title, label, body, etc.), confirm which
+role above it serves so the correct size and weight are chosen. Do not
+introduce a size or weight that is not on this table.
+
+> **Pending classification — do not treat as canonical.** `13px` and
+> `1.06rem` usages currently exist in `src/dashboard.css`; their
+> classification is pending the Stage 3 CSS sweep. Do not treat either
+> as a canonical role until reviewed per site.
 
 ### Card title roles
 
@@ -1041,6 +1078,11 @@ Edit button uses `rounded-full`. This is profile-card specific — not `rounded-
 ## ApexCharts Config Defaults
 
 Required on every chart.
+
+Every ApexCharts options object **must** set `chart.fontFamily` to the
+literal string `"Outfit, sans-serif"`. `'inherit'` is not allowed, and
+omitting `fontFamily` is not allowed — ApexCharts renders inside an SVG
+sandbox where the page font does not cascade reliably.
 
 | Setting | Value |
 |---|---|
