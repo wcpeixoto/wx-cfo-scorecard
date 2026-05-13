@@ -3446,13 +3446,16 @@ body {
   letter-spacing: normal;
 }
 
-/* Simple-mode header band — calm, breathable, TailAdmin Recent Orders style.
+/* Simple-mode header band — TailAdmin Recent Orders style with px-6/py-3
+   rhythm (24px horizontal, 12px vertical), 16px text, gray-50 background.
    Comparison-mode headers keep their existing group/sub styling. */
 .projection-table:not(.comparison-mode) thead th {
   padding: 12px 16px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  background-color: #F9FAFB;
   border-top: 1px solid var(--bg-muted);
   border-bottom: 1px solid var(--bg-muted);
 }
@@ -3585,9 +3588,10 @@ body {
   font-weight: 400;
 }
 
-/* Totals row — appears below all monthly data rows */
+/* Totals row — appears below all monthly data rows. Mirrors the gray-50
+   thead band so the table is bookended by matching gray bars. */
 .projection-table .total-row {
-  background-color: var(--bg-main);
+  background-color: #F9FAFB;
   border-top: 1px solid var(--line);
 }
 
@@ -3669,9 +3673,11 @@ body {
 
 .rollups-table thead th {
   padding: 12px 16px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  background-color: #F9FAFB;
   text-transform: none;
   letter-spacing: normal;
   border-top: 1px solid var(--bg-muted);
@@ -4310,17 +4316,23 @@ body {
   gap: 0.625rem;
 }
 
+/* Match the Projection Table card below: 14px body text, normal weight.
+   Whole block reads as anchored to the orange dot — dot sits tight to the
+   amount, then columns get a moderate gap. Elements grouped on the left. */
 .forecast-event-row {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  font-size: 0.8125rem;
+  gap: 1.25rem;
+  font-size: 14px;
   line-height: 1.4;
   flex-wrap: wrap;
+  color: var(--text-secondary);
 }
 
 /* Orange leading dot — visually matches the orange chart marker on
-   Projected Cash Balance so rows read as the same events. */
+   Projected Cash Balance so rows read as the same events. Negative
+   right margin pulls the rest of the row in so it reads anchored to
+   the dot rather than spaced like a separate column. */
 .forecast-event-row::before {
   content: '';
   display: inline-block;
@@ -4329,21 +4341,27 @@ body {
   border-radius: 50%;
   background: #F79009;
   flex-shrink: 0;
+  margin-right: -0.75rem;
 }
 
 .forecast-event-row.is-disabled::before {
   opacity: 0.35;
 }
 
+/* Row text shares the same muted gray (var(--text-secondary) from the row
+   itself) — only the orange dot and the green check provide color. */
 .forecast-event-month {
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  min-width: 4.5rem;
+  color: inherit;
+  font-size: inherit;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 
 .forecast-event-title {
-  color: var(--text-primary);
+  color: inherit;
+  font-size: inherit;
+  font-weight: 400;
   min-width: 0;
 }
 
@@ -4354,13 +4372,14 @@ body {
 }
 
 .forecast-event-impact {
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-size: inherit;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
+  color: inherit;
 }
 
 .forecast-event-impact--in {
-  color: var(--positive);
+  color: inherit;
 }
 
 .forecast-event-impact--out {
@@ -4368,13 +4387,16 @@ body {
 }
 
 .forecast-event-status {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 0.125rem 0.375rem;
-  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  font-size: inherit;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 0.1875rem 0.625rem;
+  border-radius: 999px;
   flex-shrink: 0;
+  line-height: 1;
 }
 
 .forecast-event-status.is-caution {
@@ -4502,7 +4524,7 @@ body {
   border-radius: 4px;
   cursor: pointer;
   opacity: 0.7;
-  transition: opacity 0.15s, background 0.15s;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
 }
 
 .forecast-event-row:hover .forecast-event-toggle-btn {

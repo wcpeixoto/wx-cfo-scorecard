@@ -294,6 +294,11 @@ function formatCurrencyCompact(value: number): string {
   return `$${Math.round(value)}`;
 }
 
+function formatCurrencyFull(value: number): string {
+  const rounded = Math.round(value);
+  return `$${Math.abs(rounded).toLocaleString('en-US')}`;
+}
+
 // Wraps the K or M unit suffix in a smaller span (75% size).
 // Used wherever compact currency is rendered as a ReactNode hero value.
 function wrapUnit(str: string): ReactNode {
@@ -1150,20 +1155,20 @@ export default function CashFlowForecastModule({
             <ul className="forecast-events-list">
               {groupedEventRows.map((group) => (
                 <li key={group.groupId} className={`forecast-event-row${group.enabled === false ? ' is-disabled' : ''}${group.kind === 'renewal' ? ' is-renewal' : ''}`}>
-                  <span className="forecast-event-month">{group.monthDisplay}</span>
-                  <span className="forecast-event-title">{group.title}</span>
                   <span className="forecast-event-impacts">
                     {group.amount > 0 && (
                       <span className="forecast-event-impact forecast-event-impact--in">
-                        +{formatCurrencyCompact(group.amount)}
+                        {formatCurrencyFull(group.amount)}
                       </span>
                     )}
                     {group.amount < 0 && (
                       <span className="forecast-event-impact forecast-event-impact--out">
-                        -{formatCurrencyCompact(Math.abs(group.amount))}
+                        -{formatCurrencyFull(group.amount)}
                       </span>
                     )}
                   </span>
+                  <span className="forecast-event-title">{group.title}</span>
+                  <span className="forecast-event-month">{group.monthDisplay}</span>
                   <span className="forecast-event-status is-neutral">{group.freqLabel}</span>
                   <span className="forecast-event-controls">
                     {group.kind !== 'renewal' && (
