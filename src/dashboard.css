@@ -5175,10 +5175,30 @@ body {
   --app-sidebar-w: 72px;
   width: 72px;
   padding: 20px 8px;
+  transition: width 0.2s ease, padding 0.2s ease;
 }
 
 .finance-app:has(.app-sidebar.is-collapsed) {
   grid-template-columns: 72px minmax(0, 1fr);
+}
+
+/* TailAdmin-style hover expansion: when collapsed, hovering widens the
+   sidebar back to 260px without changing the grid track, so the expanded
+   sidebar overlays the main column instead of pushing it. */
+@media (min-width: 1024px) {
+  .app-sidebar.is-collapsed:hover {
+    width: 260px;
+    padding: 20px 16px;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+  }
+  .app-sidebar.is-collapsed:hover .app-sidebar-label,
+  .app-sidebar.is-collapsed:hover .app-sidebar-brand-title {
+    display: inline;
+  }
+  .app-sidebar.is-collapsed:hover .app-sidebar-link {
+    justify-content: flex-start;
+    padding: 10px 12px;
+  }
 }
 
 .app-sidebar-brand {
