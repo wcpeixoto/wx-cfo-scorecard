@@ -1,5 +1,4 @@
 import { useRef, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { ScenarioPoint, Txn } from '../lib/data/contract';
@@ -141,6 +140,7 @@ type Props = {
   forecastProjection: ScenarioPoint[];
   reserveTarget: number;
   currentCashBalance: number;
+  onCompareYear?: (year: number) => void;
 };
 
 const TARGET_BADGE_CONFIG: Record<DistributionStatus, { label: string; className: string }> = {
@@ -164,7 +164,7 @@ function getTargetBadgeLabel(
   return TARGET_BADGE_CONFIG[status].label;
 }
 
-export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, distributionActualAmount, targetNetMargin, forecastProjection, reserveTarget, currentCashBalance }: Props) {
+export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, distributionActualAmount, targetNetMargin, forecastProjection, reserveTarget, currentCashBalance, onCompareYear }: Props) {
   const { years, actual, forecast, projectedFullYearCapacity } = buildOwnerDistSeries(
     transactions,
     today,
@@ -176,7 +176,6 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
   const currentYear = today.getFullYear();
   const pill = computeSignalPill(years, actual, projectedFullYearCapacity, currentYear);
 
-  const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -199,7 +198,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
 
   function handleYearSelect(year: number) {
     setIsDropdownOpen(false);
-    navigate({ pathname: '/forecast', search: `?compareYear=${year}` });
+    onCompareYear?.(year);
   }
 
   const options: ApexOptions = {

@@ -16,9 +16,10 @@ interface TodayPageProps {
   txns: Txn[];
   forecastProjection: ScenarioPoint[];
   targetNetMargin?: number;
+  onCompareYear?: (year: number) => void;
 }
 
-export function TodayPage({ model, txns, forecastProjection, targetNetMargin }: TodayPageProps) {
+export function TodayPage({ model, txns, forecastProjection, targetNetMargin, onCompareYear }: TodayPageProps) {
   const signals = useMemo(
     () => detectSignals(model, txns, forecastProjection),
     [model, txns, forecastProjection]
@@ -92,6 +93,7 @@ export function TodayPage({ model, txns, forecastProjection, targetNetMargin }: 
             forecastProjection={forecastProjection}
             reserveTarget={model.runway.reserveTarget}
             currentCashBalance={model.runway.currentCashBalance}
+            onCompareYear={onCompareYear}
           />
           <article className="card next-owner-dist-card" aria-label="Next Owner Distribution (placeholder)">
             <header className="next-owner-dist-header">
