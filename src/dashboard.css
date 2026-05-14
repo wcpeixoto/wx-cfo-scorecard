@@ -6194,13 +6194,51 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  align-items: flex-start;
+  align-items: stretch;
+}
+
+.today-context-grid--2-1 {
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+}
+
+.today-context-grid > * {
+  height: 100%;
 }
 
 @media (max-width: 767px) {
-  .today-context-grid {
+  .today-context-grid,
+  .today-context-grid--2-1 {
     grid-template-columns: 1fr;
   }
+  .today-context-grid > * {
+    height: auto;
+  }
+}
+
+.next-owner-dist-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.next-owner-dist-header {
+  margin-bottom: 12px;
+}
+
+.next-owner-dist-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #101828;
+  margin: 0;
+}
+
+.next-owner-dist-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #98a2b3;
+  font-size: 14px;
+  min-height: 160px;
 }
 
 /* Hero card header — headline left, severity pill right, same row */
