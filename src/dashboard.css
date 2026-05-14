@@ -2616,71 +2616,6 @@ body {
   padding-bottom: 0;
 }
 
-.donut-layout {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 20px;
-  align-items: center;
-}
-
-.donut-shell {
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-}
-
-.donut-center {
-  width: 112px;
-  height: 112px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: #f8fbff;
-  border: 1px solid #d8e3f3;
-  text-align: center;
-}
-
-.donut-center span {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.donut-center strong {
-  font-size: 0.85rem;
-}
-
-.legend-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 8px;
-}
-
-.legend-list li {
-  display: grid;
-  grid-template-columns: 10px 1fr auto;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.legend-name {
-  color: #304862;
-}
-
-.legend-value {
-  font-weight: 600;
-}
-
 .tab-grid,
 .stack-grid {
   display: grid;
@@ -3717,7 +3652,6 @@ body {
 
   .kpi-grid,
   .two-col-grid,
-  .donut-layout,
   .trajectory-grid {
     grid-template-columns: minmax(0, 1fr);
   }
