@@ -1506,7 +1506,7 @@ body {
 }
 
 .forecast-decision-detail {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 400;
   color: #667085;
   line-height: 1.4;
@@ -3838,7 +3838,7 @@ body {
 }
 
 .event-form-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-primary);
 }
@@ -4505,7 +4505,7 @@ body {
 
 .ui-lab-section-subtitle {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 400;
   line-height: 18px;
   color: #98A2B3;
