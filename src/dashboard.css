@@ -2687,27 +2687,31 @@ body {
 /* Grouped column headers */
 
 .table-card .projection-group-row th {
-  background: #FFFFFF;
+  background: #F9FAFB;
   color: #667085;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   text-align: center;
-  border-bottom: 1px solid #E4E7EC;
+  padding: 10px 16px;
+  border-top: 1px solid var(--bg-muted);
+  border-bottom: 1px solid var(--bg-muted);
 }
 
 .projection-month-header {
   text-align: left !important;
-  background: #FFFFFF !important;
+  background: #F9FAFB !important;
   vertical-align: bottom !important;
   padding-bottom: 8px !important;
 }
 
 .table-card .projection-sub-row th {
-  background: #FFFFFF;
+  background: #F9FAFB;
   font-size: 12px;
   font-weight: 500;
   text-align: center;
   color: #667085;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--bg-muted);
 }
 
 .projection-table .projection-sub-row .projection-sub-forecast {
