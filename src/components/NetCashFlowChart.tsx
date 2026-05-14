@@ -160,18 +160,19 @@ export default function NetCashFlowChart({
     // Build dual-color gradient stops: blue above zero, red below zero
     // gradientZeroOffset is data-based (objectBoundingBox units), not axis-based
     const z = gradientZeroOffset;
+    // Brand color fades from 0.28 at the highest point to 0 at the x-axis.
+    // Below the x-axis is fully transparent — no red, no fill at all.
     const colorStops = hasPositive && hasNegative
       ? [
           [
             { offset: 0, color: chartTokens.brand, opacity: 0.28 },
             { offset: z, color: chartTokens.brand, opacity: 0 },
-            { offset: z, color: chartTokens.error, opacity: 0 },
-            { offset: 100, color: chartTokens.error, opacity: 0.28 },
+            { offset: 100, color: chartTokens.brand, opacity: 0 },
           ],
         ]
       : hasNegative
       ? [
-          [{ offset: 0, color: chartTokens.error, opacity: 0 }, { offset: 100, color: chartTokens.error, opacity: 0.28 }],
+          [{ offset: 0, color: chartTokens.brand, opacity: 0 }, { offset: 100, color: chartTokens.brand, opacity: 0 }],
         ]
       : [
           [{ offset: 0, color: chartTokens.brand, opacity: 0.28 }, { offset: 100, color: chartTokens.brand, opacity: 0 }],
@@ -245,7 +246,7 @@ export default function NetCashFlowChart({
         },
         style: {
           fontSize: '12px',
-          fontWeight: '500',
+          fontWeight: '400',
           colors: chartTokens.axisText,
         },
       },

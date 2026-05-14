@@ -153,7 +153,7 @@ export default function TrendLineChartApex({
       axisBorder: { show: false },
       axisTicks: { show: false },
       labels: {
-        style: { fontSize: '12px', fontWeight: 600, colors: chartTokens.axisTextSales },
+        style: { fontSize: '12px', fontWeight: 400, colors: chartTokens.axisTextSales },
       },
       crosshairs: { show: false },
       tooltip: { enabled: false },
