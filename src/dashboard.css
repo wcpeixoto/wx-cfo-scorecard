@@ -2684,7 +2684,17 @@ body {
   color: #101828;
 }
 
-/* Grouped column headers */
+/* Grouped column headers — comparison-mode header band (TailAdmin gray-50).
+   Both .table-card and .pcd-drawer-panel scopes carry the rule so the band
+   appears in both the Forecast tab table and the Today compare drawer.
+
+   Do NOT drop the `.table-card` ancestor to "simplify." The rule
+   `.table-card th:nth-child(n+2) { text-align: right }` (line ~2535) will
+   hijack specificity (spec 0,2,1 vs 0,1,1 unprefixed) and right-align the
+   Cash In / Cash Out / Net group cells on the Forecast tab. The prefixed
+   form ties spec (0,2,1) and wins by source order. Add a parallel scope
+   (like the .pcd-drawer-panel one below) for any new drawer/panel that
+   needs the same treatment. */
 
 .table-card .projection-group-row th,
 .pcd-drawer-panel .projection-group-row th {
