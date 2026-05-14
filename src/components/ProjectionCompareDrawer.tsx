@@ -1,3 +1,12 @@
+// Side-panel drawer opened from Today → Owner Distributions "Compare year"
+// dropdown. Renders ProjectionTableV2 in comparison mode for a single past
+// year, with a segmented year toggle in the header.
+//
+// Drawer pattern is COPIED from EfficiencyDrilldownDrawer, not extracted into
+// a shared primitive. With only two drawers in the codebase, an abstraction
+// would lock in the wrong shared surface. When a third drawer appears, do an
+// extraction pass as its own PR. CSS prefix `pcd-*` keeps the two drawers
+// independent in the meantime.
 import { useEffect } from 'react';
 import ProjectionTableV2 from './ProjectionTableV2';
 import type { ScenarioPoint } from '../lib/data/contract';
