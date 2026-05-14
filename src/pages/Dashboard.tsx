@@ -3816,7 +3816,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                     </div>
                     <div className="ta-card-body">
                       <div className="card-head">
-                        <h3>Direct CSV Import</h3>
                         <p className="subtle">{importDescription}</p>
                       </div>
 
@@ -3957,7 +3956,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                     </div>
                     <div className="ta-card-body">
                       <div className="card-head">
-                        <h3>Account Setup</h3>
                         <p className="subtle">Auto-discovered from imported CSV data. Your edits become the source of truth for future imports.</p>
                         <p className="subtle">
                           Settings storage: <strong>{accountSettingsSourceLabel}</strong>
