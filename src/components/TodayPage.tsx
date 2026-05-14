@@ -82,16 +82,24 @@ export function TodayPage({ model, txns, forecastProjection, targetNetMargin }: 
 
       {/* Context section */}
       <div className="today-context-section">
-        <OwnerDistributionsCard
-          transactions={txns}
-          distributionStatus={distributionStatus.status}
-          distributionTargetAmount={distributionStatus.targetAmount}
-          distributionActualAmount={distributionStatus.actualAmount}
-          targetNetMargin={targetNetMargin}
-          forecastProjection={forecastProjection}
-          reserveTarget={model.runway.reserveTarget}
-          currentCashBalance={model.runway.currentCashBalance}
-        />
+        <div className="today-context-grid today-context-grid--2-1">
+          <OwnerDistributionsCard
+            transactions={txns}
+            distributionStatus={distributionStatus.status}
+            distributionTargetAmount={distributionStatus.targetAmount}
+            distributionActualAmount={distributionStatus.actualAmount}
+            targetNetMargin={targetNetMargin}
+            forecastProjection={forecastProjection}
+            reserveTarget={model.runway.reserveTarget}
+            currentCashBalance={model.runway.currentCashBalance}
+          />
+          <article className="card next-owner-dist-card" aria-label="Next Owner Distribution (placeholder)">
+            <header className="next-owner-dist-header">
+              <h3 className="next-owner-dist-title">Next Owner Distribution</h3>
+            </header>
+            <div className="next-owner-dist-placeholder">Coming soon</div>
+          </article>
+        </div>
       </div>
     </div>
   );
