@@ -792,7 +792,7 @@ body {
   gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   line-height: 1.5;
@@ -841,7 +841,7 @@ body {
 }
 
 .kpi-vs-label {
-  font-size: 0.75rem;
+  font-size: 12px;
   color: var(--text-secondary);
   white-space: nowrap;
 }
@@ -868,7 +868,7 @@ body {
 
 .data-trust-note {
   margin: -4px 0 0;
-  font-size: 0.72rem;
+  font-size: 12px;
   color: #98A2B3;
   letter-spacing: 0.01em;
 }
@@ -1933,7 +1933,7 @@ body {
 }
 
 .reserve-gauge-label {
-  font-size: 0.76rem;
+  font-size: 12px;
   color: var(--text-secondary);
   white-space: nowrap;
   line-height: 1.15;
@@ -2014,7 +2014,7 @@ body {
 }
 
 .reserve-stat-card-label {
-  font-size: 0.76rem;
+  font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.2;
 }
@@ -2643,7 +2643,7 @@ body {
 }
 
 .donut-center span {
-  font-size: 0.74rem;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -3405,7 +3405,7 @@ body {
 }
 
 .account-setup-summary-label {
-  font-size: 0.74rem;
+  font-size: 12px;
   color: #667c94;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -3530,7 +3530,7 @@ body {
   min-height: 26px;
   padding: 0 10px;
   border-radius: 999px;
-  font-size: 0.76rem;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -4592,7 +4592,7 @@ body {
   padding: 0 10px;
   min-height: 26px;
   border-radius: 999px;
-  font-size: 0.76rem;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   align-self: flex-start;
@@ -4686,7 +4686,7 @@ body {
   padding: 0;
   margin: 0;
   font: inherit;
-  font-size: 0.74rem;
+  font-size: 12px;
   color: #465FFF;
   cursor: pointer;
   text-decoration: underline;
@@ -6163,7 +6163,7 @@ body {
   }
   .kpi-timeframe-control .segmented-toggle-btn {
     flex: 1;
-    font-size: 0.75rem;
+    font-size: 12px;
     padding: 6px 4px;
     text-align: center;
   }
