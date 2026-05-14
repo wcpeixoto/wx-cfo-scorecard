@@ -20,6 +20,7 @@ import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import { TodayPage } from '../components/TodayPage';
+import { ProjectionCompareDrawer } from '../components/ProjectionCompareDrawer';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
 import ContractsSettingsPane from '../components/ContractsSettingsPane';
 import { computeEfficiencyOpportunities } from '../lib/kpis/efficiencyOpportunities';
@@ -818,7 +819,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [isBigPictureFilterOpen, setIsBigPictureFilterOpen] = useState(false);
   const preserveAccountSettingsOnImportClearRef = useRef(false);
   const sharedAccountSettingsSyncArmedRef = useRef(false);
-  const compareYearHandledRef = useRef<number | null>(null);
   const projectionTableRef = useRef<HTMLDivElement>(null);
   // Temporary DEV-only fallback flag — append ?oldProjectionTable=1 to the URL (or hash,
   // e.g. #/forecast?oldProjectionTable=1) to render the old projection table instead of V2.
@@ -2130,6 +2130,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     [baseTxns, currentForecastYear]
   );
   const [projectionActiveYears, setProjectionActiveYears] = useState<number[]>([]);
+  const [compareDrawerYear, setCompareDrawerYear] = useState<number | null>(null);
 
   // Phase 4.11b: pill set = default 3 + any active years injected outside the default 3
   const pillYears = useMemo(() => {
@@ -2142,34 +2143,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     );
     return [...new Set([...injected, ...defaultYears])].sort((a, b) => b - a);
   }, [priorYearActuals.detectedYears, currentForecastYear, projectionActiveYears]);
-
-  // Phase 4.11: deep-link handler — fires on each fresh arrival with a new compareYear param
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const compareYear = params.get('compareYear');
-    if (!compareYear) return;
-
-    const year = parseInt(compareYear, 10);
-    const currentYear = new Date().getFullYear();
-    if (isNaN(year) || year < 2020 || year > currentYear) return;
-
-    if (year === compareYearHandledRef.current) return; // same year already applied, skip
-
-    compareYearHandledRef.current = year;
-    setProjectionActiveYears([year]);
-    setForecastRange('1y');
-    setTimeout(() => {
-      projectionTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 150);
-  }, [location.search, priorYearActuals]);
-
-  // Phase 4.11b: reset deep-link ref when user leaves What-If tab,
-  // so a fresh arrival with the same year fires again
-  useEffect(() => {
-    if (activeTab !== 'what-if') {
-      compareYearHandledRef.current = null;
-    }
-  }, [activeTab]);
 
   const latestRollup = model.monthlyRollups[model.monthlyRollups.length - 1] ?? null;
   const previousRollup = model.monthlyRollups[model.monthlyRollups.length - 2] ?? null;
@@ -2982,7 +2955,31 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
         )}
 
         {hasImportedData && activeTab === 'today' && (
-          <TodayPage model={model} txns={filteredTxns} forecastProjection={scenarioProjection} targetNetMargin={businessRules.targetNetMargin} />
+          <TodayPage
+            model={model}
+            txns={filteredTxns}
+            forecastProjection={scenarioProjection}
+            targetNetMargin={businessRules.targetNetMargin}
+            onCompareYear={(year) => setCompareDrawerYear(year)}
+          />
+        )}
+
+        {compareDrawerYear !== null && (
+          <ProjectionCompareDrawer
+            compareYear={compareDrawerYear}
+            availableYears={priorYearActuals.years
+              .map((y) => y.year)
+              .filter((y) => y < currentForecastYear)
+              .sort((a, b) => b - a)}
+            onCompareYearChange={(year) => setCompareDrawerYear(year)}
+            onClose={() => setCompareDrawerYear(null)}
+            visibleScenarioProjection={scenarioProjection.slice(0, 12)}
+            priorYearActuals={priorYearActuals}
+            currentForecastYear={currentForecastYear}
+            hasForecastCurrentCashBalance={hasForecastCurrentCashBalance}
+            formatCurrency={formatCurrency}
+            toMonthLabel={toMonthLabel}
+          />
         )}
 
         {hasImportedData && activeTab === 'big-picture' && (
@@ -3346,11 +3343,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                   <div className="projection-table-compare-wrap">
                     <span className="projection-table-compare-label">Compare</span>
                     <div className="segmented-toggle projection-compare-toggle" role="group" aria-label="Compare years">
-                      {/* Phase 4.11: when compareYear URL param is present on load,
-                          use it as the active comparison year for this session only.
-                          If the year is outside the default 3, temporarily use it as
-                          the selected year — do not expand the list permanently.
-                          Behavior is replace-on-load only, not sticky across navigation. */}
                       {pillYears.map((year) => {
                         const isActive = projectionActiveYears.includes(year);
                         return (
