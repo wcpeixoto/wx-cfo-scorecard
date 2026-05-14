@@ -656,16 +656,6 @@ body {
   max-width: 320px;
 }
 
-.error-banner {
-  margin: 0;
-  border: 1px solid #f2c8d4;
-  background: #fff0f4;
-  color: #8f2f48;
-  border-radius: 14px;
-  padding: 10px 12px;
-  font-size: 0.9rem;
-}
-
 .dashboard-load-error {
   display: flex;
   align-items: center;
@@ -1829,37 +1819,6 @@ body {
 .reserve-header-copy {
   display: grid;
   gap: 3px;
-}
-
-.reserve-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 12px 5px;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  line-height: 1;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.reserve-badge.is-caution {
-  background: color-mix(in srgb, var(--warning) 14%, transparent);
-  color: var(--warning);
-  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
-}
-
-.reserve-badge.is-positive {
-  background: color-mix(in srgb, var(--positive) 14%, transparent);
-  color: var(--positive);
-  border: 1px solid color-mix(in srgb, var(--positive) 30%, transparent);
-}
-
-.reserve-badge.is-neutral {
-  background: var(--bg-muted);
-  color: var(--text-secondary);
-  border: 1px solid var(--line);
 }
 
 .reserve-header h3 {
@@ -3248,21 +3207,6 @@ body {
   border-bottom: none;
 }
 
-.settings-field {
-  display: grid;
-  gap: 8px;
-  font-size: 0.9rem;
-}
-
-.settings-field input {
-  width: 100%;
-  border: 1px solid #d4def1;
-  border-radius: 12px;
-  height: 42px;
-  padding: 0 12px;
-  font: inherit;
-}
-
 .settings-actions {
   margin-top: 12px;
   display: flex;
@@ -3354,31 +3298,6 @@ body {
 }
 
 .account-setup-summary-notes li + li {
-  margin-top: 6px;
-}
-
-.account-setup-warnings {
-  margin-top: 14px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid #f3c7bb;
-  background: #fff6f2;
-  color: #8b3a28;
-}
-
-.account-setup-warning-title {
-  margin: 0 0 8px;
-  font-size: 0.86rem;
-  font-weight: 700;
-}
-
-.account-setup-warnings ul {
-  margin: 0;
-  padding-left: 18px;
-  font-size: 0.84rem;
-}
-
-.account-setup-warnings li + li {
   margin-top: 6px;
 }
 
@@ -4375,13 +4294,6 @@ body {
   font-size: 1.25rem;
   font-weight: 700;
   color: #101828;
-}
-
-.settings-section-subtitle {
-  margin: 0;
-  font-size: 0.875rem;
-  font-weight: 400;
-  color: #667085;
 }
 
 /* ── Rules section ───────────────────────────────────────────────── */
