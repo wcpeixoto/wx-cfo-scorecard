@@ -722,7 +722,12 @@ body {
 
 .card-head h3 {
   margin: 0;
-  font-size: 1.06rem;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.chart-card .card-head h3 {
+  font-weight: 500;
 }
 
 .subtle {
@@ -3109,13 +3114,6 @@ body {
 .rollups-table-card {
   padding: 24px;
   border-radius: 16px;
-}
-
-.rollups-table-card .card-head h3 {
-  font-size: 1.06rem;
-  font-weight: 700;
-  color: #101828;
-  margin: 0;
 }
 
 .rollups-table {
