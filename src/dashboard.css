@@ -783,7 +783,7 @@ body {
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
   line-height: 1.5;
 }
@@ -3385,7 +3385,7 @@ body {
   padding: 0 10px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -4439,7 +4439,7 @@ body {
   min-height: 26px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
   align-self: flex-start;
 }
