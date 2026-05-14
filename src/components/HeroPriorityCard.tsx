@@ -78,7 +78,7 @@ export function HeroPriorityCard({ signal }: HeroPriorityCardProps) {
     <article className="today-hero-card">
       <div className={isFading ? 'today-hero-body is-fading' : 'today-hero-body'}>
         {/* Card label */}
-        <p className="today-hero-card-title">Top Financial Priority</p>
+        <p className="today-hero-eyebrow">Top Financial Priority</p>
 
         {/* Header row: headline left, severity pill right */}
         <div className="hero-card-header">
