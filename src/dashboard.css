@@ -1929,23 +1929,6 @@ body {
   border-radius: 14px;
 }
 
-.novelty-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 18px;
-  padding: 0 6px;
-  border-radius: 999px;
-  border: 1px solid #d8e5f8;
-  background: #eef5ff;
-  color: #315993;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  line-height: 1;
-  white-space: nowrap;
-}
-
 .chart-card {
   overflow: hidden;
 }
@@ -2493,49 +2476,6 @@ body {
   color: var(--text-secondary);
 }
 
-.movers-card-head {
-  align-items: center;
-}
-
-.movers-group-toggle {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  background: #edf3ff;
-  border: 1px solid #d5e2f6;
-  border-radius: 12px;
-  padding: 3px;
-  flex-shrink: 0;
-}
-
-.movers-group-toggle button {
-  border: none;
-  background: transparent;
-  color: #4e6076;
-  border-radius: 9px;
-  padding: 7px 10px;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.78rem;
-  min-width: 94px;
-}
-
-.movers-group-toggle button.is-active {
-  background: #ffffff;
-  color: #1d3f84;
-  font-weight: 700;
-  box-shadow: 0 2px 10px rgba(31, 58, 107, 0.1);
-}
-
-.mover-side {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
 .mover-delta {
   text-align: right;
   display: grid;
@@ -2565,26 +2505,6 @@ body {
 
 .mover-delta.is-flat {
   color: #667b93;
-}
-
-.mover-sparkline {
-  width: 72px;
-  height: 24px;
-  color: #8aa2c7;
-  opacity: 0.7;
-  flex-shrink: 0;
-}
-
-.mover-sparkline.is-placeholder {
-  opacity: 0.35;
-}
-
-.mover-sparkline path {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .table-card {
