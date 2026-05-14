@@ -2746,8 +2746,8 @@ body {
 
 .projection-header .projection-table-title {
   margin: 0;
-  font-size: 1.06rem;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 600;
   color: #101828;
   flex: 1;
   min-width: 0;
