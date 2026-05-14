@@ -2686,7 +2686,8 @@ body {
 
 /* Grouped column headers */
 
-.table-card .projection-group-row th {
+.table-card .projection-group-row th,
+.pcd-drawer-panel .projection-group-row th {
   background: #F9FAFB;
   color: #667085;
   font-size: 14px;
@@ -2704,7 +2705,8 @@ body {
   padding-bottom: 8px !important;
 }
 
-.table-card .projection-sub-row th {
+.table-card .projection-sub-row th,
+.pcd-drawer-panel .projection-sub-row th {
   background: #F9FAFB;
   font-size: 12px;
   font-weight: 500;
@@ -6676,6 +6678,10 @@ body {
 
 .pcd-drawer-header {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 16px;
   padding-right: 40px;
 }
@@ -6709,15 +6715,22 @@ body {
   font-size: 18px;
   font-weight: 600;
   color: #101828;
-  margin: 0 0 12px 0;
+  margin: 0;
 }
 
 .pcd-drawer-toggle {
   display: inline-flex;
+  flex-shrink: 0;
 }
 
-.pcd-drawer-body {
-  /* Let ProjectionTableV2 own its own scroll wrapper */
+/* Left-align all comparison-mode cells inside the drawer (Forecast tab keeps
+   center-align via the .table-card-scoped rule above). Nowrap prevents large
+   numbers from breaking onto two lines — horizontal scroll inside the drawer
+   handles overflow. */
+.pcd-drawer-panel .projection-table.comparison-mode th,
+.pcd-drawer-panel .projection-table.comparison-mode td {
+  text-align: left;
+  white-space: nowrap;
 }
 
 @media (max-width: 767px) {

@@ -50,7 +50,7 @@ export function ProjectionCompareDrawer({
       >
         <div className="pcd-drawer-header">
           <button className="pcd-drawer-close" onClick={onClose} aria-label="Close">×</button>
-          <h2 className="pcd-drawer-title">Compare {currentForecastYear} to past year</h2>
+          <h2 className="pcd-drawer-title">Compare {currentForecastYear} to {compareYear}</h2>
           <div className="segmented-toggle pcd-drawer-toggle" role="group" aria-label="Compare year">
             {availableYears.map((year) => {
               const isActive = year === compareYear;
