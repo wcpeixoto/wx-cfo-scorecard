@@ -836,26 +836,6 @@ body {
   white-space: nowrap;
 }
 
-.kpi-delta-row {
-  margin: 5px 0 0;
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  line-height: 1.25;
-  font-variant-numeric: tabular-nums;
-}
-
-.kpi-delta-row.is-up {
-  color: #12B76A;
-}
-
-.kpi-delta-row.is-down {
-  color: #F04438;
-}
-
-.kpi-delta-row.is-flat {
-  color: var(--text-secondary);
-}
-
 .data-trust-note {
   margin: -4px 0 0;
   font-size: 12px;
@@ -2279,12 +2259,6 @@ body {
 
 .forecast-point-label-worst {
   font-weight: 600;
-}
-
-.forecast-point-label-last {
-  fill: #213f66;
-  font-size: 13px;
-  font-weight: 700;
 }
 
 .forecast-point-label.is-negative {
