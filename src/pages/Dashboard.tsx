@@ -334,7 +334,7 @@ const STATISTICS_CARD_OPTIONS: ApexOptions = {
     axisBorder: { show: false },
     axisTicks: { show: false },
     labels: {
-      style: { fontSize: '12px', fontWeight: 600, colors: chartTokens.axisTextSales },
+      style: { fontSize: '12px', fontWeight: 400, colors: chartTokens.axisTextSales },
     },
     // Crosshair styling handled by global .apexcharts-xcrosshairs in dashboard.css.
     crosshairs: { show: true },
