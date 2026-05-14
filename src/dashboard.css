@@ -284,13 +284,13 @@ body {
 .top-bar-context {
   margin: 4px 0 0;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: 14px;
 }
 
 .top-bar p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: 14px;
 }
 
 .top-bar-freshness {
@@ -693,7 +693,7 @@ body {
 
 .dashboard-load-error-detail {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 14px;
   color: var(--text-primary);
   opacity: 0.85;
 }
@@ -705,7 +705,7 @@ body {
   color: var(--text-primary);
   border-radius: 8px;
   padding: 8px 14px;
-  font-size: 0.88rem;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
 }
@@ -764,7 +764,7 @@ body {
 .kpi-label {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: 14px;
 }
 
 .kpi-value {
@@ -1966,7 +1966,7 @@ body {
 }
 
 .reserve-coverage-value {
-  font-size: 0.84rem;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -2664,7 +2664,7 @@ body {
   grid-template-columns: 10px 1fr auto;
   align-items: center;
   gap: 8px;
-  font-size: 0.85rem;
+  font-size: 14px;
 }
 
 .legend-dot {
@@ -3362,7 +3362,7 @@ body {
 
 .settings-meta p {
   margin: 6px 0;
-  font-size: 0.85rem;
+  font-size: 14px;
 }
 
 .settings-meta code {
@@ -3389,7 +3389,7 @@ body {
 
 .account-setup-summary-copy {
   margin: 0;
-  font-size: 0.86rem;
+  font-size: 14px;
   color: #48627f;
 }
 
@@ -3415,7 +3415,7 @@ body {
   margin: 0;
   padding-left: 18px;
   color: #48627f;
-  font-size: 0.84rem;
+  font-size: 14px;
 }
 
 .account-setup-summary-notes li + li {
@@ -3450,7 +3450,7 @@ body {
 .settings-error {
   margin: 12px 0 0;
   color: #b42318;
-  font-size: 0.88rem;
+  font-size: 14px;
 }
 
 .settings-table-wrap {
@@ -3585,7 +3585,7 @@ body {
   margin: 0;
   padding-left: 18px;
   color: #425a78;
-  font-size: 0.86rem;
+  font-size: 14px;
 }
 
 .import-issue-list li + li {
@@ -4489,7 +4489,7 @@ body {
 }
 
 .rules-row-sub {
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 400;
   color: #667085;
 }
@@ -4581,7 +4581,7 @@ body {
 
 .sys-status-title {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 400;
   color: #667085;
 }
@@ -4626,7 +4626,7 @@ body {
 }
 
 .sys-status-lines li {
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 500;
   color: #667085;
 }
