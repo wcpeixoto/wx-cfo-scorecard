@@ -366,12 +366,6 @@ body {
   gap: 6px;
 }
 
-.dig-here-period-control {
-  position: relative;
-  display: grid;
-  justify-items: end;
-}
-
 .top-controls input {
   width: 100%;
   border: 1px solid #d4dff1;
@@ -1456,21 +1450,6 @@ body {
   display: none;
 }
 
-.forecast-mode-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.forecast-mode-copy {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .forecast-chart-shell > .chart-card {
   border: none;
   background: transparent;
@@ -1695,20 +1674,6 @@ body {
   border: 1px solid var(--line);
   background: #fff;
   box-shadow: 0 1px 3px rgba(33, 62, 108, 0.22);
-}
-
-.forecast-advanced-panel {
-  display: grid;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--bg-panel);
-}
-
-.forecast-advanced-head {
-  display: grid;
-  gap: 2px;
 }
 
 .forecast-slider-control input[type='range']::-moz-range-track {
@@ -2142,10 +2107,6 @@ body {
   white-space: nowrap;
 }
 
-.dig-here-period-control .dig-here-month-picker {
-  min-width: 310px;
-}
-
 .chart-card {
   overflow: hidden;
 }
@@ -2230,13 +2191,6 @@ body {
   font-size: 0.79rem;
   font-weight: 500;
   letter-spacing: 0.01em;
-}
-
-.chart-select-control select:focus,
-.chart-select-control select:focus-visible {
-  outline: none;
-  border-color: #cfdcf2;
-  box-shadow: 0 0 0 1px rgba(207, 220, 242, 0.9);
 }
 
 .timeframe-menu {
@@ -4371,18 +4325,6 @@ body {
 /* Two-col secondary cards */
 .skeleton-medium-card {
   min-height: 180px;
-}
-
-/* Right rail skeleton container — matches grid-area of .right-panel but neutral surface */
-.skeleton-right-rail {
-  grid-area: right;
-  display: grid;
-  align-content: start;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 16px;
-  background: var(--bg-panel);
-  border: 1px solid var(--line);
 }
 
 /* ─── Loading Screen ───────────────────────────────────────── */
