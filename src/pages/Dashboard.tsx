@@ -355,6 +355,48 @@ const TOTAL_BALANCE_SPARKLINE_OPTIONS: ApexOptions = {
   legend: { show: false },
 };
 
+// UI Lab — MonthlyTargetCard radialBar fixtures (TailAdmin demo "Monthly Target").
+// Brand-blue gauge at 85% opacity, gray-200 track at 85% opacity. Illustrative — not wired.
+const MONTHLY_TARGET_GAUGE_VALUE = 75.55;
+
+const MONTHLY_TARGET_GAUGE_OPTIONS: ApexOptions = {
+  chart: {
+    type: 'radialBar',
+    width: 345,
+    height: 460,
+    parentHeightOffset: 0,
+    offsetY: 0,
+    fontFamily: 'Outfit, sans-serif',
+    toolbar: { show: false },
+    animations: { enabled: false },
+  },
+  colors: ['rgba(70, 95, 255, 0.85)'],
+  plotOptions: {
+    radialBar: {
+      startAngle: -90,
+      endAngle: 90,
+      hollow: { size: '88%' },
+      track: {
+        background: 'rgba(228, 231, 236, 0.85)',
+        strokeWidth: '100%',
+        margin: 0,
+      },
+      dataLabels: {
+        name: { show: false },
+        value: {
+          offsetY: -25,
+          fontSize: '36px',
+          fontWeight: 600,
+          color: '#1D2939',
+          formatter: (val) => `${val}%`,
+        },
+      },
+    },
+  },
+  stroke: { lineCap: 'round' },
+  labels: ['Progress'],
+};
+
 // UI Lab — StatisticsCard chart fixtures (TailAdmin /sales "Users & Revenue Statistics").
 // Local to StatisticsCard. Do not lift to a shared lib until a second consumer needs them.
 const STATISTICS_CARD_CATEGORIES = [
@@ -4773,6 +4815,77 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       </div>
                     </div>
                 </article>
+              </div>
+            </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">MonthlyTargetCard</h3>
+              <p className="ui-lab-section-subtitle">Source: demo.tailadmin.com (Monthly Target tile). Locked spec, 2026-05-15. Outer gray frame + inner white card + stats footer.</p>
+              <div className="ui-lab-preview-width--narrow">
+                <div className="monthly-target-card-frame">
+                  <article className="monthly-target-card">
+                    <div className="monthly-target-card__header">
+                      <div className="monthly-target-card__title-block">
+                        <h3 className="monthly-target-card__title">Monthly Target</h3>
+                        <p className="monthly-target-card__subtitle">Target you've set for each month</p>
+                      </div>
+                      <button type="button" className="monthly-target-card__kebab" aria-label="More options">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <circle cx="5" cy="12" r="1.5" fill="currentColor" />
+                          <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                          <circle cx="19" cy="12" r="1.5" fill="currentColor" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div className="monthly-target-card__gauge">
+                      <ReactApexChart
+                        options={MONTHLY_TARGET_GAUGE_OPTIONS}
+                        series={[MONTHLY_TARGET_GAUGE_VALUE]}
+                        type="radialBar"
+                        width={345}
+                        height={460}
+                      />
+                      <span className="monthly-target-card__delta-pill">+10%</span>
+                    </div>
+
+                    <p className="monthly-target-card__caption">
+                      You earn $3287 today, it's higher than last month. Keep up your good work!
+                    </p>
+                  </article>
+
+                  <div className="monthly-target-card__stats">
+                    <div className="monthly-target-card__stat">
+                      <p className="monthly-target-card__stat-label">Target</p>
+                      <p className="monthly-target-card__stat-value">
+                        $20K
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                          <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="#D92D20" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </p>
+                    </div>
+                    <span className="monthly-target-card__stat-divider" aria-hidden="true" />
+                    <div className="monthly-target-card__stat">
+                      <p className="monthly-target-card__stat-label">Revenue</p>
+                      <p className="monthly-target-card__stat-value">
+                        $20K
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                          <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="#039855" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </p>
+                    </div>
+                    <span className="monthly-target-card__stat-divider" aria-hidden="true" />
+                    <div className="monthly-target-card__stat">
+                      <p className="monthly-target-card__stat-label">Today</p>
+                      <p className="monthly-target-card__stat-value">
+                        $20K
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                          <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="#039855" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
