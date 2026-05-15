@@ -1785,6 +1785,12 @@ body {
 }
 
 .reserve-gauge-end-label {
+  font-size: 13px;
+  font-weight: 600;
+  fill: var(--text-primary);
+}
+
+.reserve-gauge-end-caption {
   font-size: 11px;
   fill: var(--text-secondary);
 }

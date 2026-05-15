@@ -64,12 +64,14 @@ function ReserveGauge({
   fillPercent,
   toneClass,
   reserveTarget,
+  currentCashBalance,
 }: {
   percentLabel: string;
   coverageLabel: string;
   fillPercent: number;
   toneClass: string;
   reserveTarget: number;
+  currentCashBalance: number;
 }) {
   const size = 280;
   const cx = size / 2;
@@ -94,17 +96,20 @@ function ReserveGauge({
   const fillPath = `M ${trackStart.x} ${trackStart.y} A ${radius} ${radius} 0 ${largeArc} 1 ${fillEnd.x} ${fillEnd.y}`;
 
   const labelY = cy + strokeWidth / 2 + 16;
+  const captionY = labelY + 15;
   const maxLabel = reserveTarget > EPSILON ? formatCompactCurrency(reserveTarget) : '—';
 
   return (
     <div className="reserve-gauge-wrap">
-      <svg viewBox={`0 0 ${size} ${labelY + 4}`} className="reserve-gauge-svg" aria-hidden="true">
+      <svg viewBox={`0 0 ${size} ${captionY + 4}`} className="reserve-gauge-svg" aria-hidden="true">
         <path d={trackPath} fill="none" stroke="var(--bg-muted)" strokeWidth={strokeWidth} strokeLinecap="round" />
         {clampedPercent > 0 && (
           <path d={fillPath} fill="none" className={`reserve-gauge-arc ${toneClass}`} strokeWidth={strokeWidth} strokeLinecap="round" />
         )}
-        <text x={trackStart.x - strokeWidth / 2} y={labelY} textAnchor="start" className="reserve-gauge-end-label">$0</text>
+        <text x={trackStart.x - strokeWidth / 2} y={labelY} textAnchor="start" className="reserve-gauge-end-label">{formatCurrency(currentCashBalance)}</text>
+        <text x={trackStart.x - strokeWidth / 2} y={captionY} textAnchor="start" className="reserve-gauge-end-caption">Cash on hand</text>
         <text x={trackEnd.x + strokeWidth / 2} y={labelY} textAnchor="end" className="reserve-gauge-end-label">{maxLabel}</text>
+        <text x={trackEnd.x + strokeWidth / 2} y={captionY} textAnchor="end" className="reserve-gauge-end-caption">Safety line</text>
       </svg>
       <div className="reserve-gauge-center">
         <span className="reserve-gauge-value">{percentLabel}</span>
@@ -144,6 +149,7 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
         fillPercent={reserveFillPercent}
         toneClass={reserveTone}
         reserveTarget={reserveTarget}
+        currentCashBalance={currentCashBalance}
       />
 
       <div className="reserve-coverage">
