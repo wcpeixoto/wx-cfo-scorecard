@@ -108,8 +108,9 @@ function ReserveGauge({
       </svg>
       <div className="reserve-gauge-center">
         <span className="reserve-gauge-value">{percentLabel}</span>
-        <span className="reserve-gauge-coverage">{coverageLabel}</span>
-        <span className="reserve-gauge-label">of reserve funded</span>
+        <span className="reserve-gauge-label">
+          <span className="reserve-gauge-coverage">{coverageLabel}</span> of reserve funded
+        </span>
       </div>
     </div>
   );
