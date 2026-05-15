@@ -375,7 +375,7 @@ const MONTHLY_TARGET_GAUGE_OPTIONS: ApexOptions = {
     radialBar: {
       startAngle: -90,
       endAngle: 90,
-      hollow: { size: '70%' },
+      hollow: { size: '88%' },
       track: {
         background: 'rgba(228, 231, 236, 0.85)',
         strokeWidth: '100%',
