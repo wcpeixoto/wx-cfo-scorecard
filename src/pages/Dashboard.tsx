@@ -2180,15 +2180,37 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   // UI Lab — Top Financial Priority mock-up data. Plugs into the same
   // detectSignals/rankPriorities pipeline as the live today-hero-card so
   // promotion to the Today page is a JSX swap, not a re-wire.
-  const uiLabPriorityHero = useMemo(() => {
-    const signals = detectSignals(model, filteredTxns, scenarioProjection);
-    const ranked = rankPriorities(signals);
-    return ranked.hero;
-  }, [model, filteredTxns, scenarioProjection]);
+  const uiLabPrioritySignals = useMemo(
+    () => detectSignals(model, filteredTxns, scenarioProjection),
+    [model, filteredTxns, scenarioProjection]
+  );
+  const uiLabPriorityHero = useMemo(
+    () => rankPriorities(uiLabPrioritySignals).hero,
+    [uiLabPrioritySignals]
+  );
   const uiLabPriorityProse = useMemo(
     () => getFallbackCopy(uiLabPriorityHero),
     [uiLabPriorityHero]
   );
+  // Cash-run-out projection (when cash is projected to go negative). Picked
+  // from the same detectSignals output, regardless of which signal ranked
+  // hero — so the v2 body can speak about the run-out date even when reserve
+  // is the headline.
+  const uiLabCashRunOutMonth = useMemo(() => {
+    const negative = uiLabPrioritySignals.find(s => s.type === 'cash_flow_negative');
+    const month = negative?.troughMonth;
+    if (!month) return null;
+    const match = month.match(/^(\d{4})-(\d{2})$/);
+    if (!match) return null;
+    const year = Number.parseInt(match[1], 10);
+    const monthIndex = Number.parseInt(match[2], 10) - 1;
+    if (!Number.isFinite(year) || monthIndex < 0 || monthIndex > 11) return null;
+    return new Date(Date.UTC(year, monthIndex, 1)).toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+  }, [uiLabPrioritySignals]);
   // Walk model.monthlyRollups backward from currentCashBalance to derive
   // month-start cash balances. Last 6 months feed the sparkline.
   const uiLabCashReserveSeries = useMemo(() => {
@@ -4849,9 +4871,14 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       </div>
 
                       <div className="priority-card-v2__body">
-                        <p className="priority-card-v2__body-row">{uiLabPriorityProse.action}</p>
-                        <p className="priority-card-v2__body-row">{uiLabPriorityProse.why}</p>
-                        <p className="priority-card-v2__body-row">{uiLabPriorityProse.currentState}</p>
+                        <p className="priority-card-v2__body-row">
+                          {uiLabCashRunOutMonth
+                            ? `At this pace, you are projected to run out of cash in ${uiLabCashRunOutMonth}.`
+                            : 'At your current pace, cash stays positive through the forecast window.'}
+                        </p>
+                        <p className="priority-card-v2__body-row">
+                          At your current margins and spending levels, you need $20K more per month to break even.
+                        </p>
                       </div>
                     </article>
                   );
