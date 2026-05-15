@@ -8,14 +8,6 @@ const EPSILON = 0.00001;
  *  Mirrors the reserve_critical threshold in signals.ts (RESERVE_CRITICAL_THRESHOLD = 0.50). */
 const RESERVE_TIGHT_THRESHOLD = 0.50;
 
-function formatCurrency(value: number): string {
-  return value.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  });
-}
-
 function formatCompactCurrency(value: number): string {
   const abs = Math.abs(value);
   if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -106,7 +98,7 @@ function ReserveGauge({
         {clampedPercent > 0 && (
           <path d={fillPath} fill="none" className={`reserve-gauge-arc ${toneClass}`} strokeWidth={strokeWidth} strokeLinecap="round" />
         )}
-        <text x={trackStart.x - strokeWidth / 2} y={labelY} textAnchor="start" className="reserve-gauge-end-label">{formatCurrency(currentCashBalance)}</text>
+        <text x={trackStart.x - strokeWidth / 2} y={labelY} textAnchor="start" className="reserve-gauge-end-label">{formatCompactCurrency(currentCashBalance)}</text>
         <text x={trackStart.x - strokeWidth / 2} y={captionY} textAnchor="start" className="reserve-gauge-end-caption">Cash on hand</text>
         <text x={trackEnd.x + strokeWidth / 2} y={labelY} textAnchor="end" className="reserve-gauge-end-label">{maxLabel}</text>
         <text x={trackEnd.x + strokeWidth / 2} y={captionY} textAnchor="end" className="reserve-gauge-end-caption">Safety line</text>
