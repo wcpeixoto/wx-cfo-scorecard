@@ -4682,26 +4682,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                   <div className="priority-card__header">
                       <div className="priority-card__title-block">
                         <h3 className="priority-card__title">Total Balance</h3>
-                        <p className="priority-card__subtitle">Your cash and balance for last 30 days</p>
-                      </div>
-                      <div className="priority-card__header-actions">
-                        <button type="button" className="priority-card__dropdown">
-                          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                            <circle cx="9" cy="9" r="9" fill="#3C3B6E" />
-                            <path d="M9 0a9 9 0 0 1 0 18V0Z" fill="#B22234" />
-                            <path d="M0 9h18" stroke="#FFFFFF" strokeWidth="0.6" />
-                          </svg>
-                          USD
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </button>
-                        <button type="button" className="priority-card__dropdown">
-                          June 2025
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </button>
                       </div>
                     </div>
 
