@@ -288,6 +288,43 @@ const UI_LAB_SPARKLINE_OPTIONS: ApexOptions = {
   legend: { show: false },
 };
 
+// UI Lab — TotalBalanceCard sparkline fixtures (TailAdmin /finance "Total Balance").
+// Brand-blue sparkline, 150×70px. Illustrative — not wired to production data.
+const TOTAL_BALANCE_SPARKLINE_SERIES = [42, 48, 44, 52, 50, 58, 55, 62, 60, 68, 65, 74];
+
+const TOTAL_BALANCE_SPARKLINE_OPTIONS: ApexOptions = {
+  chart: {
+    type: 'area',
+    height: 70,
+    fontFamily: 'Outfit, sans-serif',
+    sparkline: { enabled: true },
+    toolbar: { show: false },
+    animations: { enabled: false },
+  },
+  stroke: {
+    curve: 'smooth',
+    width: 1.5,
+    colors: [chartTokens.brand],
+  },
+  fill: {
+    type: 'gradient',
+    gradient: {
+      shadeIntensity: 1,
+      opacityFrom: 0.45,
+      opacityTo: 0,
+      stops: [0, 100],
+    },
+  },
+  colors: [chartTokens.brand],
+  dataLabels: { enabled: false },
+  markers: { size: 0 },
+  grid: { show: false },
+  xaxis: { labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
+  yaxis: { labels: { show: false } },
+  tooltip: { enabled: false },
+  legend: { show: false },
+};
+
 // UI Lab — StatisticsCard chart fixtures (TailAdmin /sales "Users & Revenue Statistics").
 // Local to StatisticsCard. Do not lift to a shared lib until a second consumer needs them.
 const STATISTICS_CARD_CATEGORIES = [
@@ -4561,6 +4598,100 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       options={STATISTICS_CARD_OPTIONS}
                       series={STATISTICS_CARD_SERIES}
                     />
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">TotalBalanceCard</h3>
+              <p className="ui-lab-section-subtitle">Source: demo.tailadmin.com/finance (Total Balance tile). Locked spec, 2026-05-15. Nested shell — outer 18px gray frame with bottom actions bar, inner 12px white card.</p>
+              <div className="ui-lab-preview-width--medium">
+                <article className="total-balance-card">
+                  <div className="total-balance-card__inner">
+                    <div className="total-balance-card__header">
+                      <div className="total-balance-card__title-block">
+                        <h3 className="total-balance-card__title">Total Balance</h3>
+                        <p className="total-balance-card__subtitle">Your cash and balance for last 30 days</p>
+                      </div>
+                      <div className="total-balance-card__header-actions">
+                        <button type="button" className="total-balance-card__dropdown">
+                          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                            <circle cx="9" cy="9" r="9" fill="#3C3B6E" />
+                            <path d="M9 0a9 9 0 0 1 0 18V0Z" fill="#B22234" />
+                            <path d="M0 9h18" stroke="#FFFFFF" strokeWidth="0.6" />
+                          </svg>
+                          USD
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                        <button type="button" className="total-balance-card__dropdown">
+                          June 2025
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="total-balance-card__amount-row">
+                      <div className="total-balance-card__amount-block">
+                        <h2 className="total-balance-card__amount">19,857.00</h2>
+                        <div className="total-balance-card__trend">
+                          <span className="total-balance-card__trend-delta total-balance-card__trend-delta--up">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                              <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            3.2%
+                          </span>
+                          <span className="total-balance-card__trend-text">than last month</span>
+                        </div>
+                      </div>
+                      <div className="total-balance-card__sparkline-slot" aria-hidden="true">
+                        <ReactApexChart
+                          options={TOTAL_BALANCE_SPARKLINE_OPTIONS}
+                          series={[{ name: 'value', data: TOTAL_BALANCE_SPARKLINE_SERIES }]}
+                          type="area"
+                          height={70}
+                          width="100%"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="total-balance-card__account-row">
+                      <span className="total-balance-card__account-label">Primary Account:</span>
+                      <span className="total-balance-card__account-number">•••• •••• •••• 5332</span>
+                      <div className="total-balance-card__account-actions">
+                        <button type="button" className="total-balance-card__icon-btn" aria-label="Copy account number">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.6" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                        <button type="button" className="total-balance-card__detail-btn">See Details</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="total-balance-card__actions">
+                    <button type="button" className="total-balance-card__action total-balance-card__action--primary">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      Transfer
+                    </button>
+                    <button type="button" className="total-balance-card__action total-balance-card__action--secondary">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M17 7 7 17M7 9v8h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      Received
+                    </button>
+                    <button type="button" className="total-balance-card__action total-balance-card__action--icon" aria-label="More actions">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
                   </div>
                 </article>
               </div>

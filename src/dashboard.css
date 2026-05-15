@@ -4718,6 +4718,292 @@ body {
   max-width: 800px;
 }
 
+/* Medium preview width — matches the 6/12-column slot the TotalBalanceCard
+   sits in on TailAdmin (effective ~564px). */
+.ui-lab-preview-width--medium {
+  width: 100%;
+  max-width: 580px;
+}
+
+/* ============================================================
+   .total-balance-card — canonical total balance card
+   Source: TailAdmin demo /finance "Total Balance" tile
+   Spec extracted: 2026-05-15
+   Nested shell: outer 18px gray frame holds inner white card +
+   bottom actions bar. Outer padding 6px / inner padding 24/24/32.
+   ============================================================ */
+
+.total-balance-card {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: #F2F4F7;
+  border: 1px solid #E4E7EC;
+  border-radius: 18px;
+  box-shadow: none;
+  font-family: 'Outfit', sans-serif;
+}
+
+.total-balance-card__inner {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px 24px 32px;
+}
+
+.total-balance-card__header {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+@media (min-width: 640px) {
+  .total-balance-card__header {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+}
+
+.total-balance-card__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.total-balance-card__title {
+  margin: 0;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 24px;
+  color: #1D2939;
+}
+
+.total-balance-card__subtitle {
+  margin: 0;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.total-balance-card__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.total-balance-card__dropdown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  background: transparent;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #344054;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  cursor: pointer;
+}
+
+.total-balance-card__dropdown svg {
+  flex-shrink: 0;
+}
+
+.total-balance-card__amount-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 28px;
+  border-bottom: 1px dashed #E4E7EC;
+}
+
+.total-balance-card__amount-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.total-balance-card__amount {
+  margin: 0 0 8px 0;
+  font-weight: 500;
+  font-size: 30px;
+  line-height: 36px;
+  color: #1D2939;
+}
+
+.total-balance-card__trend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.total-balance-card__trend-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.total-balance-card__trend-delta--up {
+  color: #039855;
+}
+
+.total-balance-card__trend-text {
+  color: #667085;
+}
+
+.total-balance-card__sparkline-slot {
+  width: 150px;
+  height: 70px;
+  margin-left: auto;
+}
+
+.total-balance-card__account-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 30px;
+}
+
+@media (min-width: 640px) {
+  .total-balance-card__account-row {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.total-balance-card__account-label {
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #344054;
+}
+
+.total-balance-card__account-number {
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 28px;
+  color: #344054;
+  letter-spacing: 0.02em;
+}
+
+.total-balance-card__account-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.total-balance-card__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 32px;
+  background: #FFFFFF;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  color: #344054;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  cursor: pointer;
+}
+
+.total-balance-card__icon-btn:hover {
+  background: #F2F4F7;
+}
+
+.total-balance-card__detail-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
+  background: #FFFFFF;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #344054;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  cursor: pointer;
+}
+
+.total-balance-card__detail-btn:hover {
+  background: #F2F4F7;
+}
+
+.total-balance-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 14px 16px;
+}
+
+.total-balance-card__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.total-balance-card__action--primary {
+  flex: 1 1 0;
+  background: #465FFF;
+  border: none;
+  color: #FFFFFF;
+}
+
+.total-balance-card__action--primary:hover {
+  background: #3A4FE0;
+}
+
+.total-balance-card__action--secondary {
+  flex: 1 1 0;
+  background: #FFFFFF;
+  border: 1px solid #D0D5DD;
+  color: #344054;
+}
+
+.total-balance-card__action--secondary:hover {
+  background: #F2F4F7;
+}
+
+.total-balance-card__action--icon {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: #FFFFFF;
+  border: 1px solid #D0D5DD;
+  color: #344054;
+}
+
+.total-balance-card__action--icon:hover {
+  background: #F2F4F7;
+}
+
 /* ============================================================
    .statistics-card — canonical statistics card (shell)
    Source: TailAdmin demo /sales "Users & Revenue Statistics"
