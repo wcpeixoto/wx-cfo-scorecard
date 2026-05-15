@@ -4605,11 +4605,10 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
             <div className="ui-lab-section">
               <h3 className="ui-lab-section-title">TotalBalanceCard</h3>
-              <p className="ui-lab-section-subtitle">Source: demo.tailadmin.com/finance (Total Balance tile). Locked spec, 2026-05-15. Nested shell — outer 18px gray frame with bottom actions bar, inner 12px white card.</p>
+              <p className="ui-lab-section-subtitle">Source: demo.tailadmin.com/finance (Total Balance tile). Locked spec, 2026-05-15. White card surface — outer gray frame and bottom actions bar intentionally omitted.</p>
               <div className="ui-lab-preview-width--medium">
                 <article className="total-balance-card">
-                  <div className="total-balance-card__inner">
-                    <div className="total-balance-card__header">
+                  <div className="total-balance-card__header">
                       <div className="total-balance-card__title-block">
                         <h3 className="total-balance-card__title">Total Balance</h3>
                         <p className="total-balance-card__subtitle">Your cash and balance for last 30 days</p>
@@ -4672,27 +4671,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                         <button type="button" className="total-balance-card__detail-btn">See Details</button>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="total-balance-card__actions">
-                    <button type="button" className="total-balance-card__action total-balance-card__action--primary">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      Transfer
-                    </button>
-                    <button type="button" className="total-balance-card__action total-balance-card__action--secondary">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M17 7 7 17M7 9v8h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      Received
-                    </button>
-                    <button type="button" className="total-balance-card__action total-balance-card__action--icon" aria-label="More actions">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  </div>
                 </article>
               </div>
             </div>

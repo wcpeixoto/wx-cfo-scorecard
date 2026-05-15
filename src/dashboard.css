@@ -4729,25 +4729,18 @@ body {
    .total-balance-card — canonical total balance card
    Source: TailAdmin demo /finance "Total Balance" tile
    Spec extracted: 2026-05-15
-   Nested shell: outer 18px gray frame holds inner white card +
-   bottom actions bar. Outer padding 6px / inner padding 24/24/32.
+   White card surface — outer gray frame and bottom actions bar
+   intentionally omitted per project variant.
    ============================================================ */
 
 .total-balance-card {
-  display: flex;
-  flex-direction: column;
-  padding: 6px;
-  background: #F2F4F7;
-  border: 1px solid #E4E7EC;
-  border-radius: 18px;
+  display: block;
+  padding: 24px 24px 32px;
+  background: #FFFFFF;
+  border: none;
+  border-radius: 12px;
   box-shadow: none;
   font-family: 'Outfit', sans-serif;
-}
-
-.total-balance-card__inner {
-  background: #FFFFFF;
-  border-radius: 12px;
-  padding: 24px 24px 32px;
 }
 
 .total-balance-card__header {
@@ -4942,65 +4935,6 @@ body {
 }
 
 .total-balance-card__detail-btn:hover {
-  background: #F2F4F7;
-}
-
-.total-balance-card__actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 20px 14px 16px;
-}
-
-.total-balance-card__action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 44px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  font-family: inherit;
-  font-weight: 500;
-  font-size: 14px;
-  line-height: 20px;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.total-balance-card__action--primary {
-  flex: 1 1 0;
-  background: #465FFF;
-  border: none;
-  color: #FFFFFF;
-}
-
-.total-balance-card__action--primary:hover {
-  background: #3A4FE0;
-}
-
-.total-balance-card__action--secondary {
-  flex: 1 1 0;
-  background: #FFFFFF;
-  border: 1px solid #D0D5DD;
-  color: #344054;
-}
-
-.total-balance-card__action--secondary:hover {
-  background: #F2F4F7;
-}
-
-.total-balance-card__action--icon {
-  flex: 0 0 44px;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  background: #FFFFFF;
-  border: 1px solid #D0D5DD;
-  color: #344054;
-}
-
-.total-balance-card__action--icon:hover {
   background: #F2F4F7;
 }
 
