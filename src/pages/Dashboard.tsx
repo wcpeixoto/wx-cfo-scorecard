@@ -4674,6 +4674,78 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 </article>
               </div>
             </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">TopFinancialPriorityCard (draft)</h3>
+              <p className="ui-lab-section-subtitle">Duplicate of TotalBalanceCard, scoped under <code>.priority-card</code>. Starting point for the Today page Top Financial Priority redesign — to be iterated independently of the canonical TotalBalanceCard.</p>
+              <div className="ui-lab-preview-width--medium">
+                <article className="priority-card">
+                  <div className="priority-card__header">
+                      <div className="priority-card__title-block">
+                        <h3 className="priority-card__title">Total Balance</h3>
+                        <p className="priority-card__subtitle">Your cash and balance for last 30 days</p>
+                      </div>
+                      <div className="priority-card__header-actions">
+                        <button type="button" className="priority-card__dropdown">
+                          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                            <circle cx="9" cy="9" r="9" fill="#3C3B6E" />
+                            <path d="M9 0a9 9 0 0 1 0 18V0Z" fill="#B22234" />
+                            <path d="M0 9h18" stroke="#FFFFFF" strokeWidth="0.6" />
+                          </svg>
+                          USD
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                        <button type="button" className="priority-card__dropdown">
+                          June 2025
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="priority-card__amount-row">
+                      <div className="priority-card__amount-block">
+                        <h2 className="priority-card__amount">19,857.00</h2>
+                        <div className="priority-card__trend">
+                          <span className="priority-card__trend-delta priority-card__trend-delta--up">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                              <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            3.2%
+                          </span>
+                          <span className="priority-card__trend-text">than last month</span>
+                        </div>
+                      </div>
+                      <div className="priority-card__sparkline-slot" aria-hidden="true">
+                        <ReactApexChart
+                          options={TOTAL_BALANCE_SPARKLINE_OPTIONS}
+                          series={[{ name: 'value', data: TOTAL_BALANCE_SPARKLINE_SERIES }]}
+                          type="area"
+                          height={70}
+                          width="100%"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="priority-card__account-row">
+                      <span className="priority-card__account-label">Primary Account:</span>
+                      <span className="priority-card__account-number">•••• •••• •••• 5332</span>
+                      <div className="priority-card__account-actions">
+                        <button type="button" className="priority-card__icon-btn" aria-label="Copy account number">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.6" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                        <button type="button" className="priority-card__detail-btn">See Details</button>
+                      </div>
+                    </div>
+                </article>
+              </div>
+            </div>
           </div>
         )}
       </section>
