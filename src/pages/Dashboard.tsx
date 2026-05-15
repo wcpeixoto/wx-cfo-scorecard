@@ -384,7 +384,7 @@ const MONTHLY_TARGET_GAUGE_OPTIONS: ApexOptions = {
       dataLabels: {
         name: { show: false },
         value: {
-          offsetY: -25,
+          offsetY: -55,
           fontSize: '36px',
           fontWeight: 600,
           color: '#1D2939',
