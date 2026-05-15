@@ -4585,7 +4585,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                           </svg>
                           32%
                         </p>
-                        <p className="revenue-card__delta-context">vs last month</p>
+                        <p className="revenue-card__delta-context">vs end of last month</p>
                       </div>
                     </div>
                     <svg
@@ -4830,10 +4830,10 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                                   </svg>
                                   {`${Math.abs(uiLabCashDelta.pct * 100).toFixed(1)}%`}
                                 </span>
-                                <span className="priority-card-v2__trend-text">vs last month</span>
+                                <span className="priority-card-v2__trend-text">vs end of last month</span>
                               </>
                             ) : (
-                              <span className="priority-card-v2__trend-text">— vs last month</span>
+                              <span className="priority-card-v2__trend-text">— vs end of last month</span>
                             )}
                           </div>
                         </div>
