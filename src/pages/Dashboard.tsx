@@ -4734,8 +4734,8 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
             </div>
 
             <div className="ui-lab-section">
-              <h3 className="ui-lab-section-title">Top Financial Priority Mock Up</h3>
-              <div className="ui-lab-preview-width--medium">
+              <h3 className="ui-lab-section-title">Top Financial Priority Mock Up — Base</h3>
+              <div className="ui-lab-preview-width--two-thirds">
                 {(() => {
                   const trend = priorityTrendLabel(uiLabPriorityHero.severity);
                   return (
@@ -4778,6 +4778,58 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                         <p className="priority-card__body-row">{uiLabPriorityProse.action}</p>
                         <p className="priority-card__body-row">{uiLabPriorityProse.why}</p>
                         <p className="priority-card__body-row">{uiLabPriorityProse.currentState}</p>
+                      </div>
+                    </article>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">Top Financial Priority Mock Up — Iterating</h3>
+              <div className="ui-lab-preview-width--two-thirds">
+                {(() => {
+                  const trend = priorityTrendLabel(uiLabPriorityHero.severity);
+                  return (
+                    <article className="priority-card-v2">
+                      <div className="priority-card-v2__header">
+                        <div className="priority-card-v2__title-block">
+                          <h3 className="priority-card-v2__title">Top Financial Priority</h3>
+                        </div>
+                        <span className={`today-severity-pill is-${uiLabPriorityHero.severity}`}>
+                          <span className="today-severity-dot" aria-hidden="true" />
+                          {severityLabelText(uiLabPriorityHero.severity)}
+                        </span>
+                      </div>
+
+                      <div className="priority-card-v2__amount-row">
+                        <div className="priority-card-v2__amount-block">
+                          <h2 className="priority-card-v2__amount">{formatCashOnHand(model.runway.currentCashBalance)}</h2>
+                          <div className="priority-card-v2__trend">
+                            <span className={`priority-card-v2__trend-delta priority-card-v2__trend-delta--${trend.tone}`}>
+                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                              {trend.label}
+                            </span>
+                            <span className="priority-card-v2__trend-text">cash cushion</span>
+                          </div>
+                        </div>
+                        <div className="priority-card-v2__sparkline-slot" aria-hidden="true">
+                          <ReactApexChart
+                            options={TOTAL_BALANCE_SPARKLINE_OPTIONS}
+                            series={[{ name: 'cashReserve', data: uiLabCashReserveSeries }]}
+                            type="area"
+                            height={70}
+                            width="100%"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="priority-card-v2__body">
+                        <p className="priority-card-v2__body-row">{uiLabPriorityProse.action}</p>
+                        <p className="priority-card-v2__body-row">{uiLabPriorityProse.why}</p>
+                        <p className="priority-card-v2__body-row">{uiLabPriorityProse.currentState}</p>
                       </div>
                     </article>
                   );

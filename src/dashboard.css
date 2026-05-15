@@ -4725,6 +4725,12 @@ body {
   max-width: 580px;
 }
 
+/* Two-thirds preview width — for hero-scale cards (Top Financial Priority)
+   that need to feel like the dominant element on the Today page. */
+.ui-lab-preview-width--two-thirds {
+  width: 66.6667%;
+}
+
 /* ============================================================
    .total-balance-card — canonical total balance card
    Source: TailAdmin demo /finance "Total Balance" tile
@@ -5060,6 +5066,126 @@ body {
 }
 
 .priority-card__sparkline-slot {
+  width: 150px;
+  height: 70px;
+  margin-left: auto;
+}
+
+/* ============================================================
+   .priority-card-v2 — Top Financial Priority iteration sandbox
+   Forked from .priority-card on 2026-05-15. Pixel-identical at
+   fork; will diverge as the redesign evolves. The original
+   .priority-card stays untouched as the comparison base.
+   ============================================================ */
+
+.priority-card-v2 {
+  display: block;
+  padding: 24px 24px 32px;
+  background: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  box-shadow: none;
+  font-family: 'Outfit', sans-serif;
+}
+
+.priority-card-v2__header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.priority-card-v2__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.priority-card-v2__title {
+  margin: 0;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 24px;
+  color: #1D2939;
+}
+
+.priority-card-v2__amount-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.priority-card-v2__amount-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.priority-card-v2__amount {
+  margin: 0 0 8px 0;
+  font-weight: 500;
+  font-size: 30px;
+  line-height: 36px;
+  color: #1D2939;
+}
+
+.priority-card-v2__trend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.priority-card-v2__trend-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.priority-card-v2__trend-delta--critical {
+  color: #F04438;
+}
+
+.priority-card-v2__trend-delta--warning {
+  color: #F79009;
+}
+
+.priority-card-v2__trend-delta--healthy {
+  color: #039855;
+}
+
+.priority-card-v2__trend-text {
+  color: #667085;
+}
+
+.priority-card-v2__body {
+  display: flex;
+  flex-direction: column;
+  margin-top: 24px;
+  border-top: 1px solid #E4E7EC;
+}
+
+.priority-card-v2__body-row {
+  margin: 0;
+  padding: 16px 0;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 22px;
+  color: #344054;
+  border-bottom: 1px solid #E4E7EC;
+}
+
+.priority-card-v2__body-row:last-child {
+  border-bottom: none;
+}
+
+.priority-card-v2__sparkline-slot {
   width: 150px;
   height: 70px;
   margin-left: auto;
