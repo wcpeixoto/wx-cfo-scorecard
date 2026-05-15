@@ -2204,6 +2204,19 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     }
     return balances;
   }, [model.monthlyRollups, model.runway.currentCashBalance]);
+  // Cash-on-hand month-over-month delta — drives the trend label and
+  // arrow direction in the priority-card-v2 hero. Direction-tinted
+  // (down = critical, up = healthy), distinct from the severity pill
+  // which reflects the overall priority signal.
+  const uiLabCashDelta = useMemo(() => {
+    const s = uiLabCashReserveSeries;
+    if (s.length < 2) return null;
+    const current = s[s.length - 1];
+    const prior = s[s.length - 2];
+    if (prior === 0 || !Number.isFinite(prior)) return null;
+    const pct = (current - prior) / Math.abs(prior);
+    return { pct, direction: pct >= 0 ? 'up' as const : 'down' as const };
+  }, [uiLabCashReserveSeries]);
 
   const forecastDecisionSignals = useMemo(
     () => computeForecastDecisionSignals(scenarioProjection, model.runway.reserveTarget),
@@ -4806,13 +4819,22 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                         <div className="priority-card-v2__amount-block">
                           <h2 className="priority-card-v2__amount">{formatCashOnHand(model.runway.currentCashBalance)}</h2>
                           <div className="priority-card-v2__trend">
-                            <span className={`priority-card-v2__trend-delta priority-card-v2__trend-delta--${trend.tone}`}>
-                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                                <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                              {trend.label}
-                            </span>
-                            <span className="priority-card-v2__trend-text">cash cushion</span>
+                            {uiLabCashDelta ? (
+                              <>
+                                <span className={`priority-card-v2__trend-delta priority-card-v2__trend-delta--${uiLabCashDelta.direction === 'up' ? 'healthy' : 'critical'}`}>
+                                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                    {uiLabCashDelta.direction === 'up'
+                                      ? <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                      : <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                    }
+                                  </svg>
+                                  {`${Math.abs(uiLabCashDelta.pct * 100).toFixed(1)}%`}
+                                </span>
+                                <span className="priority-card-v2__trend-text">vs last month</span>
+                              </>
+                            ) : (
+                              <span className="priority-card-v2__trend-text">— vs last month</span>
+                            )}
                           </div>
                         </div>
                         <div className="priority-card-v2__sparkline-slot" aria-hidden="true">
