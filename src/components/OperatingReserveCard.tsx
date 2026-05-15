@@ -60,11 +60,13 @@ function formatReservePercentLabel(percent: number | null): string {
 
 function ReserveGauge({
   percentLabel,
+  coverageLabel,
   fillPercent,
   toneClass,
   reserveTarget,
 }: {
   percentLabel: string;
+  coverageLabel: string;
   fillPercent: number;
   toneClass: string;
   reserveTarget: number;
@@ -106,6 +108,7 @@ function ReserveGauge({
       </svg>
       <div className="reserve-gauge-center">
         <span className="reserve-gauge-value">{percentLabel}</span>
+        <span className="reserve-gauge-coverage">{coverageLabel}</span>
         <span className="reserve-gauge-label">of reserve funded</span>
       </div>
     </div>
@@ -136,6 +139,7 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
 
       <ReserveGauge
         percentLabel={formatReservePercentLabel(reservePercent)}
+        coverageLabel={formatCoverageWeeks(coverageWeeks)}
         fillPercent={reserveFillPercent}
         toneClass={reserveTone}
         reserveTarget={reserveTarget}
