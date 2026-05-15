@@ -151,30 +151,6 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
         reserveTarget={reserveTarget}
         currentCashBalance={currentCashBalance}
       />
-
-      <div className="reserve-coverage">
-        <div className="reserve-coverage-head">
-          <span className="reserve-coverage-label">Cash on Hand</span>
-          <span className="reserve-coverage-value">{formatCoverageWeeks(coverageWeeks)}</span>
-        </div>
-        <div className="reserve-coverage-track" aria-hidden="true">
-          <div
-            className={`reserve-coverage-fill ${reserveTone}`}
-            style={{ width: `${Math.min((coverageWeeks / 4) * 100, 100)}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="reserve-stat-cards">
-        <div className="reserve-stat-card">
-          <span className="reserve-stat-card-label">Cash on hand</span>
-          <span className="reserve-stat-card-value">{formatCurrency(currentCashBalance)}</span>
-        </div>
-        <div className="reserve-stat-card">
-          <span className="reserve-stat-card-label">Safety line</span>
-          <span className="reserve-stat-card-value">{reserveTarget > EPSILON ? formatCurrency(reserveTarget) : '—'}</span>
-        </div>
-      </div>
     </article>
   );
 }
