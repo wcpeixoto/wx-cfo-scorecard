@@ -20,6 +20,9 @@ import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import { TodayPage } from '../components/TodayPage';
+import { detectSignals } from '../lib/priorities/signals';
+import { rankPriorities } from '../lib/priorities/rank';
+import { getFallbackCopy } from '../lib/priorities/copy';
 import { ProjectionCompareDrawer } from '../components/ProjectionCompareDrawer';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
 import ContractsSettingsPane from '../components/ContractsSettingsPane';
@@ -279,6 +282,70 @@ const UI_LAB_SPARKLINE_OPTIONS: ApexOptions = {
       ],
     },
   },
+  dataLabels: { enabled: false },
+  markers: { size: 0 },
+  grid: { show: false },
+  xaxis: { labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
+  yaxis: { labels: { show: false } },
+  tooltip: { enabled: false },
+  legend: { show: false },
+};
+
+// UI Lab — Top Financial Priority mock-up helpers.
+// Severity → trend label + tone class. Reuses the today-severity-pill palette
+// so the inline trend text stays in lockstep with the pill.
+function priorityTrendLabel(severity: 'critical' | 'warning' | 'healthy'): { label: string; tone: 'critical' | 'warning' | 'healthy' } {
+  switch (severity) {
+    case 'critical': return { label: 'Critically low', tone: 'critical' };
+    case 'warning':  return { label: 'Below safety line', tone: 'warning' };
+    case 'healthy':  return { label: 'On target', tone: 'healthy' };
+  }
+}
+
+function formatCashOnHand(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function severityLabelText(severity: 'critical' | 'warning' | 'healthy'): string {
+  switch (severity) {
+    case 'critical': return 'Needs attention';
+    case 'warning':  return 'Watch';
+    case 'healthy':  return 'Healthy';
+  }
+}
+
+// UI Lab — TotalBalanceCard sparkline fixtures (TailAdmin /finance "Total Balance").
+// Brand-blue sparkline, 150×70px. Illustrative — not wired to production data.
+const TOTAL_BALANCE_SPARKLINE_SERIES = [42, 48, 44, 52, 50, 58, 55, 62, 60, 68, 65, 74];
+
+const TOTAL_BALANCE_SPARKLINE_OPTIONS: ApexOptions = {
+  chart: {
+    type: 'area',
+    height: 70,
+    fontFamily: 'Outfit, sans-serif',
+    sparkline: { enabled: true },
+    toolbar: { show: false },
+    animations: { enabled: false },
+  },
+  stroke: {
+    curve: 'smooth',
+    width: 1.5,
+    colors: [chartTokens.brand],
+  },
+  fill: {
+    type: 'gradient',
+    gradient: {
+      shadeIntensity: 1,
+      opacityFrom: 0.45,
+      opacityTo: 0,
+      stops: [0, 100],
+    },
+  },
+  colors: [chartTokens.brand],
   dataLabels: { enabled: false },
   markers: { size: 0 },
   grid: { show: false },
@@ -2110,6 +2177,77 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     () => scenarioProjection.slice(0, forecastRangeMonths),
     [forecastRangeMonths, scenarioProjection]
   );
+  // UI Lab — Top Financial Priority mock-up data. Plugs into the same
+  // detectSignals/rankPriorities pipeline as the live today-hero-card so
+  // promotion to the Today page is a JSX swap, not a re-wire.
+  const uiLabPrioritySignals = useMemo(
+    () => detectSignals(model, filteredTxns, scenarioProjection),
+    [model, filteredTxns, scenarioProjection]
+  );
+  const uiLabPriorityHero = useMemo(
+    () => rankPriorities(uiLabPrioritySignals).hero,
+    [uiLabPrioritySignals]
+  );
+  const uiLabPriorityProse = useMemo(
+    () => getFallbackCopy(uiLabPriorityHero),
+    [uiLabPriorityHero]
+  );
+  // Cash-run-out projection (when cash is projected to go negative). Picked
+  // from the same detectSignals output, regardless of which signal ranked
+  // hero — so the v2 body can speak about the run-out horizon even when
+  // reserve is the headline. Returns both months-from-now and the long-form
+  // date; the JSX layer picks the format based on a 10-month threshold:
+  // close horizons read as "in X months", farther horizons as a date.
+  const uiLabCashRunOut = useMemo(() => {
+    const negative = uiLabPrioritySignals.find(s => s.type === 'cash_flow_negative');
+    const month = negative?.troughMonth;
+    if (!month) return null;
+    const match = month.match(/^(\d{4})-(\d{2})$/);
+    if (!match) return null;
+    const troughYear = Number.parseInt(match[1], 10);
+    const troughMonthIndex = Number.parseInt(match[2], 10) - 1;
+    if (!Number.isFinite(troughYear) || troughMonthIndex < 0 || troughMonthIndex > 11) return null;
+    const now = new Date();
+    const months = Math.max(
+      0,
+      (troughYear * 12 + troughMonthIndex) - (now.getUTCFullYear() * 12 + now.getUTCMonth())
+    );
+    const date = new Date(Date.UTC(troughYear, troughMonthIndex, 1)).toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+    return { months, date };
+  }, [uiLabPrioritySignals]);
+  // Walk model.monthlyRollups backward from currentCashBalance to derive
+  // month-start cash balances. Last 6 months feed the sparkline.
+  const uiLabCashReserveSeries = useMemo(() => {
+    const sorted = [...model.monthlyRollups].sort((a, b) => a.month.localeCompare(b.month));
+    const last6 = sorted.slice(-6);
+    if (last6.length === 0) return [] as number[];
+    const balances: number[] = new Array(last6.length);
+    let balance = model.runway.currentCashBalance;
+    balances[last6.length - 1] = balance;
+    for (let i = last6.length - 1; i > 0; i--) {
+      balance -= last6[i].netCashFlow;
+      balances[i - 1] = balance;
+    }
+    return balances;
+  }, [model.monthlyRollups, model.runway.currentCashBalance]);
+  // Cash-on-hand month-over-month delta — drives the trend label and
+  // arrow direction in the priority-card-v2 hero. Direction-tinted
+  // (down = critical, up = healthy), distinct from the severity pill
+  // which reflects the overall priority signal.
+  const uiLabCashDelta = useMemo(() => {
+    const s = uiLabCashReserveSeries;
+    if (s.length < 2) return null;
+    const current = s[s.length - 1];
+    const prior = s[s.length - 2];
+    if (prior === 0 || !Number.isFinite(prior)) return null;
+    const pct = (current - prior) / Math.abs(prior);
+    return { pct, direction: pct >= 0 ? 'up' as const : 'down' as const };
+  }, [uiLabCashReserveSeries]);
+
   const forecastDecisionSignals = useMemo(
     () => computeForecastDecisionSignals(scenarioProjection, model.runway.reserveTarget),
     [model.runway.reserveTarget, scenarioProjection]
@@ -4477,7 +4615,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                           </svg>
                           32%
                         </p>
-                        <p className="revenue-card__delta-context">vs last month</p>
+                        <p className="revenue-card__delta-context">vs end of last month</p>
                       </div>
                     </div>
                     <svg
@@ -4563,6 +4701,218 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                     />
                   </div>
                 </article>
+              </div>
+            </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">TotalBalanceCard</h3>
+              <p className="ui-lab-section-subtitle">Source: demo.tailadmin.com/finance (Total Balance tile). Locked spec, 2026-05-15. White card surface — outer gray frame and bottom actions bar intentionally omitted.</p>
+              <div className="ui-lab-preview-width--medium">
+                <article className="total-balance-card">
+                  <div className="total-balance-card__header">
+                      <div className="total-balance-card__title-block">
+                        <h3 className="total-balance-card__title">Total Balance</h3>
+                        <p className="total-balance-card__subtitle">Your cash and balance for last 30 days</p>
+                      </div>
+                      <div className="total-balance-card__header-actions">
+                        <button type="button" className="total-balance-card__dropdown">
+                          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                            <circle cx="9" cy="9" r="9" fill="#3C3B6E" />
+                            <path d="M9 0a9 9 0 0 1 0 18V0Z" fill="#B22234" />
+                            <path d="M0 9h18" stroke="#FFFFFF" strokeWidth="0.6" />
+                          </svg>
+                          USD
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                        <button type="button" className="total-balance-card__dropdown">
+                          June 2025
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="total-balance-card__amount-row">
+                      <div className="total-balance-card__amount-block">
+                        <h2 className="total-balance-card__amount">19,857.00</h2>
+                        <div className="total-balance-card__trend">
+                          <span className="total-balance-card__trend-delta total-balance-card__trend-delta--up">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                              <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            3.2%
+                          </span>
+                          <span className="total-balance-card__trend-text">than last month</span>
+                        </div>
+                      </div>
+                      <div className="total-balance-card__sparkline-slot" aria-hidden="true">
+                        <ReactApexChart
+                          options={TOTAL_BALANCE_SPARKLINE_OPTIONS}
+                          series={[{ name: 'value', data: TOTAL_BALANCE_SPARKLINE_SERIES }]}
+                          type="area"
+                          height={70}
+                          width="100%"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="total-balance-card__account-row">
+                      <span className="total-balance-card__account-label">Primary Account:</span>
+                      <span className="total-balance-card__account-number">•••• •••• •••• 5332</span>
+                      <div className="total-balance-card__account-actions">
+                        <button type="button" className="total-balance-card__icon-btn" aria-label="Copy account number">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.6" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                        <button type="button" className="total-balance-card__detail-btn">See Details</button>
+                      </div>
+                    </div>
+                </article>
+              </div>
+            </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">Top Financial Priority Mock Up — Base</h3>
+              <div className="ui-lab-preview-width--two-thirds">
+                {(() => {
+                  const trend = priorityTrendLabel(uiLabPriorityHero.severity);
+                  return (
+                    <article className="priority-card">
+                      <div className="priority-card__header">
+                        <div className="priority-card__title-block">
+                          <h3 className="priority-card__title">Top Financial Priority</h3>
+                        </div>
+                        <span className={`today-severity-pill is-${uiLabPriorityHero.severity}`}>
+                          <span className="today-severity-dot" aria-hidden="true" />
+                          {severityLabelText(uiLabPriorityHero.severity)}
+                        </span>
+                      </div>
+
+                      <div className="priority-card__amount-row">
+                        <div className="priority-card__amount-block">
+                          <h2 className="priority-card__amount">{formatCashOnHand(model.runway.currentCashBalance)}</h2>
+                          <div className="priority-card__trend">
+                            <span className={`priority-card__trend-delta priority-card__trend-delta--${trend.tone}`}>
+                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                              {trend.label}
+                            </span>
+                            <span className="priority-card__trend-text">cash cushion</span>
+                          </div>
+                        </div>
+                        <div className="priority-card__sparkline-slot" aria-hidden="true">
+                          <ReactApexChart
+                            options={TOTAL_BALANCE_SPARKLINE_OPTIONS}
+                            series={[{ name: 'cashReserve', data: uiLabCashReserveSeries }]}
+                            type="area"
+                            height={70}
+                            width="100%"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="priority-card__body">
+                        <p className="priority-card__body-row">{uiLabPriorityProse.action}</p>
+                        <p className="priority-card__body-row">{uiLabPriorityProse.why}</p>
+                        <p className="priority-card__body-row">{uiLabPriorityProse.currentState}</p>
+                      </div>
+                    </article>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">Top Financial Priority Mock Up — Iterating</h3>
+              <div className="ui-lab-preview-width--two-thirds">
+                {(() => {
+                  const trend = priorityTrendLabel(uiLabPriorityHero.severity);
+                  return (
+                    <article className="priority-card-v2">
+                      <div className="priority-card-v2__header">
+                        <div className="priority-card-v2__title-block">
+                          <h3 className="priority-card-v2__title">Cash in Hand</h3>
+                        </div>
+                        <span className={`today-severity-pill is-${uiLabPriorityHero.severity}`}>
+                          <span className="today-severity-dot" aria-hidden="true" />
+                          {severityLabelText(uiLabPriorityHero.severity)}
+                        </span>
+                      </div>
+
+                      <div className="priority-card-v2__amount-row">
+                        <div className="priority-card-v2__amount-block">
+                          <h2 className="priority-card-v2__amount">{formatCashOnHand(model.runway.currentCashBalance)}</h2>
+                          <div className="priority-card-v2__trend">
+                            {uiLabCashDelta ? (
+                              <>
+                                <span className={`priority-card-v2__trend-delta priority-card-v2__trend-delta--${uiLabCashDelta.direction === 'up' ? 'healthy' : 'critical'}`}>
+                                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                    {uiLabCashDelta.direction === 'up'
+                                      ? <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                      : <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                    }
+                                  </svg>
+                                  {`${Math.abs(uiLabCashDelta.pct * 100).toFixed(1)}%`}
+                                </span>
+                                <span className="priority-card-v2__trend-text">vs end of last month</span>
+                              </>
+                            ) : (
+                              <span className="priority-card-v2__trend-text">— vs end of last month</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="priority-card-v2__sparkline-slot" aria-hidden="true">
+                          <ReactApexChart
+                            options={TOTAL_BALANCE_SPARKLINE_OPTIONS}
+                            series={[{ name: 'cashReserve', data: uiLabCashReserveSeries }]}
+                            type="area"
+                            height={70}
+                            width="100%"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="priority-card-v2__body">
+                        <p className="priority-card-v2__body-row">
+                          <span className="priority-card-v2__body-row-icon" aria-hidden="true">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="22 17 13.5 8.5 8.5 13.5 2 7" stroke="currentColor" />
+                              <polyline points="16 17 22 17 22 11" stroke="currentColor" />
+                            </svg>
+                          </span>
+                          <span>
+                            {(() => {
+                              if (uiLabCashRunOut === null) return 'At your current pace, cash stays positive through the forecast window.';
+                              const { months, date } = uiLabCashRunOut;
+                              if (months === 0) return 'At this pace, you are projected to run out of cash this month.';
+                              // Close horizons (<10 months) read as a duration; farther
+                              // horizons read as an absolute date to keep the sentence
+                              // from feeling distant or abstract.
+                              if (months < 10) return `At this pace, you are projected to run out of cash in ${months} ${months === 1 ? 'month' : 'months'}.`;
+                              return `At this pace, you are projected to run out of cash in ${date}.`;
+                            })()}
+                          </span>
+                        </p>
+                        <p className="priority-card-v2__body-row">
+                          <span className="priority-card-v2__body-row-icon" aria-hidden="true">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" />
+                              <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" stroke="currentColor" />
+                              <path d="M12 18V6" stroke="currentColor" />
+                            </svg>
+                          </span>
+                          <span>At your current margins and spending levels, you need $20K more per month to break even.</span>
+                        </p>
+                      </div>
+                    </article>
+                  );
+                })()}
               </div>
             </div>
           </div>

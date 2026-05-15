@@ -4718,6 +4718,493 @@ body {
   max-width: 800px;
 }
 
+/* Medium preview width — matches the 6/12-column slot the TotalBalanceCard
+   sits in on TailAdmin (effective ~564px). */
+.ui-lab-preview-width--medium {
+  width: 100%;
+  max-width: 580px;
+}
+
+/* Two-thirds preview width — for hero-scale cards (Top Financial Priority)
+   that need to feel like the dominant element on the Today page. */
+.ui-lab-preview-width--two-thirds {
+  width: 66.6667%;
+}
+
+/* ============================================================
+   .total-balance-card — canonical total balance card
+   Source: TailAdmin demo /finance "Total Balance" tile
+   Spec extracted: 2026-05-15
+   White card surface — outer gray frame and bottom actions bar
+   intentionally omitted per project variant.
+   ============================================================ */
+
+.total-balance-card {
+  display: block;
+  padding: 24px 24px 32px;
+  background: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  box-shadow: none;
+  font-family: 'Outfit', sans-serif;
+}
+
+.total-balance-card__header {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+@media (min-width: 640px) {
+  .total-balance-card__header {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+}
+
+.total-balance-card__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.total-balance-card__title {
+  margin: 0;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 24px;
+  color: #1D2939;
+}
+
+.total-balance-card__subtitle {
+  margin: 0;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.total-balance-card__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.total-balance-card__dropdown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  background: transparent;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #344054;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  cursor: pointer;
+}
+
+.total-balance-card__dropdown svg {
+  flex-shrink: 0;
+}
+
+.total-balance-card__amount-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 28px;
+  border-bottom: 1px dashed #E4E7EC;
+}
+
+.total-balance-card__amount-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.total-balance-card__amount {
+  margin: 0 0 8px 0;
+  font-weight: 500;
+  font-size: 30px;
+  line-height: 36px;
+  color: #1D2939;
+}
+
+.total-balance-card__trend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.total-balance-card__trend-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.total-balance-card__trend-delta--up {
+  color: #039855;
+}
+
+.total-balance-card__trend-text {
+  color: #667085;
+}
+
+.total-balance-card__sparkline-slot {
+  width: 150px;
+  height: 70px;
+  margin-left: auto;
+}
+
+.total-balance-card__account-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 30px;
+}
+
+@media (min-width: 640px) {
+  .total-balance-card__account-row {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.total-balance-card__account-label {
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #344054;
+}
+
+.total-balance-card__account-number {
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 28px;
+  color: #344054;
+  letter-spacing: 0.02em;
+}
+
+.total-balance-card__account-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.total-balance-card__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 32px;
+  background: #FFFFFF;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  color: #344054;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  cursor: pointer;
+}
+
+.total-balance-card__icon-btn:hover {
+  background: #F2F4F7;
+}
+
+.total-balance-card__detail-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
+  background: #FFFFFF;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #344054;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  cursor: pointer;
+}
+
+.total-balance-card__detail-btn:hover {
+  background: #F2F4F7;
+}
+
+/* ============================================================
+   .priority-card — Top Financial Priority card (draft)
+   Forked from .total-balance-card on 2026-05-15. Diverges
+   independently. Do not consolidate until a third consumer
+   needs the same shell.
+   ============================================================ */
+
+.priority-card {
+  display: block;
+  padding: 24px 24px 32px;
+  background: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  box-shadow: none;
+  font-family: 'Outfit', sans-serif;
+}
+
+.priority-card__header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.priority-card__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.priority-card__title {
+  margin: 0;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 24px;
+  color: #1D2939;
+}
+
+.priority-card__amount-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.priority-card__amount-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.priority-card__amount {
+  margin: 0 0 8px 0;
+  font-weight: 500;
+  font-size: 30px;
+  line-height: 36px;
+  color: #1D2939;
+}
+
+.priority-card__trend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.priority-card__trend-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.priority-card__trend-delta--up {
+  color: #039855;
+}
+
+.priority-card__trend-delta--critical {
+  color: #F04438;
+}
+
+.priority-card__trend-delta--warning {
+  color: #F79009;
+}
+
+.priority-card__trend-delta--healthy {
+  color: #039855;
+}
+
+.priority-card__trend-text {
+  color: #667085;
+}
+
+/* Three-row diagnostic body — action / why / currentState. Hairline
+   dividers between rows match the existing today-hero-card sub-section
+   rhythm. */
+.priority-card__body {
+  display: flex;
+  flex-direction: column;
+  margin-top: 24px;
+  border-top: 1px solid #E4E7EC;
+}
+
+.priority-card__body-row {
+  margin: 0;
+  padding: 16px 0;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 22px;
+  color: #344054;
+  border-bottom: 1px solid #E4E7EC;
+}
+
+.priority-card__body-row:last-child {
+  border-bottom: none;
+}
+
+.priority-card__sparkline-slot {
+  width: 150px;
+  height: 70px;
+  margin-left: auto;
+}
+
+/* ============================================================
+   .priority-card-v2 — Top Financial Priority iteration sandbox
+   Forked from .priority-card on 2026-05-15. Pixel-identical at
+   fork; will diverge as the redesign evolves. The original
+   .priority-card stays untouched as the comparison base.
+   ============================================================ */
+
+.priority-card-v2 {
+  display: block;
+  padding: 24px 24px 32px;
+  background: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  box-shadow: none;
+  font-family: 'Outfit', sans-serif;
+}
+
+.priority-card-v2__header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.priority-card-v2__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.priority-card-v2__title {
+  margin: 0;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 24px;
+  color: #1D2939;
+}
+
+.priority-card-v2__amount-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.priority-card-v2__amount-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.priority-card-v2__amount {
+  margin: 0 0 8px 0;
+  font-weight: 500;
+  font-size: 30px;
+  line-height: 36px;
+  color: #1D2939;
+}
+
+.priority-card-v2__trend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.priority-card-v2__trend-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.priority-card-v2__trend-delta--critical {
+  color: #F04438;
+}
+
+.priority-card-v2__trend-delta--warning {
+  color: #F79009;
+}
+
+.priority-card-v2__trend-delta--healthy {
+  color: #039855;
+}
+
+.priority-card-v2__trend-text {
+  color: #667085;
+}
+
+.priority-card-v2__body {
+  display: flex;
+  flex-direction: column;
+  margin-top: 24px;
+  border-top: 1px solid #E4E7EC;
+}
+
+.priority-card-v2__body-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+  padding: 16px 0;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 22px;
+  color: #344054;
+  border-bottom: 1px solid #E4E7EC;
+}
+
+.priority-card-v2__body-row:last-child {
+  border-bottom: none;
+}
+
+.priority-card-v2__body-row-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  color: #667085;
+}
+
+.priority-card-v2__sparkline-slot {
+  width: 150px;
+  height: 70px;
+  margin-left: auto;
+}
+
 /* ============================================================
    .statistics-card — canonical statistics card (shell)
    Source: TailAdmin demo /sales "Users & Revenue Statistics"
