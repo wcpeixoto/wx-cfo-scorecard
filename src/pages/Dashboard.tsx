@@ -2195,9 +2195,10 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   // Cash-run-out projection (when cash is projected to go negative). Picked
   // from the same detectSignals output, regardless of which signal ranked
   // hero — so the v2 body can speak about the run-out horizon even when
-  // reserve is the headline. Reports months-from-now (not the absolute date)
-  // so the operator doesn't have to do the subtraction.
-  const uiLabCashRunOutMonths = useMemo(() => {
+  // reserve is the headline. Returns both months-from-now and the long-form
+  // date; the JSX layer picks the format based on a 10-month threshold:
+  // close horizons read as "in X months", farther horizons as a date.
+  const uiLabCashRunOut = useMemo(() => {
     const negative = uiLabPrioritySignals.find(s => s.type === 'cash_flow_negative');
     const month = negative?.troughMonth;
     if (!month) return null;
@@ -2207,8 +2208,16 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     const troughMonthIndex = Number.parseInt(match[2], 10) - 1;
     if (!Number.isFinite(troughYear) || troughMonthIndex < 0 || troughMonthIndex > 11) return null;
     const now = new Date();
-    const diff = (troughYear * 12 + troughMonthIndex) - (now.getUTCFullYear() * 12 + now.getUTCMonth());
-    return Math.max(0, diff);
+    const months = Math.max(
+      0,
+      (troughYear * 12 + troughMonthIndex) - (now.getUTCFullYear() * 12 + now.getUTCMonth())
+    );
+    const date = new Date(Date.UTC(troughYear, troughMonthIndex, 1)).toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+    return { months, date };
   }, [uiLabPrioritySignals]);
   // Walk model.monthlyRollups backward from currentCashBalance to derive
   // month-start cash balances. Last 6 months feed the sparkline.
@@ -4871,11 +4880,16 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
                       <div className="priority-card-v2__body">
                         <p className="priority-card-v2__body-row">
-                          {uiLabCashRunOutMonths === null
-                            ? 'At your current pace, cash stays positive through the forecast window.'
-                            : uiLabCashRunOutMonths === 0
-                              ? 'At this pace, you are projected to run out of cash this month.'
-                              : `At this pace, you are projected to run out of cash in ${uiLabCashRunOutMonths} ${uiLabCashRunOutMonths === 1 ? 'month' : 'months'}.`}
+                          {(() => {
+                            if (uiLabCashRunOut === null) return 'At your current pace, cash stays positive through the forecast window.';
+                            const { months, date } = uiLabCashRunOut;
+                            if (months === 0) return 'At this pace, you are projected to run out of cash this month.';
+                            // Close horizons (<10 months) read as a duration; farther
+                            // horizons read as an absolute date to keep the sentence
+                            // from feeling distant or abstract.
+                            if (months < 10) return `At this pace, you are projected to run out of cash in ${months} ${months === 1 ? 'month' : 'months'}.`;
+                            return `At this pace, you are projected to run out of cash in ${date}.`;
+                          })()}
                         </p>
                         <p className="priority-card-v2__body-row">
                           At your current margins and spending levels, you need $20K more per month to break even.
