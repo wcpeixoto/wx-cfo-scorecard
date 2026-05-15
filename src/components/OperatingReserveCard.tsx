@@ -143,7 +143,7 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
 
       <div className="reserve-coverage">
         <div className="reserve-coverage-head">
-          <span className="reserve-coverage-label">Current coverage</span>
+          <span className="reserve-coverage-label">Cash on Hand</span>
           <span className="reserve-coverage-value">{formatCoverageWeeks(coverageWeeks)}</span>
         </div>
         <div className="reserve-coverage-track" aria-hidden="true">
