@@ -1772,12 +1772,10 @@ body {
 }
 
 .reserve-gauge-coverage {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 12px;
+  color: var(--text-secondary);
   white-space: nowrap;
   line-height: 1.15;
-  margin-top: 2px;
 }
 
 .reserve-gauge-label {
