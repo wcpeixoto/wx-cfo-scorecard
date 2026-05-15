@@ -362,7 +362,10 @@ const MONTHLY_TARGET_GAUGE_VALUE = 75.55;
 const MONTHLY_TARGET_GAUGE_OPTIONS: ApexOptions = {
   chart: {
     type: 'radialBar',
-    height: 458,
+    width: 345,
+    height: 460,
+    parentHeightOffset: 0,
+    offsetY: 0,
     fontFamily: 'Outfit, sans-serif',
     toolbar: { show: false },
     animations: { enabled: false },
@@ -4840,7 +4843,8 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                         options={MONTHLY_TARGET_GAUGE_OPTIONS}
                         series={[MONTHLY_TARGET_GAUGE_VALUE]}
                         type="radialBar"
-                        height={458}
+                        width={345}
+                        height={460}
                       />
                       <span className="monthly-target-card__delta-pill">+10%</span>
                     </div>

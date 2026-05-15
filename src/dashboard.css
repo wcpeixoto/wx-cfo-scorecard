@@ -4800,13 +4800,21 @@ body {
 
 .monthly-target-card__gauge {
   position: relative;
-  margin-top: 16px;
+  margin: 16px auto 0;
+  width: 345px;
   height: 229px;
+  max-width: 100%;
   overflow: hidden;
 }
 
 .monthly-target-card__gauge .apexcharts-canvas {
   margin: 0 auto;
+  height: 229px !important;
+}
+
+.monthly-target-card__gauge .apexcharts-svg {
+  height: 229px !important;
+  overflow: visible;
 }
 
 .monthly-target-card__delta-pill {
