@@ -4794,7 +4794,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                     <article className="priority-card-v2">
                       <div className="priority-card-v2__header">
                         <div className="priority-card-v2__title-block">
-                          <h3 className="priority-card-v2__title">Top Financial Priority</h3>
+                          <h3 className="priority-card-v2__title">Cash in Hand</h3>
                         </div>
                         <span className={`today-severity-pill is-${uiLabPriorityHero.severity}`}>
                           <span className="today-severity-dot" aria-hidden="true" />
