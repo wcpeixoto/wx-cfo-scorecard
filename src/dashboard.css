@@ -4731,11 +4731,10 @@ body {
   width: 66.6667%;
 }
 
-/* Narrow preview width — matches the ~395px slot the MonthlyTargetCard
-   sits in on TailAdmin. */
+/* Narrow preview width — 5/12 of the page width, the slot the
+   MonthlyTargetCard is intended to occupy on the real dashboard. */
 .ui-lab-preview-width--narrow {
-  width: 100%;
-  max-width: 395px;
+  width: 41.6667%;
 }
 
 /* ============================================================
