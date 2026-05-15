@@ -4756,7 +4756,6 @@ body {
   border-radius: 16px;
   background: #FFFFFF;
   padding: 24px 24px 44px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
 }
 
 .monthly-target-card__header {
@@ -4803,14 +4802,19 @@ body {
 .monthly-target-card__gauge {
   position: relative;
   margin-top: 16px;
-  max-height: 195px;
+  height: 229px;
+  overflow: hidden;
+}
+
+.monthly-target-card__gauge .apexcharts-canvas {
+  margin: 0 auto;
 }
 
 .monthly-target-card__delta-pill {
   position: absolute;
   left: 50%;
-  top: 85%;
-  transform: translate(-50%, -85%);
+  bottom: -12px;
+  transform: translateX(-50%);
   padding: 4px 12px;
   border-radius: 9999px;
   background: #ECFDF3;
@@ -4818,10 +4822,11 @@ body {
   font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
+  z-index: 2;
 }
 
 .monthly-target-card__caption {
-  margin: 6px auto 0;
+  margin: 24px auto 0;
   max-width: 380px;
   font-size: 16px;
   font-weight: 400;

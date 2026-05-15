@@ -362,8 +362,9 @@ const MONTHLY_TARGET_GAUGE_VALUE = 75.55;
 const MONTHLY_TARGET_GAUGE_OPTIONS: ApexOptions = {
   chart: {
     type: 'radialBar',
+    height: 458,
     fontFamily: 'Outfit, sans-serif',
-    sparkline: { enabled: true },
+    toolbar: { show: false },
     animations: { enabled: false },
   },
   colors: ['rgba(70, 95, 255, 0.85)'],
@@ -380,7 +381,7 @@ const MONTHLY_TARGET_GAUGE_OPTIONS: ApexOptions = {
       dataLabels: {
         name: { show: false },
         value: {
-          offsetY: -8,
+          offsetY: -25,
           fontSize: '36px',
           fontWeight: 600,
           color: '#1D2939',
@@ -4839,7 +4840,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                         options={MONTHLY_TARGET_GAUGE_OPTIONS}
                         series={[MONTHLY_TARGET_GAUGE_VALUE]}
                         type="radialBar"
-                        height={229}
+                        height={458}
                       />
                       <span className="monthly-target-card__delta-pill">+10%</span>
                     </div>
