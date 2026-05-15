@@ -4676,8 +4676,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
             </div>
 
             <div className="ui-lab-section">
-              <h3 className="ui-lab-section-title">TopFinancialPriorityCard (draft)</h3>
-              <p className="ui-lab-section-subtitle">Duplicate of TotalBalanceCard, scoped under <code>.priority-card</code>. Starting point for the Today page Top Financial Priority redesign — to be iterated independently of the canonical TotalBalanceCard.</p>
+              <h3 className="ui-lab-section-title">Top Financial Priority Mock Up</h3>
               <div className="ui-lab-preview-width--medium">
                 <article className="priority-card">
                   <div className="priority-card__header">
