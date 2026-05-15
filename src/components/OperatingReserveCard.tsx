@@ -8,14 +8,6 @@ const EPSILON = 0.00001;
  *  Mirrors the reserve_critical threshold in signals.ts (RESERVE_CRITICAL_THRESHOLD = 0.50). */
 const RESERVE_TIGHT_THRESHOLD = 0.50;
 
-function formatCurrency(value: number): string {
-  return value.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  });
-}
-
 function formatCompactCurrency(value: number): string {
   const abs = Math.abs(value);
   if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -64,12 +56,14 @@ function ReserveGauge({
   fillPercent,
   toneClass,
   reserveTarget,
+  currentCashBalance,
 }: {
   percentLabel: string;
   coverageLabel: string;
   fillPercent: number;
   toneClass: string;
   reserveTarget: number;
+  currentCashBalance: number;
 }) {
   const size = 280;
   const cx = size / 2;
@@ -94,17 +88,20 @@ function ReserveGauge({
   const fillPath = `M ${trackStart.x} ${trackStart.y} A ${radius} ${radius} 0 ${largeArc} 1 ${fillEnd.x} ${fillEnd.y}`;
 
   const labelY = cy + strokeWidth / 2 + 16;
+  const captionY = labelY + 15;
   const maxLabel = reserveTarget > EPSILON ? formatCompactCurrency(reserveTarget) : '—';
 
   return (
     <div className="reserve-gauge-wrap">
-      <svg viewBox={`0 0 ${size} ${labelY + 4}`} className="reserve-gauge-svg" aria-hidden="true">
+      <svg viewBox={`0 0 ${size} ${captionY + 4}`} className="reserve-gauge-svg" aria-hidden="true">
         <path d={trackPath} fill="none" stroke="var(--bg-muted)" strokeWidth={strokeWidth} strokeLinecap="round" />
         {clampedPercent > 0 && (
           <path d={fillPath} fill="none" className={`reserve-gauge-arc ${toneClass}`} strokeWidth={strokeWidth} strokeLinecap="round" />
         )}
-        <text x={trackStart.x - strokeWidth / 2} y={labelY} textAnchor="start" className="reserve-gauge-end-label">$0</text>
+        <text x={trackStart.x - strokeWidth / 2} y={labelY} textAnchor="start" className="reserve-gauge-end-label">{formatCompactCurrency(currentCashBalance)}</text>
+        <text x={trackStart.x - strokeWidth / 2} y={captionY} textAnchor="start" className="reserve-gauge-end-caption">Cash on hand</text>
         <text x={trackEnd.x + strokeWidth / 2} y={labelY} textAnchor="end" className="reserve-gauge-end-label">{maxLabel}</text>
+        <text x={trackEnd.x + strokeWidth / 2} y={captionY} textAnchor="end" className="reserve-gauge-end-caption">Safety line</text>
       </svg>
       <div className="reserve-gauge-center">
         <span className="reserve-gauge-value">{percentLabel}</span>
@@ -144,31 +141,8 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
         fillPercent={reserveFillPercent}
         toneClass={reserveTone}
         reserveTarget={reserveTarget}
+        currentCashBalance={currentCashBalance}
       />
-
-      <div className="reserve-coverage">
-        <div className="reserve-coverage-head">
-          <span className="reserve-coverage-label">Cash on Hand</span>
-          <span className="reserve-coverage-value">{formatCoverageWeeks(coverageWeeks)}</span>
-        </div>
-        <div className="reserve-coverage-track" aria-hidden="true">
-          <div
-            className={`reserve-coverage-fill ${reserveTone}`}
-            style={{ width: `${Math.min((coverageWeeks / 4) * 100, 100)}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="reserve-stat-cards">
-        <div className="reserve-stat-card">
-          <span className="reserve-stat-card-label">Cash on hand</span>
-          <span className="reserve-stat-card-value">{formatCurrency(currentCashBalance)}</span>
-        </div>
-        <div className="reserve-stat-card">
-          <span className="reserve-stat-card-label">Safety line</span>
-          <span className="reserve-stat-card-value">{reserveTarget > EPSILON ? formatCurrency(reserveTarget) : '—'}</span>
-        </div>
-      </div>
     </article>
   );
 }
