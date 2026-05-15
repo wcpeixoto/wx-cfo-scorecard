@@ -4880,19 +4880,34 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
                       <div className="priority-card-v2__body">
                         <p className="priority-card-v2__body-row">
-                          {(() => {
-                            if (uiLabCashRunOut === null) return 'At your current pace, cash stays positive through the forecast window.';
-                            const { months, date } = uiLabCashRunOut;
-                            if (months === 0) return 'At this pace, you are projected to run out of cash this month.';
-                            // Close horizons (<10 months) read as a duration; farther
-                            // horizons read as an absolute date to keep the sentence
-                            // from feeling distant or abstract.
-                            if (months < 10) return `At this pace, you are projected to run out of cash in ${months} ${months === 1 ? 'month' : 'months'}.`;
-                            return `At this pace, you are projected to run out of cash in ${date}.`;
-                          })()}
+                          <span className="priority-card-v2__body-row-icon" aria-hidden="true">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="22 17 13.5 8.5 8.5 13.5 2 7" stroke="currentColor" />
+                              <polyline points="16 17 22 17 22 11" stroke="currentColor" />
+                            </svg>
+                          </span>
+                          <span>
+                            {(() => {
+                              if (uiLabCashRunOut === null) return 'At your current pace, cash stays positive through the forecast window.';
+                              const { months, date } = uiLabCashRunOut;
+                              if (months === 0) return 'At this pace, you are projected to run out of cash this month.';
+                              // Close horizons (<10 months) read as a duration; farther
+                              // horizons read as an absolute date to keep the sentence
+                              // from feeling distant or abstract.
+                              if (months < 10) return `At this pace, you are projected to run out of cash in ${months} ${months === 1 ? 'month' : 'months'}.`;
+                              return `At this pace, you are projected to run out of cash in ${date}.`;
+                            })()}
+                          </span>
                         </p>
                         <p className="priority-card-v2__body-row">
-                          At your current margins and spending levels, you need $20K more per month to break even.
+                          <span className="priority-card-v2__body-row-icon" aria-hidden="true">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" />
+                              <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" stroke="currentColor" />
+                              <path d="M12 18V6" stroke="currentColor" />
+                            </svg>
+                          </span>
+                          <span>At your current margins and spending levels, you need $20K more per month to break even.</span>
                         </p>
                       </div>
                     </article>

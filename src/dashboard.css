@@ -5172,6 +5172,9 @@ body {
 }
 
 .priority-card-v2__body-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   margin: 0;
   padding: 16px 0;
   font-weight: 400;
@@ -5183,6 +5186,17 @@ body {
 
 .priority-card-v2__body-row:last-child {
   border-bottom: none;
+}
+
+.priority-card-v2__body-row-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  color: #667085;
 }
 
 .priority-card-v2__sparkline-slot {
