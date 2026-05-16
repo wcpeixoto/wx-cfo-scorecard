@@ -43,6 +43,7 @@ import {
   revenueContribution,
   shouldExcludeFromProfitability,
 } from '../cashFlow';
+import { computeCashTrend } from '../data/cashTrend';
 
 const EPSILON = 0.00001;
 const EXPENSE_COLORS = ['#76a8ff', '#5e84f1', '#4f6fdd', '#3f58c1', '#2f479f', '#243b82', '#1b2f67'];
@@ -802,6 +803,44 @@ function computeOperatingReserveSnapshot(
   const percentFunded = reserveTarget > EPSILON ? round2(currentCashBalance / reserveTarget) : null;
 
   return { reserveTarget, percentFunded };
+}
+
+export type ReserveCoverageDelta = { pct: number; direction: 'up' | 'down' };
+
+// Month-over-month change in Operating Reserve *coverage* (cash ÷ target),
+// NOT raw cash. The reserve target is a trailing-3-month expense average, so
+// it moves month to month; a pure cash delta would misstate the reserve
+// position. Prior coverage reuses the canonical snapshot with the prior
+// anchor month so current/prior targets are computed identically (no drift).
+// Returns null when there is insufficient history or no prior coverage.
+export function computeReserveCoverageDelta(
+  monthlyRollups: MonthlyRollup[],
+  currentCashBalance: number,
+  reserveTarget: number
+): ReserveCoverageDelta | null {
+  if (reserveTarget <= EPSILON) return null;
+  const fundedNow = currentCashBalance / reserveTarget;
+
+  const sorted = [...monthlyRollups].sort((a, b) => a.month.localeCompare(b.month));
+  if (sorted.length < 2) return null;
+  const priorAnchorMonth = sorted[sorted.length - 2].month;
+
+  const series = computeCashTrend(monthlyRollups, currentCashBalance).series;
+  if (series.length < 2) return null;
+  const priorCashBalance = series[series.length - 2];
+  if (!Number.isFinite(priorCashBalance)) return null;
+
+  const priorSnapshot = computeOperatingReserveSnapshot(
+    monthlyRollups,
+    priorCashBalance,
+    priorAnchorMonth
+  );
+  const fundedPrior = priorSnapshot.percentFunded;
+  if (fundedPrior === null || Math.abs(fundedPrior) <= EPSILON) return null;
+
+  const pct = (fundedNow - fundedPrior) / Math.abs(fundedPrior);
+  if (!Number.isFinite(pct)) return null;
+  return { pct, direction: pct >= 0 ? 'up' : 'down' };
 }
 
 function resolveAnchorMonth(monthlyRollups: MonthlyRollup[], anchorMonth?: string): string | null {
