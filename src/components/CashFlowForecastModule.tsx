@@ -942,28 +942,28 @@ export default function CashFlowForecastModule({
           <article className={`forecast-decision-card${bufferState === 'at-risk' ? ' forecast-decision-card--warning' : ''}`}>
             {bufferState === 'safe' && safeBuffer !== null && (
               <>
-                <span className="forecast-decision-label">You&rsquo;re above your safety line</span>
+                <span className="forecast-decision-label">You&rsquo;re above your Operating Reserve</span>
                 <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">{formatCurrencyCompactNode(safeBuffer)}</strong>
                 <span className="forecast-decision-detail">Across your full forecast</span>
               </>
             )}
             {bufferState === 'safe' && safeBuffer === null && (
               <>
-                <span className="forecast-decision-label">To stay above your safety line</span>
+                <span className="forecast-decision-label">To stay above your Operating Reserve</span>
                 <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">—</strong>
                 <span className="forecast-decision-detail">Across your full forecast</span>
               </>
             )}
             {bufferState === 'at-risk' && shortfall !== null && (
               <>
-                <span className="forecast-decision-label">To stay above your safety line</span>
+                <span className="forecast-decision-label">To stay above your Operating Reserve</span>
                 <strong className="forecast-decision-value forecast-decision-value--md">{formatCurrencyCompactNode(shortfall)}</strong>
-                <span className="forecast-decision-detail">To reach your safety line</span>
+                <span className="forecast-decision-detail">To reach your Operating Reserve</span>
               </>
             )}
             {bufferState === 'at-risk' && shortfall === null && (
               <>
-                <span className="forecast-decision-label">Below your safety line</span>
+                <span className="forecast-decision-label">Below your Operating Reserve</span>
                 <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
                 <span className="forecast-decision-detail">Across your full forecast</span>
               </>
@@ -972,9 +972,9 @@ export default function CashFlowForecastModule({
         )}
         {bufferState === null && (
           <article className="forecast-decision-card">
-            <span className="forecast-decision-label">Safety line</span>
+            <span className="forecast-decision-label">Operating Reserve</span>
             <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
-            <span className="forecast-decision-detail">No safety line set</span>
+            <span className="forecast-decision-detail">No Operating Reserve set</span>
           </article>
         )}
 

@@ -58,7 +58,7 @@ export function detectSignals(
         metricValue: percentFunded,
         targetValue: RESERVE_FUNDED_TARGET,
         gapAmount: (RESERVE_FUNDED_TARGET - percentFunded) * reserveTarget,
-        recommendedAction: 'Build your operating reserve — current level is below your safety line.',
+        recommendedAction: 'Build your Operating Reserve — current level is below your goal.',
       });
     } else if (percentFunded < RESERVE_FUNDED_TARGET) {
       signals.push({
@@ -68,7 +68,7 @@ export function detectSignals(
         metricValue: percentFunded,
         targetValue: RESERVE_FUNDED_TARGET,
         gapAmount: (RESERVE_FUNDED_TARGET - percentFunded) * reserveTarget,
-        recommendedAction: 'Keep building your reserve — you\'re funded but below the full target.',
+        recommendedAction: 'Keep building your Operating Reserve — you\'re funded but below the full target.',
       });
     }
   }
@@ -110,7 +110,7 @@ export function detectSignals(
         targetValue: reserveTarget,
         gapAmount: reserveTarget - lowestProjectedBalance,
         troughMonth: lowestProjectedMonth,
-        recommendedAction: 'Cash stays positive but dips below your safety target — watch for timing gaps.',
+        recommendedAction: 'Cash stays positive but dips below your Operating Reserve — watch for timing gaps.',
       });
     }
   }
