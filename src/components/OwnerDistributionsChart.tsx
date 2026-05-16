@@ -313,7 +313,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
           <h3 className="owner-dist-title">Owner Distributions</h3>
           {targetNetMargin && targetNetMargin > 0 && distributionTargetAmount && distributionTargetAmount > 0 && (
             <p className="owner-dist-subtitle">
-              Target distribution for {today.getFullYear()}: ${Math.round(distributionTargetAmount / 1000)}<span className="forecast-unit">K</span>{' '}({Math.round(targetNetMargin * 100)}% net profit)
+              {Math.round(targetNetMargin * 100)}% net profit goal: ${Math.round(distributionTargetAmount / 1000)}<span className="forecast-unit">K</span>
             </p>
           )}
         </div>
