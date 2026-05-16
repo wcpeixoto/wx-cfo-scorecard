@@ -101,14 +101,14 @@ function ReserveGauge({
           <path d={fillPath} fill="none" className={`reserve-gauge-arc ${toneClass}`} strokeWidth={strokeWidth} strokeLinecap="round" />
         )}
         <text x={trackStart.x - strokeWidth / 2} y={labelY} textAnchor="start" className="reserve-gauge-end-label">{formatCompactCurrency(currentCashBalance)}</text>
-        <text x={trackStart.x - strokeWidth / 2} y={captionY} textAnchor="start" className="reserve-gauge-end-caption">Cash on hand</text>
+        <text x={trackStart.x - strokeWidth / 2} y={captionY} textAnchor="start" className="reserve-gauge-end-caption">Cash available</text>
         <text x={trackEnd.x + strokeWidth / 2} y={labelY} textAnchor="end" className="reserve-gauge-end-label">{maxLabel}</text>
-        <text x={trackEnd.x + strokeWidth / 2} y={captionY} textAnchor="end" className="reserve-gauge-end-caption">Safety line</text>
+        <text x={trackEnd.x + strokeWidth / 2} y={captionY} textAnchor="end" className="reserve-gauge-end-caption">Reserve goal</text>
       </svg>
       <div className="reserve-gauge-center">
         <span className="reserve-gauge-value">{percentLabel}</span>
         <span className="reserve-gauge-label">
-          <span className="reserve-gauge-coverage">{coverageLabel}</span> of reserve funded
+          <span className="reserve-gauge-coverage">{coverageLabel}</span> covered
         </span>
       </div>
     </div>
@@ -145,13 +145,14 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
               </button>
               <div id={tooltipId} role="tooltip" className="db-tooltip-panel reserve-tooltip-panel">
                 <ul className="db-tooltip-list">
-                  <li>Cash reserves are funds set aside for short-term needs and emergencies.</li>
-                  <li>You can change your reserve goal in Settings.</li>
+                  <li>Operating Reserve is cash set aside for short-term needs and emergencies.</li>
+                  <li>You can change your Operating Reserve goal in Settings.</li>
                   <li>Current goal: 1 month of expenses, based on the average from the last 3 completed months.</li>
                 </ul>
               </div>
             </span>
           </div>
+          <span className="reserve-subtitle">1-month expense goal</span>
         </div>
         <span className={reserveBadge.className}>{reserveBadge.label}</span>
       </div>
