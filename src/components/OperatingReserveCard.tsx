@@ -38,6 +38,13 @@ function getReserveBadgeState(percentFunded: number | null): { label: string; cl
   return { label: '✓ Above target', className: 'card-status-badge is-healthy' };
 }
 
+function getReserveSubtitle(currentCashBalance: number, reserveTarget: number): string {
+  if (reserveTarget <= EPSILON) return '1-month expense goal';
+  const gap = reserveTarget - currentCashBalance;
+  if (gap <= 0) return 'Reserve goal reached';
+  return `You need ${formatCompactCurrency(gap)} to reach your reserve goal`;
+}
+
 function computeCoverageWeeks(currentCashBalance: number, reserveTarget: number): number {
   if (reserveTarget <= EPSILON || currentCashBalance <= 0) return 0;
   const weeklyBurn = reserveTarget / 4.33;
@@ -155,7 +162,7 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
               </div>
             </span>
           </div>
-          <span className="reserve-subtitle">1-month expense goal</span>
+          <span className="reserve-subtitle">{getReserveSubtitle(currentCashBalance, reserveTarget)}</span>
         </div>
         <span className={reserveBadge.className}>{reserveBadge.label}</span>
       </div>
