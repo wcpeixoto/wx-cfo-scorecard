@@ -87,6 +87,7 @@ export function TodayPage({ model, txns, forecastProjection, targetNetMargin, on
         <OperatingReserveCard
           currentCashBalance={model.runway.currentCashBalance}
           reserveTarget={model.runway.reserveTarget}
+          monthlyRollups={model.monthlyRollups}
         />
       </div>
 

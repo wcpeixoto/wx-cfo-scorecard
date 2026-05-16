@@ -9,6 +9,7 @@ import type { ApexOptions } from 'apexcharts';
 import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
 import { detectSignals } from '../lib/priorities/signals';
 import { rankPriorities } from '../lib/priorities/rank';
+import { computeCashTrend } from '../lib/data/cashTrend';
 import { chartTokens } from '../lib/ui/chartTokens';
 
 const SPARKLINE_OPTIONS: ApexOptions = {
@@ -99,34 +100,17 @@ export function CashOnHandCard({ model, txns, forecastProjection }: CashOnHandCa
     return { months, date };
   }, [signals]);
 
-  // Walk model.monthlyRollups backward from currentCashBalance to derive
-  // month-start cash balances. Last 6 months feed the sparkline.
-  const cashReserveSeries = useMemo(() => {
-    const sorted = [...model.monthlyRollups].sort((a, b) => a.month.localeCompare(b.month));
-    const last6 = sorted.slice(-6);
-    if (last6.length === 0) return [] as number[];
-    const balances: number[] = new Array(last6.length);
-    let balance = model.runway.currentCashBalance;
-    balances[last6.length - 1] = balance;
-    for (let i = last6.length - 1; i > 0; i--) {
-      balance -= last6[i].netCashFlow;
-      balances[i - 1] = balance;
-    }
-    return balances;
-  }, [model.monthlyRollups, model.runway.currentCashBalance]);
-
-  // Cash-on-hand month-over-month delta — drives the trend label and arrow
-  // direction. Direction-tinted (down = critical, up = healthy), distinct
-  // from the severity pill which reflects the overall priority signal.
-  const cashDelta = useMemo(() => {
-    const s = cashReserveSeries;
-    if (s.length < 2) return null;
-    const current = s[s.length - 1];
-    const prior = s[s.length - 2];
-    if (prior === 0 || !Number.isFinite(prior)) return null;
-    const pct = (current - prior) / Math.abs(prior);
-    return { pct, direction: pct >= 0 ? 'up' as const : 'down' as const };
-  }, [cashReserveSeries]);
+  // Month-start cash balances (last 6 months feed the sparkline) plus the
+  // month-over-month delta that drives the trend label/arrow. Shared with
+  // the Operating Reserve subtitle delta via computeCashTrend so the two
+  // cards never drift. Direction-tinted (down = critical, up = healthy),
+  // distinct from the severity pill which reflects the overall signal.
+  const cashTrend = useMemo(
+    () => computeCashTrend(model.monthlyRollups, model.runway.currentCashBalance),
+    [model.monthlyRollups, model.runway.currentCashBalance]
+  );
+  const cashReserveSeries = cashTrend.series;
+  const cashDelta = cashTrend.delta;
 
   // Break-even gap — avg monthly expenses minus revenue over the last 3
   // COMPLETED months. Anchor = latest rollup month, excluded as the

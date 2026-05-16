@@ -1745,6 +1745,29 @@ body {
   color: var(--text-secondary);
 }
 
+.reserve-subtitle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reserve-subtitle-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.reserve-subtitle-delta--up {
+  color: #039855;
+}
+
+.reserve-subtitle-delta--down {
+  color: #F04438;
+}
+
 /* ── Semicircular gauge ── */
 
 .reserve-gauge-wrap {

@@ -2,6 +2,8 @@
 // Receives only the two root values; all derived state is computed internally.
 
 import { useId } from 'react';
+import type { MonthlyRollup } from '../lib/data/contract';
+import { computeCashTrend } from '../lib/data/cashTrend';
 
 const EPSILON = 0.00001;
 
@@ -128,10 +130,12 @@ function ReserveGauge({
 interface OperatingReserveCardProps {
   currentCashBalance: number;
   reserveTarget: number;
+  monthlyRollups: MonthlyRollup[];
 }
 
-export function OperatingReserveCard({ currentCashBalance, reserveTarget }: OperatingReserveCardProps) {
+export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthlyRollups }: OperatingReserveCardProps) {
   const tooltipId = useId();
+  const cashDelta = computeCashTrend(monthlyRollups, currentCashBalance).delta;
   const reservePercent = getReservePercentDisplay(currentCashBalance, reserveTarget);
   const reserveFillPercent = reservePercent === null ? 0 : Math.min(Math.max(reservePercent, 0), 100);
   const reserveTone = reserveToneClassName(reservePercent);
@@ -162,7 +166,20 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
               </div>
             </span>
           </div>
-          <span className="reserve-subtitle">{getReserveSubtitle(currentCashBalance, reserveTarget)}</span>
+          <div className="reserve-subtitle-row">
+            <span className="reserve-subtitle">{getReserveSubtitle(currentCashBalance, reserveTarget)}</span>
+            {cashDelta && (
+              <span className={`reserve-subtitle-delta reserve-subtitle-delta--${cashDelta.direction}`}>
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  {cashDelta.direction === 'up'
+                    ? <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    : <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  }
+                </svg>
+                {`${Math.abs(cashDelta.pct * 100).toFixed(1)}%`}
+              </span>
+            )}
+          </div>
         </div>
         <span className={reserveBadge.className}>{reserveBadge.label}</span>
       </div>
