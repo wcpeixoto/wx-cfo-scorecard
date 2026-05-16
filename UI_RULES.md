@@ -674,7 +674,7 @@ onto the existing three color bands (plus neutral gray). No per-label
 | Vulnerable     | `.is-warning` | warning / amber | `#FFFAEB` / `#F79009` |
 | Below target   | `.is-warning` | warning / amber | `#FFFAEB` / `#F79009` |
 | Nearly funded  | `.is-neutral` | neutral gray    | `#F2F4F7` / `#667085` |
-| Funded         | `.is-healthy` | success green   | `#ECFDF3` / `#12B76A` |
+| Fully funded   | `.is-healthy` | success green   | `#ECFDF3` / `#12B76A` |
 | Above target   | `.is-healthy` | success green   | `#ECFDF3` / `#12B76A` |
 
 > This is a label-visible pill framework. Vulnerable/Below target share
