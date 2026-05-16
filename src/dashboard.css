@@ -5211,6 +5211,34 @@ body {
   color: #667085;
 }
 
+.priority-card-v2__footer {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 20px;
+}
+
+/* Canonical 36px trigger (UI_RULES.md "Button height taxonomy"). */
+.priority-card-v2__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  background: transparent;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #344054;
+  cursor: pointer;
+}
+
+.priority-card-v2__action:hover {
+  background: #F9FAFB;
+}
+
 .priority-card-v2__sparkline-slot {
   width: 150px;
   height: 70px;

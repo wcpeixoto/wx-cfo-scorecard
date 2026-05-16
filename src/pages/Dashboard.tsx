@@ -4837,7 +4837,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                     <article className="priority-card-v2">
                       <div className="priority-card-v2__header">
                         <div className="priority-card-v2__title-block">
-                          <h3 className="priority-card-v2__title">Cash in Hand</h3>
+                          <h3 className="priority-card-v2__title">Cash on Hand</h3>
                         </div>
                         <span className={`today-severity-pill is-${uiLabPriorityHero.severity}`}>
                           <span className="today-severity-dot" aria-hidden="true" />
@@ -4909,6 +4909,12 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                           </span>
                           <span>At your current margins and spending levels, you need $20K more per month to break even.</span>
                         </p>
+                      </div>
+
+                      <div className="priority-card-v2__footer">
+                        <button type="button" className="priority-card-v2__action">
+                          What can I do?
+                        </button>
                       </div>
                     </article>
                   );
