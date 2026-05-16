@@ -1738,6 +1738,13 @@ body {
   line-height: 1.15;
 }
 
+.reserve-subtitle {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  color: var(--text-secondary);
+}
+
 /* ── Semicircular gauge ── */
 
 .reserve-gauge-wrap {
