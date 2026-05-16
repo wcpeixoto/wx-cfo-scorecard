@@ -152,7 +152,6 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
               </div>
             </span>
           </div>
-          <span className="reserve-subtitle">3-month avg expenses</span>
         </div>
         <span className={reserveBadge.className}>{reserveBadge.label}</span>
       </div>

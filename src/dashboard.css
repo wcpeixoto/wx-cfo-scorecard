@@ -1738,13 +1738,6 @@ body {
   line-height: 1.15;
 }
 
-.reserve-subtitle {
-  margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.25;
-  color: var(--text-secondary);
-}
-
 /* ── Semicircular gauge ── */
 
 .reserve-gauge-wrap {
@@ -6495,12 +6488,16 @@ body {
   height: 100%;
 }
 
-/* Reserve card is just header + gauge — size to content and top-align it
-   instead of stretching to match the taller hero card (which left a large
-   empty gap above the gauge). */
+/* Match the Cash on Hand card's height: stretch to the full grid-row
+   height, keep the header pinned at the top, and absorb the leftover
+   vertical space evenly around the gauge so the arc sits centered. */
 .today-top-grid .reserve-card {
-  align-self: start;
-  height: auto;
+  align-self: stretch;
+  height: 100%;
+}
+
+.today-top-grid .reserve-gauge-wrap {
+  margin-block: auto;
 }
 
 @media (max-width: 1199px) {
