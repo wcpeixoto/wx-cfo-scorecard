@@ -167,7 +167,6 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
             </span>
           </div>
           <div className="reserve-subtitle-row">
-            <span className="reserve-subtitle">{getReserveSubtitle(currentCashBalance, reserveTarget)}</span>
             {cashDelta && (
               <span className={`reserve-subtitle-delta reserve-subtitle-delta--${cashDelta.direction}`}>
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -179,6 +178,7 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
                 {`${Math.abs(cashDelta.pct * 100).toFixed(1)}%`}
               </span>
             )}
+            <span className="reserve-subtitle">{getReserveSubtitle(currentCashBalance, reserveTarget)}</span>
           </div>
         </div>
         <span className={reserveBadge.className}>{reserveBadge.label}</span>
