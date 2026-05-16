@@ -4910,6 +4910,12 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                           <span>At your current margins and spending levels, you need $20K more per month to break even.</span>
                         </p>
                       </div>
+
+                      <div className="priority-card-v2__footer">
+                        <button type="button" className="priority-card-v2__action">
+                          What can I do?
+                        </button>
+                      </div>
                     </article>
                   );
                 })()}
