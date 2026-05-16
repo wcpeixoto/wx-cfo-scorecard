@@ -42,7 +42,7 @@ function getReserveSubtitle(currentCashBalance: number, reserveTarget: number): 
   if (reserveTarget <= EPSILON) return '1-month expense goal';
   const gap = reserveTarget - currentCashBalance;
   if (gap <= 0) return 'Reserve goal reached';
-  return `You need ${formatCompactCurrency(gap)} to reach your reserve goal`;
+  return `${formatCompactCurrency(gap)} to goal`;
 }
 
 function computeCoverageWeeks(currentCashBalance: number, reserveTarget: number): number {
