@@ -2,14 +2,24 @@ import { useMemo } from 'react';
 import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
 import { detectSignals } from '../lib/priorities/signals';
 import { rankPriorities } from '../lib/priorities/rank';
+import type { SignalType } from '../lib/priorities/types';
 import { classifyTxn } from '../lib/cashFlow';
-import { HeroPriorityCard } from './HeroPriorityCard';
+import { CashOnHandCard } from './CashOnHandCard';
 import { SecondaryPriority } from './SecondaryPriority';
 import { OperatingReserveCard } from './OperatingReserveCard';
 import { OwnerDistributionsCard } from './OwnerDistributionsCard';
 
 const DIST_ON_TARGET_LOW  = 0.90; // actual >= target × 0.90
 const DIST_ON_TARGET_HIGH = 1.10; // actual <= target × 1.10
+
+// Signals intentionally hidden from the Today priority surface. detectSignals
+// still produces them — CashOnHandCard reads cash_flow_negative for its
+// run-out row — they're just not surfaced as their own priority cards.
+const SUPPRESSED_PRIORITY_SIGNALS = new Set<SignalType>([
+  'reserve_critical',
+  'cash_flow_negative',
+  'expense_surge',
+]);
 
 interface TodayPageProps {
   model: DashboardModel;
@@ -24,7 +34,10 @@ export function TodayPage({ model, txns, forecastProjection, targetNetMargin, on
     () => detectSignals(model, txns, forecastProjection),
     [model, txns, forecastProjection]
   );
-  const { hero, secondary } = useMemo(() => rankPriorities(signals), [signals]);
+  const { secondary } = useMemo(
+    () => rankPriorities(signals.filter(s => !SUPPRESSED_PRIORITY_SIGNALS.has(s.type))),
+    [signals]
+  );
 
   const distributionStatus = useMemo(() => {
     if (
@@ -66,7 +79,11 @@ export function TodayPage({ model, txns, forecastProjection, targetNetMargin, on
   return (
     <div className="today-page">
       <div className="today-top-grid">
-        <HeroPriorityCard signal={hero} />
+        <CashOnHandCard
+          model={model}
+          txns={txns}
+          forecastProjection={forecastProjection}
+        />
         <OperatingReserveCard
           currentCashBalance={model.runway.currentCashBalance}
           reserveTarget={model.runway.reserveTarget}
