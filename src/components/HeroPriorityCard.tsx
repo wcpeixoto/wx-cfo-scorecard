@@ -10,9 +10,9 @@ interface HeroPriorityCardProps {
 
 function severityLabel(severity: Signal['severity']): string {
   switch (severity) {
-    case 'critical': return 'Needs attention';
+    case 'critical': return '↓ Needs attention';
     case 'warning': return 'Watch';
-    case 'healthy': return 'Healthy';
+    case 'healthy': return '✓ Healthy';
   }
 }
 
@@ -83,8 +83,7 @@ export function HeroPriorityCard({ signal }: HeroPriorityCardProps) {
         {/* Header row: headline left, severity pill right */}
         <div className="hero-card-header">
           <h2 className="today-hero-headline">{prose.headline}</h2>
-          <span className={`today-severity-pill is-${signal.severity}`}>
-            <span className="today-severity-dot" aria-hidden="true" />
+          <span className={`card-status-badge is-${signal.severity}`}>
             {severityLabel(signal.severity)}
           </span>
         </div>
