@@ -218,6 +218,19 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         borderRadius: 5,
         borderRadiusApplication: 'end',
         borderRadiusWhenStacked: 'last',
+        dataLabels: {
+          total: {
+            enabled: true,
+            formatter: (val: string | undefined) => formatCompact(Number(val ?? 0)),
+            offsetY: -4,
+            style: {
+              fontSize: '12px',
+              fontFamily: 'Outfit, sans-serif',
+              fontWeight: 600,
+              color: '#475467',
+            },
+          },
+        },
       },
     },
     dataLabels: { enabled: false },
