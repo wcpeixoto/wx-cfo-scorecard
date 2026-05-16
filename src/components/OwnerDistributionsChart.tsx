@@ -247,6 +247,8 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       crosshairs: { width: 'barWidth', opacity: 0 },
     },
     yaxis: {
+      tickAmount: 4,
+      forceNiceScale: true,
       labels: {
         formatter: (val: number) => '$' + (val / 1000).toFixed(0) + 'k',
         style: { fontSize: '12px', colors: chartTokens.axisText },
