@@ -20,10 +20,6 @@ import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import { TodayPage } from '../components/TodayPage';
-import { CashOnHandCard } from '../components/CashOnHandCard';
-import { detectSignals } from '../lib/priorities/signals';
-import { rankPriorities } from '../lib/priorities/rank';
-import { getFallbackCopy } from '../lib/priorities/copy';
 import { ProjectionCompareDrawer } from '../components/ProjectionCompareDrawer';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
 import ContractsSettingsPane from '../components/ContractsSettingsPane';
@@ -292,32 +288,6 @@ const UI_LAB_SPARKLINE_OPTIONS: ApexOptions = {
   legend: { show: false },
 };
 
-// UI Lab — Top Financial Priority mock-up helpers.
-// Severity → trend label + tone class. Reuses the today-severity-pill palette
-// so the inline trend text stays in lockstep with the pill.
-function priorityTrendLabel(severity: 'critical' | 'warning' | 'healthy'): { label: string; tone: 'critical' | 'warning' | 'healthy' } {
-  switch (severity) {
-    case 'critical': return { label: 'Critically low', tone: 'critical' };
-    case 'warning':  return { label: 'Below safety line', tone: 'warning' };
-    case 'healthy':  return { label: 'On target', tone: 'healthy' };
-  }
-}
-
-function formatCashOnHand(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-function severityLabelText(severity: 'critical' | 'warning' | 'healthy'): string {
-  switch (severity) {
-    case 'critical': return 'Needs attention';
-    case 'warning':  return 'Watch';
-    case 'healthy':  return 'Healthy';
-  }
-}
 
 // UI Lab — TotalBalanceCard sparkline fixtures (TailAdmin /finance "Total Balance").
 // Brand-blue sparkline, 150×70px. Illustrative — not wired to production data.
@@ -2178,37 +2148,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     () => scenarioProjection.slice(0, forecastRangeMonths),
     [forecastRangeMonths, scenarioProjection]
   );
-  // UI Lab — Top Financial Priority mock-up data. Plugs into the same
-  // detectSignals/rankPriorities pipeline as the live today-hero-card so
-  // promotion to the Today page is a JSX swap, not a re-wire.
-  const uiLabPrioritySignals = useMemo(
-    () => detectSignals(model, filteredTxns, scenarioProjection),
-    [model, filteredTxns, scenarioProjection]
-  );
-  const uiLabPriorityHero = useMemo(
-    () => rankPriorities(uiLabPrioritySignals).hero,
-    [uiLabPrioritySignals]
-  );
-  const uiLabPriorityProse = useMemo(
-    () => getFallbackCopy(uiLabPriorityHero),
-    [uiLabPriorityHero]
-  );
-  // Walk model.monthlyRollups backward from currentCashBalance to derive
-  // month-start cash balances. Last 6 months feed the sparkline.
-  const uiLabCashReserveSeries = useMemo(() => {
-    const sorted = [...model.monthlyRollups].sort((a, b) => a.month.localeCompare(b.month));
-    const last6 = sorted.slice(-6);
-    if (last6.length === 0) return [] as number[];
-    const balances: number[] = new Array(last6.length);
-    let balance = model.runway.currentCashBalance;
-    balances[last6.length - 1] = balance;
-    for (let i = last6.length - 1; i > 0; i--) {
-      balance -= last6[i].netCashFlow;
-      balances[i - 1] = balance;
-    }
-    return balances;
-  }, [model.monthlyRollups, model.runway.currentCashBalance]);
-
   const forecastDecisionSignals = useMemo(
     () => computeForecastDecisionSignals(scenarioProjection, model.runway.reserveTarget),
     [model.runway.reserveTarget, scenarioProjection]
@@ -4734,69 +4673,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       </div>
                     </div>
                 </article>
-              </div>
-            </div>
-
-            <div className="ui-lab-section">
-              <h3 className="ui-lab-section-title">Top Financial Priority Mock Up — Base</h3>
-              <div className="ui-lab-preview-width--two-thirds">
-                {(() => {
-                  const trend = priorityTrendLabel(uiLabPriorityHero.severity);
-                  return (
-                    <article className="priority-card">
-                      <div className="priority-card__header">
-                        <div className="priority-card__title-block">
-                          <h3 className="priority-card__title">Top Financial Priority</h3>
-                        </div>
-                        <span className={`today-severity-pill is-${uiLabPriorityHero.severity}`}>
-                          <span className="today-severity-dot" aria-hidden="true" />
-                          {severityLabelText(uiLabPriorityHero.severity)}
-                        </span>
-                      </div>
-
-                      <div className="priority-card__amount-row">
-                        <div className="priority-card__amount-block">
-                          <h2 className="priority-card__amount">{formatCashOnHand(model.runway.currentCashBalance)}</h2>
-                          <div className="priority-card__trend">
-                            <span className={`priority-card__trend-delta priority-card__trend-delta--${trend.tone}`}>
-                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                                <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                              {trend.label}
-                            </span>
-                            <span className="priority-card__trend-text">cash cushion</span>
-                          </div>
-                        </div>
-                        <div className="priority-card__sparkline-slot" aria-hidden="true">
-                          <ReactApexChart
-                            options={TOTAL_BALANCE_SPARKLINE_OPTIONS}
-                            series={[{ name: 'cashReserve', data: uiLabCashReserveSeries }]}
-                            type="area"
-                            height={70}
-                            width="100%"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="priority-card__body">
-                        <p className="priority-card__body-row">{uiLabPriorityProse.action}</p>
-                        <p className="priority-card__body-row">{uiLabPriorityProse.why}</p>
-                        <p className="priority-card__body-row">{uiLabPriorityProse.currentState}</p>
-                      </div>
-                    </article>
-                  );
-                })()}
-              </div>
-            </div>
-
-            <div className="ui-lab-section">
-              <h3 className="ui-lab-section-title">Top Financial Priority Mock Up — Iterating</h3>
-              <div className="ui-lab-preview-width--two-thirds">
-                <CashOnHandCard
-                  model={model}
-                  txns={filteredTxns}
-                  forecastProjection={scenarioProjection}
-                />
               </div>
             </div>
           </div>
