@@ -4907,7 +4907,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                               <path d="M12 18V6" stroke="currentColor" />
                             </svg>
                           </span>
-                          <span>At your current margins and spending levels, you need $20K more per month to break even.</span>
+                          <span>At your current revenue, margins, and spending levels, you need $20K more per month to break even.</span>
                         </p>
                       </div>
 
