@@ -2247,6 +2247,29 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     const pct = (current - prior) / Math.abs(prior);
     return { pct, direction: pct >= 0 ? 'up' as const : 'down' as const };
   }, [uiLabCashReserveSeries]);
+  // Break-even gap — avg monthly expenses minus revenue over the last 3
+  // COMPLETED months. Anchor = latest rollup month, excluded as the
+  // in-progress month, mirroring the Operating Reserve window
+  // (compute.ts computeOperatingReserveSnapshot) so this number stays
+  // consistent with the reserve target. Threshold (2% of avg expenses,
+  // clamped $500–$2K) is internal. null when <3 completed months — the
+  // view hides the whole row rather than show a fabricated figure.
+  const uiLabCashBreakEven = useMemo<{ gap: number; state: 'deficit' | 'flat' | 'surplus' } | null>(() => {
+    const sorted = [...model.monthlyRollups].sort((a, b) => a.month.localeCompare(b.month));
+    const anchorMonth = sorted[sorted.length - 1]?.month;
+    if (!anchorMonth) return null;
+    const window = sorted.filter(r => r.month < anchorMonth).slice(-3);
+    if (window.length < 3) return null;
+    const avgMonthlyRevenue = window.reduce((sum, r) => sum + r.revenue, 0) / window.length;
+    const avgMonthlyExpenses = window.reduce((sum, r) => sum + r.expenses, 0) / window.length;
+    const gap = avgMonthlyExpenses - avgMonthlyRevenue;
+    const threshold = Math.min(Math.max(avgMonthlyExpenses * 0.02, 500), 2000);
+    const state =
+      gap > threshold ? 'deficit' as const
+      : Math.abs(gap) <= threshold ? 'flat' as const
+      : 'surplus' as const;
+    return { gap, state };
+  }, [model.monthlyRollups]);
 
   const forecastDecisionSignals = useMemo(
     () => computeForecastDecisionSignals(scenarioProjection, model.runway.reserveTarget),
@@ -4899,16 +4922,26 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                             })()}
                           </span>
                         </p>
-                        <p className="priority-card-v2__body-row">
-                          <span className="priority-card-v2__body-row-icon" aria-hidden="true">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="10" stroke="currentColor" />
-                              <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" stroke="currentColor" />
-                              <path d="M12 18V6" stroke="currentColor" />
-                            </svg>
-                          </span>
-                          <span>At your current margins and spending levels, you need $20K more per month to break even.</span>
-                        </p>
+                        {uiLabCashBreakEven && (
+                          <p className="priority-card-v2__body-row">
+                            <span className="priority-card-v2__body-row-icon" aria-hidden="true">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" />
+                                <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" stroke="currentColor" />
+                                <path d="M12 18V6" stroke="currentColor" />
+                              </svg>
+                            </span>
+                            <span>
+                              {(() => {
+                                const { gap, state } = uiLabCashBreakEven;
+                                if (state === 'flat') return "You're operating right around break-even.";
+                                const amount = `$${Math.round(Math.abs(gap) / 1000)}K`;
+                                if (state === 'deficit') return `At your current margins and spending levels, you need ${amount} more per month to break even.`;
+                                return `You're running a ${amount} monthly surplus above break-even.`;
+                              })()}
+                            </span>
+                          </p>
+                        )}
                       </div>
 
                       <div className="priority-card-v2__footer">
