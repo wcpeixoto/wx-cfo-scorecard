@@ -1,6 +1,8 @@
 // OperatingReserveCard — extracted from Dashboard.tsx inline block.
 // Receives only the two root values; all derived state is computed internally.
 
+import { useId } from 'react';
+
 const EPSILON = 0.00001;
 
 /** Threshold below which the reserve is considered "below target" (warning).
@@ -119,6 +121,7 @@ interface OperatingReserveCardProps {
 }
 
 export function OperatingReserveCard({ currentCashBalance, reserveTarget }: OperatingReserveCardProps) {
+  const tooltipId = useId();
   const reservePercent = getReservePercentDisplay(currentCashBalance, reserveTarget);
   const reserveFillPercent = reservePercent === null ? 0 : Math.min(Math.max(reservePercent, 0), 100);
   const reserveTone = reserveToneClassName(reservePercent);
@@ -129,7 +132,26 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
     <article className="card reserve-card">
       <div className="reserve-header">
         <div className="reserve-header-copy">
-          <h3>Operating Reserve</h3>
+          <div className="reserve-title-row">
+            <h3>Operating Reserve</h3>
+            <span className="db-tooltip-wrap">
+              <button
+                type="button"
+                className="db-tooltip-btn"
+                aria-label="Operating Reserve explanation"
+                aria-describedby={tooltipId}
+              >
+                &#9432;
+              </button>
+              <div id={tooltipId} role="tooltip" className="db-tooltip-panel reserve-tooltip-panel">
+                <ul className="db-tooltip-list">
+                  <li>Cash reserves are funds set aside for short-term needs and emergencies.</li>
+                  <li>You can change your reserve goal in Settings.</li>
+                  <li>Current goal: 1 month of expenses, based on the average from the last 3 completed months.</li>
+                </ul>
+              </div>
+            </span>
+          </div>
           <span className="reserve-subtitle">3-month avg expenses</span>
         </div>
         <span className={reserveBadge.className}>{reserveBadge.label}</span>
