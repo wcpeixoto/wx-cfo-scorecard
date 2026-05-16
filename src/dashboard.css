@@ -656,6 +656,21 @@ body {
   max-width: 320px;
 }
 
+/* Operating Reserve title tooltip — left-anchored so the panel opens
+   rightward and stays within the narrow reserve card. Two prose
+   paragraphs, so give consecutive body lines real separation. */
+.reserve-tooltip-panel {
+  right: auto;
+  left: 0;
+  min-width: 260px;
+  max-width: 320px;
+  white-space: normal;
+}
+
+.reserve-tooltip-panel .db-tooltip-list li.db-tooltip-body + li.db-tooltip-body {
+  margin-top: 8px;
+}
+
 .dashboard-load-error {
   display: flex;
   align-items: center;
@@ -1699,6 +1714,20 @@ body {
 .reserve-header-copy {
   display: grid;
   gap: 3px;
+}
+
+.reserve-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+/* Anchor the tooltip panel to the title row (card content edge) rather than
+   the icon, so the left-opening panel stays within the narrow reserve card
+   instead of starting mid-title and overflowing right. */
+.reserve-title-row .db-tooltip-wrap {
+  position: static;
 }
 
 .reserve-header h3 {
