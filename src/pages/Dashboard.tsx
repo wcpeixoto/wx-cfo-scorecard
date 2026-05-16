@@ -4219,14 +4219,14 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                           </div>
                         </div>
 
-                        {/* Rule 2 — Safety line */}
+                        {/* Rule 2 — Operating Reserve goal */}
                         <div className="rules-row">
                           <div className="rules-row-info">
-                            <span className="rules-row-label">Safety line</span>
+                            <span className="rules-row-label">Operating Reserve goal</span>
                             <span className="rules-row-sub">
                               {businessRules.safetyReserveMethod === 'fixed'
-                                ? 'Fixed reserve amount used as your safety line'
-                                : '1 month of average operating expenses'}
+                                ? 'Fixed amount used as your Operating Reserve goal'
+                                : '1 month of expenses, based on the average of the last 3 completed months'}
                             </span>
                           </div>
                           <div className="rules-row-control rules-row-control--col">
@@ -4254,7 +4254,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                                   type="number"
                                   min="0"
                                   step="1000"
-                                  aria-label="Safety line amount"
+                                  aria-label="Operating Reserve goal amount"
                                   placeholder="40000"
                                   value={businessRules.safetyReserveAmount === 0 ? '' : businessRules.safetyReserveAmount}
                                   onChange={(event) => {
