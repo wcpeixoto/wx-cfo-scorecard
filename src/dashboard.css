@@ -8012,3 +8012,69 @@ body {
   flex-shrink: 0;
   margin-left: 4px;
 }
+
+/* Top-level ErrorBoundary fallback. Mirrors the .loading-screen
+   full-viewport layout so a crash lands on a familiar surface. */
+.error-boundary {
+  position: fixed;
+  inset: 0;
+  background: #F9FAFB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.error-boundary__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  padding: 24px;
+  max-width: 420px;
+}
+
+.error-boundary__brand {
+  font-size: 14px;
+  font-weight: 500;
+  color: #465FFF;
+  letter-spacing: 0.05em;
+}
+
+.error-boundary__headline {
+  font-size: 20px;
+  font-weight: 600;
+  color: #101828;
+  margin: 0;
+}
+
+.error-boundary__subline {
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.error-boundary__btn {
+  margin-top: 4px;
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #FFFFFF;
+  background: #465FFF;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.error-boundary__btn:hover {
+  background: #3A4FE0;
+}
+
+.error-boundary__btn:focus-visible {
+  outline: 2px solid #465FFF;
+  outline-offset: 2px;
+}
