@@ -625,9 +625,10 @@ Light primary example: `bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:tex
 ### Shared badge primitive
 
 All card-level status badges use `.card-status-badge` with variants:
-- `.is-warning` — amber (`#F79009` / `#FFFAEB`)
 - `.is-critical` — red (`#F04438` / `#FEF3F2`)
+- `.is-warning` — amber (`#F79009` / `#FFFAEB`)
 - `.is-healthy` — green (`#12B76A` / `#ECFDF3`)
+- `.is-neutral` — gray (`#667085` / `#F2F4F7`)
 
 ### `.is-pressure` — Under Pressure (project overlay)
 - Background: `#FEF3E2`
@@ -635,10 +636,52 @@ All card-level status badges use `.card-status-badge` with variants:
 - Dark bg: `rgba(220, 104, 3, 0.15)`
 - Dark text: `#FDB022`
 - Used exclusively on: CashTrendHero status badge when status = 'pressure'
+- This is the only case that uses project pressure orange instead of the
+  standard amber `.is-warning`. Do not reach for it for generic warnings.
 
-Badge spec: `font-size: 12px`, `font-weight: 500`, `padding: 4px 10px`,
-`border-radius: 999px`, `display: inline-flex`, `align-items: center`,
-`gap: 4px`.
+Badge spec (matches shipped `.card-status-badge` in `src/dashboard.css`):
+
+```
+display: inline-flex;
+align-items: center;
+gap: 4px;
+padding: 4px 10px;
+border-radius: 999px;
+font-size: 12px;       /* the size .card-status-badge already uses — do not introduce a new one */
+font-weight: 500;
+white-space: nowrap;
+flex-shrink: 0;
+```
+
+> The shipped base sets `inline-flex` (auto-width, single-line via
+> `white-space: nowrap`), so it does not set `justify-content`; centering
+> is moot for nowrap label content. TailAdmin's pill/badge utilities are
+> the visual source of inspiration, but the canonical implementation in
+> this repo is the `.card-status-badge` CSS class and its `.is-*`
+> variants — never Tailwind utility strings in JSX, and never a new
+> parallel pill-prefixed CSS namespace.
+
+### Status pill labels
+
+`.card-status-badge` is a **label-visible pill framework**: the visible
+text label carries the precise state, and color collapses six labels
+onto the existing three color bands (plus neutral gray). No per-label
+`.is-*` modifier is needed — reuse the variants above:
+
+| Label          | Variant       | Band            | Bg / Text             |
+|----------------|---------------|-----------------|-----------------------|
+| Critical       | `.is-critical`| red             | `#FEF3F2` / `#F04438` |
+| Vulnerable     | `.is-warning` | warning / amber | `#FFFAEB` / `#F79009` |
+| Below target   | `.is-warning` | warning / amber | `#FFFAEB` / `#F79009` |
+| Nearly funded  | `.is-neutral` | neutral gray    | `#F2F4F7` / `#667085` |
+| Funded         | `.is-healthy` | success green   | `#ECFDF3` / `#12B76A` |
+| Above target   | `.is-healthy` | success green   | `#ECFDF3` / `#12B76A` |
+
+> This is a label-visible pill framework. Vulnerable/Below target share
+> warning styling, and Funded/Above target share success styling; labels
+> and thresholds distinguish them. If a future visualization has no
+> visible label, collapse to critical / warning / healthy / neutral
+> instead of trying to encode all six states by color alone.
 
 Never create a new badge pattern. Reuse `.card-status-badge`.
 
