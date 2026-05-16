@@ -145,8 +145,9 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget }: Oper
               </button>
               <div id={tooltipId} role="tooltip" className="db-tooltip-panel reserve-tooltip-panel">
                 <ul className="db-tooltip-list">
-                  <li className="db-tooltip-body">Cash reserves are funds set aside for short-term needs and emergencies.</li>
-                  <li className="db-tooltip-body">Your reserve goal is set in Settings. Current goal: 1 month of expenses, based on the average from the last 3 completed months.</li>
+                  <li>Cash reserves are funds set aside for short-term needs and emergencies.</li>
+                  <li>You can change your reserve goal in Settings.</li>
+                  <li>Current goal: 1 month of expenses, based on the average from the last 3 completed months.</li>
                 </ul>
               </div>
             </span>

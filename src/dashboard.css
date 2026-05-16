@@ -667,7 +667,7 @@ body {
   white-space: normal;
 }
 
-.reserve-tooltip-panel .db-tooltip-list li.db-tooltip-body + li.db-tooltip-body {
+.reserve-tooltip-panel .db-tooltip-list li + li {
   margin-top: 8px;
 }
 
