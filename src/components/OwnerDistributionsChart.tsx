@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useId } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { ScenarioPoint, Txn } from '../lib/data/contract';
@@ -174,6 +174,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
   );
 
   const currentYear = today.getFullYear();
+  const titleTooltipId = useId();
   const pill = computeSignalPill(years, actual, projectedFullYearCapacity, currentYear);
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -310,7 +311,24 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
     <article className="owner-dist-card">
       <div className="owner-dist-header">
         <div className="owner-dist-header-left">
-          <h3 className="owner-dist-title">Owner Distributions</h3>
+          <div className="owner-dist-title-row">
+            <h3 className="owner-dist-title">Owner Distributions</h3>
+            <span className="db-tooltip-wrap">
+              <button
+                type="button"
+                className="db-tooltip-btn"
+                aria-label="Owner Distributions explanation"
+                aria-describedby={titleTooltipId}
+              >
+                &#9432;
+              </button>
+              <div id={titleTooltipId} role="tooltip" className="db-tooltip-panel owner-dist-tooltip-panel">
+                <ul className="db-tooltip-list">
+                  <li>You can change your net profit goal in Settings.</li>
+                </ul>
+              </div>
+            </span>
+          </div>
           {targetNetMargin && targetNetMargin > 0 && distributionTargetAmount && distributionTargetAmount > 0 && (
             <p className="owner-dist-subtitle">
               {Math.round(targetNetMargin * 100)}% net profit goal: ${Math.round(distributionTargetAmount / 1000)}<span className="forecast-unit">K</span>
