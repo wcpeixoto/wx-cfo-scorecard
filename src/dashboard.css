@@ -6266,6 +6266,28 @@ body {
   gap: 2px;
 }
 
+.owner-dist-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+/* Anchor the tooltip panel to the title row (card content edge) rather
+   than the icon, so the panel opens rightward and stays within the card
+   instead of overflowing left from a near-edge icon. */
+.owner-dist-title-row .db-tooltip-wrap {
+  position: static;
+}
+
+.owner-dist-tooltip-panel {
+  right: auto;
+  left: 0;
+  min-width: 260px;
+  max-width: 320px;
+  white-space: normal;
+}
+
 .owner-dist-title {
   font-size: 18px;
   font-weight: 600;
