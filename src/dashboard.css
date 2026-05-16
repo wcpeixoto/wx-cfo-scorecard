@@ -1699,7 +1699,7 @@ body {
   gap: 10px;
   align-self: start;
   min-height: auto;
-  padding: 20px 24px;
+  padding: 20px 24px 32px;
   border-radius: 16px;
 }
 
