@@ -6521,7 +6521,7 @@ body {
 }
 
 /* Severity pill — shared by hero and secondary */
-.today-severity-pill {
+.card-domain-tag {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -6532,24 +6532,17 @@ body {
   line-height: 1;
 }
 
-.today-severity-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: currentColor;
-}
-
-.today-severity-pill.is-critical {
+.card-domain-tag.is-critical {
   color: #F04438;
   background: #FEF3F2;
 }
 
-.today-severity-pill.is-warning {
+.card-domain-tag.is-warning {
   color: #F79009;
   background: #FFFAEB;
 }
 
-.today-severity-pill.is-healthy {
+.card-domain-tag.is-healthy {
   color: #12B76A;
   background: #ECFDF3;
 }
@@ -6661,7 +6654,7 @@ body {
 }
 
 /* Pill inside secondary header must not shrink or wrap */
-.today-secondary-card .today-severity-pill {
+.today-secondary-card .card-domain-tag {
   flex-shrink: 0;
   white-space: nowrap;
 }
