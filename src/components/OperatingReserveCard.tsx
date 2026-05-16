@@ -5,11 +5,6 @@ import { useId } from 'react';
 
 const EPSILON = 0.00001;
 
-/** Threshold below which the reserve is considered "below target" (warning).
- *  Below 50% funded is critical. 50–100% is warning. 100%+ is healthy.
- *  Mirrors the reserve_critical threshold in signals.ts (RESERVE_CRITICAL_THRESHOLD = 0.50). */
-const RESERVE_TIGHT_THRESHOLD = 0.50;
-
 function formatCompactCurrency(value: number): string {
   const abs = Math.abs(value);
   if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -28,11 +23,19 @@ function reserveToneClassName(percent: number | null): string {
   return 'is-caution';
 }
 
+// Six-tier reserve pill, classified by funded ratio only (inclusive-lower,
+// exclusive-upper). These bands intentionally differ from the priority
+// thresholds in signals.ts (RESERVE_CRITICAL_THRESHOLD) — the card surfaces a
+// finer-grained label; the priority engine keeps its own coarser signal. Do
+// not re-couple them.
 function getReserveBadgeState(percentFunded: number | null): { label: string; className: string } {
   if (percentFunded === null) return { label: '—', className: 'card-status-badge is-neutral' };
-  if (percentFunded >= 1.0) return { label: '✓ Fully funded', className: 'card-status-badge is-healthy' };
-  if (percentFunded >= RESERVE_TIGHT_THRESHOLD) return { label: '↓ Below target', className: 'card-status-badge is-warning' };
-  return { label: '↓ Critical', className: 'card-status-badge is-critical' };
+  if (percentFunded < 0.25) return { label: '↓ Critical', className: 'card-status-badge is-critical' };
+  if (percentFunded < 0.50) return { label: '↓ Vulnerable', className: 'card-status-badge is-warning' };
+  if (percentFunded < 0.75) return { label: '↓ Below target', className: 'card-status-badge is-warning' };
+  if (percentFunded < 1.00) return { label: 'Nearly funded', className: 'card-status-badge is-neutral' };
+  if (percentFunded < 1.50) return { label: '✓ Fully funded', className: 'card-status-badge is-healthy' };
+  return { label: '✓ Above target', className: 'card-status-badge is-healthy' };
 }
 
 function computeCoverageWeeks(currentCashBalance: number, reserveTarget: number): number {
