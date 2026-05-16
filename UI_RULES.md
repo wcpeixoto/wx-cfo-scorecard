@@ -683,7 +683,45 @@ onto the existing three color bands (plus neutral gray). No per-label
 > visible label, collapse to critical / warning / healthy / neutral
 > instead of trying to encode all six states by color alone.
 
-Never create a new badge pattern. Reuse `.card-status-badge`.
+Never create a new *status* badge pattern — reuse `.card-status-badge`.
+The only sanctioned non-status pill is `.card-domain-tag`, defined below.
+
+### `.card-domain-tag` — domain tag (distinct primitive)
+
+A domain tag answers "*which area?*", not "*what state?*". The visible
+label is a **domain** (Reserve, Cash Flow, Expenses, Revenue, Owner
+Draws, On Track); the `.is-*` variant **tints** it by severity using
+the same three bands as `.card-status-badge`. It is the only pill where
+the label is NOT a status string — the color carries severity, the
+label carries domain.
+
+- Used by: `SecondaryPriority` (Today secondary cards).
+- **No glyph.** The universal ↓/✓ glyph rule applies to status pills
+  only; domain tags are explicitly exempt.
+- Variants (same hex pairs as `.card-status-badge` — no new colors):
+
+| Variant        | Band            | Bg / Text             |
+|----------------|-----------------|-----------------------|
+| `.is-critical` | red             | `#FEF3F2` / `#F04438` |
+| `.is-warning`  | warning / amber | `#FFFAEB` / `#F79009` |
+| `.is-healthy`  | success green   | `#ECFDF3` / `#12B76A` |
+
+Base spec (matches shipped `.card-domain-tag` in `src/dashboard.css` —
+intentionally distinct from `.card-status-badge`, not a drifted copy):
+
+```
+display: inline-flex;
+align-items: center;
+gap: 6px;
+padding: 4px 10px;
+border-radius: 999px;
+font-size: 12px;
+font-weight: 500;
+line-height: 1;
+```
+
+Reconcile exactly with `src/dashboard.css`. Never encode the domain in
+color alone — the label is load-bearing.
 
 ---
 
