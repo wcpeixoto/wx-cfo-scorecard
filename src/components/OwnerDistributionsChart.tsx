@@ -116,7 +116,7 @@ function computeSignalPill(
 
   if (ratio > 1.1) return { label: '↑ Above avg', variant: 'above-avg' };
   if (ratio < 0.9) return { label: '↓ Below avg', variant: 'below-avg' };
-  return { label: '~ On track', variant: 'on-track' };
+  return { label: 'On track', variant: 'on-track' };
 }
 
 function ownerDistBadgeClass(variant: PillVariant): string {
