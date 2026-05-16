@@ -198,8 +198,17 @@ export function CashOnHandCard({ model, txns, forecastProjection }: CashOnHandCa
         <p className="priority-card-v2__body-row">
           <span className="priority-card-v2__body-row-icon" aria-hidden="true">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 17 13.5 8.5 8.5 13.5 2 7" stroke="currentColor" />
-              <polyline points="16 17 22 17 22 11" stroke="currentColor" />
+              {cashRunOut === null ? (
+                <>
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" stroke="currentColor" />
+                  <polyline points="16 7 22 7 22 13" stroke="currentColor" />
+                </>
+              ) : (
+                <>
+                  <polyline points="22 17 13.5 8.5 8.5 13.5 2 7" stroke="currentColor" />
+                  <polyline points="16 17 22 17 22 11" stroke="currentColor" />
+                </>
+              )}
             </svg>
           </span>
           <span>
