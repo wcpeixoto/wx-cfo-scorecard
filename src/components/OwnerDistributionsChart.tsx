@@ -158,7 +158,7 @@ function getTargetBadgeLabel(
     const pct = Math.round((forecastTotal / targetAmount) * 100);
     if (isFinite(pct) && !isNaN(pct)) {
       const arrow = pct >= 100 ? '↑' : '↓';
-      return `${arrow} Forecast ${pct}% of target`;
+      return `${arrow} Forecast: ${pct}% of target`;
     }
   }
   return TARGET_BADGE_CONFIG[status].label;
