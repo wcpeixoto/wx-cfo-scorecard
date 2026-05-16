@@ -54,9 +54,9 @@ function formatCashOnHand(amount: number): string {
 
 function severityLabelText(severity: 'critical' | 'warning' | 'healthy'): string {
   switch (severity) {
-    case 'critical': return 'Needs attention';
+    case 'critical': return '↓ Needs attention';
     case 'warning':  return 'Watch';
-    case 'healthy':  return 'Healthy';
+    case 'healthy':  return '✓ Healthy';
   }
 }
 
@@ -156,8 +156,7 @@ export function CashOnHandCard({ model, txns, forecastProjection }: CashOnHandCa
         <div className="priority-card-v2__title-block">
           <h3 className="priority-card-v2__title">Cash on Hand</h3>
         </div>
-        <span className={`today-severity-pill is-${hero.severity}`}>
-          <span className="today-severity-dot" aria-hidden="true" />
+        <span className={`card-status-badge is-${hero.severity}`}>
           {severityLabelText(hero.severity)}
         </span>
       </div>
