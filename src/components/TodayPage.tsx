@@ -8,6 +8,7 @@ import { CashOnHandCard } from './CashOnHandCard';
 import { SecondaryPriority } from './SecondaryPriority';
 import { OperatingReserveCard } from './OperatingReserveCard';
 import { OwnerDistributionsCard } from './OwnerDistributionsCard';
+import NextOwnerDistributionCard from './NextOwnerDistributionCard';
 
 const DIST_ON_TARGET_LOW  = 0.90; // actual >= target × 0.90
 const DIST_ON_TARGET_HIGH = 1.10; // actual <= target × 1.10
@@ -113,12 +114,7 @@ export function TodayPage({ model, txns, forecastProjection, targetNetMargin, on
             currentCashBalance={model.runway.currentCashBalance}
             onCompareYear={onCompareYear}
           />
-          <article className="card next-owner-dist-card" aria-label="Next Owner Distribution (placeholder)">
-            <header className="next-owner-dist-header">
-              <h3 className="next-owner-dist-title">Next Owner Distribution</h3>
-            </header>
-            <div className="next-owner-dist-placeholder">Coming soon</div>
-          </article>
+          <NextOwnerDistributionCard />
         </div>
       </div>
     </div>

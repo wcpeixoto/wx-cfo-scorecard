@@ -6853,16 +6853,6 @@ body {
   margin: 0;
 }
 
-.next-owner-dist-placeholder {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #98a2b3;
-  font-size: 14px;
-  min-height: 160px;
-}
-
 /* Hero card header — headline left, severity pill right, same row */
 .hero-card-header {
   display: flex;
