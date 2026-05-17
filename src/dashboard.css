@@ -6837,70 +6837,216 @@ body {
   }
 }
 
-.next-owner-dist-card {
+/* ============================================================
+   .nod-balance-card — Next Owner Distribution mock.
+   Forked from .total-balance-card (UI Lab / TailAdmin finance
+   "Total Balance"). Visual replica only. Diverges independently;
+   do not consolidate until a third consumer needs the shell.
+   ============================================================ */
+
+.nod-balance-card {
+  display: block;
+  padding: 24px 24px 32px;
+  background: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  box-shadow: none;
+  font-family: 'Outfit', sans-serif;
+}
+
+.nod-balance-card__header {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 40px;
 }
 
-.next-owner-dist-header {
-  margin-bottom: 12px;
+@media (min-width: 640px) {
+  .nod-balance-card__header {
+    flex-direction: row;
+    align-items: flex-start;
+  }
 }
 
-.next-owner-dist-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #101828;
-  margin: 0;
-}
-
-/* Value + delta mock — replicated from the UI Lab Total Revenue card
-   spec (.revenue-card__*), kept under a local prefix. */
-.next-owner-dist-delta-row {
+.nod-balance-card__title-block {
   display: flex;
-  flex-direction: row;
-  align-items: normal;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.next-owner-dist-delta {
-  display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 4px;
+}
+
+.nod-balance-card__title {
   margin: 0;
-  padding: 0;
-  background: transparent;
-  border: none;
   font-weight: 500;
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 16px;
+  line-height: 24px;
+  color: #1D2939;
 }
 
-.next-owner-dist-delta--up {
-  color: #039855;
-}
-
-.next-owner-dist-delta-context {
+.nod-balance-card__subtitle {
   margin: 0;
-  padding: 0;
   font-weight: 400;
   font-size: 14px;
   line-height: 20px;
   color: #667085;
 }
 
-.next-owner-dist-hero-row {
+.nod-balance-card__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nod-balance-card__dropdown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  background: transparent;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #344054;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  cursor: pointer;
+}
+
+.nod-balance-card__dropdown svg {
+  flex-shrink: 0;
+}
+
+.nod-balance-card__amount-row {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 28px;
+  border-bottom: 1px dashed #E4E7EC;
 }
 
-.next-owner-dist-value {
-  margin: 0;
-  font-weight: 600;
+.nod-balance-card__amount-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.nod-balance-card__amount {
+  margin: 0 0 8px 0;
+  font-weight: 500;
   font-size: 30px;
   line-height: 36px;
   color: #1D2939;
+}
+
+.nod-balance-card__trend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.nod-balance-card__trend-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.nod-balance-card__trend-delta--up {
+  color: #039855;
+}
+
+.nod-balance-card__trend-text {
+  color: #667085;
+}
+
+.nod-balance-card__sparkline-slot {
+  width: 150px;
+  height: 70px;
+  margin-left: auto;
+}
+
+.nod-balance-card__account-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 30px;
+}
+
+@media (min-width: 640px) {
+  .nod-balance-card__account-row {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.nod-balance-card__account-label {
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #344054;
+}
+
+.nod-balance-card__account-number {
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 28px;
+  color: #344054;
+  letter-spacing: 0.02em;
+}
+
+.nod-balance-card__account-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.nod-balance-card__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 32px;
+  background: #FFFFFF;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  color: #344054;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  cursor: pointer;
+}
+
+.nod-balance-card__icon-btn:hover {
+  background: #F2F4F7;
+}
+
+.nod-balance-card__detail-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
+  background: #FFFFFF;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #344054;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  cursor: pointer;
+}
+
+.nod-balance-card__detail-btn:hover {
+  background: #F2F4F7;
 }
 
 /* Hero card header — headline left, severity pill right, same row */
