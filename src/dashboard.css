@@ -6853,6 +6853,56 @@ body {
   margin: 0;
 }
 
+/* Value + delta mock — replicated from the UI Lab Total Revenue card
+   spec (.revenue-card__*), kept under a local prefix. */
+.next-owner-dist-delta-row {
+  display: flex;
+  flex-direction: row;
+  align-items: normal;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.next-owner-dist-delta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.next-owner-dist-delta--up {
+  color: #039855;
+}
+
+.next-owner-dist-delta-context {
+  margin: 0;
+  padding: 0;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.next-owner-dist-hero-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.next-owner-dist-value {
+  margin: 0;
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 36px;
+  color: #1D2939;
+}
+
 /* Hero card header — headline left, severity pill right, same row */
 .hero-card-header {
   display: flex;
