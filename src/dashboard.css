@@ -6522,10 +6522,10 @@ body {
   margin-bottom: 0;
 }
 
-/* Top grid: Hero (2fr) + Operating Reserve (1fr) side by side on desktop */
+/* Top grid: Hero (7fr) + Operating Reserve (5fr → 5/12) side by side on desktop */
 .today-top-grid {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(360px, 1fr);
+  grid-template-columns: minmax(0, 7fr) minmax(360px, 5fr);
   gap: 16px;
   align-items: stretch;
 }
@@ -6820,7 +6820,7 @@ body {
 }
 
 .today-context-grid--2-1 {
-  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  grid-template-columns: minmax(0, 7fr) minmax(280px, 5fr);
 }
 
 .today-context-grid > * {
