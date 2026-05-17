@@ -12,6 +12,13 @@ function formatCompact(value: number): string {
   return `$${Math.round(value)}`;
 }
 
+function formatCompactWhole(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `$${Math.round(value / 1_000_000)}M`;
+  if (abs >= 1_000) return `$${Math.round(value / 1_000)}K`;
+  return `$${Math.round(value)}`;
+}
+
 type OwnerDistSeries = {
   years: number[];
   actual: number[];
@@ -221,7 +228,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         dataLabels: {
           total: {
             enabled: true,
-            formatter: (val: string | undefined) => formatCompact(Number(val ?? 0)),
+            formatter: (val: string | undefined) => formatCompactWhole(Number(val ?? 0)),
             offsetY: -4,
             style: {
               fontSize: '12px',
