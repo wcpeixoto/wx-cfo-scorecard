@@ -6844,24 +6844,69 @@ body {
 }
 
 .next-owner-dist-header {
-  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 40px;
 }
 
 .next-owner-dist-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #101828;
   margin: 0;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 24px;
+  color: #1D2939;
 }
 
-.next-owner-dist-placeholder {
-  flex: 1;
+.next-owner-dist-subtitle {
+  margin: 0;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.next-owner-dist-amount-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.next-owner-dist-amount {
+  margin: 0 0 8px 0;
+  font-weight: 500;
+  font-size: 30px;
+  line-height: 36px;
+  color: #1D2939;
+}
+
+.next-owner-dist-trend {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #98a2b3;
+  gap: 6px;
+  font-weight: 400;
   font-size: 14px;
-  min-height: 160px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.next-owner-dist-trend-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.next-owner-dist-trend-delta--up {
+  color: #039855;
+}
+
+.next-owner-dist-trend-text {
+  color: #667085;
+}
+
+.next-owner-dist-channel-bar {
+  margin-top: 28px;
+  width: 100%;
 }
 
 /* Hero card header — headline left, severity pill right, same row */
