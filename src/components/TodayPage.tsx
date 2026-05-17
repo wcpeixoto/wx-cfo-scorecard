@@ -40,9 +40,7 @@ const NEXT_OWNER_DIST_CHANNEL_OPTIONS: ApexOptions = {
     bar: {
       horizontal: false,
       distributed: true,
-      // Spec is "70%", but apexcharts ^5.10.4 renders that at a ~0.46
-      // bar/pitch ratio; "94%" reproduces TailAdmin's actual 0.70 ratio.
-      columnWidth: '94%',
+      columnWidth: '70%',
       borderRadius: 1,
       borderRadiusApplication: 'around',
     },
