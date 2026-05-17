@@ -1713,7 +1713,7 @@ body {
 
 .reserve-header-copy {
   display: grid;
-  gap: 3px;
+  gap: 6px;
 }
 
 .reserve-title-row {
@@ -1740,9 +1740,10 @@ body {
 
 .reserve-subtitle {
   margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.25;
-  color: var(--text-secondary);
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
 }
 
 .reserve-subtitle-row {
