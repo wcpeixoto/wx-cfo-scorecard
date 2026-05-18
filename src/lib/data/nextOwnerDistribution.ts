@@ -181,9 +181,3 @@ function selectBlocker(
   //    (0, MIN_DISTRIBUTION_THRESHOLD). This is also the default fallthrough.
   return 'below_minimum_payout';
 }
-
-export const BLOCKER_LABELS: Record<NextDistributionBlocker, string> = {
-  reserve_shortfall: 'Reserve shortfall',
-  negative_distributable_cash: 'Negative distributable cash',
-  below_minimum_payout: 'Below minimum payout',
-};
