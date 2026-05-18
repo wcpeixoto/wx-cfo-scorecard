@@ -80,7 +80,7 @@ export function NextOwnerDistributionCard({
       categories: monthLabels,
       axisBorder: { show: false },
       axisTicks: { show: false },
-      labels: { style: { fontSize: '12px', colors: chartTokens.axisText } },
+      labels: { show: false },
       crosshairs: { show: false },
     },
     yaxis: { show: false },
@@ -193,7 +193,6 @@ export function NextOwnerDistributionCard({
         </div>
       )}
 
-      <p className="nod-chart-label">12-month owner pay forecast</p>
       <p className="nod-legend">
         <span className="nod-legend-word nod-legend-reserve">Reserve floor</span>
         <span className="nod-legend-sep"> · </span>
