@@ -6838,19 +6838,27 @@ body {
   }
 }
 
-.next-owner-dist-card {
+/* ── Next Owner Distribution card (.nod-*) ──────────────────────────────
+   When can the owner next take a distribution without breaching the
+   operating reserve safety line? Scoped under .nod-card; reuses the
+   shared .card shell + .card-status-badge pill. */
+.nod-card {
   display: flex;
   flex-direction: column;
+  border-radius: 16px;
+  border: 1px solid #E4E7EC;
+  padding: 22px;
 }
 
-.next-owner-dist-header {
+.nod-header {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
-.next-owner-dist-title {
+.nod-title {
   margin: 0;
   font-weight: 500;
   font-size: 16px;
@@ -6858,55 +6866,95 @@ body {
   color: #1D2939;
 }
 
-.next-owner-dist-subtitle {
-  margin: 0;
-  font-weight: 400;
-  font-size: 14px;
-  line-height: 20px;
-  color: #667085;
-}
-
-.next-owner-dist-amount-block {
+.nod-headline-block {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  margin-bottom: 16px;
 }
 
-.next-owner-dist-amount {
-  margin: 0 0 8px 0;
-  font-weight: 500;
-  font-size: 30px;
-  line-height: 36px;
+.nod-month {
+  margin: 0;
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 32px;
   color: #1D2939;
 }
 
-.next-owner-dist-trend {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.nod-amount {
+  margin: 0;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 22px;
+  color: #344054;
+}
+
+.nod-context {
+  margin: 0;
   font-weight: 400;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 20px;
   color: #667085;
 }
 
-.next-owner-dist-trend-delta {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.nod-blocker {
+  margin: 0;
   font-weight: 500;
+  font-size: 15px;
+  line-height: 22px;
+  color: #475467;
 }
 
-.next-owner-dist-trend-delta--up {
-  color: #039855;
+.nod-chart-label {
+  margin: 0 0 4px 0;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 20px;
+  color: #344054;
 }
 
-.next-owner-dist-trend-text {
+.nod-legend {
+  margin: 0 0 4px 0;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 18px;
   color: #667085;
 }
 
-.next-owner-dist-channel-bar {
-  margin-top: 28px;
+.nod-legend-word {
+  font-weight: 500;
+}
+
+.nod-legend-reserve {
+  color: #98A2B3;
+}
+
+.nod-legend-safe {
+  color: #9CB9FF;
+}
+
+.nod-legend-dist {
+  color: #465FFF;
+}
+
+.nod-legend-sep {
+  color: #D0D5DD;
+}
+
+.nod-chart {
   width: 100%;
+}
+
+.nod-footnote {
+  margin: 8px 0 0 0;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.nod-tooltip-inner .apexcharts-tooltip-text-y-label {
+  color: #475467;
 }
 
 /* Hero card header — headline left, severity pill right, same row */
