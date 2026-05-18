@@ -16,12 +16,11 @@ import {
   BLOCKER_LABELS,
 } from '../lib/data/nextOwnerDistribution';
 
-// Segment colors. Reserve floor reads as the structural/neutral base; safe
-// cash is the lighter brand tint; the carved-out distribution slice is full
-// brand saturation so it stands out as "what you can take."
-const RESERVE_COLOR = '#E4E7EC';
-const SAFE_CASH_COLOR = chartTokens.brandSecondary; // #9CB9FF
-const DISTRIBUTION_COLOR = chartTokens.brand; // #465FFF
+// Segment colors follow the TailAdmin stacked-bar hierarchy: darkest at the
+// base, medium in the middle, lightest on top.
+const RESERVE_COLOR = chartTokens.brand; // #465FFF
+const SAFE_CASH_COLOR = chartTokens.brand400; // #637AEA
+const DISTRIBUTION_COLOR = chartTokens.brandSecondary; // #9CB9FF
 
 interface NextOwnerDistributionCardProps {
   ownerPayProjection: ScenarioPoint[];
