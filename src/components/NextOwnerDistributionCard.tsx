@@ -80,7 +80,7 @@ export function NextOwnerDistributionCard({
       categories: monthLabels,
       axisBorder: { show: false },
       axisTicks: { show: false },
-      labels: { show: false },
+      labels: { style: { fontSize: '12px', colors: chartTokens.axisText } },
       crosshairs: { show: false },
     },
     yaxis: { show: false },
