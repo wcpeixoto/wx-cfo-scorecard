@@ -6526,7 +6526,7 @@ body {
 /* Top grid: Hero (7fr) + Operating Reserve (5fr → 5/12) side by side on desktop */
 .today-top-grid {
   display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(360px, 5fr);
+  grid-template-columns: minmax(0, 7fr) minmax(280px, 5fr);
   gap: 16px;
   align-items: stretch;
 }
@@ -6553,7 +6553,7 @@ body {
   margin-block: auto;
 }
 
-@media (max-width: 1199px) {
+@media (max-width: 767px) {
   .today-top-grid {
     grid-template-columns: 1fr;
     align-items: flex-start;
