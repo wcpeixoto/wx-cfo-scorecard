@@ -1,7 +1,7 @@
 // NextOwnerDistributionCard — when can the owner next take a distribution
 // without breaching the operating reserve safety line?
 //
-// Data: a dedicated Reality/Base/15-month forecast (ownerPayProjection) plus
+// Data: a dedicated Reality/Base/9-month forecast (ownerPayProjection) plus
 // the effective reserve floor (Settings-fixed-aware, identical to the
 // Forecast safety-line rule). All decision logic lives in the pure helper.
 
@@ -223,7 +223,7 @@ export function NextOwnerDistributionCard({
       ) : (
         <div className="nod-headline-block">
           <p className="nod-month">No payout forecast</p>
-          <p className="nod-context">Next 12 months</p>
+          <p className="nod-context">Next 6 months</p>
         </div>
       )}
 
