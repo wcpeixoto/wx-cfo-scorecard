@@ -223,7 +223,7 @@ export function NextOwnerDistributionCard({
       ) : (
         <div className="nod-headline-block">
           <p className="nod-month">No payout forecast</p>
-          <p className="nod-context">Next 12 months</p>
+          <p className="nod-context">Next 6 months</p>
         </div>
       )}
 

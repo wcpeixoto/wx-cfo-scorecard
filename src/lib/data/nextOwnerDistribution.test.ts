@@ -5,9 +5,9 @@ import {
   MIN_DISTRIBUTION_THRESHOLD,
 } from './nextOwnerDistribution';
 
-// Helper: build a 15-point ScenarioPoint series from ending-cash balances.
-// Only `month` and `endingCashBalance` matter to the helper; other fields
-// are filled with zeros.
+// Helper: build a ScenarioPoint series from ending-cash balances. The helper
+// requires >= 9 points (6 display + 3 look-ahead); tests pass at least that
+// many. Only `month` and `endingCashBalance` matter; other fields are zeros.
 function series(endingCash: number[]): ScenarioPoint[] {
   return endingCash.map((bal, i) => {
     const monthNum = (i % 12) + 1;
@@ -43,24 +43,23 @@ describe('computeNextOwnerDistribution', () => {
     expect(result.bars[0].distributionSegment).toBe(20_000);
   });
 
-  // 2. Forecast — first qualifying month at index 6.
-  it('forecasts the first qualifying month at index 6', () => {
-    // Months 0..5: just below reserve (reserve shortfall would trigger if
-    // blocked, but a later month qualifies so state is forecast). Use values
-    // above reserve but with a dip inside every early safety window so no
-    // early candidate qualifies, then a clear plateau from month 6.
+  // 2. Forecast — first qualifying month at index 3 (not index 0).
+  it('forecasts the first qualifying month at index 3', () => {
+    // Months 0..2 produce sub-threshold surpluses (1k < 3k) because each
+    // early safety window still includes a low month, so no early candidate
+    // qualifies; a clear plateau from index 3 makes index 3 the first payout.
     const cash = [
-      31_000, 31_000, 31_000, 31_000, 31_000, 31_000, // 0..5: surplus 1k < 3k
-      60_000, 60_000, 60_000, 60_000, 60_000, 60_000, // 6..11
-      60_000, 60_000, 60_000, // 12..14 look-ahead
+      31_000, 31_000, 31_000, // 0..2: surplus 1k < 3k
+      60_000, 60_000, 60_000, // 3..5
+      60_000, 60_000, 60_000, // 6..8 look-ahead (9-month minimum)
     ];
     const result = computeNextOwnerDistribution(series(cash), RESERVE);
     expect(result.state).toBe('forecast');
     if (result.state !== 'forecast') return;
-    expect(result.monthLabel).toBe('Jul 2026'); // index 6
+    expect(result.monthLabel).toBe('Apr 2026'); // index 3
     expect(result.distributionAmount).toBe(30_000); // 60k - 30k
-    expect(result.bars[6].isFirstPayout).toBe(true);
-    for (let i = 0; i < 6; i += 1) {
+    expect(result.bars[3].isFirstPayout).toBe(true);
+    for (let i = 0; i < 3; i += 1) {
       expect(result.bars[i].distributionSegment).toBe(0);
       expect(result.bars[i].isFirstPayout).toBe(false);
     }
@@ -79,7 +78,7 @@ describe('computeNextOwnerDistribution', () => {
     expect(result.bars[0].isFirstPayout).toBe(true);
     // Later months qualify on their own merits but carry no distribution
     // segment (only the first payout month renders one).
-    for (let i = 1; i < 12; i += 1) {
+    for (let i = 1; i < 6; i += 1) {
       expect(result.bars[i].distributionSegment).toBe(0);
     }
   });
@@ -142,29 +141,26 @@ describe('computeNextOwnerDistribution', () => {
     expect(justBelow.blocker).toBe('below_minimum_payout');
   });
 
-  // 8. Edge — 4-month window at index 11 uses months 11..14 of the 15-input.
-  it('uses months 11..14 for the candidate at index 11', () => {
-    // Months 0..10 dip below reserve so no earlier candidate qualifies and
-    // the index-11 window is the decisive one. Make 0..10 below reserve →
-    // that would trigger reserve_shortfall if blocked, but index 11 qualifies
-    // so state is forecast and the win comes from the 11..14 window.
+  // 8. Edge — 4-month window at index 5 uses months 5..8 of the 9-input.
+  it('uses months 5..8 for the candidate at index 5', () => {
+    // Months 0..4 produce sub-threshold surpluses (1k) so no earlier
+    // candidate qualifies, and stay above reserve so reserve_shortfall does
+    // not pre-empt; index 5 is the decisive last-display-month candidate and
+    // its window is the last 4 months of the 9-month internal requirement.
     const cash = [
-      // 0..10 produce sub-threshold surpluses (1k) so no early qualifier,
-      // and stay above reserve so reserve_shortfall does not pre-empt.
-      31_000, 31_000, 31_000, 31_000, 31_000, 31_000,
       31_000, 31_000, 31_000, 31_000, 31_000,
-      // index 11 + look-ahead 12,13,14 — window min 45k → surplus 15k.
+      // index 5 + look-ahead 6,7,8 — window min 45k → surplus 15k.
       45_000, 45_000, 45_000, 45_000,
     ];
     const result = computeNextOwnerDistribution(series(cash), RESERVE);
     expect(result.state).toBe('forecast');
     if (result.state !== 'forecast') return;
-    expect(result.bars[11].isFirstPayout).toBe(true);
+    expect(result.bars[5].isFirstPayout).toBe(true);
     expect(result.distributionAmount).toBe(15_000); // min(45k..) - 30k
-    // Sanity: if month 14 were excluded the min would differ; force a dip at
-    // 14 and confirm it changes the result.
+    // Sanity: if month 8 were excluded the min would differ; force a dip at
+    // 8 and confirm it changes the result.
     const cashDip = [...cash];
-    cashDip[14] = 35_000; // window min becomes 35k → surplus 5k still qualifies
+    cashDip[8] = 35_000; // window min becomes 35k → surplus 5k still qualifies
     const dipped = computeNextOwnerDistribution(series(cashDip), RESERVE);
     expect(dipped.state).toBe('forecast');
     if (dipped.state !== 'forecast') return;
@@ -183,10 +179,10 @@ describe('computeNextOwnerDistribution', () => {
         31_000, 31_000, 31_000,
       ]), // blocked reserve shortfall
       series([
-        31_000, 31_000, 31_000, 31_000, 31_000, 31_000,
-        60_000, 60_000, 60_000, 60_000, 60_000, 60_000,
+        31_000, 31_000, 31_000,
         60_000, 60_000, 60_000,
-      ]), // forecast at index 6
+        60_000, 60_000, 60_000,
+      ]), // forecast — first qualifier at index 3
     ];
     for (const s of cases) {
       const result = computeNextOwnerDistribution(s, RESERVE);
@@ -198,13 +194,40 @@ describe('computeNextOwnerDistribution', () => {
     }
   });
 
-  // 10. Helper throws when input series length < 15.
-  it('throws when the input series has fewer than 15 points', () => {
+  // 10. Helper throws when input series length < 9; succeeds at exactly 9.
+  it('throws below 9 points and succeeds at exactly 9', () => {
     expect(() =>
-      computeNextOwnerDistribution(series(Array(14).fill(50_000)), RESERVE)
-    ).toThrow(/at least 15/);
+      computeNextOwnerDistribution(series(Array(8).fill(50_000)), RESERVE)
+    ).toThrow(/at least 9/);
     expect(() => computeNextOwnerDistribution([], RESERVE)).toThrow(
-      /at least 15/
+      /at least 9/
     );
+    // Exactly 9 points (6 display + 3 look-ahead) is the minimum valid input.
+    const atMin = computeNextOwnerDistribution(
+      series(Array(9).fill(50_000)),
+      RESERVE
+    );
+    expect(atMin.state).toBe('forecast');
+    expect(atMin.bars).toHaveLength(6);
+  });
+
+  // 11. Scan stops at the display window — a qualifying month past index 5
+  //     (at index 6) must NOT rescue an otherwise-blocked forecast. Guards
+  //     against the scan accidentally extending past the new 6-month window.
+  it('returns blocked when the only qualifying month is past the display window', () => {
+    // Months 0..5 produce sub-threshold surpluses (1k < 3k). A clear
+    // qualifying plateau starts at index 6 — outside the 0..5 scan. The
+    // helper still needs >= 9 points; provide 10 so index 6's data exists.
+    const cash = [
+      31_000, 31_000, 31_000, 31_000, 31_000, 31_000, // 0..5: surplus 1k
+      80_000, 80_000, 80_000, 80_000, // 6..9: would qualify if scanned
+    ];
+    const result = computeNextOwnerDistribution(series(cash), RESERVE);
+    expect(result.state).toBe('blocked');
+    if (result.state !== 'blocked') return;
+    // All 0..5 stay above the floor with positive-but-tiny distributable
+    // cash → below_minimum_payout (not reserve_shortfall).
+    expect(result.blocker).toBe('below_minimum_payout');
+    expect(result.bars).toHaveLength(6);
   });
 });

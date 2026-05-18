@@ -1,14 +1,14 @@
 // Next Owner Distribution — pure helper.
 //
-// Given a dedicated Reality/Base/15-month forecast series (events-parity
+// Given a dedicated Reality/Base/9-month forecast series (events-parity
 // applied upstream in Dashboard.tsx) and an effective reserve floor, decide
 // when the owner can next take a distribution without breaching the reserve
-// safety line, and produce per-bar chart segments for the 12-month display
+// safety line, and produce per-bar chart segments for the 6-month display
 // window.
 //
-// Internal window: months 0..14 (15 months) — the 4-month safety window for
-// candidate month 11 looks at months 11..14.
-// Display window:  months 0..11 (12 bars).
+// Internal window: months 0..8 (9 months) — the 4-month safety window for
+// candidate month 5 looks at months 5..8.
+// Display window:  months 0..5 (6 bars).
 
 import type { ScenarioPoint } from './contract';
 
@@ -16,11 +16,11 @@ import type { ScenarioPoint } from './contract';
  *  payout month. Hardcoded in v1 — no Settings UI. */
 export const MIN_DISTRIBUTION_THRESHOLD = 3000;
 
-/** Months required in the input series (display 12 + 3 look-ahead). */
-export const REQUIRED_SERIES_LENGTH = 15;
+/** Months required in the input series (display 6 + 3 look-ahead). */
+export const REQUIRED_SERIES_LENGTH = 9;
 
-/** Number of display bars (candidate months 0..11). */
-const DISPLAY_MONTHS = 12;
+/** Number of display bars (candidate months 0..5). */
+const DISPLAY_MONTHS = 6;
 
 /** Safety window length: candidate month + next 3 = 4 months. */
 const SAFETY_WINDOW = 4;
@@ -69,11 +69,11 @@ function formatMonthLabel(token: string): string {
 /**
  * Compute the next owner distribution state and per-bar chart segments.
  *
- * @param ownerPayProjection Dedicated Reality/Base/15-month series with
- *   known-events overlay applied upstream. Must have >= 15 points.
+ * @param ownerPayProjection Dedicated Reality/Base/9-month series with
+ *   known-events overlay applied upstream. Must have >= 9 points.
  * @param reserveFloor Effective reserve floor — the Settings-fixed-aware
  *   value identical to the Forecast safety-line rule (NOT raw reserveTarget).
- * @throws if the series has fewer than 15 points.
+ * @throws if the series has fewer than 9 points.
  */
 export function computeNextOwnerDistribution(
   ownerPayProjection: ScenarioPoint[],
@@ -88,7 +88,7 @@ export function computeNextOwnerDistribution(
 
   const endingCash = ownerPayProjection.map((p) => p.endingCashBalance);
 
-  // First qualifying candidate month in the 12-month display window.
+  // First qualifying candidate month in the 6-month display window.
   let firstPayoutIndex = -1;
   let firstPayoutAmount = 0;
   for (let i = 0; i < DISPLAY_MONTHS; i += 1) {
@@ -107,7 +107,7 @@ export function computeNextOwnerDistribution(
 
   const qualifying = firstPayoutIndex >= 0;
 
-  // Build the 12 display bars (Option A — distribution carved from safe cash).
+  // Build the 6 display bars (Option A — distribution carved from safe cash).
   const bars: BarSegments[] = [];
   for (let i = 0; i < DISPLAY_MONTHS; i += 1) {
     const cash = endingCash[i];
@@ -144,9 +144,9 @@ export function computeNextOwnerDistribution(
 
 /**
  * Blocker selection, highest priority first:
- *  1. reserve_shortfall — any ending cash in months 0..11 below reserveFloor.
+ *  1. reserve_shortfall — any ending cash in months 0..5 below reserveFloor.
  *  2. negative_distributable_cash — no positive (endingCash - reserve) value
- *     exists across months 0..11.
+ *     exists across months 0..5.
  *  3. below_minimum_payout — at least one candidate produces a 4-month
  *     safety-window surplus > 0 but < MIN_DISTRIBUTION_THRESHOLD.
  *
