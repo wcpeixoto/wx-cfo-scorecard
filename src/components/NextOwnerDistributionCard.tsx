@@ -16,9 +16,9 @@ import {
   type NextDistributionBlocker,
 } from '../lib/data/nextOwnerDistribution';
 
-// Segment colors follow the TailAdmin stacked-bar hierarchy: darkest at the
-// base, medium in the middle, lightest on top.
-const RESERVE_COLOR = chartTokens.brand; // #465FFF
+// TailAdmin brand ramp (preserved from #132): darkest at the base,
+// medium in the middle, lightest on top.
+const OPERATING_CASH_COLOR = chartTokens.brand; // #465FFF
 const SAFE_CASH_COLOR = chartTokens.brand400; // #637AEA
 const DISTRIBUTION_COLOR = chartTokens.brandSecondary; // #9CB9FF
 
@@ -47,10 +47,38 @@ export function NextOwnerDistributionCard({
   const bars = result.bars;
   const monthLabels = bars.map((b) => b.monthLabel.split(' ')[0]); // "Aug"
 
+  // Negative-cash months: the helper faithfully returns a negative
+  // operating-cash segment (true ending cash). A stacked bar can't render a
+  // negative floor sensibly, so for display those months clamp to a thin
+  // neutral stub at the zero baseline — magnitude is intentionally not shown
+  // (the tooltip carries "< $0"). Real values stay in `bars` for the tooltip.
+  const maxPositiveTotal = Math.max(
+    0,
+    ...bars
+      .filter((b) => b.endingCashBeforePayout >= 0)
+      .map((b) => b.reserveSegment + b.safeCashSegment + b.distributionSegment)
+  );
+  const negativeStub = maxPositiveTotal > 0 ? maxPositiveTotal * 0.02 : 1;
+
   const series = [
-    { name: 'Reserve floor', data: bars.map((b) => b.reserveSegment) },
-    { name: 'Safe cash', data: bars.map((b) => b.safeCashSegment) },
-    { name: 'Owner distribution', data: bars.map((b) => b.distributionSegment) },
+    {
+      name: 'Operating cash',
+      data: bars.map((b) =>
+        b.endingCashBeforePayout < 0 ? negativeStub : b.reserveSegment
+      ),
+    },
+    {
+      name: 'Safe cash',
+      data: bars.map((b) =>
+        b.endingCashBeforePayout < 0 ? 0 : b.safeCashSegment
+      ),
+    },
+    {
+      name: 'Owner distribution',
+      data: bars.map((b) =>
+        b.endingCashBeforePayout < 0 ? 0 : b.distributionSegment
+      ),
+    },
   ];
 
   const firstPayoutIndex = bars.findIndex((b) => b.isFirstPayout);
@@ -64,7 +92,7 @@ export function NextOwnerDistributionCard({
       background: 'transparent',
       animations: { enabled: false },
     },
-    colors: [RESERVE_COLOR, SAFE_CASH_COLOR, DISTRIBUTION_COLOR],
+    colors: [OPERATING_CASH_COLOR, SAFE_CASH_COLOR, DISTRIBUTION_COLOR],
     plotOptions: {
       bar: {
         horizontal: false,
@@ -76,7 +104,7 @@ export function NextOwnerDistributionCard({
     },
     fill: {
       colors: [
-        () => RESERVE_COLOR,
+        () => OPERATING_CASH_COLOR,
         () => SAFE_CASH_COLOR,
         () => DISTRIBUTION_COLOR,
       ],
@@ -129,43 +157,40 @@ export function NextOwnerDistributionCard({
       theme: 'light',
       shared: true,
       intersect: false,
-      // Line 2 ("Ending cash before payout") is a computed total
-      // incompatible with the standard per-series tooltip. Custom HTML
-      // formatter follows the pre-approved OwnerDistributionsChart precedent.
+      // Custom HTML formatter (pre-approved OwnerDistributionsChart
+      // precedent). Rows mirror the stacked bar top-down. Negative-cash
+      // months never show a negative figure: "< $0" plus a plain-text
+      // redirect, matching the standard tooltip styling.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       custom: ({ dataPointIndex }: { dataPointIndex: number }) => {
         const bar = bars[dataPointIndex];
         if (!bar) return '';
-        const rows: string[] = [];
-        rows.push(
+        const row = (label: string, value: string) =>
           `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
             <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
-              <span class="apexcharts-tooltip-text-y-label">Ending cash before payout</span>
-              <span class="apexcharts-tooltip-text-y-value">${formatCompact(bar.endingCashBeforePayout)}</span>
+              <span class="apexcharts-tooltip-text-y-label">${label}</span>
+              <span class="apexcharts-tooltip-text-y-value">${value}</span>
             </div>
-          </div>`
-        );
-        rows.push(
-          `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
-            <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
-              <span class="apexcharts-tooltip-text-y-label">Reserve floor</span>
-              <span class="apexcharts-tooltip-text-y-value">${formatCompact(reserveFloor)}</span>
-            </div>
-          </div>`
-        );
-        const distRow =
-          bar.distributionSegment > 0
-            ? `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
-                <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
-                  <span class="apexcharts-tooltip-text-y-label">Distribution</span>
-                  <span class="apexcharts-tooltip-text-y-value">${formatCompact(bar.distributionSegment)}</span>
-                </div>
-              </div>`
-            : '';
+          </div>`;
+        const isNegative = bar.endingCashBeforePayout < 0;
+        const rows = isNegative
+          ? [
+              row('Owner distribution', '$0'),
+              row('Safe cash', '$0'),
+              row('Operating cash', '&lt; $0'),
+            ]
+          : [
+              row('Owner distribution', formatCompact(bar.distributionSegment)),
+              row('Safe cash', formatCompact(bar.safeCashSegment)),
+              row('Operating cash', formatCompact(bar.reserveSegment)),
+            ];
+        const note = isNegative
+          ? `<div class="nod-tooltip-note">Cash is forecast to run out.<br />Review Cash Forecast.</div>`
+          : '';
         return `<div class="owl-tooltip-inner nod-tooltip-inner">
           <div class="apexcharts-tooltip-title">${bar.monthLabel}</div>
           ${rows.join('')}
-          ${distRow}
+          ${note}
         </div>`;
       },
     },
@@ -203,7 +228,7 @@ export function NextOwnerDistributionCard({
       )}
 
       <p className="nod-legend">
-        <span className="nod-legend-word nod-legend-reserve">Reserve floor</span>
+        <span className="nod-legend-word nod-legend-operating">Operating cash</span>
         <span className="nod-legend-sep"> · </span>
         <span className="nod-legend-word nod-legend-safe">Safe cash</span>
         <span className="nod-legend-sep"> · </span>
