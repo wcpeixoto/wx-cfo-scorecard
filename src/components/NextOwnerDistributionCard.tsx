@@ -48,28 +48,6 @@ export function NextOwnerDistributionCard({
 
   const firstPayoutIndex = bars.findIndex((b) => b.isFirstPayout);
 
-  // Month labels are rendered as zero-baseline point annotations rather than
-  // native x-axis labels: ApexCharts has no zero-anchored axis-label option,
-  // so y: 0 keeps them on the baseline (bottom when all bars are positive,
-  // the zero-crossing when a bar goes negative). offsetY drops them just
-  // below the line so positive bars rise above and negative bars fall below.
-  const monthLabelPoints = monthLabels.map((label) => ({
-    x: label,
-    y: 0,
-    marker: { size: 0 },
-    label: {
-      text: label,
-      borderColor: 'transparent',
-      offsetY: 16,
-      style: {
-        background: 'transparent',
-        color: chartTokens.axisText,
-        fontSize: '12px',
-        fontFamily: 'Outfit, sans-serif',
-      },
-    },
-  }));
-
   const options: ApexOptions = {
     chart: {
       type: 'bar',
@@ -108,18 +86,17 @@ export function NextOwnerDistributionCard({
     yaxis: { show: false },
     grid: {
       show: false,
-      padding: { top: firstPayoutIndex >= 0 ? 20 : 0, right: 0, bottom: 22, left: 0 },
+      padding: { top: firstPayoutIndex >= 0 ? 20 : 0, right: 0, bottom: 0, left: 0 },
     },
     states: {
       hover: { filter: { type: 'none' } },
       active: { filter: { type: 'none' } },
     },
     legend: { show: false },
-    annotations: {
-      points:
-        firstPayoutIndex >= 0
-          ? [
-              ...monthLabelPoints,
+    annotations:
+      firstPayoutIndex >= 0
+        ? {
+            points: [
               {
                 x: monthLabels[firstPayoutIndex],
                 y: bars[firstPayoutIndex].endingCashBeforePayout,
@@ -138,9 +115,9 @@ export function NextOwnerDistributionCard({
                   },
                 },
               },
-            ]
-          : monthLabelPoints,
-    },
+            ],
+          }
+        : {},
     tooltip: {
       theme: 'light',
       shared: true,
