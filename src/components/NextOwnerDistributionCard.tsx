@@ -13,7 +13,7 @@ import { chartTokens } from '../lib/ui/chartTokens';
 import { formatCompact } from '../lib/utils/formatCompact';
 import {
   computeNextOwnerDistribution,
-  BLOCKER_LABELS,
+  type NextDistributionBlocker,
 } from '../lib/data/nextOwnerDistribution';
 
 // Segment colors follow the TailAdmin stacked-bar hierarchy: darkest at the
@@ -21,6 +21,14 @@ import {
 const RESERVE_COLOR = chartTokens.brand; // #465FFF
 const SAFE_CASH_COLOR = chartTokens.brand400; // #637AEA
 const DISTRIBUTION_COLOR = chartTokens.brandSecondary; // #9CB9FF
+
+// Owner-facing blocked-state pill copy. reserve_shortfall and
+// negative_distributable_cash intentionally collapse to the same message.
+const BLOCKED_PILL_LABELS: Record<NextDistributionBlocker, string> = {
+  reserve_shortfall: 'No payout room',
+  negative_distributable_cash: 'No payout room',
+  below_minimum_payout: 'Almost there',
+};
 
 interface NextOwnerDistributionCardProps {
   ownerPayProjection: ScenarioPoint[];
@@ -167,7 +175,10 @@ export function NextOwnerDistributionCard({
   const badgeClass = isForecast
     ? 'card-status-badge is-healthy'
     : 'card-status-badge is-neutral';
-  const badgeLabel = isForecast ? 'Forecast' : 'Blocked';
+  const badgeLabel =
+    result.state === 'forecast'
+      ? 'Coming up'
+      : BLOCKED_PILL_LABELS[result.blocker];
 
   return (
     <article className="card nod-card" aria-label="Next Owner Distribution">
@@ -188,7 +199,6 @@ export function NextOwnerDistributionCard({
         <div className="nod-headline-block">
           <p className="nod-month">No payout forecast</p>
           <p className="nod-context">Next 12 months</p>
-          <p className="nod-blocker">{BLOCKER_LABELS[result.blocker]}</p>
         </div>
       )}
 
