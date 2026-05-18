@@ -28,7 +28,6 @@ export const chartTokens = {
   pressure:        '#DC6803',
 
   // Structural
-  gray200:         '#E4E7EC',
   gridBorder:      '#e0e0e0',
   crosshairStroke: '#b6b6b6',
   axisText:        '#667085',

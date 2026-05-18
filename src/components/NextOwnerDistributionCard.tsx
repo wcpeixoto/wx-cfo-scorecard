@@ -16,9 +16,9 @@ import {
   type NextDistributionBlocker,
 } from '../lib/data/nextOwnerDistribution';
 
-// Operating-cash floor is the neutral structural base; safe cash and the
-// carved-out distribution slice carry the brand hierarchy above it.
-const OPERATING_CASH_COLOR = chartTokens.gray200; // #E4E7EC
+// TailAdmin brand ramp (preserved from #132): darkest at the base,
+// medium in the middle, lightest on top.
+const OPERATING_CASH_COLOR = chartTokens.brand; // #465FFF
 const SAFE_CASH_COLOR = chartTokens.brand400; // #637AEA
 const DISTRIBUTION_COLOR = chartTokens.brandSecondary; // #9CB9FF
 
