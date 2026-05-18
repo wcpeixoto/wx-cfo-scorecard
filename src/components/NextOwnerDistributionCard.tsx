@@ -212,7 +212,7 @@ export function NextOwnerDistributionCard({
       </div>
 
       <p className="nod-footnote">
-        Adjust revenue and expenses to see how to get paid sooner.
+        Simulate revenue and expense changes to see how to get paid sooner
       </p>
     </article>
   );
