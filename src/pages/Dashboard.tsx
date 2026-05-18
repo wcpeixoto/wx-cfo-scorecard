@@ -2152,6 +2152,112 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     () => computeForecastDecisionSignals(scenarioProjection, model.runway.reserveTarget),
     [model.runway.reserveTarget, scenarioProjection]
   );
+
+  // Dedicated projection for the Next Owner Distribution card. It mirrors
+  // the forecastProjection pipeline above but FORCES three params,
+  // independent of selectedScenarioKey / forecastPosture / forecastRangeMonths:
+  //   - Scenario: Base preset (never custom).
+  //   - Posture:  Reality — always composeConservativeFloor.
+  //   - Horizon:  15 months (caller-layer month-of-year extension; the
+  //               12-month composer cap is unchanged).
+  // Known-events parity: the same applyEventsOverlay step on the same basis
+  // as the main forecast, but expanded to >= 15 months so a short UI range
+  // (default 3) does not under-count recurring events in the 15-month window.
+  const OWNER_PAY_HORIZON_MONTHS = 15;
+  const ownerPayExpandedEvents = useMemo(
+    () =>
+      expandRecurringEvents(
+        forecastEvents,
+        Math.max(OWNER_PAY_HORIZON_MONTHS, forecastRangeMonths)
+      ),
+    [forecastEvents, forecastRangeMonths]
+  );
+  const ownerPayProjection = useMemo(() => {
+    const baseScenario = forecastScenarioPresets.base;
+    const scenarioWithMonths = {
+      ...baseScenario,
+      months: Math.max(baseScenario.months, OWNER_PAY_HORIZON_MONTHS),
+    };
+    const COMPOSER_MONTHS_CAP = 12;
+    const composerInput = {
+      ...scenarioWithMonths,
+      months: Math.min(scenarioWithMonths.months, COMPOSER_MONTHS_CAP),
+    };
+    const engineProj = projectScenario(
+      model,
+      composerInput,
+      forecastCurrentCashBalance,
+      []
+    );
+    const cadenceProj = projectCategoryCadenceScenario(
+      model,
+      composerInput,
+      filteredTxns,
+      forecastCurrentCashBalance,
+      []
+    );
+    // Reality posture only — always Conservative Floor, never Split.
+    const composed = composeConservativeFloor(
+      engineProj,
+      cadenceProj,
+      forecastCurrentCashBalance
+    );
+
+    const requestedMonths = scenarioWithMonths.months;
+    let result = composed;
+    if (requestedMonths > composed.points.length && composed.points.length > 0) {
+      const sourceByMonthOfYear = new Map<string, ScenarioPoint>();
+      for (const p of composed.points) {
+        const moy = p.month.slice(5, 7);
+        if (!sourceByMonthOfYear.has(moy)) sourceByMonthOfYear.set(moy, p);
+      }
+      const firstMonth = composed.points[0].month;
+      const extended: ScenarioPoint[] = [];
+      let prevBalance = forecastCurrentCashBalance;
+      for (let i = 0; i < requestedMonths; i += 1) {
+        if (i < composed.points.length) {
+          const p = composed.points[i];
+          extended.push(p);
+          prevBalance = p.endingCashBalance;
+          continue;
+        }
+        const monthToken =
+          addMonthsToToken(firstMonth, i) ??
+          composed.points[i % composed.points.length].month;
+        const sourceMoy = monthToken.slice(5, 7);
+        const source = sourceByMonthOfYear.get(sourceMoy);
+        if (!source) break;
+        const endingCashBalance = prevBalance + source.netCashFlow;
+        extended.push({
+          month: monthToken,
+          operatingCashIn: source.operatingCashIn,
+          operatingCashOut: source.operatingCashOut,
+          cashIn: source.cashIn,
+          cashOut: source.cashOut,
+          netCashFlow: source.netCashFlow,
+          endingCashBalance,
+        });
+        prevBalance = endingCashBalance;
+      }
+      result = { points: extended, seasonality: composed.seasonality };
+    }
+    // Same overlay step, same basis as the main forecast, but expanded to
+    // >= 15 months (ownerPayExpandedEvents). Empty events → input unchanged.
+    return applyEventsOverlay(result.points, ownerPayExpandedEvents);
+  }, [
+    filteredTxns,
+    forecastCurrentCashBalance,
+    forecastScenarioPresets,
+    ownerPayExpandedEvents,
+    model,
+  ]);
+  // Effective reserve floor — identical to the Forecast safety-line rule
+  // (Settings fixed-reserve override aware), NOT raw model.runway.reserveTarget.
+  const ownerPayReserveFloor =
+    businessRules.safetyReserveMethod === 'fixed' &&
+    businessRules.safetyReserveAmount > 0
+      ? businessRules.safetyReserveAmount
+      : model.runway.reserveTarget;
   const cashFlowForecastTrend = useMemo<TrendPoint[]>(
     () =>
       visibleScenarioProjection.map((point) => ({
@@ -2997,6 +3103,8 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
             model={model}
             txns={filteredTxns}
             forecastProjection={scenarioProjection}
+            ownerPayProjection={ownerPayProjection}
+            ownerPayReserveFloor={ownerPayReserveFloor}
             targetNetMargin={businessRules.targetNetMargin}
             onCompareYear={(year) => setCompareDrawerYear(year)}
           />

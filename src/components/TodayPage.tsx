@@ -1,6 +1,4 @@
 import { useMemo } from 'react';
-import ReactApexChart from 'react-apexcharts';
-import type { ApexOptions } from 'apexcharts';
 import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
 import { detectSignals } from '../lib/priorities/signals';
 import { rankPriorities } from '../lib/priorities/rank';
@@ -10,60 +8,10 @@ import { CashOnHandCard } from './CashOnHandCard';
 import { SecondaryPriority } from './SecondaryPriority';
 import { OperatingReserveCard } from './OperatingReserveCard';
 import { OwnerDistributionsCard } from './OwnerDistributionsCard';
+import { NextOwnerDistributionCard } from './NextOwnerDistributionCard';
 
 const DIST_ON_TARGET_LOW  = 0.90; // actual >= target × 0.90
 const DIST_ON_TARGET_HIGH = 1.10; // actual <= target × 1.10
-
-// Next Owner Distribution — vertical sparkline channel bar.
-// Faithful replica of TailAdmin /sales "Sales by Channel" card (chart-30.js, #chartThirty).
-// Illustrative fixture — not wired to production data.
-const NEXT_OWNER_DIST_CHANNEL_COLORS = [
-  ...Array(14).fill('#465FFF'),
-  ...Array(14).fill('#36BFFA'),
-  ...Array(14).fill('#E4E7EC'),
-];
-
-const NEXT_OWNER_DIST_CHANNEL_SERIES = [
-  { data: Array(NEXT_OWNER_DIST_CHANNEL_COLORS.length).fill(100) },
-];
-
-const NEXT_OWNER_DIST_CHANNEL_OPTIONS: ApexOptions = {
-  chart: {
-    fontFamily: 'Outfit, sans-serif',
-    type: 'bar',
-    height: 32,
-    sparkline: { enabled: true },
-    toolbar: { show: false },
-    animations: { enabled: false },
-  },
-  plotOptions: {
-    bar: {
-      horizontal: false,
-      distributed: true,
-      columnWidth: '70%',
-      borderRadius: 1,
-      borderRadiusApplication: 'around',
-    },
-  },
-  colors: NEXT_OWNER_DIST_CHANNEL_COLORS,
-  dataLabels: { enabled: false },
-  xaxis: {
-    labels: { show: false },
-    axisBorder: { show: false },
-    axisTicks: { show: false },
-  },
-  yaxis: {
-    show: false,
-    min: 0,
-    max: 100,
-  },
-  grid: {
-    show: false,
-    padding: { top: 0, right: 0, bottom: 0, left: 0 },
-  },
-  tooltip: { enabled: false },
-  legend: { show: false },
-};
 
 // Signals intentionally hidden from the Today priority surface. detectSignals
 // still produces them — CashOnHandCard reads cash_flow_negative for its
@@ -78,11 +26,13 @@ interface TodayPageProps {
   model: DashboardModel;
   txns: Txn[];
   forecastProjection: ScenarioPoint[];
+  ownerPayProjection: ScenarioPoint[];
+  ownerPayReserveFloor: number;
   targetNetMargin?: number;
   onCompareYear?: (year: number) => void;
 }
 
-export function TodayPage({ model, txns, forecastProjection, targetNetMargin, onCompareYear }: TodayPageProps) {
+export function TodayPage({ model, txns, forecastProjection, ownerPayProjection, ownerPayReserveFloor, targetNetMargin, onCompareYear }: TodayPageProps) {
   const signals = useMemo(
     () => detectSignals(model, txns, forecastProjection),
     [model, txns, forecastProjection]
@@ -166,33 +116,10 @@ export function TodayPage({ model, txns, forecastProjection, targetNetMargin, on
             currentCashBalance={model.runway.currentCashBalance}
             onCompareYear={onCompareYear}
           />
-          <article className="card next-owner-dist-card" aria-label="Next Owner Distribution">
-            <header className="next-owner-dist-header">
-              <h3 className="next-owner-dist-title">Next Owner Distribution</h3>
-              <p className="next-owner-dist-subtitle">Your cash and balance for last 30 days</p>
-            </header>
-            <div className="next-owner-dist-amount-block">
-              <h2 className="next-owner-dist-amount">19,857.00</h2>
-              <div className="next-owner-dist-trend">
-                <span className="next-owner-dist-trend-delta next-owner-dist-trend-delta--up">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  3.2%
-                </span>
-                <span className="next-owner-dist-trend-text">than last month</span>
-              </div>
-            </div>
-            <div className="next-owner-dist-channel-bar" aria-hidden="true">
-              <ReactApexChart
-                options={NEXT_OWNER_DIST_CHANNEL_OPTIONS}
-                series={NEXT_OWNER_DIST_CHANNEL_SERIES}
-                type="bar"
-                height={32}
-                width="100%"
-              />
-            </div>
-          </article>
+          <NextOwnerDistributionCard
+            ownerPayProjection={ownerPayProjection}
+            reserveFloor={ownerPayReserveFloor}
+          />
         </div>
       </div>
     </div>
