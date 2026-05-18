@@ -40,13 +40,6 @@ export function NextOwnerDistributionCard({
   const bars = result.bars;
   const monthLabels = bars.map((b) => b.monthLabel.split(' ')[0]); // "Aug"
 
-  // First-payout emphasis: full saturation on the first qualifying month's
-  // distribution slice, ~60% on any later month (none carry a segment today,
-  // but the per-point color array keeps the rule explicit and future-proof).
-  const distributionColors = bars.map((b) =>
-    b.isFirstPayout ? DISTRIBUTION_COLOR : `${DISTRIBUTION_COLOR}99`
-  );
-
   const series = [
     { name: 'Reserve floor', data: bars.map((b) => b.reserveSegment) },
     { name: 'Safe cash', data: bars.map((b) => b.safeCashSegment) },
@@ -78,9 +71,7 @@ export function NextOwnerDistributionCard({
       colors: [
         () => RESERVE_COLOR,
         () => SAFE_CASH_COLOR,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ({ dataPointIndex }: any) =>
-          distributionColors[dataPointIndex] ?? DISTRIBUTION_COLOR,
+        () => DISTRIBUTION_COLOR,
       ],
     },
     dataLabels: { enabled: false },
