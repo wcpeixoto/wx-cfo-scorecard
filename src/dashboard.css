@@ -1732,10 +1732,13 @@ body {
 
 .reserve-header h3 {
   margin: 0;
-  font-size: 1.04rem;
+  /* Slightly reduced + nowrap so "Operating Reserve" stays on one line
+     in the narrow context column instead of wrapping. */
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.15;
+  white-space: nowrap;
 }
 
 .reserve-subtitle {
@@ -1774,8 +1777,12 @@ body {
 .reserve-gauge-wrap {
   position: relative;
   width: 100%;
-  max-width: 320px;
-  margin: 0 auto;
+  /* Shrunk 20% (320 → 256) — the card now sits in a narrow context
+     column, so the gauge no longer needs the full top-row width. */
+  max-width: 256px;
+  /* Lowered so the arc's circle-center sits nearer the card's vertical
+     center, rather than hugging the header. */
+  margin: 24px auto 0;
 }
 
 .reserve-gauge-svg {
@@ -1808,12 +1815,29 @@ body {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, 5%);
+  /* -22% (was -10%): the taller label band raised the wrap height, so
+     top:50% drifts down ~8px vs the arc; this holds the prior position. */
+  transform: translate(-50%, -22%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   pointer-events: none;
+}
+
+.reserve-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 36px;
+  text-align: center;
+}
+
+.reserve-footer-context {
+  font-size: 0.8rem;
+  color: #667085;
+  line-height: 1.25;
 }
 
 .reserve-gauge-value {
@@ -1837,15 +1861,41 @@ body {
   line-height: 1.15;
 }
 
+/* End labels live in an HTML overlay (not SVG <text>) so their type is
+   fixed px and never scales with the gauge size. Pinned to the bottom
+   corners under the arc endpoints. */
+.reserve-gauge-ends {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 6px;
+  pointer-events: none;
+}
+
+.reserve-gauge-end {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.reserve-gauge-end--right {
+  text-align: right;
+}
+
 .reserve-gauge-end-label {
   font-size: 13px;
   font-weight: 600;
-  fill: var(--text-primary);
+  color: var(--text-primary);
+  line-height: 1.2;
 }
 
 .reserve-gauge-end-caption {
   font-size: 11px;
-  fill: var(--text-secondary);
+  color: var(--text-secondary);
+  line-height: 1.2;
 }
 
 /* ── Coverage weeks bar ── */

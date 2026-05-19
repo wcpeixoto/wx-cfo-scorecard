@@ -32,18 +32,24 @@ function reserveToneClassName(percent: number | null): string {
 // not re-couple them.
 function getReserveBadgeState(percentFunded: number | null): { label: string; className: string } {
   if (percentFunded === null) return { label: '—', className: 'card-status-badge is-neutral' };
-  if (percentFunded < 0.25) return { label: '↓ Critical', className: 'card-status-badge is-critical' };
-  if (percentFunded < 0.50) return { label: '↓ Vulnerable', className: 'card-status-badge is-warning' };
-  if (percentFunded < 0.75) return { label: '↓ Below target', className: 'card-status-badge is-warning' };
+  if (percentFunded < 0.25) return { label: 'Critical', className: 'card-status-badge is-critical' };
+  if (percentFunded < 0.50) return { label: 'Vulnerable', className: 'card-status-badge is-warning' };
+  if (percentFunded < 0.75) return { label: 'Below target', className: 'card-status-badge is-warning' };
   if (percentFunded < 1.00) return { label: 'Nearly funded', className: 'card-status-badge is-neutral' };
-  if (percentFunded < 1.50) return { label: '✓ Fully funded', className: 'card-status-badge is-healthy' };
-  return { label: '✓ Above target', className: 'card-status-badge is-healthy' };
+  if (percentFunded < 1.50) return { label: 'Fully funded', className: 'card-status-badge is-healthy' };
+  return { label: 'Above target', className: 'card-status-badge is-healthy' };
 }
 
-function getReserveSubtitle(currentCashBalance: number, reserveTarget: number): string {
-  if (reserveTarget <= EPSILON) return '1-month expense goal';
+// The reserve goal is, by construction in computeOperatingReserveSnapshot,
+// exactly one month of trailing-average expenses — so the subtitle states
+// that basis rather than a derived gap. Wired: only the constant label, but
+// it is the faithful description of the live target.
+const RESERVE_SUBTITLE = '1-month expense goal';
+
+function getReserveGapLabel(currentCashBalance: number, reserveTarget: number): string | null {
+  if (reserveTarget <= EPSILON) return null;
   const gap = reserveTarget - currentCashBalance;
-  if (gap <= 0) return 'Reserve goal reached';
+  if (gap <= 0) return null;
   return `${formatCompactCurrency(gap)} to goal`;
 }
 
@@ -101,22 +107,29 @@ function ReserveGauge({
   const trackPath = `M ${trackStart.x} ${trackStart.y} A ${radius} ${radius} 0 1 1 ${trackEnd.x} ${trackEnd.y}`;
   const fillPath = `M ${trackStart.x} ${trackStart.y} A ${radius} ${radius} 0 ${largeArc} 1 ${fillEnd.x} ${fillEnd.y}`;
 
-  const labelY = cy + strokeWidth / 2 + 16;
-  const captionY = labelY + 15;
+  // Reserved whitespace below the arc (y = cy) for the HTML end-label
+  // overlay. Larger value = more breathing room between arc and labels.
+  const labelBandHeight = 60;
   const maxLabel = reserveTarget > EPSILON ? formatCompactCurrency(reserveTarget) : '—';
 
   return (
     <div className="reserve-gauge-wrap">
-      <svg viewBox={`0 0 ${size} ${captionY + 4}`} className="reserve-gauge-svg" aria-hidden="true">
+      <svg viewBox={`0 0 ${size} ${cy + labelBandHeight}`} className="reserve-gauge-svg" aria-hidden="true">
         <path d={trackPath} fill="none" stroke="var(--bg-muted)" strokeWidth={strokeWidth} strokeLinecap="round" />
         {clampedPercent > 0 && (
           <path d={fillPath} fill="none" className={`reserve-gauge-arc ${toneClass}`} strokeWidth={strokeWidth} strokeLinecap="round" />
         )}
-        <text x={trackStart.x - strokeWidth / 2} y={labelY} textAnchor="start" className="reserve-gauge-end-label">{formatCompactCurrency(currentCashBalance)}</text>
-        <text x={trackStart.x - strokeWidth / 2} y={captionY} textAnchor="start" className="reserve-gauge-end-caption">Cash available</text>
-        <text x={trackEnd.x + strokeWidth / 2} y={labelY} textAnchor="end" className="reserve-gauge-end-label">{maxLabel}</text>
-        <text x={trackEnd.x + strokeWidth / 2} y={captionY} textAnchor="end" className="reserve-gauge-end-caption">Reserve goal</text>
       </svg>
+      <div className="reserve-gauge-ends" aria-hidden="true">
+        <div className="reserve-gauge-end reserve-gauge-end--left">
+          <span className="reserve-gauge-end-label">{formatCompactCurrency(currentCashBalance)}</span>
+          <span className="reserve-gauge-end-caption">Cash available</span>
+        </div>
+        <div className="reserve-gauge-end reserve-gauge-end--right">
+          <span className="reserve-gauge-end-label">{maxLabel}</span>
+          <span className="reserve-gauge-end-caption">Reserve goal</span>
+        </div>
+      </div>
       <div className="reserve-gauge-center">
         <span className="reserve-gauge-value">{percentLabel}</span>
         <span className="reserve-gauge-label">
@@ -141,6 +154,10 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
   const reserveTone = reserveToneClassName(reservePercent);
   const reserveBadge = getReserveBadgeState(reservePercent !== null ? reservePercent / 100 : null);
   const coverageWeeks = computeCoverageWeeks(currentCashBalance, reserveTarget);
+  const gapLabel = getReserveGapLabel(currentCashBalance, reserveTarget);
+  const footerContext = [coverageDelta ? 'vs last month' : null, gapLabel]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <article className="card reserve-card">
@@ -166,20 +183,7 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
               </div>
             </span>
           </div>
-          <div className="reserve-subtitle-row">
-            {coverageDelta && (
-              <span className={`reserve-subtitle-delta reserve-subtitle-delta--${coverageDelta.direction}`}>
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  {coverageDelta.direction === 'up'
-                    ? <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    : <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  }
-                </svg>
-                {`${Math.abs(coverageDelta.pct * 100).toFixed(1)}%`}
-              </span>
-            )}
-            <span className="reserve-subtitle">{getReserveSubtitle(currentCashBalance, reserveTarget)}</span>
-          </div>
+          <span className="reserve-subtitle">{RESERVE_SUBTITLE}</span>
         </div>
         <span className={reserveBadge.className}>{reserveBadge.label}</span>
       </div>
@@ -192,6 +196,23 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
         reserveTarget={reserveTarget}
         currentCashBalance={currentCashBalance}
       />
+
+      {(coverageDelta || gapLabel) && (
+        <div className="reserve-footer">
+          {coverageDelta && (
+            <span className={`reserve-subtitle-delta reserve-subtitle-delta--${coverageDelta.direction}`}>
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                {coverageDelta.direction === 'up'
+                  ? <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  : <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                }
+              </svg>
+              {`${Math.abs(coverageDelta.pct * 100).toFixed(1)}%`}
+            </span>
+          )}
+          <span className="reserve-footer-context">{footerContext}</span>
+        </div>
+      )}
     </article>
   );
 }
