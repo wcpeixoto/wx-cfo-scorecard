@@ -4,6 +4,7 @@
 import { useId } from 'react';
 import type { MonthlyRollup } from '../lib/data/contract';
 import { computeReserveCoverageDelta } from '../lib/kpis/compute';
+import { formatReserveFooter } from '../lib/ui/reserveFooterCopy';
 
 const EPSILON = 0.00001;
 
@@ -155,9 +156,15 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
   const reserveBadge = getReserveBadgeState(reservePercent !== null ? reservePercent / 100 : null);
   const coverageWeeks = computeCoverageWeeks(currentCashBalance, reserveTarget);
   const gapLabel = getReserveGapLabel(currentCashBalance, reserveTarget);
-  const footerContext = [coverageDelta?.label, gapLabel]
-    .filter(Boolean)
-    .join(' · ');
+  const reserveGoalValid = reserveTarget > EPSILON;
+  const footerText = formatReserveFooter({
+    reserveGoalValid,
+    fundedNow: reserveGoalValid ? currentCashBalance / reserveTarget : 0,
+    overfunded: reserveGoalValid && currentCashBalance - reserveTarget > 0.5,
+    hasPrior: !!coverageDelta && coverageDelta.label !== 'No prior month to compare yet',
+    direction: coverageDelta?.direction ?? 'flat',
+    amountToGoalLabel: gapLabel,
+  });
 
   return (
     <article className="card reserve-card">
@@ -197,19 +204,9 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
         currentCashBalance={currentCashBalance}
       />
 
-      {(coverageDelta || gapLabel) && (
+      {footerText && (
         <div className="reserve-footer">
-          {coverageDelta && coverageDelta.direction !== 'flat' && (
-            <span className={`reserve-subtitle-delta reserve-subtitle-delta--${coverageDelta.direction}`}>
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                {coverageDelta.direction === 'up'
-                  ? <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  : <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                }
-              </svg>
-            </span>
-          )}
-          <span className="reserve-footer-context">{footerContext}</span>
+          <span className="reserve-footer-context">{footerText}</span>
         </div>
       )}
     </article>
