@@ -2260,6 +2260,91 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     businessRules.safetyReserveAmount > 0
       ? businessRules.safetyReserveAmount
       : model.runway.reserveTarget;
+
+  // Slider re-projection: given a revenueGrowthPct override, re-runs the
+  // identical pipeline used to build ownerPayProjection but with the
+  // supplied growth rate substituted. Called from NextOwnerDistributionCard
+  // on slider change (session-only, no persistence).
+  const reprojectOwnerPay = useCallback(
+    (revenueGrowthPct: number): ScenarioPoint[] => {
+      const baseScenario = forecastScenarioPresets.base;
+      const scenarioWithMonths = {
+        ...baseScenario,
+        revenueGrowthPct,
+        months: Math.max(baseScenario.months, OWNER_PAY_HORIZON_MONTHS),
+      };
+      const COMPOSER_MONTHS_CAP = 12;
+      const composerInput = {
+        ...scenarioWithMonths,
+        months: Math.min(scenarioWithMonths.months, COMPOSER_MONTHS_CAP),
+      };
+      const engineProj = projectScenario(
+        model,
+        composerInput,
+        forecastCurrentCashBalance,
+        []
+      );
+      const cadenceProj = projectCategoryCadenceScenario(
+        model,
+        composerInput,
+        filteredTxns,
+        forecastCurrentCashBalance,
+        []
+      );
+      const composed = composeConservativeFloor(
+        engineProj,
+        cadenceProj,
+        forecastCurrentCashBalance
+      );
+      const requestedMonths = scenarioWithMonths.months;
+      let result = composed;
+      if (requestedMonths > composed.points.length && composed.points.length > 0) {
+        const sourceByMonthOfYear = new Map<string, ScenarioPoint>();
+        for (const p of composed.points) {
+          const moy = p.month.slice(5, 7);
+          if (!sourceByMonthOfYear.has(moy)) sourceByMonthOfYear.set(moy, p);
+        }
+        const firstMonth = composed.points[0].month;
+        const extended: ScenarioPoint[] = [];
+        let prevBalance = forecastCurrentCashBalance;
+        for (let i = 0; i < requestedMonths; i += 1) {
+          if (i < composed.points.length) {
+            const p = composed.points[i];
+            extended.push(p);
+            prevBalance = p.endingCashBalance;
+            continue;
+          }
+          const monthToken =
+            addMonthsToToken(firstMonth, i) ??
+            composed.points[i % composed.points.length].month;
+          const sourceMoy = monthToken.slice(5, 7);
+          const source = sourceByMonthOfYear.get(sourceMoy);
+          if (!source) break;
+          const endingCashBalance = prevBalance + source.netCashFlow;
+          extended.push({
+            month: monthToken,
+            operatingCashIn: source.operatingCashIn,
+            operatingCashOut: source.operatingCashOut,
+            cashIn: source.cashIn,
+            cashOut: source.cashOut,
+            netCashFlow: source.netCashFlow,
+            endingCashBalance,
+          });
+          prevBalance = endingCashBalance;
+        }
+        result = { points: extended, seasonality: composed.seasonality };
+      }
+      return applyEventsOverlay(result.points, ownerPayExpandedEvents);
+    },
+    [
+      filteredTxns,
+      forecastCurrentCashBalance,
+      forecastScenarioPresets,
+      ownerPayExpandedEvents,
+      model,
+    ]
+  );
+
   const cashFlowForecastTrend = useMemo<TrendPoint[]>(
     () =>
       visibleScenarioProjection.map((point) => ({
@@ -3109,6 +3194,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
             ownerPayReserveFloor={ownerPayReserveFloor}
             targetNetMargin={businessRules.targetNetMargin}
             onCompareYear={(year) => setCompareDrawerYear(year)}
+            reprojectOwnerPay={reprojectOwnerPay}
           />
         )}
 
@@ -4793,6 +4879,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 <NextOwnerDistributionCardLab
                   ownerPayProjection={ownerPayProjection}
                   reserveFloor={ownerPayReserveFloor}
+                  reprojectOwnerPay={reprojectOwnerPay}
                 />
               </div>
             </div>
