@@ -6424,9 +6424,13 @@ body {
 .owner-dist-footer {
   display: flex;
   align-items: center;
-  /* Symmetric vertical padding so the CTA centers between the chart's
-     x-axis labels (footer top) and the card bottom edge (footer bottom). */
+  /* Symmetric vertical padding so the CTA centers within the footer. */
   padding: 6px 20px;
+  /* Pull the footer up into the chart's internal bottom padding (~27px
+     of empty space Apex renders below the year labels). Lands the CTA
+     visually centered between the year labels and the card bottom,
+     rather than between the chart CANVAS bottom and the card bottom. */
+  margin-top: -12px;
 }
 
 .owner-dist-footer .action-dropdown-menu {
