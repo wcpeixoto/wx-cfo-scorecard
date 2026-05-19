@@ -6,6 +6,8 @@ import { OperatingReserveCard } from './OperatingReserveCard';
 import { OwnerDistributionsCard } from './OwnerDistributionsCard';
 import { NextOwnerDistributionCard } from './NextOwnerDistributionCard';
 
+type ReprojectOwnerPay = (revenueGrowthPct: number) => ScenarioPoint[];
+
 const DIST_ON_TARGET_LOW  = 0.90; // actual >= target × 0.90
 const DIST_ON_TARGET_HIGH = 1.10; // actual <= target × 1.10
 
@@ -17,9 +19,10 @@ interface TodayPageProps {
   ownerPayReserveFloor: number;
   targetNetMargin?: number;
   onCompareYear?: (year: number) => void;
+  reprojectOwnerPay?: ReprojectOwnerPay;
 }
 
-export function TodayPage({ model, txns, forecastProjection, ownerPayProjection, ownerPayReserveFloor, targetNetMargin, onCompareYear }: TodayPageProps) {
+export function TodayPage({ model, txns, forecastProjection, ownerPayProjection, ownerPayReserveFloor, targetNetMargin, onCompareYear, reprojectOwnerPay }: TodayPageProps) {
   const distributionStatus = useMemo(() => {
     if (
       !model.monthlyRollups ||
@@ -76,6 +79,7 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
           <NextOwnerDistributionCard
             ownerPayProjection={ownerPayProjection}
             reserveFloor={ownerPayReserveFloor}
+            reprojectOwnerPay={reprojectOwnerPay}
           />
           <OwnerDistributionsCard
             transactions={txns}

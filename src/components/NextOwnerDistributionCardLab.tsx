@@ -8,7 +8,8 @@
 // the effective reserve floor (Settings-fixed-aware, identical to the
 // Forecast safety-line rule). All decision logic lives in the pure helper.
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { useId } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { ScenarioPoint } from '../lib/data/contract';
@@ -17,7 +18,13 @@ import { formatCompact } from '../lib/utils/formatCompact';
 import {
   computeNextOwnerDistribution,
   type NextDistributionBlocker,
+  REQUIRED_SERIES_LENGTH,
 } from '../lib/data/nextOwnerDistribution';
+
+// Slider range constants (revenueGrowthPct, percent units).
+const SLIDER_MIN = -10;
+const SLIDER_MAX = 25;
+const SLIDER_NEUTRAL = 0;
 
 // TailAdmin brand ramp (preserved from #132): darkest at the base,
 // medium in the middle, lightest on top.
@@ -33,28 +40,95 @@ const BLOCKED_PILL_LABELS: Record<NextDistributionBlocker, string> = {
   below_minimum_payout: 'Almost there',
 };
 
+/** Dollar-per-month translation label for the slider thumb. */
+function formatSliderDollarLabel(revenueGrowthPct: number, baselineMonthlyRevenue: number): string {
+  const delta = Math.round((revenueGrowthPct / 100) * baselineMonthlyRevenue);
+  if (delta === 0) return '$0/mo';
+  const abs = formatCompact(Math.abs(delta));
+  return delta > 0 ? `+${abs}/mo` : `-${abs}/mo`;
+}
+
+/** Thumb position percentage for left-offset of the floating value label. */
+function thumbPercent(value: number, min: number, max: number): number {
+  return ((value - min) / (max - min)) * 100;
+}
+
+/** Result sentence per spec constraint #8. */
+function buildResultSentence(
+  baseState: 'forecast' | 'blocked',
+  baseMonthLabel: string | undefined,
+  sliderPct: number,
+  sliderState: 'forecast' | 'blocked',
+  sliderMonthLabel: string | undefined,
+  dollarLabel: string
+): string {
+  if (sliderPct === 0) {
+    if (baseState === 'forecast' && baseMonthLabel) {
+      return `No change — first payout stays ${baseMonthLabel}.`;
+    }
+    return 'No change — payout stays outside the window.';
+  }
+
+  const prefix = `At ${dollarLabel} revenue,`;
+
+  if (sliderState === 'forecast' && sliderMonthLabel) {
+    if (baseState === 'forecast' && baseMonthLabel === sliderMonthLabel) {
+      return `${prefix} first payout stays ${sliderMonthLabel}.`;
+    }
+    return `${prefix} first payout moves to ${sliderMonthLabel}.`;
+  }
+
+  return `${prefix} payout stays outside the window.`;
+}
+
 interface NextOwnerDistributionCardLabProps {
   ownerPayProjection: ScenarioPoint[];
   reserveFloor: number;
+  reprojectOwnerPay?: (revenueGrowthPct: number) => ScenarioPoint[];
 }
 
 export function NextOwnerDistributionCardLab({
   ownerPayProjection,
   reserveFloor,
+  reprojectOwnerPay,
 }: NextOwnerDistributionCardLabProps) {
-  const result = useMemo(
+  const tooltipId = useId();
+  const [sliderValue, setSliderValue] = useState<number>(SLIDER_NEUTRAL);
+
+  // Baseline (0% growth) result — the unmodified projection.
+  const baseResult = useMemo(
     () => computeNextOwnerDistribution(ownerPayProjection, reserveFloor),
     [ownerPayProjection, reserveFloor]
   );
 
-  const bars = result.bars;
+  // Baseline $/mo: average operatingCashIn across the unmodified projection.
+  const baselineMonthlyRevenue = useMemo(() => {
+    if (!ownerPayProjection || ownerPayProjection.length === 0) return 0;
+    const total = ownerPayProjection.reduce((sum, p) => sum + (p.operatingCashIn ?? 0), 0);
+    return total / ownerPayProjection.length;
+  }, [ownerPayProjection]);
+
+  // Slider re-projection — only when reprojectOwnerPay is available and
+  // slider is non-zero.
+  const slidedProjection = useMemo((): ScenarioPoint[] | null => {
+    if (sliderValue === 0 || !reprojectOwnerPay) return null;
+    const proj = reprojectOwnerPay(sliderValue);
+    if (!proj || proj.length < REQUIRED_SERIES_LENGTH) return null;
+    return proj;
+  }, [sliderValue, reprojectOwnerPay]);
+
+  const slidedResult = useMemo(() => {
+    if (!slidedProjection) return null;
+    return computeNextOwnerDistribution(slidedProjection, reserveFloor);
+  }, [slidedProjection, reserveFloor]);
+
+  // Active display result: slided if available, else base.
+  const displayResult = slidedResult ?? baseResult;
+
+  // Chart uses baseResult bars always (chart shows baseline, not the slider overlay).
+  const bars = baseResult.bars;
   const monthLabels = bars.map((b) => b.monthLabel.split(' ')[0]); // "Aug"
 
-  // Negative-cash months: the helper faithfully returns a negative
-  // operating-cash segment (true ending cash). A stacked bar can't render a
-  // negative floor sensibly, so for display those months clamp to a thin
-  // neutral stub at the zero baseline — magnitude is intentionally not shown
-  // (the tooltip carries "< $0"). Real values stay in `bars` for the tooltip.
   const maxPositiveTotal = Math.max(
     0,
     ...bars
@@ -114,10 +188,6 @@ export function NextOwnerDistributionCardLab({
     },
     dataLabels: { enabled: false },
     stroke: { show: true, width: 2, colors: ['transparent'] },
-    // Axis/grid treatment matches the sibling OwnerDistributionsChart for
-    // cross-card consistency on the Today context grid. (This reinstates the
-    // visible X labels / Y ticks that #130 had stripped — a deliberate
-    // owner decision to align with the neighbour card.)
     xaxis: {
       categories: monthLabels,
       axisBorder: { show: false },
@@ -138,9 +208,6 @@ export function NextOwnerDistributionCardLab({
       strokeDashArray: 4,
       yaxis: { lines: { show: true } },
       xaxis: { lines: { show: false } },
-      // Preserved from the prior NOD grid: headroom for the "First payout"
-      // annotation label. OwnerDistributionsChart has no annotation so its
-      // grid omits this — the only intentional delta from the sibling.
       padding: { top: firstPayoutIndex >= 0 ? 20 : 0, right: 0, bottom: 0, left: 0 },
     },
     states: {
@@ -177,10 +244,6 @@ export function NextOwnerDistributionCardLab({
       theme: 'light',
       shared: true,
       intersect: false,
-      // Custom HTML formatter (pre-approved OwnerDistributionsChart
-      // precedent). Rows mirror the stacked bar top-down. Negative-cash
-      // months never show a negative figure: "< $0" plus a plain-text
-      // redirect, matching the standard tooltip styling.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       custom: ({ dataPointIndex }: { dataPointIndex: number }) => {
         const bar = bars[dataPointIndex];
@@ -216,34 +279,66 @@ export function NextOwnerDistributionCardLab({
     },
   };
 
-  const isForecast = result.state === 'forecast';
+  const isForecast = displayResult.state === 'forecast';
   const badgeClass = isForecast
     ? 'card-status-badge is-healthy'
     : 'card-status-badge is-neutral';
   const badgeLabel =
-    result.state === 'forecast'
+    displayResult.state === 'forecast'
       ? 'Coming up'
-      : BLOCKED_PILL_LABELS[result.blocker];
+      : BLOCKED_PILL_LABELS[displayResult.blocker];
+
+  const dollarLabel = formatSliderDollarLabel(sliderValue, baselineMonthlyRevenue);
+
+  const resultSentence = buildResultSentence(
+    baseResult.state,
+    baseResult.state === 'forecast' ? baseResult.monthLabel : undefined,
+    sliderValue,
+    displayResult.state,
+    displayResult.state === 'forecast' ? displayResult.monthLabel : undefined,
+    dollarLabel
+  );
+
+  const thumbPct = thumbPercent(sliderValue, SLIDER_MIN, SLIDER_MAX);
+  const labelLeft = `clamp(0px, calc(${thumbPct}% - 22px), calc(100% - 60px))`;
+
+  const hasSlider = reprojectOwnerPay != null;
 
   return (
     <article className="card nodlab-card" aria-label="Next Owner Distribution (Lab)">
       <div className="nodlab-header">
-        <h3 className="nodlab-title">Next Owner Distribution</h3>
+        <div className="nodlab-title-row">
+          <h3 className="nodlab-title">Next Owner Distribution</h3>
+          <span className="db-tooltip-wrap">
+            <button
+              type="button"
+              className="db-tooltip-btn"
+              aria-label="Next Owner Distribution explanation"
+              aria-describedby={tooltipId}
+            >
+              &#9432;
+            </button>
+            <div id={tooltipId} role="tooltip" className="db-tooltip-panel nodlab-tooltip-panel">
+              <ul className="db-tooltip-list">
+                <li>Shows when you can next take an owner distribution without breaching your operating reserve.</li>
+                <li>Uses a 4-month safety window: the projected cash must stay above your reserve floor for the payout month plus the next 3 months.</li>
+                <li>Slide the revenue lever to see how a change would shift the timeline.</li>
+              </ul>
+            </div>
+          </span>
+        </div>
         <span className={badgeClass}>{badgeLabel}</span>
       </div>
 
-      {result.state === 'forecast' ? (
+      {displayResult.state === 'forecast' ? (
         <div className="nodlab-headline-block">
-          <p className="nodlab-month">{result.monthLabel}</p>
-          <p className="nodlab-amount">
-            {formatCompact(result.distributionAmount)} forecast distribution
-          </p>
-          <p className="nodlab-context">Based on current forecast</p>
+          <p className="nodlab-month">{displayResult.monthLabel}</p>
+          <p className="nodlab-subhead">First expected owner payout</p>
         </div>
       ) : (
         <div className="nodlab-headline-block">
-          <p className="nodlab-month">No payout forecast</p>
-          <p className="nodlab-context">Next 6 months</p>
+          <p className="nodlab-month">Not in next 6 months</p>
+          <p className="nodlab-subhead">Forecast leaves no room for owner payout.</p>
         </div>
       )}
 
@@ -273,9 +368,48 @@ export function NextOwnerDistributionCardLab({
         />
       </div>
 
-      <p className="nodlab-footnote">
-        Simulate revenue and expense changes to see how to get paid sooner
-      </p>
+      {hasSlider && (
+        <>
+          <hr className="nodlab-divider" aria-hidden="true" />
+
+          <div className="nodlab-scenario-section">
+            <p className="nodlab-scenario-label">What if revenue changes?</p>
+
+            <div className="nodlab-slider-control">
+              <div className="nodlab-slider-track-wrap">
+                <span
+                  className="nodlab-slider-thumb-value"
+                  style={{ left: labelLeft }}
+                  aria-hidden="true"
+                >
+                  {dollarLabel}
+                </span>
+                <input
+                  type="range"
+                  min={SLIDER_MIN}
+                  max={SLIDER_MAX}
+                  step={1}
+                  value={sliderValue}
+                  onChange={(e) => setSliderValue(Number(e.target.value))}
+                  className="nodlab-slider-input"
+                  aria-label="Revenue growth adjustment"
+                />
+              </div>
+              <div className="nodlab-slider-tick-label-row" aria-hidden="true">
+                <span>−10%</span>
+                <span>0</span>
+                <span>+25%</span>
+              </div>
+            </div>
+
+            <p className="nodlab-result-sentence">{resultSentence}</p>
+          </div>
+        </>
+      )}
+
+      <a href="#/forecast" className="nodlab-forecast-link">
+        Plan this in Forecast →
+      </a>
     </article>
   );
 }

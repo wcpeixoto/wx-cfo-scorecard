@@ -7041,6 +7041,146 @@ body {
   color: #667085;
 }
 
+/* ── NOD card: title row with info icon ──────────────────────────────── */
+.nod-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── NOD card: hero sub-heading (replaces nod-amount / nod-context) ─── */
+.nod-subhead {
+  margin: 0;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 20px;
+  color: #667085;
+}
+
+/* ── NOD card: divider before scenario section ───────────────────────── */
+.nod-divider {
+  border: none;
+  border-top: 1px solid #EAECF0;
+  margin: 16px 0;
+}
+
+/* ── NOD card: scenario / slider section ────────────────────────────── */
+.nod-scenario-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nod-scenario-label {
+  margin: 0;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 20px;
+  color: #344054;
+}
+
+.nod-slider-control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.nod-slider-track-wrap {
+  position: relative;
+  width: 100%;
+  padding-top: 20px;
+}
+
+.nod-slider-thumb-value {
+  position: absolute;
+  top: 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary, #667085);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.nod-slider-input {
+  width: 100%;
+  accent-color: var(--accent, #465FFF);
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  display: block;
+}
+
+.nod-slider-input::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--line, #D0D5DD) 0%, var(--bg-muted, #F2F4F7) 100%);
+}
+
+.nod-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  border: 1.5px solid #D0D5DD;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(33, 62, 108, 0.22);
+}
+
+.nod-slider-input::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(90deg, #D0D5DD 0%, #F2F4F7 100%);
+}
+
+.nod-slider-input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid #D0D5DD;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(33, 62, 108, 0.22);
+}
+
+.nod-slider-tick-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  color: rgba(18, 32, 52, 0.56);
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.nod-result-sentence {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: #667085;
+}
+
+/* ── NOD card: "Plan this in Forecast →" link ───────────────────────── */
+.nod-forecast-link {
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #465FFF;
+  text-decoration: none;
+  line-height: 20px;
+}
+
+.nod-forecast-link:hover {
+  text-decoration: underline;
+}
+
 /* ── Next Owner Distribution — UI Lab replica (.nodlab-*) ───────────────
    Independent duplicate of the .nod-* block above. Verbatim values, own
    prefix per the codebase's copy-don't-share convention so the Lab card
@@ -7162,6 +7302,146 @@ body {
   font-size: 12px;
   line-height: 18px;
   color: #667085;
+}
+
+/* ── NOD Lab: title row with info icon ───────────────────────────────── */
+.nodlab-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── NOD Lab: hero sub-heading ───────────────────────────────────────── */
+.nodlab-subhead {
+  margin: 0;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 20px;
+  color: #667085;
+}
+
+/* ── NOD Lab: divider before scenario section ────────────────────────── */
+.nodlab-divider {
+  border: none;
+  border-top: 1px solid #EAECF0;
+  margin: 16px 0;
+}
+
+/* ── NOD Lab: scenario / slider section ─────────────────────────────── */
+.nodlab-scenario-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nodlab-scenario-label {
+  margin: 0;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 20px;
+  color: #344054;
+}
+
+.nodlab-slider-control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.nodlab-slider-track-wrap {
+  position: relative;
+  width: 100%;
+  padding-top: 20px;
+}
+
+.nodlab-slider-thumb-value {
+  position: absolute;
+  top: 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary, #667085);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.nodlab-slider-input {
+  width: 100%;
+  accent-color: var(--accent, #465FFF);
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  display: block;
+}
+
+.nodlab-slider-input::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--line, #D0D5DD) 0%, var(--bg-muted, #F2F4F7) 100%);
+}
+
+.nodlab-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  border: 1.5px solid #D0D5DD;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(33, 62, 108, 0.22);
+}
+
+.nodlab-slider-input::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(90deg, #D0D5DD 0%, #F2F4F7 100%);
+}
+
+.nodlab-slider-input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid #D0D5DD;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(33, 62, 108, 0.22);
+}
+
+.nodlab-slider-tick-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  color: rgba(18, 32, 52, 0.56);
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.nodlab-result-sentence {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: #667085;
+}
+
+/* ── NOD Lab: "Plan this in Forecast →" link ────────────────────────── */
+.nodlab-forecast-link {
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #465FFF;
+  text-decoration: none;
+  line-height: 20px;
+}
+
+.nodlab-forecast-link:hover {
+  text-decoration: underline;
 }
 
 /* Hero card header — headline left, severity pill right, same row */
