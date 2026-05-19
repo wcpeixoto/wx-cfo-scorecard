@@ -92,6 +92,7 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
           reserveTarget={model.runway.reserveTarget}
           monthlyRollups={model.monthlyRollups}
         />
+        <div className="card card--placeholder" aria-hidden="true" />
       </div>
 
       {secondary.length > 0 && (
