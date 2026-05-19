@@ -121,6 +121,7 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
             ownerPayProjection={ownerPayProjection}
             reserveFloor={ownerPayReserveFloor}
           />
+          <div className="card card--placeholder" aria-hidden="true" />
         </div>
       </div>
     </div>
