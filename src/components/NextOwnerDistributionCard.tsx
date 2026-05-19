@@ -194,69 +194,65 @@ export function NextOwnerDistributionCard({
       )}
 
       {hasSlider && (
-        <>
-          <hr className="nod-divider" aria-hidden="true" />
+        <div className="nod-scenario-section">
+          <p className="nod-scenario-label">What if revenue changes?</p>
 
-          <div className="nod-scenario-section">
-            <p className="nod-scenario-label">What if revenue changes?</p>
-
-            <div className="nod-slider-control">
-              <div className="nod-slider-track-wrap">
-                {/* Floating thumb value label */}
-                <span
-                  className="nod-slider-thumb-value"
-                  style={{ left: `${thumbPct}%`, transform: labelTransform }}
-                  aria-hidden="true"
-                >
-                  {dollarLabel}
-                </span>
-                <div className="nod-slider-ticks" aria-hidden="true">
-                  {SLIDER_MAJOR_TICKS.map((t) => (
-                    <span
-                      key={`nod-tick-${t}`}
-                      className={`nod-slider-tick${t === 0 ? ' is-zero' : ''}`}
-                      style={{ left: `${thumbPercent(t, SLIDER_MIN, SLIDER_MAX)}%` }}
-                    />
-                  ))}
-                  {SLIDER_MINOR_TICKS.map((t) => (
-                    <span
-                      key={`nod-minor-${t}`}
-                      className="nod-slider-tick nod-slider-tick--minor"
-                      style={{ left: `${thumbPercent(t, SLIDER_MIN, SLIDER_MAX)}%` }}
-                    />
-                  ))}
-                </div>
-                <input
-                  type="range"
-                  min={SLIDER_MIN}
-                  max={SLIDER_MAX}
-                  step={1}
-                  value={sliderValue}
-                  onChange={(e) => setSliderValue(Number(e.target.value))}
-                  className="nod-slider-input"
-                  aria-label="Revenue growth adjustment"
-                />
+          <div className="nod-slider-control">
+            <div className="nod-slider-track-wrap">
+              {/* Floating thumb value label */}
+              <span
+                className="nod-slider-thumb-value"
+                style={{ left: `${thumbPct}%`, transform: labelTransform }}
+                aria-hidden="true"
+              >
+                {dollarLabel}
+              </span>
+              <div className="nod-slider-ticks" aria-hidden="true">
+                {SLIDER_MAJOR_TICKS.map((t) => (
+                  <span
+                    key={`nod-tick-${t}`}
+                    className={`nod-slider-tick${t === 0 ? ' is-zero' : ''}`}
+                    style={{ left: `${thumbPercent(t, SLIDER_MIN, SLIDER_MAX)}%` }}
+                  />
+                ))}
+                {SLIDER_MINOR_TICKS.map((t) => (
+                  <span
+                    key={`nod-minor-${t}`}
+                    className="nod-slider-tick nod-slider-tick--minor"
+                    style={{ left: `${thumbPercent(t, SLIDER_MIN, SLIDER_MAX)}%` }}
+                  />
+                ))}
               </div>
-              <div className="nod-slider-tick-label-row" aria-hidden="true">
-                {SLIDER_MAJOR_TICKS.map((t) => {
-                  const pct = thumbPercent(t, SLIDER_MIN, SLIDER_MAX);
-                  return (
-                    <span
-                      key={`nod-ticklabel-${t}`}
-                      style={{ left: `${pct}%`, transform: edgeTransform(pct) }}
-                    >
-                      {formatTickLabel(t)}
-                    </span>
-                  );
-                })}
-              </div>
+              <input
+                type="range"
+                min={SLIDER_MIN}
+                max={SLIDER_MAX}
+                step={1}
+                value={sliderValue}
+                onChange={(e) => setSliderValue(Number(e.target.value))}
+                className="nod-slider-input"
+                aria-label="Revenue growth adjustment"
+              />
             </div>
-
-            {resultSentence && (
-              <p className="nod-result-sentence">{resultSentence}</p>
-            )}
+            <div className="nod-slider-tick-label-row" aria-hidden="true">
+              {SLIDER_MAJOR_TICKS.map((t) => {
+                const pct = thumbPercent(t, SLIDER_MIN, SLIDER_MAX);
+                return (
+                  <span
+                    key={`nod-ticklabel-${t}`}
+                    style={{ left: `${pct}%`, transform: edgeTransform(pct) }}
+                  >
+                    {formatTickLabel(t)}
+                  </span>
+                );
+              })}
+            </div>
           </div>
-        </>
+
+          {resultSentence && (
+            <p className="nod-result-sentence">{resultSentence}</p>
+          )}
+        </div>
       )}
     </article>
   );

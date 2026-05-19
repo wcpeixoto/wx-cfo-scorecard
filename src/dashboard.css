@@ -7055,20 +7055,16 @@ body {
   color: #667085;
 }
 
-/* ── NOD card: divider before scenario section ───────────────────────── */
-.nod-divider {
-  border: none;
-  border-top: 1px solid #EAECF0;
-  /* Divider + scenario block sit higher (no bottom auto-anchor); the
-     14px below sets the gap to the "What if revenue changes?" label. */
-  margin: 28px 0 14px;
-}
-
 /* ── NOD card: scenario / slider section ────────────────────────────── */
 .nod-scenario-section {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* Bottom-anchor the slider block: margin-top: auto consumes the flex
+     stretch space between the hero and this section, so the slider sits
+     at the bottom of the card and the gap from slider-bottom to card-
+     bottom is exactly .nod-card padding-bottom (32px, matching OR). */
+  margin-top: auto;
 }
 
 .nod-scenario-label {
