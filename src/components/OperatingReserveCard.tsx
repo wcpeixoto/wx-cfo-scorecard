@@ -107,13 +107,14 @@ function ReserveGauge({
   const trackPath = `M ${trackStart.x} ${trackStart.y} A ${radius} ${radius} 0 1 1 ${trackEnd.x} ${trackEnd.y}`;
   const fillPath = `M ${trackStart.x} ${trackStart.y} A ${radius} ${radius} 0 ${largeArc} 1 ${fillEnd.x} ${fillEnd.y}`;
 
-  const labelY = cy + strokeWidth / 2 + 16;
-  const captionY = labelY + 15;
+  // Reserved whitespace below the arc (y = cy) for the HTML end-label
+  // overlay. Larger value = more breathing room between arc and labels.
+  const labelBandHeight = 60;
   const maxLabel = reserveTarget > EPSILON ? formatCompactCurrency(reserveTarget) : '—';
 
   return (
     <div className="reserve-gauge-wrap">
-      <svg viewBox={`0 0 ${size} ${captionY + 4}`} className="reserve-gauge-svg" aria-hidden="true">
+      <svg viewBox={`0 0 ${size} ${cy + labelBandHeight}`} className="reserve-gauge-svg" aria-hidden="true">
         <path d={trackPath} fill="none" stroke="var(--bg-muted)" strokeWidth={strokeWidth} strokeLinecap="round" />
         {clampedPercent > 0 && (
           <path d={fillPath} fill="none" className={`reserve-gauge-arc ${toneClass}`} strokeWidth={strokeWidth} strokeLinecap="round" />
