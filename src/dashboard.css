@@ -6897,32 +6897,45 @@ body {
   color: #667085;
 }
 
+/* Mirrors .owner-dist-legend-row/item/dot (sibling card) for cross-card
+   consistency. Copied with the nod- prefix per the codebase's
+   copy-don't-share convention; values intentionally identical. */
 .nod-legend {
-  margin: 0 0 4px 0;
-  font-weight: 400;
-  font-size: 12px;
-  line-height: 18px;
-  color: #667085;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding-top: 20px;
+  padding-left: 0;
+  margin: 0;
+  width: 100%;
 }
 
-.nod-legend-word {
-  font-weight: 500;
+.nod-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #667085;
+  font-family: Outfit, sans-serif;
+}
+
+.nod-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .nod-legend-operating {
-  color: #465FFF;
+  background: #465FFF;
 }
 
 .nod-legend-safe {
-  color: #637AEA;
+  background: #637AEA;
 }
 
 .nod-legend-dist {
-  color: #9CB9FF;
-}
-
-.nod-legend-sep {
-  color: #D0D5DD;
+  background: #9CB9FF;
 }
 
 .nod-chart {

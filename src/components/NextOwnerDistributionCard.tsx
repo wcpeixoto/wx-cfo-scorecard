@@ -244,13 +244,22 @@ export function NextOwnerDistributionCard({
         </div>
       )}
 
-      <p className="nod-legend">
-        <span className="nod-legend-word nod-legend-operating">Operating cash</span>
-        <span className="nod-legend-sep"> · </span>
-        <span className="nod-legend-word nod-legend-safe">Safe cash</span>
-        <span className="nod-legend-sep"> · </span>
-        <span className="nod-legend-word nod-legend-dist">Owner distribution</span>
-      </p>
+      {/* Dot + neutral-label row, matching the sibling
+          OwnerDistributionsChart legend for cross-card consistency. */}
+      <div className="nod-legend">
+        <span className="nod-legend-item">
+          <span className="nod-legend-dot nod-legend-operating"></span>
+          Operating cash
+        </span>
+        <span className="nod-legend-item">
+          <span className="nod-legend-dot nod-legend-safe"></span>
+          Safe cash
+        </span>
+        <span className="nod-legend-item">
+          <span className="nod-legend-dot nod-legend-dist"></span>
+          Owner distribution
+        </span>
+      </div>
 
       <div className="nod-chart">
         <ReactApexChart
