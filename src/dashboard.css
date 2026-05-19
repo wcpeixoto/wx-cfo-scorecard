@@ -1732,13 +1732,10 @@ body {
 
 .reserve-header h3 {
   margin: 0;
-  /* Slightly reduced + nowrap so "Operating Reserve" stays on one line
-     in the narrow context column instead of wrapping. */
-  font-size: 0.95rem;
+  /* Matches .owner-dist-title (canonical card-title style on Today). */
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
-  line-height: 1.15;
-  white-space: nowrap;
 }
 
 .reserve-subtitle {
@@ -6938,11 +6935,10 @@ body {
 
 .nod-title {
   margin: 0;
-  font-size: 0.95rem;
+  /* Matches .owner-dist-title (canonical card-title style on Today). */
+  font-size: 18px;
   font-weight: 600;
-  line-height: 1.15;
   color: var(--text-primary);
-  white-space: nowrap;
 }
 
 .nod-headline-block {
