@@ -6911,7 +6911,7 @@ body {
    guarantee. */
 @media (min-width: 1024px) {
   .today-context-grid {
-    grid-template-columns: 1fr 1fr 1.4fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr);
   }
 }
 
@@ -6924,30 +6924,32 @@ body {
   flex-direction: column;
   border-radius: 16px;
   border: 1px solid #E4E7EC;
-  padding: 22px;
+  padding: 20px 24px 32px;
 }
 
 .nod-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  /* Title→hero gap (tuned; ~2x the UI-Lab Total Balance card's
+     .total-balance-card__header margin-bottom). */
+  margin-bottom: 80px;
 }
 
 .nod-title {
   margin: 0;
-  font-weight: 500;
-  font-size: 16px;
-  line-height: 24px;
-  color: #1D2939;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .nod-headline-block {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .nod-month {
@@ -7061,18 +7063,21 @@ body {
 .nod-divider {
   border: none;
   border-top: 1px solid #EAECF0;
-  margin: 16px 0;
+  /* Divider + scenario block sit higher (no bottom auto-anchor); the
+     14px below sets the gap to the "What if revenue changes?" label. */
+  margin: 28px 0 14px;
 }
 
 /* ── NOD card: scenario / slider section ────────────────────────────── */
 .nod-scenario-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .nod-scenario-label {
-  margin: 0;
+  /* Extra padding below the question, before the slider. */
+  margin: 0 0 16px;
   font-weight: 500;
   font-size: 13px;
   line-height: 20px;
@@ -7089,15 +7094,17 @@ body {
 .nod-slider-track-wrap {
   position: relative;
   width: 100%;
-  padding-top: 20px;
+  padding-top: 18px;
+  padding-bottom: 0;
 }
 
 .nod-slider-thumb-value {
   position: absolute;
-  top: 2px;
-  font-size: 0.75rem;
+  top: 1px;
+  left: 0;
+  font-size: 0.76rem;
   font-weight: 600;
-  color: var(--text-secondary, #667085);
+  color: var(--text-secondary);
   line-height: 1;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -7107,7 +7114,7 @@ body {
 
 .nod-slider-input {
   width: 100%;
-  accent-color: var(--accent, #465FFF);
+  accent-color: var(--accent);
   appearance: none;
   -webkit-appearance: none;
   background: transparent;
@@ -7120,16 +7127,16 @@ body {
 .nod-slider-input::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--line, #D0D5DD) 0%, var(--bg-muted, #F2F4F7) 100%);
+  background: linear-gradient(90deg, var(--line) 0%, var(--bg-muted) 100%);
 }
 
 .nod-slider-input::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: -5px;
+  width: 11px;
+  height: 11px;
+  margin-top: -4px;
   border-radius: 50%;
-  border: 1.5px solid #D0D5DD;
+  border: 1px solid var(--line);
   background: #fff;
   box-shadow: 0 1px 3px rgba(33, 62, 108, 0.22);
 }
@@ -7138,26 +7145,66 @@ body {
   height: 4px;
   border-radius: 999px;
   border: none;
-  background: linear-gradient(90deg, #D0D5DD 0%, #F2F4F7 100%);
+  background: linear-gradient(90deg, var(--line) 0%, var(--bg-muted) 100%);
 }
 
 .nod-slider-input::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  border: 1.5px solid #D0D5DD;
+  border: 1px solid var(--line);
   background: #fff;
   box-shadow: 0 1px 3px rgba(33, 62, 108, 0.22);
 }
 
+/* Track tick marks — verbatim from .forecast-slider-tick* so the NOD
+   slider is visually identical to the Projected Cash Balance slider. */
+.nod-slider-ticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 18px;
+  height: 10px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.nod-slider-tick {
+  position: absolute;
+  top: -2px;
+  width: 1px;
+  height: 7px;
+  background: rgba(18, 32, 52, 0.12);
+  transform: translateX(-50%);
+}
+
+.nod-slider-tick.is-zero {
+  height: 8px;
+  background: rgba(18, 32, 52, 0.24);
+}
+
+.nod-slider-tick--minor {
+  height: 4px;
+  top: 0px;
+  background: rgba(18, 32, 52, 0.22);
+}
+
 .nod-slider-tick-label-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  position: relative;
+  margin-top: 10px;
+  height: 12px;
   font-size: 10px;
   color: rgba(18, 32, 52, 0.56);
   line-height: 1;
   letter-spacing: 0.01em;
+}
+
+/* Labels pinned to their actual track % (range is asymmetric, so
+   space-between would mis-place "0%"). */
+.nod-slider-tick-label-row > span {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
 }
 
 .nod-result-sentence {
@@ -7165,20 +7212,6 @@ body {
   font-size: 12px;
   line-height: 18px;
   color: #667085;
-}
-
-/* ── NOD card: "Plan this in Forecast →" link ───────────────────────── */
-.nod-forecast-link {
-  margin-top: 14px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #465FFF;
-  text-decoration: none;
-  line-height: 20px;
-}
-
-.nod-forecast-link:hover {
-  text-decoration: underline;
 }
 
 /* ── Next Owner Distribution — UI Lab replica (.nodlab-*) ───────────────

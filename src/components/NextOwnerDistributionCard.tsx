@@ -15,7 +15,6 @@ import type { ScenarioPoint } from '../lib/data/contract';
 import { formatCompact } from '../lib/utils/formatCompact';
 import {
   computeNextOwnerDistribution,
-  type NextDistributionBlocker,
   REQUIRED_SERIES_LENGTH,
 } from '../lib/data/nextOwnerDistribution';
 
@@ -24,13 +23,11 @@ const SLIDER_MIN = -10;
 const SLIDER_MAX = 25;
 const SLIDER_NEUTRAL = 0;
 
-// Owner-facing blocked-state pill copy. reserve_shortfall and
-// negative_distributable_cash intentionally collapse to the same message.
-const BLOCKED_PILL_LABELS: Record<NextDistributionBlocker, string> = {
-  reserve_shortfall: 'No payout room',
-  negative_distributable_cash: 'No payout room',
-  below_minimum_payout: 'Almost there',
-};
+// Track tick marks — mirrors the Projected Cash Balance slider
+// (.forecast-slider-tick*). Major ticks at the ends + zero (emphasized);
+// minor ticks every 5%.
+const SLIDER_MAJOR_TICKS = [SLIDER_MIN, 0, SLIDER_MAX];
+const SLIDER_MINOR_TICKS = [-5, 5, 10, 15, 20];
 
 /** Dollar-per-month translation label for the slider thumb. */
 function formatSliderDollarLabel(revenueGrowthPct: number, baselineMonthlyRevenue: number): string {
@@ -46,38 +43,46 @@ function thumbPercent(value: number, min: number, max: number): number {
   return ((value - min) / (max - min)) * 100;
 }
 
-/** Result sentence per spec constraint #8. */
+/** Tick label: signed percent, "0%" at zero (− = U+2212, matches ticks). */
+function formatTickLabel(pct: number): string {
+  if (pct === 0) return '0%';
+  return pct > 0 ? `+${pct}%` : `−${Math.abs(pct)}%`;
+}
+
+/** Edge-snapped horizontal shift so end labels don't overflow the track. */
+function edgeTransform(pct: number): string {
+  return pct < 8
+    ? 'translateX(0%)'
+    : pct > 92
+      ? 'translateX(-100%)'
+      : 'translateX(-50%)';
+}
+
+/**
+ * Two-state dynamic copy beneath the slider.
+ *
+ * Outside window: "Still outside the payout window."
+ * Inside window:  "At +$X.XK/mo, first payout moves to <Month YYYY>."
+ *
+ * Degenerate/fallback → outside copy.
+ */
 function buildResultSentence(
-  baseState: 'forecast' | 'blocked',
-  baseMonthLabel: string | undefined,
   sliderPct: number,
   sliderState: 'forecast' | 'blocked',
   sliderMonthLabel: string | undefined,
   dollarLabel: string
 ): string {
-  if (sliderPct === 0) {
-    if (baseState === 'forecast' && baseMonthLabel) {
-      return `No change — first payout stays ${baseMonthLabel}.`;
-    }
-    return 'No change — payout stays outside the window.';
-  }
-
-  // Non-zero slider. dollarLabel already has +/- prefix.
-  const prefix = `At ${dollarLabel} revenue,`;
-
   if (sliderState === 'forecast' && sliderMonthLabel) {
-    // Check if it changed from base.
-    if (baseState === 'forecast' && baseMonthLabel === sliderMonthLabel) {
-      return `${prefix} first payout stays ${sliderMonthLabel}.`;
+    // Payout is inside the window at the current slider position.
+    if (sliderPct === 0) {
+      // Base state already has a payout in window — no adjustment made.
+      return `First payout on track for ${sliderMonthLabel}.`;
     }
-    return `${prefix} first payout moves to ${sliderMonthLabel}.`;
+    return `At ${dollarLabel}, first payout moves to ${sliderMonthLabel}.`;
   }
-
-  // Slider is blocked.
-  if (baseState === 'forecast' && baseMonthLabel) {
-    return `${prefix} payout stays outside the window.`;
-  }
-  return `${prefix} payout stays outside the window.`;
+  // Payout is outside the window (or degenerate result) — no sentence;
+  // the hero ("No Payout") already states this.
+  return '';
 }
 
 interface NextOwnerDistributionCardProps {
@@ -129,30 +134,25 @@ export function NextOwnerDistributionCard({
   // Active display result: slided if available, else base.
   const displayResult = slidedResult ?? baseResult;
 
-  const isForecast = displayResult.state === 'forecast';
-  const badgeClass = isForecast
-    ? 'card-status-badge is-healthy'
-    : 'card-status-badge is-neutral';
-  const badgeLabel =
-    displayResult.state === 'forecast'
-      ? 'Coming up'
-      : BLOCKED_PILL_LABELS[displayResult.blocker];
-
   const dollarLabel = formatSliderDollarLabel(sliderValue, baselineMonthlyRevenue);
 
   const resultSentence = buildResultSentence(
-    baseResult.state,
-    baseResult.state === 'forecast' ? baseResult.monthLabel : undefined,
     sliderValue,
     displayResult.state,
     displayResult.state === 'forecast' ? displayResult.monthLabel : undefined,
     dollarLabel
   );
 
-  // Thumb position for floating label (0–100%).
+  // Thumb position for floating label (0–100%). Matches the Projected Cash
+  // Balance slider: anchor at the thumb %, shift via translateX, and snap the
+  // shift at the track edges so the label never overflows.
   const thumbPct = thumbPercent(sliderValue, SLIDER_MIN, SLIDER_MAX);
-  // Nudge the label left so it doesn't overflow the right edge.
-  const labelLeft = `clamp(0px, calc(${thumbPct}% - 22px), calc(100% - 60px))`;
+  const labelTransform =
+    thumbPct < 8
+      ? 'translateX(0%)'
+      : thumbPct > 92
+        ? 'translateX(-100%)'
+        : 'translateX(-50%)';
 
   const hasSlider = reprojectOwnerPay != null;
 
@@ -179,7 +179,6 @@ export function NextOwnerDistributionCard({
             </div>
           </span>
         </div>
-        <span className={badgeClass}>{badgeLabel}</span>
       </div>
 
       {displayResult.state === 'forecast' ? (
@@ -189,8 +188,8 @@ export function NextOwnerDistributionCard({
         </div>
       ) : (
         <div className="nod-headline-block">
-          <p className="nod-month">Not in next 6 months</p>
-          <p className="nod-subhead">Forecast leaves no room for owner payout.</p>
+          <p className="nod-month">No Payout</p>
+          <p className="nod-subhead">The next 6 months are too tight for owner payout.</p>
         </div>
       )}
 
@@ -206,11 +205,27 @@ export function NextOwnerDistributionCard({
                 {/* Floating thumb value label */}
                 <span
                   className="nod-slider-thumb-value"
-                  style={{ left: labelLeft }}
+                  style={{ left: `${thumbPct}%`, transform: labelTransform }}
                   aria-hidden="true"
                 >
                   {dollarLabel}
                 </span>
+                <div className="nod-slider-ticks" aria-hidden="true">
+                  {SLIDER_MAJOR_TICKS.map((t) => (
+                    <span
+                      key={`nod-tick-${t}`}
+                      className={`nod-slider-tick${t === 0 ? ' is-zero' : ''}`}
+                      style={{ left: `${thumbPercent(t, SLIDER_MIN, SLIDER_MAX)}%` }}
+                    />
+                  ))}
+                  {SLIDER_MINOR_TICKS.map((t) => (
+                    <span
+                      key={`nod-minor-${t}`}
+                      className="nod-slider-tick nod-slider-tick--minor"
+                      style={{ left: `${thumbPercent(t, SLIDER_MIN, SLIDER_MAX)}%` }}
+                    />
+                  ))}
+                </div>
                 <input
                   type="range"
                   min={SLIDER_MIN}
@@ -223,20 +238,26 @@ export function NextOwnerDistributionCard({
                 />
               </div>
               <div className="nod-slider-tick-label-row" aria-hidden="true">
-                <span>−10%</span>
-                <span>0</span>
-                <span>+25%</span>
+                {SLIDER_MAJOR_TICKS.map((t) => {
+                  const pct = thumbPercent(t, SLIDER_MIN, SLIDER_MAX);
+                  return (
+                    <span
+                      key={`nod-ticklabel-${t}`}
+                      style={{ left: `${pct}%`, transform: edgeTransform(pct) }}
+                    >
+                      {formatTickLabel(t)}
+                    </span>
+                  );
+                })}
               </div>
             </div>
 
-            <p className="nod-result-sentence">{resultSentence}</p>
+            {resultSentence && (
+              <p className="nod-result-sentence">{resultSentence}</p>
+            )}
           </div>
         </>
       )}
-
-      <a href="#/forecast" className="nod-forecast-link">
-        Plan this in Forecast →
-      </a>
     </article>
   );
 }
