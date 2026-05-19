@@ -6961,6 +6961,129 @@ body {
   color: #667085;
 }
 
+/* ── Next Owner Distribution — UI Lab replica (.nodlab-*) ───────────────
+   Independent duplicate of the .nod-* block above. Verbatim values, own
+   prefix per the codebase's copy-don't-share convention so the Lab card
+   can be iterated without touching the shipped Today card. */
+.nodlab-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  border: 1px solid #E4E7EC;
+  padding: 22px;
+}
+
+.nodlab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.nodlab-title {
+  margin: 0;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 24px;
+  color: #1D2939;
+}
+
+.nodlab-headline-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 16px;
+}
+
+.nodlab-month {
+  margin: 0;
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 32px;
+  color: #1D2939;
+}
+
+.nodlab-amount {
+  margin: 0;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 22px;
+  color: #344054;
+}
+
+.nodlab-context {
+  margin: 0;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.nodlab-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 20px;
+  padding-top: 20px;
+  padding-left: 0;
+  margin: 0;
+  width: 100%;
+}
+
+.nodlab-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #667085;
+  font-family: Outfit, sans-serif;
+}
+
+.nodlab-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.nodlab-legend-operating {
+  background: #465FFF;
+}
+
+.nodlab-legend-safe {
+  background: #637AEA;
+}
+
+.nodlab-legend-dist {
+  background: #9CB9FF;
+}
+
+.nodlab-chart {
+  width: 100%;
+}
+
+.nodlab-footnote {
+  margin: 8px 0 0 0;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 20px;
+  color: #667085;
+}
+
+.nodlab-tooltip-inner .apexcharts-tooltip-text-y-label {
+  color: #475467;
+}
+
+.nodlab-tooltip-note {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #EAECF0;
+  font-size: 12px;
+  line-height: 18px;
+  color: #667085;
+}
+
 /* Hero card header — headline left, severity pill right, same row */
 .hero-card-header {
   display: flex;
