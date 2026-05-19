@@ -1774,7 +1774,9 @@ body {
 .reserve-gauge-wrap {
   position: relative;
   width: 100%;
-  max-width: 320px;
+  /* Shrunk 20% (320 → 256) — the card now sits in a narrow context
+     column, so the gauge no longer needs the full top-row width. */
+  max-width: 256px;
   margin: 0 auto;
 }
 
@@ -1812,8 +1814,29 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   pointer-events: none;
+}
+
+.reserve-gauge-shortfall {
+  font-size: 12px;
+  font-weight: 500;
+  color: #667085;
+  white-space: nowrap;
+  line-height: 1.15;
+}
+
+.reserve-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.reserve-footer-context {
+  font-size: 0.8rem;
+  color: #667085;
+  line-height: 1.25;
 }
 
 .reserve-gauge-value {

@@ -40,11 +40,17 @@ function getReserveBadgeState(percentFunded: number | null): { label: string; cl
   return { label: '✓ Above target', className: 'card-status-badge is-healthy' };
 }
 
-function getReserveSubtitle(currentCashBalance: number, reserveTarget: number): string {
-  if (reserveTarget <= EPSILON) return '1-month expense goal';
+// The reserve goal is, by construction in computeOperatingReserveSnapshot,
+// exactly one month of trailing-average expenses — so the subtitle states
+// that basis rather than a derived gap. Wired: only the constant label, but
+// it is the faithful description of the live target.
+const RESERVE_SUBTITLE = '1-month expense goal';
+
+function getReserveShortfall(currentCashBalance: number, reserveTarget: number): string | null {
+  if (reserveTarget <= EPSILON) return null;
   const gap = reserveTarget - currentCashBalance;
-  if (gap <= 0) return 'Reserve goal reached';
-  return `${formatCompactCurrency(gap)} to goal`;
+  if (gap <= 0) return null;
+  return `${formatCompactCurrency(gap)} short of goal`;
 }
 
 function computeCoverageWeeks(currentCashBalance: number, reserveTarget: number): number {
@@ -67,6 +73,7 @@ function formatReservePercentLabel(percent: number | null): string {
 function ReserveGauge({
   percentLabel,
   coverageLabel,
+  shortfallLabel,
   fillPercent,
   toneClass,
   reserveTarget,
@@ -74,6 +81,7 @@ function ReserveGauge({
 }: {
   percentLabel: string;
   coverageLabel: string;
+  shortfallLabel: string | null;
   fillPercent: number;
   toneClass: string;
   reserveTarget: number;
@@ -122,6 +130,9 @@ function ReserveGauge({
         <span className="reserve-gauge-label">
           <span className="reserve-gauge-coverage">{coverageLabel}</span> covered
         </span>
+        {shortfallLabel && (
+          <span className="reserve-gauge-shortfall">{shortfallLabel}</span>
+        )}
       </div>
     </div>
   );
@@ -166,20 +177,7 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
               </div>
             </span>
           </div>
-          <div className="reserve-subtitle-row">
-            {coverageDelta && (
-              <span className={`reserve-subtitle-delta reserve-subtitle-delta--${coverageDelta.direction}`}>
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  {coverageDelta.direction === 'up'
-                    ? <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    : <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  }
-                </svg>
-                {`${Math.abs(coverageDelta.pct * 100).toFixed(1)}%`}
-              </span>
-            )}
-            <span className="reserve-subtitle">{getReserveSubtitle(currentCashBalance, reserveTarget)}</span>
-          </div>
+          <span className="reserve-subtitle">{RESERVE_SUBTITLE}</span>
         </div>
         <span className={reserveBadge.className}>{reserveBadge.label}</span>
       </div>
@@ -187,11 +185,27 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
       <ReserveGauge
         percentLabel={formatReservePercentLabel(reservePercent)}
         coverageLabel={formatCoverageWeeks(coverageWeeks)}
+        shortfallLabel={getReserveShortfall(currentCashBalance, reserveTarget)}
         fillPercent={reserveFillPercent}
         toneClass={reserveTone}
         reserveTarget={reserveTarget}
         currentCashBalance={currentCashBalance}
       />
+
+      {coverageDelta && (
+        <div className="reserve-footer">
+          <span className={`reserve-subtitle-delta reserve-subtitle-delta--${coverageDelta.direction}`}>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              {coverageDelta.direction === 'up'
+                ? <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                : <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              }
+            </svg>
+            {`${Math.abs(coverageDelta.pct * 100).toFixed(1)}%`}
+          </span>
+          <span className="reserve-footer-context">vs end of last month</span>
+        </div>
+      )}
     </article>
   );
 }
