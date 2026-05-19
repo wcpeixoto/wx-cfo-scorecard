@@ -6424,7 +6424,9 @@ body {
 .owner-dist-footer {
   display: flex;
   align-items: center;
-  padding: 0 20px 12px;
+  /* Symmetric vertical padding so the CTA centers between the chart's
+     x-axis labels (footer top) and the card bottom edge (footer bottom). */
+  padding: 6px 20px;
 }
 
 .owner-dist-footer .action-dropdown-menu {
@@ -6462,12 +6464,13 @@ body {
   all: unset;
   font-size: 12px;
   font-weight: 500;
-  color: #465FFF;
+  /* Default to the Tail Admin muted-text gray; brand blue on hover. */
+  color: #667085;
   cursor: pointer;
 }
 
 .owner-dist-forecast-action:hover {
-  color: #3641F5;
+  color: #465FFF;
 }
 
 /* Trends overflow fix — trend-charts-pair must also shrink below content size */
