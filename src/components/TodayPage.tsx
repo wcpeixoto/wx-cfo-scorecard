@@ -73,6 +73,10 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
             reserveTarget={model.runway.reserveTarget}
             monthlyRollups={model.monthlyRollups}
           />
+          <NextOwnerDistributionCard
+            ownerPayProjection={ownerPayProjection}
+            reserveFloor={ownerPayReserveFloor}
+          />
           <OwnerDistributionsCard
             transactions={txns}
             distributionStatus={distributionStatus.status}
@@ -83,10 +87,6 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
             reserveTarget={model.runway.reserveTarget}
             currentCashBalance={model.runway.currentCashBalance}
             onCompareYear={onCompareYear}
-          />
-          <NextOwnerDistributionCard
-            ownerPayProjection={ownerPayProjection}
-            reserveFloor={ownerPayReserveFloor}
           />
         </div>
       </div>
