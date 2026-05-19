@@ -104,7 +104,7 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
 
       {/* Context section */}
       <div className="today-context-section">
-        <div className="today-context-grid today-context-grid--2-1">
+        <div className="today-context-grid">
           <OwnerDistributionsCard
             transactions={txns}
             distributionStatus={distributionStatus.status}
