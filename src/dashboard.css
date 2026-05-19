@@ -1780,7 +1780,9 @@ body {
   /* Shrunk 20% (320 → 256) — the card now sits in a narrow context
      column, so the gauge no longer needs the full top-row width. */
   max-width: 256px;
-  margin: 0 auto;
+  /* Lowered so the arc's circle-center sits nearer the card's vertical
+     center, rather than hugging the header. */
+  margin: 24px auto 0;
 }
 
 .reserve-gauge-svg {
@@ -1817,15 +1819,22 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   pointer-events: none;
 }
 
 .reserve-footer {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 20px;
+}
+
+.reserve-footer-line {
+  display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 20px;
 }
 
 .reserve-footer-context {
