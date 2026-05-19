@@ -111,16 +111,33 @@ export function NextOwnerDistributionCard({
     },
     dataLabels: { enabled: false },
     stroke: { show: true, width: 2, colors: ['transparent'] },
+    // Axis/grid treatment matches the sibling OwnerDistributionsChart for
+    // cross-card consistency on the Today context grid. (This reinstates the
+    // visible X labels / Y ticks that #130 had stripped — a deliberate
+    // owner decision to align with the neighbour card.)
     xaxis: {
       categories: monthLabels,
       axisBorder: { show: false },
       axisTicks: { show: false },
-      labels: { show: false },
+      labels: { style: { fontSize: '12px', colors: chartTokens.axisText } },
       crosshairs: { show: false },
     },
-    yaxis: { show: false },
+    yaxis: {
+      tickAmount: 4,
+      forceNiceScale: true,
+      labels: {
+        formatter: (val: number) => '$' + (val / 1000).toFixed(0) + 'k',
+        style: { fontSize: '12px', colors: chartTokens.axisText },
+      },
+    },
     grid: {
-      show: false,
+      borderColor: chartTokens.gridBorder,
+      strokeDashArray: 4,
+      yaxis: { lines: { show: true } },
+      xaxis: { lines: { show: false } },
+      // Preserved from the prior NOD grid: headroom for the "First payout"
+      // annotation label. OwnerDistributionsChart has no annotation so its
+      // grid omits this — the only intentional delta from the sibling.
       padding: { top: firstPayoutIndex >= 0 ? 20 : 0, right: 0, bottom: 0, left: 0 },
     },
     states: {
