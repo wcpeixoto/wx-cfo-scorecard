@@ -6855,12 +6855,13 @@ body {
   }
 }
 
-/* Desktop: Owner Distributions (center) ~40% wider than the flanking
-   Operating Reserve and Next Owner Distribution cards. Below 1024px the
-   auto-fit base falls back, keeping the #143 no-overflow guarantee. */
+/* Desktop: Owner Distributions (last card) ~40% wider than the
+   preceding Operating Reserve and Next Owner Distribution cards. Below
+   1024px the auto-fit base falls back, keeping the #143 no-overflow
+   guarantee. */
 @media (min-width: 1024px) {
   .today-context-grid {
-    grid-template-columns: 1fr 1.4fr 1fr;
+    grid-template-columns: 1fr 1fr 1.4fr;
   }
 }
 
