@@ -120,11 +120,17 @@ function ReserveGauge({
         {clampedPercent > 0 && (
           <path d={fillPath} fill="none" className={`reserve-gauge-arc ${toneClass}`} strokeWidth={strokeWidth} strokeLinecap="round" />
         )}
-        <text x={trackStart.x - strokeWidth / 2} y={labelY} textAnchor="start" className="reserve-gauge-end-label">{formatCompactCurrency(currentCashBalance)}</text>
-        <text x={trackStart.x - strokeWidth / 2} y={captionY} textAnchor="start" className="reserve-gauge-end-caption">Cash available</text>
-        <text x={trackEnd.x + strokeWidth / 2} y={labelY} textAnchor="end" className="reserve-gauge-end-label">{maxLabel}</text>
-        <text x={trackEnd.x + strokeWidth / 2} y={captionY} textAnchor="end" className="reserve-gauge-end-caption">Reserve goal</text>
       </svg>
+      <div className="reserve-gauge-ends" aria-hidden="true">
+        <div className="reserve-gauge-end reserve-gauge-end--left">
+          <span className="reserve-gauge-end-label">{formatCompactCurrency(currentCashBalance)}</span>
+          <span className="reserve-gauge-end-caption">Cash available</span>
+        </div>
+        <div className="reserve-gauge-end reserve-gauge-end--right">
+          <span className="reserve-gauge-end-label">{maxLabel}</span>
+          <span className="reserve-gauge-end-caption">Reserve goal</span>
+        </div>
+      </div>
       <div className="reserve-gauge-center">
         <span className="reserve-gauge-value">{percentLabel}</span>
         <span className="reserve-gauge-label">

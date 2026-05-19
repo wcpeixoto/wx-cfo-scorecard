@@ -1862,17 +1862,40 @@ body {
   line-height: 1.15;
 }
 
-/* Counter-scaled by 1.25 (13→16, 11→14) so the rendered size is
-   unchanged after the gauge SVG was shrunk 20% (wrap 320→256). */
+/* End labels live in an HTML overlay (not SVG <text>) so their type is
+   fixed px and never scales with the gauge size. Pinned to the bottom
+   corners under the arc endpoints. */
+.reserve-gauge-ends {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 6px;
+  pointer-events: none;
+}
+
+.reserve-gauge-end {
+  display: flex;
+  flex-direction: column;
+}
+
+.reserve-gauge-end--right {
+  text-align: right;
+}
+
 .reserve-gauge-end-label {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
-  fill: var(--text-primary);
+  color: var(--text-primary);
+  line-height: 1.2;
 }
 
 .reserve-gauge-end-caption {
-  font-size: 14px;
-  fill: var(--text-secondary);
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.2;
 }
 
 /* ── Coverage weeks bar ── */
