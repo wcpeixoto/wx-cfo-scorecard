@@ -32,12 +32,12 @@ function reserveToneClassName(percent: number | null): string {
 // not re-couple them.
 function getReserveBadgeState(percentFunded: number | null): { label: string; className: string } {
   if (percentFunded === null) return { label: '—', className: 'card-status-badge is-neutral' };
-  if (percentFunded < 0.25) return { label: '↓ Critical', className: 'card-status-badge is-critical' };
-  if (percentFunded < 0.50) return { label: '↓ Vulnerable', className: 'card-status-badge is-warning' };
-  if (percentFunded < 0.75) return { label: '↓ Below target', className: 'card-status-badge is-warning' };
+  if (percentFunded < 0.25) return { label: 'Critical', className: 'card-status-badge is-critical' };
+  if (percentFunded < 0.50) return { label: 'Vulnerable', className: 'card-status-badge is-warning' };
+  if (percentFunded < 0.75) return { label: 'Below target', className: 'card-status-badge is-warning' };
   if (percentFunded < 1.00) return { label: 'Nearly funded', className: 'card-status-badge is-neutral' };
-  if (percentFunded < 1.50) return { label: '✓ Fully funded', className: 'card-status-badge is-healthy' };
-  return { label: '✓ Above target', className: 'card-status-badge is-healthy' };
+  if (percentFunded < 1.50) return { label: 'Fully funded', className: 'card-status-badge is-healthy' };
+  return { label: 'Above target', className: 'card-status-badge is-healthy' };
 }
 
 // The reserve goal is, by construction in computeOperatingReserveSnapshot,
@@ -46,11 +46,11 @@ function getReserveBadgeState(percentFunded: number | null): { label: string; cl
 // it is the faithful description of the live target.
 const RESERVE_SUBTITLE = '1-month expense goal';
 
-function getReserveShortfall(currentCashBalance: number, reserveTarget: number): string | null {
+function getReserveGapLabel(currentCashBalance: number, reserveTarget: number): string | null {
   if (reserveTarget <= EPSILON) return null;
   const gap = reserveTarget - currentCashBalance;
   if (gap <= 0) return null;
-  return `${formatCompactCurrency(gap)} short of goal`;
+  return `${formatCompactCurrency(gap)} to goal`;
 }
 
 function computeCoverageWeeks(currentCashBalance: number, reserveTarget: number): number {
@@ -73,7 +73,6 @@ function formatReservePercentLabel(percent: number | null): string {
 function ReserveGauge({
   percentLabel,
   coverageLabel,
-  shortfallLabel,
   fillPercent,
   toneClass,
   reserveTarget,
@@ -81,7 +80,6 @@ function ReserveGauge({
 }: {
   percentLabel: string;
   coverageLabel: string;
-  shortfallLabel: string | null;
   fillPercent: number;
   toneClass: string;
   reserveTarget: number;
@@ -136,9 +134,6 @@ function ReserveGauge({
         <span className="reserve-gauge-label">
           <span className="reserve-gauge-coverage">{coverageLabel}</span> covered
         </span>
-        {shortfallLabel && (
-          <span className="reserve-gauge-shortfall">{shortfallLabel}</span>
-        )}
       </div>
     </div>
   );
@@ -158,6 +153,13 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
   const reserveTone = reserveToneClassName(reservePercent);
   const reserveBadge = getReserveBadgeState(reservePercent !== null ? reservePercent / 100 : null);
   const coverageWeeks = computeCoverageWeeks(currentCashBalance, reserveTarget);
+  const gapLabel = getReserveGapLabel(currentCashBalance, reserveTarget);
+  const footerContext = [
+    coverageDelta ? 'vs end of last month' : null,
+    gapLabel,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <article className="card reserve-card">
@@ -191,25 +193,26 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
       <ReserveGauge
         percentLabel={formatReservePercentLabel(reservePercent)}
         coverageLabel={formatCoverageWeeks(coverageWeeks)}
-        shortfallLabel={getReserveShortfall(currentCashBalance, reserveTarget)}
         fillPercent={reserveFillPercent}
         toneClass={reserveTone}
         reserveTarget={reserveTarget}
         currentCashBalance={currentCashBalance}
       />
 
-      {coverageDelta && (
+      {(coverageDelta || gapLabel) && (
         <div className="reserve-footer">
-          <span className={`reserve-subtitle-delta reserve-subtitle-delta--${coverageDelta.direction}`}>
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              {coverageDelta.direction === 'up'
-                ? <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                : <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              }
-            </svg>
-            {`${Math.abs(coverageDelta.pct * 100).toFixed(1)}%`}
-          </span>
-          <span className="reserve-footer-context">vs end of last month</span>
+          {coverageDelta && (
+            <span className={`reserve-subtitle-delta reserve-subtitle-delta--${coverageDelta.direction}`}>
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                {coverageDelta.direction === 'up'
+                  ? <path d="M8 13.333V2.667M4 6.663l4-3.996 4 3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  : <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                }
+              </svg>
+              {`${Math.abs(coverageDelta.pct * 100).toFixed(1)}%`}
+            </span>
+          )}
+          <span className="reserve-footer-context">{footerContext}</span>
         </div>
       )}
     </article>
