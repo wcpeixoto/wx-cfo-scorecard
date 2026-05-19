@@ -1820,10 +1820,10 @@ body {
   pointer-events: none;
 }
 
+/* Match "<n> weeks covered" (.reserve-gauge-label) exactly. */
 .reserve-gauge-shortfall {
   font-size: 12px;
-  font-weight: 500;
-  color: #667085;
+  color: var(--text-secondary);
   white-space: nowrap;
   line-height: 1.15;
 }
@@ -1832,7 +1832,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 4px;
+  margin-top: 20px;
 }
 
 .reserve-footer-context {
@@ -1862,14 +1862,16 @@ body {
   line-height: 1.15;
 }
 
+/* Counter-scaled by 1.25 (13→16, 11→14) so the rendered size is
+   unchanged after the gauge SVG was shrunk 20% (wrap 320→256). */
 .reserve-gauge-end-label {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   fill: var(--text-primary);
 }
 
 .reserve-gauge-end-caption {
-  font-size: 11px;
+  font-size: 14px;
   fill: var(--text-secondary);
 }
 
