@@ -155,7 +155,7 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
   const reserveBadge = getReserveBadgeState(reservePercent !== null ? reservePercent / 100 : null);
   const coverageWeeks = computeCoverageWeeks(currentCashBalance, reserveTarget);
   const gapLabel = getReserveGapLabel(currentCashBalance, reserveTarget);
-  const footerContext = [coverageDelta ? 'vs last month' : null, gapLabel]
+  const footerContext = [coverageDelta?.label, gapLabel]
     .filter(Boolean)
     .join(' · ');
 
@@ -199,7 +199,7 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
 
       {(coverageDelta || gapLabel) && (
         <div className="reserve-footer">
-          {coverageDelta && (
+          {coverageDelta && coverageDelta.direction !== 'flat' && (
             <span className={`reserve-subtitle-delta reserve-subtitle-delta--${coverageDelta.direction}`}>
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 {coverageDelta.direction === 'up'
@@ -207,7 +207,6 @@ export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthl
                   : <path d="M8 2.667V13.333M4 9.337l4 3.996 4-3.996" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 }
               </svg>
-              {`${Math.abs(coverageDelta.pct * 100).toFixed(1)}%`}
             </span>
           )}
           <span className="reserve-footer-context">{footerContext}</span>
