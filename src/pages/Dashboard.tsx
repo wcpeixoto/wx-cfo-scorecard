@@ -20,6 +20,7 @@ import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import { TodayPage } from '../components/TodayPage';
+import { NextOwnerDistributionCardLab } from '../components/NextOwnerDistributionCardLab';
 import { ProjectionCompareDrawer } from '../components/ProjectionCompareDrawer';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
 import ContractsSettingsPane from '../components/ContractsSettingsPane';
@@ -4781,6 +4782,17 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       </div>
                     </div>
                 </article>
+              </div>
+            </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">NextOwnerDistributionCard</h3>
+              <p className="ui-lab-section-subtitle">Independent live replica of the Today "Next Owner Distribution" card (chart, legend, axes, all states). Own component + .nodlab-* CSS so it can be iterated without touching the shipped card. Wired to real ownerPay data.</p>
+              <div className="ui-lab-preview-width--medium">
+                <NextOwnerDistributionCardLab
+                  ownerPayProjection={ownerPayProjection}
+                  reserveFloor={ownerPayReserveFloor}
+                />
               </div>
             </div>
           </div>
