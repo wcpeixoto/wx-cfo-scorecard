@@ -6524,13 +6524,20 @@ body {
   margin-bottom: 0;
 }
 
-/* Top grid: Hero (7fr) + Operating Reserve (5fr → 5/12) side by side on desktop */
+/* Top grid: three equal thirds — Cash on Hand, Operating Reserve, and a
+   placeholder slot — side by side on desktop. */
 .today-top-grid {
   display: grid;
-  /* Even 50/50 split: Cash on Hand and Operating Reserve each half-page. */
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   align-items: stretch;
+}
+
+/* Empty visual placeholder — same shell as a real .card so it slots into
+   the row without drawing attention. Stretches to the row height via the
+   grid's align-items: stretch + .today-top-grid > * { height: 100% }. */
+.card--placeholder {
+  min-height: 180px;
 }
 
 @media (min-width: 768px) {
@@ -6817,7 +6824,7 @@ body {
 
 .today-context-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   align-items: stretch;
 }
