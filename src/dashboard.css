@@ -6424,8 +6424,7 @@ body {
 .owner-dist-footer {
   display: flex;
   align-items: center;
-  border-top: 1px solid #E4E7EC;
-  padding: 8px 20px 12px;
+  padding: 0 20px 12px;
 }
 
 .owner-dist-footer .action-dropdown-menu {
