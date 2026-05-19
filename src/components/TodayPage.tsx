@@ -62,17 +62,17 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
           txns={txns}
           forecastProjection={forecastProjection}
         />
-        <OperatingReserveCard
-          currentCashBalance={model.runway.currentCashBalance}
-          reserveTarget={model.runway.reserveTarget}
-          monthlyRollups={model.monthlyRollups}
-        />
         <div className="card card--placeholder" aria-hidden="true" />
       </div>
 
       {/* Context section */}
       <div className="today-context-section">
         <div className="today-context-grid">
+          <OperatingReserveCard
+            currentCashBalance={model.runway.currentCashBalance}
+            reserveTarget={model.runway.reserveTarget}
+            monthlyRollups={model.monthlyRollups}
+          />
           <OwnerDistributionsCard
             transactions={txns}
             distributionStatus={distributionStatus.status}
