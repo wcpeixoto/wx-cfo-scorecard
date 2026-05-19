@@ -21,6 +21,7 @@ import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import { TodayPage } from '../components/TodayPage';
 import { NextOwnerDistributionCardLab } from '../components/NextOwnerDistributionCardLab';
+import { SecondaryPrioritiesLab } from '../components/SecondaryPrioritiesLab';
 import { ProjectionCompareDrawer } from '../components/ProjectionCompareDrawer';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
 import ContractsSettingsPane from '../components/ContractsSettingsPane';
@@ -4794,6 +4795,16 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                   reserveFloor={ownerPayReserveFloor}
                 />
               </div>
+            </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">Secondary priorities</h3>
+              <p className="ui-lab-section-subtitle">Ranked secondary-priority cards (Cash Flow / Revenue / etc.). Moved off the Today page; rendered here live from the same signal → rank pipeline.</p>
+              <SecondaryPrioritiesLab
+                model={model}
+                txns={filteredTxns}
+                forecastProjection={scenarioProjection}
+              />
             </div>
           </div>
         )}
