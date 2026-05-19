@@ -1815,7 +1815,7 @@ body {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, 5%);
+  transform: translate(-50%, -10%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1825,16 +1825,11 @@ body {
 
 .reserve-footer {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  margin-top: 20px;
-}
-
-.reserve-footer-line {
-  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  margin-top: 20px;
+  text-align: center;
 }
 
 .reserve-footer-context {
