@@ -7064,9 +7064,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  /* Section gap to the hero block above (replaces removed .nod-divider,
-     which contributed 28px top + 14px bottom margins around its line). */
-  margin-top: 42px;
+  /* Section gap to the hero block above. Replaces the removed .nod-divider
+     (which contributed 28+14=42px around its line), with extra breathing
+     room above the "What if revenue changes?" label so it doesn't feel
+     anchored to the hero. */
+  margin-top: 56px;
 }
 
 .nod-scenario-label {
