@@ -6549,6 +6549,16 @@ body {
   }
 }
 
+/* Desktop: fixed proportions — Cash on Hand 5/12, placeholder 7/12.
+   Below 1024px the auto-fit/min(100%,340px) base (and the 767px
+   single-column rule) still govern, preserving the #143 no-overflow
+   guarantee on narrow viewports. */
+@media (min-width: 1024px) {
+  .today-top-grid {
+    grid-template-columns: 5fr 7fr;
+  }
+}
+
 .today-top-grid > * {
   height: 100%;
 }
@@ -6842,6 +6852,15 @@ body {
   }
   .today-context-grid > * {
     height: auto;
+  }
+}
+
+/* Desktop: Owner Distributions (center) ~40% wider than the flanking
+   Operating Reserve and Next Owner Distribution cards. Below 1024px the
+   auto-fit base falls back, keeping the #143 no-overflow guarantee. */
+@media (min-width: 1024px) {
+  .today-context-grid {
+    grid-template-columns: 1fr 1.4fr 1fr;
   }
 }
 
