@@ -20,6 +20,7 @@ import TopPayeesTable from '../components/TopPayeesTable';
 import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import { TodayPage } from '../components/TodayPage';
+import { NextOwnerDistributionCardFull } from '../components/NextOwnerDistributionCardFull';
 import { ProjectionCompareDrawer } from '../components/ProjectionCompareDrawer';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
 import ContractsSettingsPane from '../components/ContractsSettingsPane';
@@ -4781,6 +4782,17 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                       </div>
                     </div>
                 </article>
+              </div>
+            </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">NextOwnerDistributionCard (full)</h3>
+              <p className="ui-lab-section-subtitle">Preserved chart-version of the Next Owner Distribution card (chart, legend, axes, all states). The Today surface uses the stripped stat-only variant; this is the live full reference.</p>
+              <div className="ui-lab-preview-width--medium">
+                <NextOwnerDistributionCardFull
+                  ownerPayProjection={ownerPayProjection}
+                  reserveFloor={ownerPayReserveFloor}
+                />
               </div>
             </div>
           </div>
