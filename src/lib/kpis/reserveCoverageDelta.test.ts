@@ -2,41 +2,78 @@ import { describe, it, expect } from 'vitest';
 import type { MonthlyRollup } from '../data/contract';
 import { computeReserveCoverageDelta } from './compute';
 
-function rollup(month: string, expenses: number, netCashFlow: number): MonthlyRollup {
-  return { month, revenue: expenses + netCashFlow, expenses, netCashFlow, savingsRate: 0, transactionCount: 0 };
+function rollup(month: string, expenses: number): MonthlyRollup {
+  return { month, revenue: expenses, expenses, netCashFlow: 0, savingsRate: 0, transactionCount: 0 };
 }
 
-describe('computeReserveCoverageDelta', () => {
-  // Expenses rise, so the trailing-3 reserve target rises month to month.
-  // The coverage delta must account for the moving denominator — it should
-  // diverge from a naive cash-only delta.
-  const rollups: MonthlyRollup[] = [
-    rollup('2026-01', 6000, 0),
-    rollup('2026-02', 6000, 0),
-    rollup('2026-03', 6000, 0),
-    rollup('2026-04', 12000, 0),
-    rollup('2026-05', 30000, 6000),
+// 5 months, all netCashFlow = 0 → the cash-trend series is flat, so
+// priorCashBalance === currentCashBalance. priorAnchor = 2026-04, whose
+// trailing-3 expense basis is Jan–Mar; set those to `priorTargetExpenses`
+// so fundedPrior = currentCash / priorTargetExpenses. fundedNow is the
+// passed reserveTarget: currentCash / reserveTarget.
+function fixture(priorTargetExpenses: number): MonthlyRollup[] {
+  return [
+    rollup('2026-01', priorTargetExpenses),
+    rollup('2026-02', priorTargetExpenses),
+    rollup('2026-03', priorTargetExpenses),
+    rollup('2026-04', priorTargetExpenses),
+    rollup('2026-05', priorTargetExpenses),
   ];
-  const currentCashBalance = 20000;
-  const reserveTargetNow = 8000; // avg expenses Feb–Apr (anchor = May)
+}
 
-  it('measures coverage change, not raw cash change', () => {
-    const result = computeReserveCoverageDelta(rollups, currentCashBalance, reserveTargetNow);
-    expect(result).not.toBeNull();
-    expect(result!.direction).toBe('up');
-    // fundedNow = 20000/8000 = 2.5; priorCash = 20000 - 6000 = 14000;
-    // priorTarget = avg Jan–Mar = 6000; fundedPrior = 14000/6000 = 2.33;
-    // coverage delta = (2.5 - 2.33) / 2.33 ≈ 0.0730
-    expect(result!.pct).toBeCloseTo(0.073, 2);
-    // It must NOT equal the naive cash delta (20000-14000)/14000 ≈ 0.4286.
-    expect(result!.pct).not.toBeCloseTo(0.4286, 2);
+describe('computeReserveCoverageDelta — absolute coverage move + copy', () => {
+  it('prior 0.17 → now 0.66: "↑ 17% → 66% funded since last month"', () => {
+    // currentCash 1700, priorTarget 10000 → fundedPrior 0.17;
+    // reserveTarget 1700/0.66 → fundedNow 0.66.
+    const r = computeReserveCoverageDelta(fixture(10000), 1700, 1700 / 0.66);
+    expect(r).not.toBeNull();
+    expect(r!.direction).toBe('up');
+    expect(r!.label).toBe('17% → 66% funded since last month');
   });
 
-  it('returns null with insufficient history', () => {
-    expect(computeReserveCoverageDelta([rollup('2026-01', 6000, 0)], 20000, 8000)).toBeNull();
+  it('prior 0.654 → now 0.656: "No change since last month" (move < 0.5pp)', () => {
+    const r = computeReserveCoverageDelta(fixture(10000), 6540, 6540 / 0.656);
+    expect(r!.direction).toBe('flat');
+    expect(r!.label).toBe('No change since last month');
   });
 
-  it('returns null when the reserve target is unavailable', () => {
-    expect(computeReserveCoverageDelta(rollups, 20000, 0)).toBeNull();
+  it('prior 0.654 → now 0.662: "↑ 65% → 66% funded since last month"', () => {
+    const r = computeReserveCoverageDelta(fixture(10000), 6540, 6540 / 0.662);
+    expect(r!.direction).toBe('up');
+    expect(r!.label).toBe('65% → 66% funded since last month');
+  });
+
+  it('prior 0.66 → now 0.46: "↓ 66% → 46% funded since last month"', () => {
+    const r = computeReserveCoverageDelta(fixture(10000), 6600, 6600 / 0.46);
+    expect(r!.direction).toBe('down');
+    expect(r!.label).toBe('66% → 46% funded since last month');
+  });
+
+  it('prior 0.13 → now 2.00: "↑ 13% → above target since last month"', () => {
+    const r = computeReserveCoverageDelta(fixture(10000), 1300, 650);
+    expect(r!.direction).toBe('up');
+    expect(r!.label).toBe('13% → above target since last month');
+  });
+
+  it('single rollup, no prior anchor: "No prior month to compare yet"', () => {
+    const r = computeReserveCoverageDelta([rollup('2026-01', 10000)], 6600, 10000);
+    expect(r).not.toBeNull();
+    expect(r!.direction).toBe('flat');
+    expect(r!.label).toBe('No prior month to compare yet');
+  });
+
+  it('null only when the current reserve target is unavailable', () => {
+    expect(computeReserveCoverageDelta(fixture(10000), 6600, 0)).toBeNull();
+  });
+
+  // Regression: a recovery off a low prior base (≈0.17) must report the
+  // absolute before→after pair, NOT the old relative form
+  // (fundedNow−fundedPrior)/|fundedPrior|, which produced "+288%". Guards
+  // against reintroducing the divide-by-small-prior pattern.
+  it('low prior base does not produce a relative-percentage blowup', () => {
+    const r = computeReserveCoverageDelta(fixture(10000), 1700, 1700 / 0.66);
+    expect(r!.label).toBe('17% → 66% funded since last month');
+    expect('pct' in (r as object)).toBe(false);
+    expect(r!.label).not.toMatch(/\d{3,}\s*%/);
   });
 });

@@ -805,14 +805,35 @@ function computeOperatingReserveSnapshot(
   return { reserveTarget, percentFunded };
 }
 
-export type ReserveCoverageDelta = { pct: number; direction: 'up' | 'down' };
+export type ReserveCoverageDelta = {
+  // 'flat' covers both "No change" and "no prior month" — neither draws an
+  // arrow; the consumer keys arrow rendering off up/down only.
+  direction: 'up' | 'down' | 'flat';
+  // Owner-facing copy, ready to render verbatim (no arrow glyph — the
+  // consumer supplies the ↑/↓ icon for up/down).
+  label: string;
+};
+
+// "No change" fires when the absolute coverage move is under half a
+// percentage point of the funded ratio (0.005). Per the spec's tests this
+// is governed by the RAW delta, not by whether the rounded whole-percent
+// values happen to differ (e.g. 65.4%→65.6% rounds to 65→66 but is still
+// "No change" because the move is 0.2pp).
+const RESERVE_COVERAGE_FLAT_THRESHOLD = 0.005;
 
 // Month-over-month change in Operating Reserve *coverage* (cash ÷ target),
 // NOT raw cash. The reserve target is a trailing-3-month expense average, so
 // it moves month to month; a pure cash delta would misstate the reserve
 // position. Prior coverage reuses the canonical snapshot with the prior
 // anchor month so current/prior targets are computed identically (no drift).
-// Returns null when there is insufficient history or no prior coverage.
+//
+// Reports the ABSOLUTE change in funded ratio (fundedNow − fundedPrior), not
+// the relative change (Δ / |fundedPrior|). The relative form explodes off a
+// small prior base — a recovery from 17%→66% funding read as "+288%", which
+// is internally correct but owner-facing nonsense. Surfaced as before→after
+// funded percentages instead. Returns the "no prior month" state (not null)
+// when there is no prior anchor to compare; null only when the current
+// funded ratio itself cannot be computed (no reserve target).
 export function computeReserveCoverageDelta(
   monthlyRollups: MonthlyRollup[],
   currentCashBalance: number,
@@ -821,26 +842,47 @@ export function computeReserveCoverageDelta(
   if (reserveTarget <= EPSILON) return null;
   const fundedNow = currentCashBalance / reserveTarget;
 
+  const noPrior: ReserveCoverageDelta = {
+    direction: 'flat',
+    label: 'No prior month to compare yet',
+  };
+
   const sorted = [...monthlyRollups].sort((a, b) => a.month.localeCompare(b.month));
-  if (sorted.length < 2) return null;
+  if (sorted.length < 2) return noPrior;
   const priorAnchorMonth = sorted[sorted.length - 2].month;
 
   const series = computeCashTrend(monthlyRollups, currentCashBalance).series;
-  if (series.length < 2) return null;
+  if (series.length < 2) return noPrior;
   const priorCashBalance = series[series.length - 2];
-  if (!Number.isFinite(priorCashBalance)) return null;
+  if (!Number.isFinite(priorCashBalance)) return noPrior;
 
   const priorSnapshot = computeOperatingReserveSnapshot(
     monthlyRollups,
     priorCashBalance,
     priorAnchorMonth
   );
-  const fundedPrior = priorSnapshot.percentFunded;
-  if (fundedPrior === null || Math.abs(fundedPrior) <= EPSILON) return null;
+  // Derive fundedPrior as the raw ratio rather than reading
+  // priorSnapshot.percentFunded: the latter is round2()'d (whole-percent
+  // granularity), which would mask sub-percentage-point moves the
+  // "No change" threshold (0.5pp) is meant to detect.
+  if (priorSnapshot.reserveTarget <= EPSILON) return noPrior;
+  const fundedPrior = priorCashBalance / priorSnapshot.reserveTarget;
 
-  const pct = (fundedNow - fundedPrior) / Math.abs(fundedPrior);
-  if (!Number.isFinite(pct)) return null;
-  return { pct, direction: pct >= 0 ? 'up' : 'down' };
+  const rawDelta = fundedNow - fundedPrior;
+  if (!Number.isFinite(rawDelta)) return noPrior;
+
+  if (Math.abs(rawDelta) < RESERVE_COVERAGE_FLAT_THRESHOLD) {
+    return { direction: 'flat', label: 'No change since last month' };
+  }
+
+  const priorPct = Math.round(fundedPrior * 100);
+  const nowPct = Math.round(fundedNow * 100);
+  const current = fundedNow >= 1 ? 'above target' : `${nowPct}% funded`;
+
+  return {
+    direction: rawDelta >= 0 ? 'up' : 'down',
+    label: `${priorPct}% → ${current} since last month`,
+  };
 }
 
 function resolveAnchorMonth(monthlyRollups: MonthlyRollup[], anchorMonth?: string): string | null {
