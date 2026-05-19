@@ -6527,7 +6527,8 @@ body {
 /* Top grid: Hero (7fr) + Operating Reserve (5fr → 5/12) side by side on desktop */
 .today-top-grid {
   display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(280px, 5fr);
+  /* Even 50/50 split: Cash on Hand and Operating Reserve each half-page. */
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
   align-items: stretch;
 }
@@ -6821,17 +6822,12 @@ body {
   align-items: stretch;
 }
 
-.today-context-grid--2-1 {
-  grid-template-columns: minmax(0, 7fr) minmax(280px, 5fr);
-}
-
 .today-context-grid > * {
   height: 100%;
 }
 
 @media (max-width: 767px) {
-  .today-context-grid,
-  .today-context-grid--2-1 {
+  .today-context-grid {
     grid-template-columns: 1fr;
   }
   .today-context-grid > * {
