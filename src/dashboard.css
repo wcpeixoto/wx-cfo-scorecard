@@ -6524,11 +6524,14 @@ body {
   margin-bottom: 0;
 }
 
-/* Top grid: three equal thirds — Cash on Hand, Operating Reserve, and a
-   placeholder slot — side by side on desktop. */
+/* Top grid: Cash on Hand, Operating Reserve, and a placeholder slot.
+   Equal columns that keep a 340px floor and wrap 3 → 2 → 1 as the
+   viewport narrows, rather than squishing below the cards' content
+   width. min(100%, 340px) keeps a lone column from overflowing on
+   very narrow viewports. */
 .today-top-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
   gap: 16px;
   align-items: stretch;
 }
@@ -6824,7 +6827,7 @@ body {
 
 .today-context-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
   gap: 16px;
   align-items: stretch;
 }
