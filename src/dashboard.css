@@ -6934,9 +6934,9 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  /* Title→hero gap (tuned; ~2x the UI-Lab Total Balance card's
-     .total-balance-card__header margin-bottom). */
-  margin-bottom: 80px;
+  /* Title→hero gap. Trimmed from 80 to lift the "No Payout" hero a
+     touch closer to the title. */
+  margin-bottom: 64px;
 }
 
 .nod-title {

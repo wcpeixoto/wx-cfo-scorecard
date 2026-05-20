@@ -229,12 +229,6 @@ export function CashOnHandCard({ model, txns, forecastProjection }: CashOnHandCa
           </p>
         )}
       </div>
-
-      <div className="priority-card-v2__footer">
-        <button type="button" className="priority-card-v2__action">
-          What can I do?
-        </button>
-      </div>
     </article>
   );
 }
