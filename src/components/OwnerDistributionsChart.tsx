@@ -233,7 +233,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
             style: {
               fontSize: '12px',
               fontFamily: 'Outfit, sans-serif',
-              fontWeight: 600,
+              fontWeight: 500,
               color: '#475467',
             },
           },
