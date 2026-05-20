@@ -908,14 +908,11 @@ export default function CashFlowForecastModule({
     return <>{wrapUnit(str.slice(0, idx))}<span className="forecast-mo">/mo</span></>;
   }
 
-  // Profit-goal-card variant: amount + " per month" suffix (no leading "+",
-  // no "/mo"). Used only on the Profit goal card per the May 2026 copy
-  // refresh — the value reads as estimated additional revenue.
   function fmtMonthlyValuePerMonth(value: number): ReactNode {
     const str = fmtMonthly(value);
     const idx = str.lastIndexOf('/mo');
     const amount = idx === -1 ? str : str.slice(0, idx);
-    return <>{wrapUnit(amount)}<span className="forecast-mo"> per month</span></>;
+    return <>{wrapUnit(amount)}<span className="forecast-mo">/mo</span></>;
   }
 
   // Signed variant: preserves the negative sign for values like avgNet.
