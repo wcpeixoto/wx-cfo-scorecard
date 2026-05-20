@@ -7076,7 +7076,7 @@ body {
 .nod-scenario-label {
   /* Extra padding below the question, before the slider. */
   margin: 0 0 16px;
-  font-weight: 500;
+  font-weight: 400;
   font-size: 13px;
   line-height: 20px;
   color: #344054;
