@@ -173,7 +173,6 @@ not by visual size.
 | **24px / 600 or 500** | Large chart label or secondary hero value (slightly below primary stat) | "13.5M" donut center (AI); "$9,758.00" Total Revenue in Cashflow Overview (Finance). |
 | **20px / 600** | Page title — once per page only | "Sales Dashboard" (Sales). Not used in card bodies. |
 | **18px / 600** | Card title (primary) — standard for major cards/sections | "Top Products", "Recent Transactions", "API Token Usages", "Quick Send", "My Cards", "Spending". Most consistent title style in the system. |
-| **18px / 500** | Card title (secondary) or prominent inline text | "Users & Revenue Statistics", "Sales by Channel", "Sales by Country" (Sales); "User Analytics" (AI); "Virtual Card", "•••• •••• •••• 5332" (Finance). |
 | **16px / 600** | Stat card label or strong sub-section title | "Total Revenue", "Total Sales", "Refund Rate" stat-card labels (Sales). |
 | **16px / 500** | Card sub-title or category label | "Total Balance", "Cashflow Overview" sub-titles (Finance); "GPT", "Gemini", "xAI" model labels (AI). |
 | **16px / 400** | Descriptive inline label paired with a metric | "Total Balance", "Monthly Income", "Total Spent", "Saving Rate" descriptions inside stat cards (Finance). |
@@ -195,22 +194,30 @@ introduce a size or weight that is not on this table.
 
 ### Card title roles
 
-Two named card title roles extend the base type scale. Both are TailAdmin-native (DevTools-extracted).
+Two card title roles. Pick by content, not by taste.
 
-| Role | Size | Weight | Line height | Color | Source |
-|------|------|--------|-------------|-------|--------|
-| Card title (medium) | 16px | 600 | 24px | #344054 | TailAdmin /sales "Total Revenue" |
-| Card title (large) | 18px | 500 | 28px | #1D2939 | TailAdmin /sales "Users & Revenue Statistics" |
+| Role | Size | Weight | Line height | Color | When to use |
+|------|------|--------|-------------|-------|-------------|
+| Standard card title | 18px | 600 | 28px | `#1D2939` | Default for all cards |
+| KPI label title | 16px | 600 | 24px | `#344054` | Required when title sits above a metric value ≥24px (text-2xl+) |
 
-**When to use:**
-- **Card title (medium)** — compact or hybrid cards where the title sits above a sparkline or alongside
-  a hero value; the smaller size keeps the title from competing with the primary metric.
-- **Card title (large)** — full chart-cards with a 250px+ chart area where the title needs more
-  weight but the 600 semibold would be too heavy against the chart visual.
-- **Standard card title (text-lg / 600)** — all other cards; the TailAdmin default.
+Font family: `Outfit, sans-serif`. Title tag: `<h3>`. Dark mode: title color is `white/90`.
 
-Note: "Card title (large)" is 18px/500, not 18px/600. The weight reduction is intentional on
-chart-cards — the title lives above a large visual and 600 would overpower it.
+**Mechanical rule, not a judgment call.** If the card's primary content
+is a metric value ≥24px (text-2xl, text-title-sm, text-title-md), use
+the KPI label title. Otherwise use the standard card title. There is
+no third option.
+
+### Card subtitle
+
+When a card has a subtitle directly under the title:
+
+| Property | Value |
+|----------|-------|
+| Size | 14px (`text-theme-sm`) |
+| Color | `gray-500` (`#667085`) light / `gray-400` (`#98A2B3`) dark |
+| Gap from title | 4px (`mt-1` on the subtitle) |
+| Perceived text-to-text gap | ~12px (accounts for line-box descent) |
 
 ---
 
@@ -2015,7 +2022,7 @@ weight, and color. When in doubt about where text goes, identify its role first.
 
 | Role | Semantic meaning | Size / weight | Color | Position |
 |------|-----------------|---------------|-------|----------|
-| **Title** | WHAT this card shows — the name of the metric, chart, or section | text-lg / font-semibold | gray-800 | Top-left of header |
+| **Title** | WHAT this card shows — the name of the metric, chart, or section | text-lg / font-semibold | gray-800 (#1D2939) | Top-left of header |
 | **Subtitle** | CONTEXT — timeframe, target, data source, or qualifying description | text-theme-sm / font-normal | gray-500 | mt-1 directly below title |
 | **Legend label** | SERIES — the name of a data series in a multi-series chart | text-theme-sm / font-normal | gray-500 | Legend row, next to color dot |
 | **Badge** | STATUS — a signal or evaluation (above/below target, on track, at risk) | text-theme-xs / font-medium | semantic color | Header-right column only |
@@ -2150,7 +2157,7 @@ The constraints below are calibrated to the actual TailAdmin source — not stri
 - Width: half-page on desktop (2-column grid), full width on mobile
 
 ### Header (Pattern B)
-- Title: 18px, font-weight 600, color `#101828`
+- Title: 18px, font-weight 600, color `#1D2939`
 - Subtitle: 14px, font-weight 400, color `#667085`, margin-top 4px
 
 ### Headline strip
