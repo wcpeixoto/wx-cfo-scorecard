@@ -146,6 +146,13 @@ export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData 
       <div className="priority-card-v2__amount-row">
         <div className="priority-card-v2__amount-block">
           <h2 className="priority-card-v2__amount">{formatCashOnHand(model.runway.currentCashBalance)}</h2>
+          {/*
+            Delta semantics: trailing 30-day mean cash balance vs the prior
+            30-day mean, anchored to latestAvailableTxnDate. If a tooltip is
+            ever added, suggested copy:
+              "Compares your average cash balance over the latest 30 days
+               with the average from the 30 days before that."
+          */}
           <div className="priority-card-v2__trend">
             {cashDelta ? (
               <>
@@ -158,10 +165,10 @@ export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData 
                   </svg>
                   {`${Math.abs(cashDelta.pct * 100).toFixed(1)}%`}
                 </span>
-                <span className="priority-card-v2__trend-text">vs 30-day average</span>
+                <span className="priority-card-v2__trend-text">vs prior 30 days</span>
               </>
             ) : (
-              <span className="priority-card-v2__trend-text">— vs 30-day average</span>
+              <span className="priority-card-v2__trend-text">Not enough history for a 30-day comparison</span>
             )}
           </div>
         </div>
