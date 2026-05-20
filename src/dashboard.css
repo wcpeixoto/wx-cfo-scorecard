@@ -5245,8 +5245,12 @@ body {
 
 .priority-card-v2__trend {
   display: flex;
+  /* When the amount-block is narrow (e.g. Cash on Hand collapsed next to
+     the sparkline), let the caption drop to its own line rather than
+     wrapping mid-phrase ("vs end of last / month"). */
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 2px 6px;
   font-weight: 400;
   font-size: 14px;
   line-height: 20px;
