@@ -2,7 +2,7 @@ import type { BalancePoint } from './balanceSeries';
 
 export type CashTrendDelta = { pct: number; direction: 'up' | 'down' };
 
-export type CashTrend = {
+export type CashTrendDeltaResult = {
   series: number[];
   delta: CashTrendDelta | null;
 };
@@ -51,11 +51,11 @@ function balanceAt(series: BalancePoint[], anchorIndex: number, dateISO: string)
 //
 // Returns the null-fallback `{ series: [currentCashBalance], delta: null }`
 // when `asOfDate` is null or the daily series has fewer than 60 points.
-export function computeCashTrend(
+export function computeCashTrendDelta(
   balanceSeries: BalancePoint[],
   currentCashBalance: number,
   asOfDate: string | null,
-): CashTrend {
+): CashTrendDeltaResult {
   if (!asOfDate || balanceSeries.length < MIN_REQUIRED_DAYS) {
     return { series: [currentCashBalance], delta: null };
   }

@@ -31,7 +31,7 @@ import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccou
 import { isCapitalDistributionCategory } from '../lib/cashFlow';
 import { computeWhatNeedsAttention } from '../lib/kpis/digHere';
 import { computeCashTrend } from '../lib/kpis/cashTrend';
-import { computeCashTrend as computeCashBalanceTrend } from '../lib/data/cashTrend';
+import { computeCashTrendDelta } from '../lib/data/cashTrendDelta';
 import { buildCashBalanceSeries } from '../lib/data/balanceSeries';
 import { computePriorYearActuals } from '../lib/kpis/priorYearActuals';
 import { runDataSanityChecks } from '../lib/dataSanity';
@@ -1362,7 +1362,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     [baseTxns, accountRecords],
   );
   const cashTrendData = useMemo(
-    () => computeCashBalanceTrend(cashBalanceSeries, currentCashBalance, latestAvailableTxnDate),
+    () => computeCashTrendDelta(cashBalanceSeries, currentCashBalance, latestAvailableTxnDate),
     [cashBalanceSeries, currentCashBalance, latestAvailableTxnDate],
   );
   const activeCashAccountRecords = useMemo(
