@@ -31,6 +31,8 @@ import { discoverAccountRecords, mergeDiscoveredAccountRecords, parseStoredAccou
 import { isCapitalDistributionCategory } from '../lib/cashFlow';
 import { computeWhatNeedsAttention } from '../lib/kpis/digHere';
 import { computeCashTrend } from '../lib/kpis/cashTrend';
+import { computeCashTrend as computeCashBalanceTrend } from '../lib/data/cashTrend';
+import { buildCashBalanceSeries } from '../lib/data/balanceSeries';
 import { computePriorYearActuals } from '../lib/kpis/priorYearActuals';
 import { runDataSanityChecks } from '../lib/dataSanity';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
@@ -59,6 +61,7 @@ import {
   computeExpenseSlices,
   computeKpiComparisons,
   computeMonthlyRollups,
+  computeReserveCoverageDelta,
   projectScenario,
   toMonthLabel,
 } from '../lib/kpis/compute';
@@ -1348,6 +1351,20 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
       0
     );
   }, [accountRecords, accountBalanceMap]);
+
+  // True daily cash balance series for cash-included accounts. Same recipe
+  // as `currentCashBalance` above (startingBalance + Σ rawAmount), evaluated
+  // at every calendar day in the txn window. Feeds the Cash on Hand
+  // sparkline + 30-day-average delta, and (via priorCashBalance) the
+  // Operating Reserve coverage delta.
+  const cashBalanceSeries = useMemo(
+    () => buildCashBalanceSeries(baseTxns, accountRecords),
+    [baseTxns, accountRecords],
+  );
+  const cashTrendData = useMemo(
+    () => computeCashBalanceTrend(cashBalanceSeries, currentCashBalance, latestAvailableTxnDate),
+    [cashBalanceSeries, currentCashBalance, latestAvailableTxnDate],
+  );
   const activeCashAccountRecords = useMemo(
     () => accountRecords.filter((record) => record.active && record.accountType === 'Cash'),
     [accountRecords]
@@ -1474,6 +1491,22 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     () => computeEfficiencyOpportunities(model, filteredTxns),
     [model, filteredTxns]
   );
+  // Operating Reserve coverage delta — computed here so the locked
+  // computeReserveCoverageDelta no longer needs to walk back through
+  // monthlyRollups for a prior cash balance. priorCashBalance comes from
+  // the reconstructed-balance series via cashTrendData.
+  const reserveCoverageDelta = useMemo(() => {
+    const priorCashBalance =
+      cashTrendData.series.length >= 2
+        ? cashTrendData.series[cashTrendData.series.length - 2]
+        : null;
+    return computeReserveCoverageDelta(
+      model.monthlyRollups,
+      currentCashBalance,
+      model.runway.reserveTarget,
+      priorCashBalance,
+    );
+  }, [cashTrendData, currentCashBalance, model.monthlyRollups, model.runway.reserveTarget]);
   const netCashFlowChartModel = useMemo(
     () =>
       computeDashboardModel(filteredTxns, {
@@ -3195,6 +3228,8 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
             targetNetMargin={businessRules.targetNetMargin}
             onCompareYear={(year) => setCompareDrawerYear(year)}
             reprojectOwnerPay={reprojectOwnerPay}
+            cashTrendData={cashTrendData}
+            reserveCoverageDelta={reserveCoverageDelta}
           />
         )}
 

@@ -2,8 +2,7 @@
 // Receives only the two root values; all derived state is computed internally.
 
 import { useId } from 'react';
-import type { MonthlyRollup } from '../lib/data/contract';
-import { computeReserveCoverageDelta } from '../lib/kpis/compute';
+import type { ReserveCoverageDelta } from '../lib/kpis/compute';
 import { formatReserveFooter } from '../lib/ui/reserveFooterCopy';
 
 const EPSILON = 0.00001;
@@ -144,12 +143,12 @@ function ReserveGauge({
 interface OperatingReserveCardProps {
   currentCashBalance: number;
   reserveTarget: number;
-  monthlyRollups: MonthlyRollup[];
+  reserveCoverageDelta: ReserveCoverageDelta | null;
 }
 
-export function OperatingReserveCard({ currentCashBalance, reserveTarget, monthlyRollups }: OperatingReserveCardProps) {
+export function OperatingReserveCard({ currentCashBalance, reserveTarget, reserveCoverageDelta }: OperatingReserveCardProps) {
   const tooltipId = useId();
-  const coverageDelta = computeReserveCoverageDelta(monthlyRollups, currentCashBalance, reserveTarget);
+  const coverageDelta = reserveCoverageDelta;
   const reservePercent = getReservePercentDisplay(currentCashBalance, reserveTarget);
   const reserveFillPercent = reservePercent === null ? 0 : Math.min(Math.max(reservePercent, 0), 100);
   const reserveTone = reserveToneClassName(reservePercent);

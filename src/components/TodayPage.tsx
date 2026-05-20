@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
+import type { CashTrend } from '../lib/data/cashTrend';
+import type { ReserveCoverageDelta } from '../lib/kpis/compute';
 import { classifyTxn } from '../lib/cashFlow';
 import { CashOnHandCard } from './CashOnHandCard';
 import { OperatingReserveCard } from './OperatingReserveCard';
@@ -20,9 +22,11 @@ interface TodayPageProps {
   targetNetMargin?: number;
   onCompareYear?: (year: number) => void;
   reprojectOwnerPay?: ReprojectOwnerPay;
+  cashTrendData: CashTrend;
+  reserveCoverageDelta: ReserveCoverageDelta | null;
 }
 
-export function TodayPage({ model, txns, forecastProjection, ownerPayProjection, ownerPayReserveFloor, targetNetMargin, onCompareYear, reprojectOwnerPay }: TodayPageProps) {
+export function TodayPage({ model, txns, forecastProjection, ownerPayProjection, ownerPayReserveFloor, targetNetMargin, onCompareYear, reprojectOwnerPay, cashTrendData, reserveCoverageDelta }: TodayPageProps) {
   const distributionStatus = useMemo(() => {
     if (
       !model.monthlyRollups ||
@@ -64,6 +68,7 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
           model={model}
           txns={txns}
           forecastProjection={forecastProjection}
+          cashTrendData={cashTrendData}
         />
         <div className="card card--placeholder" aria-hidden="true" />
       </div>
@@ -74,7 +79,7 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
           <OperatingReserveCard
             currentCashBalance={model.runway.currentCashBalance}
             reserveTarget={model.runway.reserveTarget}
-            monthlyRollups={model.monthlyRollups}
+            reserveCoverageDelta={reserveCoverageDelta}
           />
           <NextOwnerDistributionCard
             ownerPayProjection={ownerPayProjection}
