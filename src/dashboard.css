@@ -7163,8 +7163,9 @@ body {
   box-shadow: 0 1px 3px rgba(33, 62, 108, 0.22);
 }
 
-/* Track tick marks — verbatim from .forecast-slider-tick* so the NOD
-   slider is visually identical to the Projected Cash Balance slider. */
+/* NOD slider styling parallels .forecast-slider-* by design
+   (copy-don't-share convention). Tick-label-row rules below
+   intentionally diverge — see .nod-slider-tick-label-row. */
 .nod-slider-ticks {
   position: absolute;
   left: 0;
