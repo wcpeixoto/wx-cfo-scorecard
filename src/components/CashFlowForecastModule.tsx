@@ -301,12 +301,8 @@ function formatCurrencyFull(value: number): string {
   return `$${Math.abs(rounded).toLocaleString('en-US')}`;
 }
 
-// Wraps the K or M unit suffix in a smaller span (75% size).
-// Used wherever compact currency is rendered as a ReactNode hero value.
 function wrapUnit(str: string): ReactNode {
-  const match = str.match(/^(.*?)([KM])$/);
-  if (!match) return str;
-  return <>{match[1]}<span className="forecast-unit">{match[2]}</span></>;
+  return str;
 }
 
 function formatCurrencyCompactNode(value: number): ReactNode {
