@@ -1895,7 +1895,7 @@ Use this pattern when the table is the primary content of its card — header, r
   - `padding: 12px 16px`
   - `font-size: 14px`
   - `font-weight: 600`
-  - `color: var(--text-primary)` / `#101828`
+  - `color: var(--text-primary)` / `#1D2939`
   - `white-space: nowrap`
   - `text-transform: none`, `letter-spacing: normal` (title-case, not uppercase)
   - `border-top: 1px solid var(--bg-muted)` and `border-bottom: 1px solid var(--bg-muted)`
