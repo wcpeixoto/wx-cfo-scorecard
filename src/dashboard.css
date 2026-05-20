@@ -6908,11 +6908,15 @@ body {
   }
 }
 
-/* Desktop: Owner Distributions (last card) ~40% wider than the
-   preceding Operating Reserve and Next Owner Distribution cards. Below
-   1024px the auto-fit base falls back, keeping the #143 no-overflow
-   guarantee. */
-@media (min-width: 1024px) {
+/* Wide desktop: Owner Distributions (last card) ~40% wider than the
+   preceding Operating Reserve and Next Owner Distribution cards.
+   Threshold raised to 1440px: below it, OR/OD card content widths drop
+   under the inline title+badge sum at canonical 18px/600 titles, causing
+   header text to wrap and the OR gauge end-labels ($18.4K / $39.7K) to
+   collide with the centered 46% value as the aspect-locked SVG shrinks.
+   Under 1440px the auto-fit base falls back to 2 columns at typical
+   laptop widths, keeping all card internals intact. */
+@media (min-width: 1440px) {
   .today-context-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr);
   }
