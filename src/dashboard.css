@@ -1731,7 +1731,7 @@ body {
   /* Matches .owner-dist-title (canonical card-title style on Today). */
   font-size: 18px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #1D2939;
 }
 
 .reserve-subtitle {
@@ -5216,7 +5216,7 @@ body {
   /* Matches .owner-dist-title (canonical card-title style on Today). */
   font-weight: 600;
   font-size: 18px;
-  color: #101828;
+  color: #1D2939;
 }
 
 .priority-card-v2__amount-row {
@@ -6362,7 +6362,7 @@ body {
 .owner-dist-title {
   font-size: 18px;
   font-weight: 600;
-  color: #101828;
+  color: #1D2939;
   margin: 0;
 }
 
@@ -6948,7 +6948,7 @@ body {
   /* Matches .owner-dist-title (canonical card-title style on Today). */
   font-size: 18px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #1D2939;
 }
 
 .nod-headline-block {
