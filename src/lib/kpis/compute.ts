@@ -43,7 +43,6 @@ import {
   revenueContribution,
   shouldExcludeFromProfitability,
 } from '../cashFlow';
-import { computeCashTrend } from '../data/cashTrend';
 
 const EPSILON = 0.00001;
 const EXPENSE_COLORS = ['#76a8ff', '#5e84f1', '#4f6fdd', '#3f58c1', '#2f479f', '#243b82', '#1b2f67'];
@@ -837,7 +836,8 @@ const RESERVE_COVERAGE_FLAT_THRESHOLD = 0.005;
 export function computeReserveCoverageDelta(
   monthlyRollups: MonthlyRollup[],
   currentCashBalance: number,
-  reserveTarget: number
+  reserveTarget: number,
+  priorCashBalance: number | null,
 ): ReserveCoverageDelta | null {
   if (reserveTarget <= EPSILON) return null;
   const fundedNow = currentCashBalance / reserveTarget;
@@ -851,10 +851,7 @@ export function computeReserveCoverageDelta(
   if (sorted.length < 2) return noPrior;
   const priorAnchorMonth = sorted[sorted.length - 2].month;
 
-  const series = computeCashTrend(monthlyRollups, currentCashBalance).series;
-  if (series.length < 2) return noPrior;
-  const priorCashBalance = series[series.length - 2];
-  if (!Number.isFinite(priorCashBalance)) return noPrior;
+  if (priorCashBalance === null || !Number.isFinite(priorCashBalance)) return noPrior;
 
   const priorSnapshot = computeOperatingReserveSnapshot(
     monthlyRollups,

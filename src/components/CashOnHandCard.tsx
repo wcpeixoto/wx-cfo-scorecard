@@ -7,9 +7,9 @@ import { useMemo } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
+import type { CashTrend } from '../lib/data/cashTrend';
 import { detectSignals } from '../lib/priorities/signals';
 import { rankPriorities } from '../lib/priorities/rank';
-import { computeCashTrend } from '../lib/data/cashTrend';
 import { chartTokens } from '../lib/ui/chartTokens';
 
 const SPARKLINE_OPTIONS: ApexOptions = {
@@ -65,9 +65,10 @@ interface CashOnHandCardProps {
   model: DashboardModel;
   txns: Txn[];
   forecastProjection: ScenarioPoint[];
+  cashTrendData: CashTrend;
 }
 
-export function CashOnHandCard({ model, txns, forecastProjection }: CashOnHandCardProps) {
+export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData }: CashOnHandCardProps) {
   const signals = useMemo(
     () => detectSignals(model, txns, forecastProjection),
     [model, txns, forecastProjection]
@@ -100,17 +101,14 @@ export function CashOnHandCard({ model, txns, forecastProjection }: CashOnHandCa
     return { months, date };
   }, [signals]);
 
-  // Month-start cash balances (last 6 months feed the sparkline) plus the
-  // month-over-month delta that drives the trend label/arrow. Shared with
-  // the Operating Reserve subtitle delta via computeCashTrend so the two
-  // cards never drift. Direction-tinted (down = critical, up = healthy),
-  // distinct from the severity pill which reflects the overall signal.
-  const cashTrend = useMemo(
-    () => computeCashTrend(model.monthlyRollups, model.runway.currentCashBalance),
-    [model.monthlyRollups, model.runway.currentCashBalance]
-  );
-  const cashReserveSeries = cashTrend.series;
-  const cashDelta = cashTrend.delta;
+  // True end-of-month cash balances (up to 6 points feed the sparkline)
+  // plus the 30-day rolling-average delta that drives the trend label/arrow.
+  // Computed upstream in Dashboard.tsx from the daily balance series so the
+  // Cash on Hand and Operating Reserve cards stay aligned on the same prior
+  // anchor. Direction-tinted (down = critical, up = healthy), distinct from
+  // the severity pill which reflects the overall signal.
+  const cashReserveSeries = cashTrendData.series;
+  const cashDelta = cashTrendData.delta;
 
   // Break-even gap — avg monthly expenses minus revenue over the last 3
   // COMPLETED months. Anchor = latest rollup month, excluded as the
@@ -160,10 +158,10 @@ export function CashOnHandCard({ model, txns, forecastProjection }: CashOnHandCa
                   </svg>
                   {`${Math.abs(cashDelta.pct * 100).toFixed(1)}%`}
                 </span>
-                <span className="priority-card-v2__trend-text">vs end of last month</span>
+                <span className="priority-card-v2__trend-text">vs 30-day average</span>
               </>
             ) : (
-              <span className="priority-card-v2__trend-text">— vs end of last month</span>
+              <span className="priority-card-v2__trend-text">— vs 30-day average</span>
             )}
           </div>
         </div>
