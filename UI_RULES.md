@@ -77,11 +77,19 @@ Weights: 400 Regular · 500 Medium · 600 Semibold · 700 Bold
 | Role | Hex |
 |------|-----|
 | Primary | #1D2939 (gray-800) |
-| Primary strong | #101828 (gray-900) |
+| Primary strong (reserved — see note) | #101828 (gray-900) |
 | Card title / strong secondary | #344054 (gray-700) |
 | Secondary / labels | #667085 (gray-500) |
 | Muted / metadata | #98A2B3 (gray-400) |
 | Inverse (on dark bg) | white/90 |
+
+> **Note on `#101828` (Primary strong):** Reserved. Not used on card content
+> per TailAdmin reference inspection (2026-05-20). Every KPI value on
+> demo.tailadmin.com/crm — top-strip 30px heroes and inline 20px Statistics
+> KPIs — renders at `#1D2939` (`text-gray-800`), same as titles. Role for
+> `#101828` is under review — do not apply to card titles, KPI values, or
+> hero metrics without re-inspection. (Known non-card uses: dropdown hover
+> color, segmented-control active text, table row hover/active state.)
 
 ### Chart-specific text
 | Role | Hex |
@@ -1876,7 +1884,7 @@ Use this pattern when the table is the primary content of its card — header, r
 - Title:
   - `font-size: 1.06rem`
   - `font-weight: 700`
-  - `color: #101828` (`--text-primary`)
+  - `color: #1D2939` (card title — see §6 Card title roles; source `--text-primary` is currently `#101828` and pending a follow-up source PR to align with this spec)
 - Right-side controls (Compare toggle, Export CSV, etc.) align with the title row and remain outside the table itself
 - Segmented toggles follow the standard pattern (`.projection-compare-toggle*` — see "Segmented toggle (standard pattern)" above)
 
@@ -2027,7 +2035,7 @@ weight, and color. When in doubt about where text goes, identify its role first.
 | **Legend label** | SERIES — the name of a data series in a multi-series chart | text-theme-sm / font-normal | gray-500 | Legend row, next to color dot |
 | **Badge** | STATUS — a signal or evaluation (above/below target, on track, at risk) | text-theme-xs / font-medium | semantic color | Header-right column only |
 | **Action** | NEXT STEP — a user-invokable behavior (compare, view all, export) | text-theme-sm / font-medium | brand-500 | Below chart, or header-right |
-| **KPI label** | METRIC NAME — the label above or below a standalone metric value | text-sm / font-normal | gray-500 | Above or below value in KPI card |
+| **KPI label** | METRIC NAME — the label above or below a standalone metric value | text-sm / font-normal | gray-700 (#344054) | Above or below value in KPI card |
 | **KPI value** | THE NUMBER — the primary data point | text-title-sm or larger / font-bold | gray-800 | Dominant position in KPI card |
 | **Delta** | CHANGE — direction and magnitude vs a comparison period | text-sm / font-medium | success/error semantic | Inline with or below KPI value |
 | **Context** | COMPARISON BASIS — "Vs last month", "From last month" | text-theme-xs / font-normal | gray-500 | Below delta in KPI card |
@@ -2163,7 +2171,7 @@ The constraints below are calibrated to the actual TailAdmin source — not stri
 ### Headline strip
 - Background: `#F2F4F7`, border-radius 12px, padding `14px 20px`
 - Layout: flex row, `align-items: baseline`, gap 10px, flex-wrap
-- Amount: 30px, font-weight 700, color `#101828`
+- Amount: 30px, font-weight 700, color `#1D2939` (KPI value — matches TailAdmin CRM top-strip hero render)
 - Label: 13px, font-weight 400, color `#667085`
 
 ### Column headers
