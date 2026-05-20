@@ -231,7 +231,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
             formatter: (val: string | undefined) => formatCompactWhole(Number(val ?? 0)),
             offsetY: -4,
             style: {
-              fontSize: '12px',
+              fontSize: '11px',
               fontFamily: 'Outfit, sans-serif',
               fontWeight: 600,
               color: '#475467',
