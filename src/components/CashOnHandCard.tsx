@@ -158,10 +158,10 @@ export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData 
                   </svg>
                   {`${Math.abs(cashDelta.pct * 100).toFixed(1)}%`}
                 </span>
-                <span className="priority-card-v2__trend-text">vs 30-day average</span>
+                <span className="priority-card-v2__trend-text">vs prior 30 days</span>
               </>
             ) : (
-              <span className="priority-card-v2__trend-text">— vs 30-day average</span>
+              <span className="priority-card-v2__trend-text">— vs prior 30 days</span>
             )}
           </div>
         </div>
