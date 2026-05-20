@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
-import type { CashTrend } from '../lib/data/cashTrend';
+import type { CashTrendDeltaResult } from '../lib/data/cashTrendDelta';
 import { detectSignals } from '../lib/priorities/signals';
 import { rankPriorities } from '../lib/priorities/rank';
 import { chartTokens } from '../lib/ui/chartTokens';
@@ -65,7 +65,7 @@ interface CashOnHandCardProps {
   model: DashboardModel;
   txns: Txn[];
   forecastProjection: ScenarioPoint[];
-  cashTrendData: CashTrend;
+  cashTrendData: CashTrendDeltaResult;
 }
 
 export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData }: CashOnHandCardProps) {

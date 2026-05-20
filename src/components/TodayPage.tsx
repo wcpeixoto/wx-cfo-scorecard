@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
-import type { CashTrend } from '../lib/data/cashTrend';
+import type { CashTrendDeltaResult } from '../lib/data/cashTrendDelta';
 import type { ReserveCoverageDelta } from '../lib/kpis/compute';
 import { classifyTxn } from '../lib/cashFlow';
 import { CashOnHandCard } from './CashOnHandCard';
@@ -22,7 +22,7 @@ interface TodayPageProps {
   targetNetMargin?: number;
   onCompareYear?: (year: number) => void;
   reprojectOwnerPay?: ReprojectOwnerPay;
-  cashTrendData: CashTrend;
+  cashTrendData: CashTrendDeltaResult;
   reserveCoverageDelta: ReserveCoverageDelta | null;
 }
 
