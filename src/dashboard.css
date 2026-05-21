@@ -8822,6 +8822,7 @@ body {
   font-weight: 500;
   line-height: 20px;
   text-align: left;
+  cursor: pointer;
 }
 
 .cfo-assistant-chip:disabled {
@@ -8851,4 +8852,27 @@ body {
   font-size: 14px;
   font-weight: 400;
   line-height: 20px;
+}
+
+/* Structured answer for the "What should I watch?" chip — a label/value pair,
+   not prose. Label gray-secondary, value gray-700 semibold, baseline-aligned
+   so the metric reads as a single line. */
+.cfo-assistant-card__watch {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cfo-assistant-card__watch-label {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.cfo-assistant-card__watch-value {
+  color: #344054;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
 }

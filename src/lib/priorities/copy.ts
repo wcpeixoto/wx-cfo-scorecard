@@ -228,3 +228,54 @@ export function getFallbackCopy(
     }
   }
 }
+
+// ─── Watch metric ──────────────────────────────────────────────────────────────
+
+// Same currency format as CashOnHandCard.tsx so the steady_state watch metric
+// shows the same number under the same name as the Today Cash on Hand card.
+const watchCashFormat = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+});
+
+// Powers the "What should I watch?" chip on the CFO Assistant card. A structured
+// {label, value} per signal type — NOT prose and NOT part of the AIProse contract.
+// Kept as a sibling of getFallbackCopy so the AI proxy path (AIProse,
+// SYSTEM_PROMPT, validateProseResponse) stays untouched. steady_state carries no
+// metricValue, so it falls back to the passed-in current cash balance.
+export function getWatchMetric(
+  signal: Signal,
+  currentCashBalance: number
+): { label: string; value: string } {
+  switch (signal.type) {
+
+    case 'reserve_critical':
+    case 'reserve_warning':
+      return { label: 'Reserve funded', value: pct(signal.metricValue) };
+
+    case 'cash_flow_negative':
+    case 'cash_flow_tight': {
+      // Trough month folds into the value so the label stays stable across both
+      // cash-flow types; dropped silently when the month is absent.
+      const floor = fmt(signal.metricValue);
+      return {
+        label: 'Cash floor',
+        value: signal.troughMonth ? `${floor} in ${formatTroughMonth(signal.troughMonth)}` : floor,
+      };
+    }
+
+    case 'expense_surge':
+      return { label: `${cat(signal.categoryFlagged)} spend`, value: fmt(signal.metricValue) };
+
+    case 'revenue_decline':
+      return { label: 'Revenue (3-mo avg)', value: fmt(signal.metricValue) };
+
+    case 'owner_distributions_high':
+      return { label: 'Draw pace', value: fmt(signal.metricValue) };
+
+    case 'steady_state':
+    default:
+      return { label: 'Cash on Hand', value: watchCashFormat.format(currentCashBalance) };
+  }
+}
