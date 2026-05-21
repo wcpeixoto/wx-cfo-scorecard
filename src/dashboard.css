@@ -742,7 +742,7 @@ body {
 }
 
 .chart-card .card-head h3 {
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* Card subtitle role: bare <p class="subtle"> inside a .card-head wrapper.
@@ -1043,12 +1043,11 @@ body {
 }
 
 
-/* Card title — matches UI Lab .statistics-card__title (TailAdmin
-   "Users & Revenue Statistics" spec): 18/500/28, near-black. */
+/* Card title — locked card-title spec: 18/600/28, near-black. */
 .forecast-chart-title {
   margin: 0;
   font-size: 18px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 28px;
   color: #1D2939;
 }
