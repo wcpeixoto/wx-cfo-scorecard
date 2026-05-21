@@ -1,11 +1,40 @@
 /**
- * CFO Assistant card — Today page, top-right cell (Phase 1a: shell only).
+ * CFO Assistant card — Today page, top-right cell.
  *
- * Deterministic copy and three inert question chips. No AI wiring, no
- * freeform input, no click handlers. Phase 1b will wire one chip to the
- * existing priority prose path.
+ * Phase 1b: the "What's the one step I should take?" chip is wired to the
+ * deterministic priority prose. The card recomputes the hero signal locally
+ * (mirroring CashOnHandCard) and renders getFallbackCopy(hero).action inline
+ * on click. No fetch, no AI proxy call, no new architecture. The other two
+ * chips stay inert. The action === null branch is defensive only — in live
+ * data rankPriorities always returns a hero and getFallbackCopy always yields
+ * a non-empty action, so the chip is always enabled.
  */
-export function CfoAssistantCard() {
+import { useMemo, useState } from 'react';
+import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
+import { detectSignals } from '../lib/priorities/signals';
+import { rankPriorities } from '../lib/priorities/rank';
+import { getFallbackCopy } from '../lib/priorities/copy';
+
+interface CfoAssistantCardProps {
+  model: DashboardModel;
+  txns: Txn[];
+  forecastProjection: ScenarioPoint[];
+}
+
+export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssistantCardProps) {
+  const hero = useMemo(
+    () => rankPriorities(detectSignals(model, txns, forecastProjection)).hero,
+    [model, txns, forecastProjection]
+  );
+
+  const action = useMemo<string | null>(() => {
+    const copy = getFallbackCopy(hero);
+    return copy.action.trim() ? copy.action : null;
+  }, [hero]);
+
+  const [activeChipId, setActiveChipId] = useState<'next-step' | null>(null);
+  const isAnswered = activeChipId === 'next-step' && action !== null;
+
   return (
     <section className="card cfo-assistant-card" aria-labelledby="cfo-assistant-title">
       <header className="card-head">
@@ -25,10 +54,27 @@ export function CfoAssistantCard() {
           <button type="button" className="cfo-assistant-chip" disabled>
             Where is my cash going?
           </button>
-          <button type="button" className="cfo-assistant-chip" disabled>
+          <button
+            type="button"
+            className={
+              isAnswered
+                ? 'cfo-assistant-chip cfo-assistant-chip--is-active'
+                : 'cfo-assistant-chip'
+            }
+            aria-pressed={isAnswered}
+            disabled={action === null}
+            onClick={() =>
+              setActiveChipId((prev) => (prev === 'next-step' ? null : 'next-step'))
+            }
+          >
             What's the one step I should take?
           </button>
         </div>
+        {isAnswered && (
+          <div className="cfo-assistant-card__answer">
+            <p className="cfo-assistant-card__answer-text">{action}</p>
+          </div>
+        )}
       </div>
     </section>
   );

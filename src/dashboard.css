@@ -8828,3 +8828,27 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Selected state for the wired chip — soft brand fill + brand border/text,
+   pulled from the :root accent tokens (no invented hex). */
+.cfo-assistant-chip--is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Inline answer slot below the chips. __body is a plain block (no flex gap),
+   so the slot carries its own top margin, matching the 16px prompt->chips
+   section rhythm. Gray-700 (#344054) is the prevailing literal in this file;
+   there's no token for it. Font inherits Outfit from :root. */
+.cfo-assistant-card__answer {
+  margin-top: 16px;
+}
+
+.cfo-assistant-card__answer-text {
+  margin: 0;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+}
