@@ -8765,3 +8765,66 @@ body {
   outline: 2px solid #465FFF;
   outline-offset: 2px;
 }
+
+/* ============================================================
+   CFO Assistant card (Today page, top-right cell) — Phase 1a shell
+   Deterministic copy + three inert question chips. No AI wiring.
+   Light-only: the .card shell has no dark variant and no theme
+   toggle is wired in the app, so no .dark rules here by design.
+   ============================================================ */
+.cfo-assistant-card {
+  height: 100%;
+}
+
+/* Stack title above subtitle. Base .card-head is a flex ROW
+   (space-between) sized for a title + right-side control; this card
+   has no right-side element, so switch to a column. h3 + .subtle stay
+   DIRECT children so they keep the canonical .card-head h3 (18/600)
+   and .card-head > .subtle (14px + 4px margin-top) specs. gap is
+   zeroed so the only title->subtitle space is the subtitle's 4px
+   margin-top — avoids the gap double-count fixed in #177. */
+.cfo-assistant-card .card-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.cfo-assistant-card__prompt {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.cfo-assistant-card__chips {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Outline chip — mirrors the canonical action-dropdown trigger
+   (.forecast-compare-btn): 40px height, #D0D5DD border, 8px radius,
+   Outfit 14/500. Full-width and left-aligned so the labels read as a
+   list of questions. Inert in Phase 1a (rendered disabled). */
+.cfo-assistant-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #344054;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  text-align: left;
+}
+
+.cfo-assistant-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

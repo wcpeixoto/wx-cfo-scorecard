@@ -7,6 +7,7 @@ import { CashOnHandCard } from './CashOnHandCard';
 import { OperatingReserveCard } from './OperatingReserveCard';
 import { OwnerDistributionsCard } from './OwnerDistributionsCard';
 import { NextOwnerDistributionCard } from './NextOwnerDistributionCard';
+import { CfoAssistantCard } from './CfoAssistantCard';
 
 type ReprojectOwnerPay = (revenueGrowthPct: number) => ScenarioPoint[];
 
@@ -70,7 +71,7 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
           forecastProjection={forecastProjection}
           cashTrendData={cashTrendData}
         />
-        <div className="card card--placeholder" aria-hidden="true" />
+        <CfoAssistantCard />
       </div>
 
       {/* Context section */}
