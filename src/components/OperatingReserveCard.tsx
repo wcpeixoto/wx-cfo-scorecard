@@ -44,7 +44,7 @@ function getReserveBadgeState(percentFunded: number | null): { label: string; cl
 // exactly one month of trailing-average expenses — so the subtitle states
 // that basis rather than a derived gap. Wired: only the constant label, but
 // it is the faithful description of the live target.
-const RESERVE_SUBTITLE = '1-month expense goal';
+const RESERVE_SUBTITLE = 'Goal: cover 1-month expenses';
 
 function getReserveGapLabel(currentCashBalance: number, reserveTarget: number): string | null {
   if (reserveTarget <= EPSILON) return null;
