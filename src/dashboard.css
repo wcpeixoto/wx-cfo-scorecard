@@ -735,6 +735,10 @@ body {
   margin-bottom: 12px;
 }
 
+/* Load-bearing: bare <h3> inside .card-head wrappers inherits its
+   18/600 card-title spec from this rule. Do not narrow this selector
+   without explicit-classing the consumers in TopCategoriesCard,
+   Dashboard summary cards, and OperatingReserveCard. */
 .card-head h3 {
   margin: 0;
   font-size: 18px;
