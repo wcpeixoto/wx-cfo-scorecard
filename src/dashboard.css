@@ -781,8 +781,9 @@ body {
 
 .kpi-label {
   margin: 0;
-  color: var(--text-secondary);
-  font-size: 14px;
+  color: #344054;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .kpi-value {
