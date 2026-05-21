@@ -735,6 +735,10 @@ body {
   margin-bottom: 12px;
 }
 
+/* Load-bearing: bare <h3> inside .card-head wrappers inherits its
+   18/600 card-title spec from this rule. Do not narrow this selector
+   without explicit-classing the consumers in TopCategoriesCard,
+   Dashboard summary cards, and OperatingReserveCard. */
 .card-head h3 {
   margin: 0;
   font-size: 18px;
@@ -742,7 +746,15 @@ body {
 }
 
 .chart-card .card-head h3 {
-  font-weight: 500;
+  font-weight: 600;
+}
+
+/* Card subtitle role: bare <p class="subtle"> inside a .card-head wrapper.
+   Scoped here (not base .subtle) so non-card .subtle text — top-bar
+   freshness, body notes — keeps its own typography. */
+.card-head .subtle {
+  font-size: 14px;
+  margin-top: 4px;
 }
 
 .subtle {
@@ -773,8 +785,9 @@ body {
 
 .kpi-label {
   margin: 0;
-  color: var(--text-secondary);
-  font-size: 14px;
+  color: #344054;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .kpi-value {
@@ -860,8 +873,8 @@ body {
 }
 
 .top-categories-total {
-  margin: 1px 0 0;
-  font-size: 0.8rem;
+  margin: 4px 0 0;
+  font-size: 14px;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
@@ -1035,12 +1048,11 @@ body {
 }
 
 
-/* Card title — matches UI Lab .statistics-card__title (TailAdmin
-   "Users & Revenue Statistics" spec): 18/500/28, near-black. */
+/* Card title — locked card-title spec: 18/600/28, near-black. */
 .forecast-chart-title {
   margin: 0;
   font-size: 18px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 28px;
   color: #1D2939;
 }
@@ -1138,7 +1150,7 @@ body {
 }
 
 .projected-cash-date-range {
-  margin: 0;
+  margin: 4px 0 0;
   font-size: 14px;
   font-weight: 400;
   line-height: 20px;
@@ -1735,7 +1747,7 @@ body {
 }
 
 .reserve-subtitle {
-  margin: 0;
+  margin: 4px 0 0;
   font-weight: 400;
   font-size: 14px;
   line-height: 20px;
@@ -2069,8 +2081,8 @@ body {
 }
 
 .chart-head-subtitle {
-  margin: 0;
-  font-size: 0.76rem;
+  margin: 4px 0 0;
+  font-size: 14px;
 }
 
 .chart-head-has-center {
@@ -2671,7 +2683,7 @@ body {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #101828;
+  color: #1D2939;
   flex: 1;
   min-width: 0;
 }
@@ -5485,7 +5497,7 @@ body {
   margin: 0;
   font-size: 18px;    /* text-lg */
   font-weight: 600;   /* font-semibold */
-  color: #101828;     /* primary strong */
+  color: #1D2939;     /* card title */
   line-height: 1.3;
 }
 
@@ -5510,10 +5522,10 @@ body {
   color: #D1D5DB;     /* gray-300 in dark mode */
 }
 
-/* Context line — metadata below explanation, pre-Prompt-2 subtitle size */
+/* Context line — card subtitle role (metadata below the explanation) */
 .eff-opp-context {
-  margin: 2px 0 0;
-  font-size: 14px;    /* text-theme-sm — reverted to pre-Prompt-2 subtitle size */
+  margin: 4px 0 0;
+  font-size: 14px;    /* text-theme-sm */
   font-weight: 400;
   color: #667085;     /* secondary text */
   line-height: 1.5;
@@ -6367,10 +6379,10 @@ body {
 }
 
 .owner-dist-subtitle {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 400;
   color: #667085;
-  margin-top: 2px;
+  margin-top: 4px;
   margin-bottom: 0;
 }
 
@@ -8004,6 +8016,7 @@ body {
 }
 
 .wna-title {
+  margin: 0;
   font-size: 18px;
   font-weight: 600;
   color: #1D2939;
@@ -8011,6 +8024,7 @@ body {
 }
 
 .wna-period {
+  margin: 0;
   font-size: 14px;
   font-weight: 400;
   color: #667085;
