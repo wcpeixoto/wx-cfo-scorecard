@@ -749,10 +749,12 @@ body {
   font-weight: 600;
 }
 
-/* Card subtitle role: bare <p class="subtle"> inside a .card-head wrapper.
-   Scoped here (not base .subtle) so non-card .subtle text — top-bar
-   freshness, body notes — keeps its own typography. */
-.card-head .subtle {
+/* Card subtitle role: bare <p class="subtle"> as a DIRECT child of a
+   .card-head wrapper (summary cards). Scoped here (not base .subtle) so
+   non-card .subtle text — top-bar freshness, body notes — keeps its own
+   typography. Child combinator (>) so it does not leak margin-top into
+   nested .subtle subtitles (e.g. chart-head, which owns its own gap). */
+.card-head > .subtle {
   font-size: 14px;
   margin-top: 4px;
 }
@@ -1150,7 +1152,9 @@ body {
 }
 
 .projected-cash-date-range {
-  margin: 4px 0 0;
+  /* No margin-top: the .projected-cash-heading flex gap (4px) already
+     provides the title↔subtitle spacing; a margin here would double-count. */
+  margin: 0;
   font-size: 14px;
   font-weight: 400;
   line-height: 20px;
@@ -1721,7 +1725,9 @@ body {
 
 .reserve-header-copy {
   display: grid;
-  gap: 6px;
+  /* 4px = title↔subtitle gap (spec). Subtitle carries no margin-top here,
+     or it would double-count against this gap. */
+  gap: 4px;
 }
 
 .reserve-title-row {
@@ -1747,7 +1753,7 @@ body {
 }
 
 .reserve-subtitle {
-  margin: 4px 0 0;
+  margin: 0;
   font-weight: 400;
   font-size: 14px;
   line-height: 20px;
@@ -2077,11 +2083,14 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 3px;
+  /* 4px = title↔subtitle gap (spec). Subtitle carries no margin-top here,
+     or it would double-count against this gap. Shared: NetCashFlowChart +
+     TrendLineChart. */
+  gap: 4px;
 }
 
 .chart-head-subtitle {
-  margin: 4px 0 0;
+  margin: 0;
   font-size: 14px;
 }
 
@@ -6346,7 +6355,9 @@ body {
 .owner-dist-header-left {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  /* 4px = title↔subtitle gap (spec). Subtitle carries no margin-top here,
+     or it would double-count against this gap. */
+  gap: 4px;
 }
 
 .owner-dist-title-row {
@@ -6382,7 +6393,7 @@ body {
   font-size: 14px;
   font-weight: 400;
   color: #667085;
-  margin-top: 4px;
+  margin-top: 0;
   margin-bottom: 0;
 }
 
