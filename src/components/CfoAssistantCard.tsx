@@ -1,19 +1,20 @@
 /**
  * CFO Assistant card — Today page, top-right cell.
  *
- * Phase 1b: the "What's the one step I should take?" chip is wired to the
- * deterministic priority prose. The card recomputes the hero signal locally
- * (mirroring CashOnHandCard) and renders getFallbackCopy(hero).action inline
- * on click. No fetch, no AI proxy call, no new architecture. The other two
- * chips stay inert. The action === null branch is defensive only — in live
- * data rankPriorities always returns a hero and getFallbackCopy always yields
- * a non-empty action, so the chip is always enabled.
+ * Phase 1c: three structural follow-up chips, all wired to deterministic copy.
+ * The card recomputes the hero signal locally (mirroring CashOnHandCard) and
+ * answers each chip inline on click. "What should I do next?" and "Why this
+ * step?" render prose from getFallbackCopy(hero); "What should I watch?" renders
+ * the structured {label, value} from getWatchMetric. No fetch, no AI proxy call.
+ * The chip array is a literal here by design — structure lives in the component,
+ * content lives on the hero signal. The disabled branch is defensive only: in
+ * live data every answer is non-empty, so the chips are always enabled.
  */
 import { useMemo, useState } from 'react';
 import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
 import { detectSignals } from '../lib/priorities/signals';
 import { rankPriorities } from '../lib/priorities/rank';
-import { getFallbackCopy } from '../lib/priorities/copy';
+import { getFallbackCopy, getWatchMetric } from '../lib/priorities/copy';
 
 interface CfoAssistantCardProps {
   model: DashboardModel;
@@ -21,19 +22,34 @@ interface CfoAssistantCardProps {
   forecastProjection: ScenarioPoint[];
 }
 
+const CHIPS = [
+  { id: 'do-next', label: 'What should I do next?' },
+  { id: 'why', label: 'Why this step?' },
+  { id: 'watch', label: 'What should I watch?' },
+] as const;
+
+type ChipId = (typeof CHIPS)[number]['id'];
+
 export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssistantCardProps) {
   const hero = useMemo(
     () => rankPriorities(detectSignals(model, txns, forecastProjection)).hero,
     [model, txns, forecastProjection]
   );
 
-  const action = useMemo<string | null>(() => {
-    const copy = getFallbackCopy(hero);
-    return copy.action.trim() ? copy.action : null;
-  }, [hero]);
+  const copy = useMemo(() => getFallbackCopy(hero), [hero]);
+  const watch = useMemo(
+    () => getWatchMetric(hero, model.runway.currentCashBalance),
+    [hero, model.runway.currentCashBalance]
+  );
 
-  const [activeChipId, setActiveChipId] = useState<'next-step' | null>(null);
-  const isAnswered = activeChipId === 'next-step' && action !== null;
+  // value per chip — also gates the defensive disabled state below.
+  const content: Record<ChipId, string> = {
+    'do-next': copy.action,
+    why: copy.why,
+    watch: watch.value,
+  };
+
+  const [activeChipId, setActiveChipId] = useState<ChipId | null>(null);
 
   return (
     <section className="card cfo-assistant-card" aria-labelledby="cfo-assistant-title">
@@ -48,31 +64,40 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
           role="group"
           aria-label="Suggested questions"
         >
-          <button type="button" className="cfo-assistant-chip" disabled>
-            Why is cash tight?
-          </button>
-          <button type="button" className="cfo-assistant-chip" disabled>
-            Where is my cash going?
-          </button>
-          <button
-            type="button"
-            className={
-              isAnswered
-                ? 'cfo-assistant-chip cfo-assistant-chip--is-active'
-                : 'cfo-assistant-chip'
-            }
-            aria-pressed={isAnswered}
-            disabled={action === null}
-            onClick={() =>
-              setActiveChipId((prev) => (prev === 'next-step' ? null : 'next-step'))
-            }
-          >
-            What's the one step I should take?
-          </button>
+          {CHIPS.map((chip) => {
+            const isActive = activeChipId === chip.id;
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                className={
+                  isActive
+                    ? 'cfo-assistant-chip cfo-assistant-chip--is-active'
+                    : 'cfo-assistant-chip'
+                }
+                aria-pressed={isActive}
+                disabled={!content[chip.id].trim()}
+                onClick={() =>
+                  setActiveChipId((prev) => (prev === chip.id ? null : chip.id))
+                }
+              >
+                {chip.label}
+              </button>
+            );
+          })}
         </div>
-        {isAnswered && (
+        {activeChipId && (
           <div className="cfo-assistant-card__answer">
-            <p className="cfo-assistant-card__answer-text">{action}</p>
+            {activeChipId === 'watch' ? (
+              <div className="cfo-assistant-card__watch">
+                <span className="cfo-assistant-card__watch-label">{watch.label}</span>
+                <span className="cfo-assistant-card__watch-value">{watch.value}</span>
+              </div>
+            ) : (
+              <p className="cfo-assistant-card__answer-text">
+                {activeChipId === 'do-next' ? copy.action : copy.why}
+              </p>
+            )}
           </div>
         )}
       </div>
