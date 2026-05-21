@@ -5522,10 +5522,10 @@ body {
   color: #D1D5DB;     /* gray-300 in dark mode */
 }
 
-/* Context line — metadata below explanation, pre-Prompt-2 subtitle size */
+/* Context line — card subtitle role (metadata below the explanation) */
 .eff-opp-context {
-  margin: 2px 0 0;
-  font-size: 14px;    /* text-theme-sm — reverted to pre-Prompt-2 subtitle size */
+  margin: 4px 0 0;
+  font-size: 14px;    /* text-theme-sm */
   font-weight: 400;
   color: #667085;     /* secondary text */
   line-height: 1.5;
