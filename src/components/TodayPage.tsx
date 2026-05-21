@@ -71,7 +71,7 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
           forecastProjection={forecastProjection}
           cashTrendData={cashTrendData}
         />
-        <CfoAssistantCard />
+        <CfoAssistantCard model={model} txns={txns} forecastProjection={forecastProjection} />
       </div>
 
       {/* Context section */}
