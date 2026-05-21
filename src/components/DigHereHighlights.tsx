@@ -130,8 +130,8 @@ export default function DigHereHighlights({ result }: Props) {
 
       {/* ── Header (stacked) ───────────────────────────────────────────── */}
       <div className="wna-header wna-header--stacked">
-        <span className="wna-title">Cost Spikes to Investigate</span>
-        {subtitle ? <span className="wna-period">{subtitle}</span> : null}
+        <h3 className="wna-title">Cost Spikes to Investigate</h3>
+        {subtitle ? <p className="wna-period">{subtitle}</p> : null}
       </div>
 
       {/* ── Body ───────────────────────────────────────────────────────── */}
