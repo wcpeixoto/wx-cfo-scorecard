@@ -2679,7 +2679,7 @@ body {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #101828;
+  color: #1D2939;
   flex: 1;
   min-width: 0;
 }
@@ -5493,7 +5493,7 @@ body {
   margin: 0;
   font-size: 18px;    /* text-lg */
   font-weight: 600;   /* font-semibold */
-  color: #101828;     /* primary strong */
+  color: #1D2939;     /* card title */
   line-height: 1.3;
 }
 
