@@ -8812,11 +8812,21 @@ body {
   line-height: 20px;
 }
 
+/* Commit + dismiss share one row below the recommendation. __consent stays a
+   column at the outer level (recommendation on its own line above); only these
+   two buttons sit side by side here, so the primary no longer stretches. */
+.cfo-assistant-card__commit-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
 /* Bare "I'll do this" primary — the call that matters. A filled accent button
    against the outline chips below gives the hierarchy (calm = hierarchy, not
-   size parity), 44px vs the chips' 40px. Label-only by design ("bare"): what
-   "this" refers to is the recommendation rendered directly above. Stretches
-   full-width via the flex column's default align-items: stretch. */
+   size parity), 44px vs the chips' 36px. Label-only by design ("bare"): what
+   "this" refers to is the recommendation rendered directly above. Sized to its
+   label inside the commit row (no longer full-width). */
 .cfo-assistant-card__commit {
   display: inline-flex;
   align-items: center;
@@ -8840,10 +8850,8 @@ body {
 }
 
 /* "Not this week" — quiet text link, session-only dismissal. No chrome so it
-   never competes with the primary; left-aligned to the card rhythm. */
+   never competes with the primary; sits inline-right of it in the commit row. */
 .cfo-assistant-card__dismiss {
-  align-self: flex-start;
-  margin-top: 8px;
   padding: 4px 0;
   border: none;
   background: none;
@@ -8881,17 +8889,17 @@ body {
   gap: 12px;
 }
 
-/* Outline chip — mirrors the canonical action-dropdown trigger
-   (.forecast-compare-btn): 40px height, #D0D5DD border, 8px radius,
-   Outfit 14/500. Full-width and left-aligned so the labels read as a
-   list of questions. Inert in Phase 1a (rendered disabled). */
+/* Outline chip — these read as prompts, not commit affordances, so they take
+   the 36px compact-selector height (not the 40px action-dropdown trigger).
+   #D0D5DD border, 8px radius, Outfit 14/500. Full-width and left-aligned so the
+   labels read as a list of questions. */
 .cfo-assistant-chip {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
   width: 100%;
-  height: 40px;
-  padding: 0 16px;
+  height: 36px;
+  padding: 0 12px;
   border: 1px solid #D0D5DD;
   border-radius: 8px;
   background: #FFFFFF;
@@ -8909,10 +8917,10 @@ body {
   cursor: not-allowed;
 }
 
-/* Selected state for the wired chip — soft brand fill + brand border/text,
-   pulled from the :root accent tokens (no invented hex). */
+/* Selected state for the wired chip — calm: brand border + brand text only, no
+   fill. A soft fill reads as a selected form field, the aesthetic these prompts
+   are meant to leave behind. Brand from the :root accent token (no invented hex). */
 .cfo-assistant-chip--is-active {
-  background: var(--accent-soft);
   border-color: var(--accent);
   color: var(--accent);
 }

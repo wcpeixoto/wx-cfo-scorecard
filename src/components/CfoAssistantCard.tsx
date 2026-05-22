@@ -5,7 +5,7 @@
  * card surfaces the hero's recommended action (copy.action, rendered as-is) with
  * a bare "I'll do this" primary and a "Not this week" text link. Tapping the
  * primary writes a commitment via commitToPriority and the same slot re-renders
- * the open commitment ("You committed to … — checking back ~<date>"); the link
+ * the open commitment ("Committed: … Checking back ~<date>."); the link
  * is a session-only dismissal that stores nothing. The open commitment is read
  * once on mount (getOpenCommitment) — it's global, not per-signal. steady_state
  * surfaces no consent (nothing to commit to), so the whole slot is gated on it.
@@ -109,32 +109,34 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
         {showConsentSlot && openCommitment && (
           <div className="cfo-assistant-card__commitment">
             <p className="cfo-assistant-card__commitment-text">
-              You committed to {openCommitment.committed_action} — checking back ~
-              {formatCheckIn(openCommitment.check_in_at)}
+              Committed: {openCommitment.committed_action}. Checking back ~
+              {formatCheckIn(openCommitment.check_in_at)}.
             </p>
           </div>
         )}
         {showConsentSlot && !openCommitment && !dismissed && (
           <div className="cfo-assistant-card__consent">
             <p className="cfo-assistant-card__recommendation">{copy.action}</p>
-            <button
-              type="button"
-              className="cfo-assistant-card__commit"
-              onClick={handleCommit}
-              disabled={committing}
-            >
-              I'll do this
-            </button>
-            <button
-              type="button"
-              className="cfo-assistant-card__dismiss"
-              onClick={() => setDismissed(true)}
-            >
-              Not this week
-            </button>
+            <div className="cfo-assistant-card__commit-row">
+              <button
+                type="button"
+                className="cfo-assistant-card__commit"
+                onClick={handleCommit}
+                disabled={committing}
+              >
+                I'll do this
+              </button>
+              <button
+                type="button"
+                className="cfo-assistant-card__dismiss"
+                onClick={() => setDismissed(true)}
+              >
+                Not this week
+              </button>
+            </div>
           </div>
         )}
-        <p className="cfo-assistant-card__prompt">Want more context?</p>
+        <p className="cfo-assistant-card__prompt">Understand this recommendation</p>
         <div
           className="cfo-assistant-card__chips"
           role="group"
