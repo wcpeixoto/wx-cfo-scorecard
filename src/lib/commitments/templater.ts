@@ -69,8 +69,9 @@ export function commitmentTemplate(
 
 // The card-row line, time-aware per the during-window cadence (#8). Day-one
 // states the commitment; midpoint and day-before show progress + time remaining
-// only (Gate 1: no pace judgment, no execute CTA — Execute is hidden until
-// Phase 3); after-deadline shifts to the check-in (#7) — a hit target is
+// only (Gate 1: no pace judgment, no execute CTA in this line — the Execute
+// affordance is a separate, dev-gated card scaffold as of B-1; content lands in
+// B-2); after-deadline shifts to the check-in (#7) — a hit target is
 // celebrated, an unclear outcome asks honestly. watch.value is the honest signed
 // "$Y of $X" — never a causation claim.
 function summaryFor(
