@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { commitmentTemplate } from './templater';
+import { commitmentTemplate, executeLabelFor } from './templater';
 import type { CommitmentBeat, CommitmentPhase } from './cadence';
 import type { PriorityHistoryRow } from '../priorities/types';
 import type { DashboardModel } from '../data/contract';
@@ -121,5 +121,23 @@ describe('commitmentTemplate — close consequence (#6)', () => {
       commitmentTemplate(row({ gap_amount: undefined }), beat('midpoint', 3), model(6800))
         .closeConsequence
     ).toBe("Stopping ends this week's reserve push. Stop anyway?");
+  });
+});
+
+describe('executeLabelFor — beat-aware Execute offer (#8 / B-3)', () => {
+  it('day_one opens with "Help me execute"', () => {
+    expect(executeLabelFor('day_one')).toBe('Help me execute');
+  });
+
+  it('midpoint keeps the same offer (no differentiation — pace nudge deferred)', () => {
+    expect(executeLabelFor('midpoint')).toBe('Help me execute');
+  });
+
+  it('day_before escalates to the final push', () => {
+    expect(executeLabelFor('day_before')).toBe('Final push');
+  });
+
+  it('after_deadline offers nothing (Execute slot is hidden post-deadline)', () => {
+    expect(executeLabelFor('after_deadline')).toBeNull();
   });
 });
