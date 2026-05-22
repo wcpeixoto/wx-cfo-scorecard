@@ -28,19 +28,19 @@ const usd = new Intl.NumberFormat('en-US', {
 
 // The exact title compute.ts buildOpportunities emits for its generic fallback
 // (compute.ts ~L1751) when NO category overran its baseline. compute.ts is a
-// LOCKED file (AGENTS.md), so we detect the fallback by matching this literal
-// rather than adding a discriminator field to OpportunityItem. If that wording
-// ever changes (which requires unlocking compute.ts), the execute.test.ts pin
-// fails loudly — update both together.
+// LOCKED file (AGENTS.md), so we detect the fallback by matching this literal here
+// rather than adding a discriminator field to OpportunityItem. Because compute.ts
+// can't drift without an explicit unlock, the execute.test.ts pin only guards this
+// B-2-side copy against accidental edits — if you ever unlock and reword compute's
+// fallback, update this constant to match.
 export const FALLBACK_OPPORTUNITY_TITLE = 'Tighten discretionary spend';
 
 // compute.ts titles overrun opportunities as `Control <category>`; strip the
-// prefix to recover the bare category for owner-voice copy. Degrades to the full
-// title if the prefix is ever absent.
+// prefix to recover the bare category. Degrades to the full title if absent.
 const CONTROL_PREFIX = 'Control ';
 
 export interface ExecuteLever {
-  /** Bare expense category, e.g. "Marketing". */
+  /** Full expense category (unique key), e.g. "Marketing:Ads". */
   category: string;
   /** Dollars this category ran above its recent baseline (the opportunity savings). */
   overrun: number;
@@ -63,21 +63,38 @@ function categoryOf(item: OpportunityItem): string {
     : item.title;
 }
 
-function toLever(item: OpportunityItem, recommended: boolean): ExecuteLever {
-  const category = categoryOf(item);
+// compute categories are `Parent:Subcategory`; the leaf (after the last colon) is
+// the owner-facing label. Returns the whole string when there's no colon.
+function leafOf(category: string): string {
+  const i = category.lastIndexOf(':');
+  return i === -1 ? category : category.slice(i + 1);
+}
+
+// Resolve each displayed lever's label: the leaf when that leaf is unique across
+// the shown set, else the full `Parent:Subcategory` for disambiguation.
+function resolveLabels(categories: string[]): string[] {
+  const leaves = categories.map(leafOf);
+  const counts = new Map<string, number>();
+  for (const leaf of leaves) counts.set(leaf, (counts.get(leaf) ?? 0) + 1);
+  return categories.map((category, i) =>
+    (counts.get(leaves[i] ?? category) ?? 0) > 1 ? category : leaves[i] ?? category
+  );
+}
+
+function toLever(item: OpportunityItem, label: string, recommended: boolean): ExecuteLever {
   const amount = usd.format(item.savings);
   return {
-    category,
+    category: categoryOf(item),
     overrun: item.savings,
     text: recommended
-      ? `${category} ran ${amount} above its recent average — the clearest place to find it.`
-      : `${category} — ${amount} above average`,
+      ? `${label} ran ${amount} above its recent average.`
+      : `${label} — ${amount} above average`,
   };
 }
 
 export function buildExecuteHelp(
   model: DashboardModel,
-  commitment: PriorityHistoryRow,
+  commitment: PriorityHistoryRow
 ): ExecuteHelp | null {
   // Narrow path (lock #1): money-finding help only applies to a reserve_warning.
   if (commitment.signal_type !== 'reserve_warning') return null;
@@ -85,7 +102,7 @@ export function buildExecuteHelp(
   // compute.ts already sorts by savings desc; apply a deterministic secondary
   // (category asc) so equal-overrun ties render stably.
   const ranked = [...model.opportunities].sort(
-    (a, b) => b.savings - a.savings || categoryOf(a).localeCompare(categoryOf(b)),
+    (a, b) => b.savings - a.savings || categoryOf(a).localeCompare(categoryOf(b))
   );
   const top = ranked[0];
 
@@ -99,10 +116,16 @@ export function buildExecuteHelp(
     };
   }
 
+  // The recommended pick plus up to two alternates; labels resolved across the
+  // shown set so a colliding leaf falls back to its parent context.
+  const chosen = ranked.slice(0, 3);
+  const labels = resolveLabels(chosen.map(categoryOf));
   return {
     kind: 'levers',
     lead: "Here's where spending ran above its recent norm this month — pick one to pull back:",
-    recommended: toLever(top, true),
-    alternates: ranked.slice(1, 3).map((item) => toLever(item, false)),
+    recommended: toLever(top, labels[0] ?? leafOf(categoryOf(top)), true),
+    alternates: chosen
+      .slice(1)
+      .map((item, i) => toLever(item, labels[i + 1] ?? leafOf(categoryOf(item)), false)),
   };
 }

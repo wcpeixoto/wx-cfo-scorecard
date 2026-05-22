@@ -61,6 +61,26 @@ describe('buildExecuteHelp — B-2 reserve_warning money-finding aid (Shape C)',
     expect(help.alternates.map((a) => a.category)).toEqual(['Mango', 'Zebra']);
   });
 
+  it('renders leaf labels for Parent:Subcategory categories when unambiguous', () => {
+    const help = buildExecuteHelp(
+      model([opp('Control Taxes and Licenses:State Tax', 1288), opp('Control Marketing:Ads', 822)]),
+      row()
+    );
+    if (help?.kind !== 'levers') throw new Error('expected levers');
+    expect(help.recommended.text).toBe('State Tax ran $1,288 above its recent average.');
+    expect(help.alternates[0]?.text).toBe('Ads — $822 above average');
+  });
+
+  it('includes parent context when leaf labels collide across the shown set', () => {
+    const help = buildExecuteHelp(
+      model([opp('Control Marketing:Ads', 900), opp('Control Events:Ads', 400)]),
+      row()
+    );
+    if (help?.kind !== 'levers') throw new Error('expected levers');
+    expect(help.recommended.text).toBe('Marketing:Ads ran $900 above its recent average.');
+    expect(help.alternates[0]?.text).toBe('Events:Ads — $400 above average');
+  });
+
   it('returns the honest "none" message when only compute\'s generic fallback is present (#3)', () => {
     const help = buildExecuteHelp(model([opp(FALLBACK_OPPORTUNITY_TITLE, 320)]), row());
     if (help?.kind !== 'none') throw new Error('expected none');
@@ -77,11 +97,11 @@ describe('buildExecuteHelp — B-2 reserve_warning money-finding aid (Shape C)',
     expect(help?.kind).toBe('levers');
   });
 
-  it('pins the fallback literal to compute.ts buildOpportunities (locked file)', () => {
-    // compute.ts is a LOCKED file; we detect its generic fallback by this exact
-    // title rather than touching the schema/compute layer. If compute's fallback
-    // wording ever changes (which requires unlocking compute.ts), this breaks
-    // loudly — update both together.
+  it("pins the B-2 layer's fallback literal against accidental B-2-side edits", () => {
+    // This does NOT exercise compute.ts. compute.ts is locked, so its upstream
+    // fallback string can't drift without an explicit unlock; this only guards the
+    // B-2 copy of the literal (used for fallback detection) against accidental edits
+    // on the B-2 side.
     expect(FALLBACK_OPPORTUNITY_TITLE).toBe('Tighten discretionary spend');
   });
 });
