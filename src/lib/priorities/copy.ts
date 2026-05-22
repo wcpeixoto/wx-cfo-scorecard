@@ -62,10 +62,9 @@ export function getFallbackCopy(
   switch (signal.type) {
 
     case 'reserve_critical': {
-      // TODO(phase-2.5+): this action bundles three options ("early renewals, a
-      // short promotion, or collect…") — a principle #2 violation. Deferred:
-      // reserve_critical stays awareness-only this slice (Fork E). Make it
-      // commitment-ready (one action + a registry watch entry) in a later slice.
+      // TODO(phase-2.5+): reserve_critical stays awareness-only this slice
+      // (Fork E). Make it commitment-ready (one action + a registry watch
+      // entry) in a later slice.
       const fundedPct = pct(signal.metricValue);
       const gap = fmt(signal.gapAmount);
       return {
@@ -76,7 +75,7 @@ export function getFallbackCopy(
           ? `Your reserve has dropped further — now at ${fundedPct} of where it needs to be. Right now there's not much between you and a real squeeze if something unexpected hits.`
           : `Your reserve is at ${fundedPct} — below the level that keeps you safe when something unexpected hits. Right now, there's not much buffer between you and a real squeeze.`,
         currentState: `You need ${gap} more to get above the halfway mark. Every dollar you add here buys real breathing room.`,
-        action: 'Push for revenue this week — early renewals, a short promotion, or collect any outstanding payments.',
+        action: 'Find one expense to cut this month — the fastest controllable move when reserves are critical.',
         alternative: 'If revenue can\'t move quickly, identify one expense you can delay by 30 days.',
         followupNote: 'Getting above 50% funded is the first milestone — let\'s close that gap.',
       };
