@@ -217,3 +217,61 @@ alter table public.forecast_events
 
 create index if not exists forecast_events_workspace_source_contract_idx
   on public.forecast_events (workspace_id, source, contract_id);
+
+-- Priority history — one row per fired CFO-assistant priority signal,
+-- keyed by a surrogate uuid id (workspace_id is a soft scope, not part of
+-- the key). Phase 2a added the commitment-loop columns (status,
+-- committed_at, check_in_at), the status CHECK, and the partial unique
+-- index that enforces at most one open commitment per workspace. Created
+-- out-of-band via the Supabase dashboard; this is a hand-written snapshot
+-- of the current live state. RLS policies live in first_test_policies.sql.
+
+create table if not exists public.priority_history (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id text not null default 'default',
+  fired_at timestamptz not null default now(),
+  signal_type text not null,
+  severity text not null,
+  metric_value numeric null,
+  target_value numeric null,
+  category_flagged text null,
+  gap_amount numeric null,
+  recommended_action text null,
+  ai_headline text null,
+  committed_action text null,
+  outcome_metric numeric null,
+  resolved_at timestamptz null,
+  status text null,
+  committed_at timestamptz null,
+  check_in_at timestamptz null,
+  constraint priority_history_status_check
+    check (status is null or status in ('open', 'kept', 'lapsed', 'replaced'))
+);
+
+create unique index if not exists priority_history_one_open_per_workspace
+  on public.priority_history (workspace_id)
+  where status = 'open';
+
+-- Priority prose cache — memoizes AI-generated headline/body prose for a
+-- fired signal, keyed by (workspace_id, cache_key, prompt_version) so a
+-- prompt-template bump misses the cache cleanly. Upserted on that unique
+-- triple via PostgREST merge-duplicates. Created out-of-band via the
+-- Supabase dashboard; this is a hand-written snapshot of the current live
+-- state. RLS policies live in first_test_policies.sql.
+
+create table if not exists public.priority_prose_cache (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id text not null,
+  cache_key text not null,
+  prompt_version text not null default 'v1',
+  signal_type text not null,
+  severity text not null,
+  prose_json jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint priority_prose_cache_workspace_id_cache_key_prompt_version_key
+    unique (workspace_id, cache_key, prompt_version)
+);
+
+create index if not exists priority_prose_cache_workspace_id_signal_type_idx
+  on public.priority_prose_cache (workspace_id, signal_type);
