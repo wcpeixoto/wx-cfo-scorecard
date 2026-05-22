@@ -7,7 +7,7 @@ import type {
   RenewalContractStatus,
   TransactionImportSummary,
 } from './contract';
-import type { SignalType, PriorityHistoryRow } from '../priorities/types';
+import type { Signal, SignalType, PriorityHistoryRow } from '../priorities/types';
 import type { AIProse } from '../priorities/ai';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
@@ -1100,6 +1100,146 @@ export async function savePriorityHistory(
     }
   } catch (err) {
     console.error('[priority-history] Write failed:', err);
+  }
+}
+
+// ── Commitment loop (CFO Assistant Phase 2) ────────────────────────────────
+// Deliberately separate from savePriorityHistory above: that function's 7-day
+// dedup PATCH would clobber a committed_action when the same signal re-fires.
+// Commitment rows are written only on explicit owner consent. The "one open
+// commitment at a time" invariant is maintained at write time (commitToPriority
+// replaces any open row before inserting — the calm transition), defended at
+// read time (getOpenCommitment orders + limits to 1), and hard-enforced at the
+// DB by a partial unique index on (workspace_id) where status = 'open'.
+const COMMITMENT_DEFAULT_CHECK_IN_DAYS = 14;
+
+function isoDaysFromNow(days: number): string {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+// The single open commitment, or null. Global by design (not filtered by
+// signal_type) — only one commitment is open across all signals at a time.
+export async function getOpenCommitment(): Promise<PriorityHistoryRow | null> {
+  if (!isConfigured()) return null;
+
+  try {
+    const path = `${PRIORITY_HISTORY_TABLE}?select=*&status=eq.open&order=committed_at.desc&limit=1`;
+    const rows = await request<PriorityHistoryRow[]>(withWorkspaceFilter(path));
+    if (!rows || rows.length === 0) return null;
+    return rows[0];
+  } catch (err) {
+    console.warn('[priority-history] getOpenCommitment failed:', err);
+    return null;
+  }
+}
+
+// Records an owner's commitment to a recommended action. Supersedes any open
+// commitment (status -> 'replaced') before inserting the new row. Returns the
+// created row, or null if nothing was persisted — callers MUST treat null as a
+// soft failure and not render a committed state.
+export async function commitToPriority(
+  signal: Signal,
+  committedAction: string,
+  checkInDays: number = COMMITMENT_DEFAULT_CHECK_IN_DAYS
+): Promise<PriorityHistoryRow | null> {
+  if (!isConfigured()) return null;
+
+  try {
+    // Calm transition: any currently-open commitment is superseded first.
+    await request<unknown>(
+      withWorkspaceFilter(`${PRIORITY_HISTORY_TABLE}?status=eq.open`),
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ status: 'replaced' }),
+      }
+    );
+
+    const created = await request<PriorityHistoryRow[]>(PRIORITY_HISTORY_TABLE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({
+        workspace_id: WORKSPACE_ID,
+        signal_type: signal.type,
+        severity: signal.severity,
+        metric_value: signal.metricValue ?? null,
+        target_value: signal.targetValue ?? null,
+        category_flagged: signal.categoryFlagged ?? null,
+        gap_amount: signal.gapAmount ?? null,
+        // recommended_action = the assistant's words; committed_action = what
+        // the owner agreed to. Equal in Phase 2, distinct for the deferred
+        // "I'll do something else" path.
+        recommended_action: signal.recommendedAction ?? null,
+        committed_action: committedAction,
+        committed_at: new Date().toISOString(),
+        check_in_at: isoDaysFromNow(checkInDays),
+        status: 'open',
+      }),
+    });
+    return created && created.length > 0 ? created[0] : null;
+  } catch (err) {
+    // Partial-unique-index race: another open row won. Re-read and return the
+    // winner so the caller renders the live commitment, not a failure.
+    if (err instanceof Error && /duplicate|unique|23505/i.test(err.message)) {
+      console.warn('[priority-history] commitToPriority race; re-reading open commitment');
+      return getOpenCommitment();
+    }
+    console.error('[priority-history] commitToPriority failed:', err);
+    return null;
+  }
+}
+
+// Resolves the open commitment to a terminal state. The status=eq.open guard
+// makes this idempotent — a row already resolved/replaced is left untouched.
+export async function resolveCommitment(
+  id: string,
+  outcome: 'kept' | 'lapsed',
+  outcomeMetric?: number
+): Promise<boolean> {
+  if (!isConfigured()) return false;
+
+  try {
+    await request<unknown>(
+      `${PRIORITY_HISTORY_TABLE}?id=eq.${encodeURIComponent(id)}&status=eq.open`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          status: outcome,
+          resolved_at: new Date().toISOString(),
+          outcome_metric: outcomeMetric ?? null,
+        }),
+      }
+    );
+    return true;
+  } catch (err) {
+    console.error('[priority-history] resolveCommitment failed:', err);
+    return false;
+  }
+}
+
+// Pushes the check-in window out to now + extendDays ("Keep going"). Resets
+// from now (not the existing check_in_at) so day-math lives in one place and
+// the caller never needs to read the current window.
+export async function extendCommitment(
+  id: string,
+  extendDays: number = COMMITMENT_DEFAULT_CHECK_IN_DAYS
+): Promise<boolean> {
+  if (!isConfigured()) return false;
+
+  try {
+    await request<unknown>(
+      `${PRIORITY_HISTORY_TABLE}?id=eq.${encodeURIComponent(id)}&status=eq.open`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ check_in_at: isoDaysFromNow(extendDays) }),
+      }
+    );
+    return true;
+  } catch (err) {
+    console.error('[priority-history] extendCommitment failed:', err);
+    return false;
   }
 }
 
