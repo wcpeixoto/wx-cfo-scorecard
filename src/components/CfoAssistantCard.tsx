@@ -37,7 +37,7 @@ const CHIPS = [
 type ChipId = (typeof CHIPS)[number]['id'];
 
 // "2026-05-05T…" -> "May 5". Short month + day, en-US — the friendly form of the
-// stored check_in_at timestamp.
+// stored deadline_date timestamp.
 function formatCheckIn(iso: string | undefined): string {
   if (!iso) return 'soon';
   const date = new Date(iso);
@@ -110,7 +110,7 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
           <div className="cfo-assistant-card__commitment">
             <p className="cfo-assistant-card__commitment-text">
               Committed: {openCommitment.committed_action}. Checking back ~
-              {formatCheckIn(openCommitment.check_in_at)}.
+              {formatCheckIn(openCommitment.deadline_date)}.
             </p>
           </div>
         )}

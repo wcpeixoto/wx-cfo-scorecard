@@ -1172,7 +1172,7 @@ export async function commitToPriority(
         recommended_action: signal.recommendedAction ?? null,
         committed_action: committedAction,
         committed_at: new Date().toISOString(),
-        check_in_at: isoDaysFromNow(checkInDays),
+        deadline_date: isoDaysFromNow(checkInDays),
         status: 'open',
       }),
     });
@@ -1219,7 +1219,7 @@ export async function resolveCommitment(
 }
 
 // Pushes the check-in window out to now + extendDays ("Keep going"). Resets
-// from now (not the existing check_in_at) so day-math lives in one place and
+// from now (not the existing deadline_date) so day-math lives in one place and
 // the caller never needs to read the current window.
 export async function extendCommitment(
   id: string,
@@ -1233,7 +1233,7 @@ export async function extendCommitment(
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ check_in_at: isoDaysFromNow(extendDays) }),
+        body: JSON.stringify({ deadline_date: isoDaysFromNow(extendDays) }),
       }
     );
     return true;
