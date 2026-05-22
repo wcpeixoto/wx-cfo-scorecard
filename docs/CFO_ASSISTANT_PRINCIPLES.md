@@ -112,3 +112,20 @@ Achieve Outcome.
 
 Execute layer surfaces AFTER commit, not on the fresh card (keeps calm
 hierarchy — one decision at a time).
+
+## 11. Recommendation is always visible (render invariant)
+
+Every signal renders a recommendation on the card, every time — no path renders
+an empty card. The recommendation appears in exactly one place per state:
+- **Commitment-ready, not yet committed** → inside the consent slot.
+- **Committed** → inside the committed summary (beat-aware, #8).
+- **Awareness-only** (not commitment-ready, #3) → as a standalone paragraph.
+
+Any refactor that moves or removes one of these surfaces MUST preserve a visible
+recommendation for **every** signal state, not just the committable one. Enumerate
+the render branches before changing a shared affordance — seed data exercises one
+branch; the others stay blank until production hits them.
+
+(Added after #195: dropping the "do-next" chip in #191 left awareness-only
+signals — reserve_critical, the prod default — showing "Understand this
+recommendation" with nothing to understand.)
