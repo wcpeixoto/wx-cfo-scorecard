@@ -221,7 +221,7 @@ create index if not exists forecast_events_workspace_source_contract_idx
 -- Priority history — one row per fired CFO-assistant priority signal,
 -- keyed by a surrogate uuid id (workspace_id is a soft scope, not part of
 -- the key). Phase 2a added the commitment-loop columns (status,
--- committed_at, check_in_at), the status CHECK, and the partial unique
+-- committed_at, deadline_date), the status CHECK, and the partial unique
 -- index that enforces at most one open commitment per workspace. Created
 -- out-of-band via the Supabase dashboard; this is a hand-written snapshot
 -- of the current live state. RLS policies live in first_test_policies.sql.
@@ -243,7 +243,7 @@ create table if not exists public.priority_history (
   resolved_at timestamptz null,
   status text null,
   committed_at timestamptz null,
-  check_in_at timestamptz null,
+  deadline_date timestamptz null,
   constraint priority_history_status_check
     check (status is null or status in ('open', 'kept', 'lapsed', 'replaced'))
 );

@@ -46,5 +46,5 @@ export interface PriorityHistoryRow {
   // owner-consent commitment rows. status one of open/kept/lapsed/replaced.
   status?: 'open' | 'kept' | 'lapsed' | 'replaced';
   committed_at?: string;
-  check_in_at?: string;
+  deadline_date?: string;
 }
