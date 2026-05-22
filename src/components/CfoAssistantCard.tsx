@@ -12,10 +12,16 @@
  * per-signal) and renders the committed state until resolved (principle #5),
  * regardless of the current hero.
  *
- * The three structural chips below — "What should I do next?" / "Why this
- * step?" / "What should I watch?" — answer inline from getFallbackCopy(hero) and
- * getWatchMetric (the watch routes reserve_warning through the registry; other
- * types keep their current metric). No fetch, no AI proxy call.
+ * Committed-state copy (summary, watch progress) comes from commitmentTemplate —
+ * the single source of commitment-state language; the card never reads raw
+ * commitment columns.
+ *
+ * Two structural chips below — "Why this step?" / "What should I watch?" — answer
+ * inline. "Why" is getFallbackCopy(hero).why; "Watch" is the templater's progress
+ * when committed, else getWatchMetric (the signal-derived awareness watch). The
+ * old "What should I do next?" chip was dropped: the action already leads the
+ * consent slot (fresh) or the committed summary, so the chip only echoed it. No
+ * fetch, no AI proxy call.
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
@@ -23,8 +29,8 @@ import type { PriorityHistoryRow } from '../lib/priorities/types';
 import { detectSignals } from '../lib/priorities/signals';
 import { rankPriorities } from '../lib/priorities/rank';
 import { getFallbackCopy, getWatchMetric } from '../lib/priorities/copy';
-import { getOpenCommitment, commitToPriority, readCommitmentWatch } from '../lib/data/sharedPersistence';
-import { commitmentFromSignal, type Commitment } from '../lib/commitments';
+import { getOpenCommitment, commitToPriority } from '../lib/data/sharedPersistence';
+import { commitmentFromSignal, commitmentTemplate, type Commitment } from '../lib/commitments';
 
 interface CfoAssistantCardProps {
   model: DashboardModel;
@@ -33,21 +39,11 @@ interface CfoAssistantCardProps {
 }
 
 const CHIPS = [
-  { id: 'do-next', label: 'What should I do next?' },
   { id: 'why', label: 'Why this step?' },
   { id: 'watch', label: 'What should I watch?' },
 ] as const;
 
 type ChipId = (typeof CHIPS)[number]['id'];
-
-// "2026-05-05T…" -> "May 5". Short month + day, en-US — the friendly form of the
-// stored deadline_date timestamp.
-function formatCheckIn(iso: string | undefined): string {
-  if (!iso) return 'soon';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return 'soon';
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
 
 export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssistantCardProps) {
   const hero = useMemo(
@@ -76,19 +72,19 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   const target = Number.parseFloat(targetInput);
   const validTarget = Number.isFinite(target) && target > 0;
 
-  const watch = useMemo(
-    () =>
-      getWatchMetric(
-        hero,
-        model,
-        openCommitment ? readCommitmentWatch(openCommitment) : null
-      ),
-    [hero, model, openCommitment]
+  // Committed-state copy bundle (Commitment Mode, #5), or null when fresh.
+  const template = useMemo(
+    () => (openCommitment ? commitmentTemplate(openCommitment, model) : null),
+    [openCommitment, model]
   );
+
+  // Committed → progress from the templater; fresh → the signal-derived
+  // awareness watch.
+  const freshWatch = useMemo(() => getWatchMetric(hero, model), [hero, model]);
+  const watch = template ? template.watch : freshWatch;
 
   // value per chip — also gates the defensive disabled state below.
   const content: Record<ChipId, string> = {
-    'do-next': copy.action,
     why: copy.why,
     watch: watch.value,
   };
@@ -133,12 +129,9 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
         <p className="subtle">Let's make the numbers useful.</p>
       </header>
       <div className="cfo-assistant-card__body">
-        {openCommitment && (
+        {template && (
           <div className="cfo-assistant-card__commitment">
-            <p className="cfo-assistant-card__commitment-text">
-              Committed: {openCommitment.committed_action}. Checking back ~
-              {formatCheckIn(openCommitment.deadline_date)}.
-            </p>
+            <p className="cfo-assistant-card__commitment-text">{template.summary}</p>
           </div>
         )}
         {!openCommitment && draft && !dismissed && (
@@ -216,9 +209,7 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
                 <span className="cfo-assistant-card__watch-value">{watch.value}</span>
               </div>
             ) : (
-              <p className="cfo-assistant-card__answer-text">
-                {activeChipId === 'do-next' ? copy.action : copy.why}
-              </p>
+              <p className="cfo-assistant-card__answer-text">{copy.why}</p>
             )}
           </div>
         )}

@@ -13,37 +13,20 @@ const sig = (overrides: Partial<Signal> & Pick<Signal, 'type'>): Signal => ({
   ...overrides,
 });
 
-describe('getWatchMetric — Phase 2.5 registry routing', () => {
-  it('reserve_warning, fresh (no commitment): the baseline-to-be', () => {
-    const w = getWatchMetric(sig({ type: 'reserve_warning' }), model(6600), null);
+// getWatchMetric now serves the FRESH/awareness watch only. Committed-state
+// progress ("$Y of $X") moved to commitmentTemplate (commitments/templater.ts);
+// see templater.test.ts for those cases.
+describe('getWatchMetric — fresh/awareness routing', () => {
+  it('reserve_warning, fresh: the baseline-to-be', () => {
+    const w = getWatchMetric(sig({ type: 'reserve_warning' }), model(6600));
     expect(w.label).toBe('Cash toward reserve');
     expect(w.value).toBe('starting at $6,600');
-  });
-
-  it('reserve_warning, committed: progress "$Y of $X" (positive)', () => {
-    const w = getWatchMetric(
-      sig({ type: 'reserve_warning' }),
-      model(7100),
-      { baseline: 6600, target: 3400 }
-    );
-    expect(w.label).toBe('Cash toward reserve');
-    expect(w.value).toBe('$500 of $3,400');
-  });
-
-  it('reserve_warning, committed: reads honestly when cash fell (negative)', () => {
-    const w = getWatchMetric(
-      sig({ type: 'reserve_warning' }),
-      model(6000),
-      { baseline: 6600, target: 3400 }
-    );
-    expect(w.value).toBe('-$600 of $3,400');
   });
 
   it('reserve_critical stays awareness-only (portfolio % in Watch)', () => {
     const w = getWatchMetric(
       sig({ type: 'reserve_critical', severity: 'critical', metricValue: 0.46 }),
-      model(6600),
-      null
+      model(6600)
     );
     expect(w.label).toBe('Reserve funded');
     expect(w.value).toBe('46%');
@@ -52,8 +35,7 @@ describe('getWatchMetric — Phase 2.5 registry routing', () => {
   it('steady_state shows Cash on Hand from the model', () => {
     const w = getWatchMetric(
       sig({ type: 'steady_state', severity: 'healthy', weight: 0 }),
-      model(12345),
-      null
+      model(12345)
     );
     expect(w.label).toBe('Cash on Hand');
     expect(w.value).toBe('$12,345');

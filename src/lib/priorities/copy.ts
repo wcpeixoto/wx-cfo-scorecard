@@ -253,22 +253,14 @@ const watchCashFormat = new Intl.NumberFormat('en-US', {
 export function getWatchMetric(
   signal: Signal,
   model: DashboardModel,
-  committed?: { baseline: number | null; target: number | null } | null
 ): { label: string; value: string } {
   // Commitment-ready types route through the watch-metric registry (action-tied,
-  // #4). reserve_warning is the only one this slice: committed → progress
-  // "$Y of $X" (signed, honest at any sign — never "you contributed"); fresh →
-  // the baseline-to-be ("starting at $X").
+  // #4): the fresh/awareness watch is the baseline-to-be ("starting at $X").
+  // Committed-state progress ("$Y of $X") lives in commitmentTemplate
+  // (commitments/templater.ts), the single source of committed-state copy.
   const spec = watchMetricForSignal(signal.type);
   if (spec) {
     const current = spec.computeCurrent(model);
-    if (committed && committed.baseline !== null && committed.target !== null) {
-      const progress = current - committed.baseline;
-      return {
-        label: spec.label,
-        value: `${watchCashFormat.format(progress)} of ${watchCashFormat.format(committed.target)}`,
-      };
-    }
     return { label: spec.label, value: `starting at ${watchCashFormat.format(current)}` };
   }
 
