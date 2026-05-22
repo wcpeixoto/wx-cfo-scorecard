@@ -106,6 +106,52 @@ to anon
 using (workspace_id = 'default')
 with check (workspace_id = 'default');
 
+-- Priority history (CFO Assistant): unlike the tables above, these live
+-- policies are scoped to the public role with unconditional predicates
+-- (using true / with check true) rather than to anon with a workspace_id
+-- filter. Snapshot matches what was created out-of-band in the dashboard.
+-- Requires the priority_history table from shared_persistence_schema.sql.
+
+alter table public.priority_history enable row level security;
+
+drop policy if exists "Enable read access for all users" on public.priority_history;
+drop policy if exists "first_test_write_priority_history" on public.priority_history;
+
+create policy "Enable read access for all users"
+on public.priority_history
+for select
+to public
+using (true);
+
+create policy "first_test_write_priority_history"
+on public.priority_history
+for all
+to public
+using (true)
+with check (true);
+
+-- Priority prose cache (CFO Assistant): same public-role / unconditional
+-- pattern as priority_history above.
+-- Requires the priority_prose_cache table from shared_persistence_schema.sql.
+
+alter table public.priority_prose_cache enable row level security;
+
+drop policy if exists "Enable read access for all users" on public.priority_prose_cache;
+drop policy if exists "first_test_write_priority_prose_cache" on public.priority_prose_cache;
+
+create policy "Enable read access for all users"
+on public.priority_prose_cache
+for select
+to public
+using (true);
+
+create policy "first_test_write_priority_prose_cache"
+on public.priority_prose_cache
+for all
+to public
+using (true)
+with check (true);
+
 -- Recommended cleanup before any broader rollout:
 -- 1. drop these first-test policies
 -- 2. replace anon access with authenticated policies or a server-side write path
