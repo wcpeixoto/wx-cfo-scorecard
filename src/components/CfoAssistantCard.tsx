@@ -44,6 +44,7 @@ import {
   extendCommitment,
 } from '../lib/data/sharedPersistence';
 import { commitmentFromSignal, commitmentTemplate, commitmentBeat, type Commitment } from '../lib/commitments';
+import { devCommitment } from '../lib/commitments/devSeam';
 
 interface CfoAssistantCardProps {
   model: DashboardModel;
@@ -74,6 +75,13 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   // once on mount: while null the consent affordance shows; once set, the slot
   // renders the committed state instead and stays until resolved (principle #5).
   const [openCommitment, setOpenCommitment] = useState<PriorityHistoryRow | null>(null);
+  // DEV-only preview seam (PR-D): ?devCommitment=<phase> injects a fake open
+  // commitment so the committed/check-in states render without Supabase. null in
+  // prod (import.meta.env.DEV-gated), so activeCommitment is just openCommitment.
+  const [devCommit, setDevCommit] = useState<PriorityHistoryRow | null>(() =>
+    import.meta.env.DEV ? devCommitment(model.runway.currentCashBalance) : null
+  );
+  const activeCommitment = devCommit ?? openCommitment;
   const [committing, setCommitting] = useState(false);
   // Session-only "Not this week" dismissal — stores nothing; the recommendation
   // returns on the next load.
@@ -89,10 +97,10 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   // follow-up beat is computed on open (#8) from the commitment's timestamps.
   const template = useMemo(
     () =>
-      openCommitment
-        ? commitmentTemplate(openCommitment, commitmentBeat(openCommitment), model)
+      activeCommitment
+        ? commitmentTemplate(activeCommitment, commitmentBeat(activeCommitment), model)
         : null,
-    [openCommitment, model]
+    [activeCommitment, model]
   );
 
   // Committed → progress from the templater; fresh → the signal-derived
@@ -150,6 +158,13 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   // lets it go, or stops early via "Not doing this"). outcome_metric = final cash
   // at resolve. On success the commitment is done — drop back to the fresh state.
   const handleResolve = async (outcome: 'kept' | 'lapsed') => {
+    if (import.meta.env.DEV && devCommit) {
+      // Dev seam: simulate the terminal transition back to the fresh state.
+      setDevCommit(null);
+      setShowCloseConfirm(false);
+      setSelectedAttribution(null);
+      return;
+    }
     if (resolving || !openCommitment?.id) return;
     setResolving(true);
     const ok = await resolveCommitment(openCommitment.id, outcome, model.runway.currentCashBalance);
@@ -164,6 +179,12 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   // "Keep going" pushes the deadline a fresh +7d; re-read so the new window (and
   // recomputed beat) take effect.
   const handleExtend = async () => {
+    if (import.meta.env.DEV && devCommit) {
+      // Dev seam: a fresh +7d window restarts the loop at day-one.
+      setDevCommit(devCommitment(model.runway.currentCashBalance, 'day_one'));
+      setSelectedAttribution(null);
+      return;
+    }
     if (resolving || !openCommitment?.id) return;
     setResolving(true);
     const ok = await extendCommitment(openCommitment.id);
@@ -302,7 +323,7 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
             )}
           </div>
         )}
-        {!openCommitment && draft && !dismissed && (
+        {!activeCommitment && draft && !dismissed && (
           <div className="cfo-assistant-card__consent">
             <p className="cfo-assistant-card__recommendation">
               {validTarget
