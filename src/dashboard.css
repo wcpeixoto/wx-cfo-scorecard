@@ -8977,9 +8977,8 @@ body {
 
 /* Execute affordance (#6.1, Item B). The "Help me execute" toggle reuses the 36px
    chip control (no new button size) and the opened slot reuses the __answer surface;
-   this only spaces the affordance from the "Not doing this" hatch below it. B-2 fills
-   the slot with the money-finding aid; visibility stays DEV-gated through B-4
-   (hidden in prod, revealed in dev via ?devExecute=). */
+   this only spaces the affordance from the "Not doing this" hatch below it. The slot
+   holds the money-finding aid (live as of B-4). */
 .cfo-assistant-card__execute {
   margin-bottom: 12px;
 }
