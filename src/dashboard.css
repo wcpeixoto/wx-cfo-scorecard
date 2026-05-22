@@ -8789,6 +8789,85 @@ body {
   gap: 0;
 }
 
+/* Consent slot (Phase 2b) — sits above the "Want more context?" label and the
+   chips. Holds either the fresh recommendation + commit affordance or, once a
+   commitment is open, the committed state. The 20px bottom margin sets the gap
+   down to the label so the chips read as the secondary, dig-deeper layer. */
+.cfo-assistant-card__consent {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 20px;
+}
+
+.cfo-assistant-card__commitment {
+  margin: 0 0 20px;
+}
+
+/* The hero's recommended action, rendered as-is (no framing prefix — that's 2c
+   copy work). Body text; the commit button below carries the emphasis. */
+.cfo-assistant-card__recommendation {
+  margin: 0 0 12px;
+  color: #344054;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* Bare "I'll do this" primary — the call that matters. A filled accent button
+   against the outline chips below gives the hierarchy (calm = hierarchy, not
+   size parity), 44px vs the chips' 40px. Label-only by design ("bare"): what
+   "this" refers to is the recommendation rendered directly above. Stretches
+   full-width via the flex column's default align-items: stretch. */
+.cfo-assistant-card__commit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.cfo-assistant-card__commit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* "Not this week" — quiet text link, session-only dismissal. No chrome so it
+   never competes with the primary; left-aligned to the card rhythm. */
+.cfo-assistant-card__dismiss {
+  align-self: flex-start;
+  margin-top: 8px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.cfo-assistant-card__dismiss:hover {
+  color: #344054;
+  text-decoration: underline;
+}
+
+/* Open-commitment state — reuses the consent slot. Calm, body-weight; no
+   resolution chrome (the follow-up taps arrive in 2c). */
+.cfo-assistant-card__commitment-text {
+  margin: 0;
+  color: #344054;
+  font-size: 14px;
+  line-height: 20px;
+}
+
 .cfo-assistant-card__prompt {
   margin: 0 0 16px;
   color: var(--text-secondary);
