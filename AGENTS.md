@@ -65,6 +65,15 @@ TailAdmin source reference for patterns (replicate, don't reinvent):
 
 ---
 
+## Product principles
+
+The CFO Assistant product loop is governed by
+`docs/CFO_ASSISTANT_PRINCIPLES.md` — the canonical, locked source of truth
+(memory caches in Claude/Codex sessions may drift; that doc wins on
+conflict). **Read it before any CFO Assistant work.**
+
+---
+
 ## Gotchas
 
 **Supabase `max_rows` must be 10000.** Set in Supabase Dashboard →
