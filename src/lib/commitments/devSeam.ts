@@ -95,19 +95,3 @@ export function devGroundingOverride(draft: CommitmentDraft | null): CommitmentD
     },
   };
 }
-
-// DEV-only: `?devExecute=1` reveals the Execute "Help me execute" affordance + slot
-// in Commitment Mode. B-2 supplies real content (buildExecuteHelp), but visibility
-// stays DEV-gated through B-4 — browser-verifiable now while production keeps it
-// hidden until launch. Same prod-safety contract as devCommitment /
-// devGroundingOverride: import.meta.env.DEV-gated AND
-// only ever called behind an `import.meta.env.DEV ? … : …` site, so the minifier
-// drops the call and tree-shakes this out of prod (no `devExecute` string ships).
-// Takes a truthy flag (`=1`), not an enum. Returns `base` unchanged when not DEV /
-// param absent / falsy.
-export function devExecuteOverride(base: boolean): boolean {
-  if (!import.meta.env.DEV) return base;
-  const v = new URLSearchParams(location.search).get('devExecute');
-  if (v === null || v === '' || v === '0' || v === 'false') return base;
-  return true;
-}

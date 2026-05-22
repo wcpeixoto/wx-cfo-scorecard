@@ -52,7 +52,7 @@ import {
   executeLabelFor,
   type Commitment,
 } from '../lib/commitments';
-import { devCommitment, devGroundingOverride, devExecuteOverride } from '../lib/commitments/devSeam';
+import { devCommitment, devGroundingOverride } from '../lib/commitments/devSeam';
 
 interface CfoAssistantCardProps {
   model: DashboardModel;
@@ -144,13 +144,9 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
     () => (activeCommitment ? buildExecuteHelp(model, activeCommitment) : null),
     [activeCommitment, model]
   );
-  // Visibility stays DEV-gated through B-4 (B stays "Next" until B-4): production
-  // hides the affordance even though content now exists; ?devExecute= reveals it in
-  // dev for browser verification. The prod branch is a literal `false`, so
-  // devExecuteOverride (and the `devExecute` string) tree-shake from prod — B-4
-  // flips this to `executeHelp !== null` to launch.
-  const executeAvailable =
-    executeHelp !== null && (import.meta.env.DEV ? devExecuteOverride(false) : false);
+  // Execute (#6.1 / #10) is LAUNCHED (B-4): the affordance shows whenever there's an
+  // open reserve_warning commitment with money-finding content — no longer DEV-gated.
+  const executeAvailable = executeHelp !== null;
   // B-3 (#8): the Execute offer's label follows the cadence beat — day_one and
   // midpoint open with "Help me execute", day_before escalates to "Final push".
   // Recomputed inline per render (cheap ms math); null when fresh or post-deadline.
@@ -335,10 +331,10 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
               </div>
             ) : (
               // #6 escape hatches, during-window committed state. "Help me execute"
-              // (#6.1) is the B-2 money-finding aid below — DEV-gated through B-4
-              // (?devExecute= reveals it; hidden in prod). "Not doing this" (#6.3)
-              // shows the consequence before closing. "Update plan" (#6.2) stays
-              // deferred (needs a PATCH helper in the locked sharedPersistence.ts).
+              // (#6.1) is the money-finding aid below (live as of B-4). "Not doing
+              // this" (#6.3) shows the consequence before closing. "Update plan"
+              // (#6.2) stays deferred (needs a PATCH helper in the locked
+              // sharedPersistence.ts).
               <div className="cfo-assistant-card__escape">
                 {executeAvailable && !showCloseConfirm && (
                   <div className="cfo-assistant-card__execute">
