@@ -13,6 +13,12 @@ const WEEKS_PER_MONTH = 4.33;
 const MAX_WINDOW_MONTHS = 12;
 const MIN_HISTORY_MONTHS = 6; // matches REVENUE_DECLINE_MIN_HISTORY_MONTHS (signals.ts)
 
+const usd = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+});
+
 function roundTo25(value: number): number {
   return Math.round(value / 25) * 25;
 }
@@ -80,5 +86,28 @@ export function groundReserveWarningTarget(
     ceiling,
     weeklyCapacity: capacity,
     unknownReason: null,
+  };
+}
+
+// TG-2: the consent slot's read of a grounded target. Adjacent guidance only —
+// a single number + horizon ("supports ~$X/week — funds your reserve in ~N
+// weeks"), never a pre-fill (the input keeps its generic placeholder). The
+// `floor` rides along so the card can soft-warn (not block) below it.
+export interface ReserveGroundingHint {
+  text: string;
+  floor: number; // weekly $ below which to soft-warn
+}
+
+// Keyed on `recommended`, NOT `classification`: a positive "do we have a number
+// to show?" test. The card therefore never branches on classification, so it
+// can't define the unknown render branch by negation — TG-3 owns unknown→
+// awareness routing exclusively (the #195 trap). null ⇒ consent slot unchanged.
+export function reserveGroundingHint(grounding: TargetGrounding): ReserveGroundingHint | null {
+  const { recommended, ceiling, floor } = grounding;
+  if (recommended === null) return null;
+  const weeks = Math.max(1, Math.ceil(ceiling / recommended));
+  return {
+    text: `Your recent surplus supports about ${usd.format(recommended)}/week — that fully funds your reserve in ~${weeks} week${weeks === 1 ? '' : 's'}.`,
+    floor,
   };
 }

@@ -8812,6 +8812,26 @@ body {
   line-height: 20px;
 }
 
+/* TG-2: grounded weekly target as adjacent guidance (single number + horizon),
+   derived from real operating surplus. Frames what to type without pre-filling
+   the field — the placeholder stays generic. Sits below the recommendation. */
+.cfo-assistant-card__grounding {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* TG-2 soft-warn: a gentle nudge when the typed target is below the $25/wk floor.
+   Caution-amber (not error red); the commit button stays enabled — soft-warn,
+   not a hard gate. Darkened from --warning toward text for AA contrast. */
+.cfo-assistant-card__floor-warning {
+  margin: 0 0 12px;
+  color: color-mix(in srgb, var(--warning) 50%, var(--text-primary));
+  font-size: 13px;
+  line-height: 18px;
+}
+
 /* Owner-entered weekly target (Phase 2.5) — the one required field in the
    consent slot. Blank by default with a placeholder; a pre-filled value would
    become the answer and re-invent the auto-slice we rejected. 40px field height

@@ -43,7 +43,13 @@ import {
   resolveCommitment,
   extendCommitment,
 } from '../lib/data/sharedPersistence';
-import { commitmentFromSignal, commitmentTemplate, commitmentBeat, type Commitment } from '../lib/commitments';
+import {
+  commitmentFromSignal,
+  commitmentTemplate,
+  commitmentBeat,
+  reserveGroundingHint,
+  type Commitment,
+} from '../lib/commitments';
 import { devCommitment } from '../lib/commitments/devSeam';
 
 interface CfoAssistantCardProps {
@@ -92,6 +98,18 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   const [targetInput, setTargetInput] = useState('');
   const target = Number.parseFloat(targetInput);
   const validTarget = Number.isFinite(target) && target > 0;
+
+  // TG-2: the grounded weekly target as adjacent guidance for the consent slot.
+  // null when there's no grounded number to show — the helper keys off the
+  // recommendation, never the classification, so the card never defines the
+  // unknown branch (TG-3 owns that). null ⇒ the slot is unchanged: generic
+  // placeholder, owner types freely.
+  const groundingHint = useMemo(
+    () => (draft ? reserveGroundingHint(draft.grounding) : null),
+    [draft]
+  );
+  // Soft-warn only (not a hard gate, per TG-0): commit stays enabled below floor.
+  const belowFloor = groundingHint !== null && validTarget && target < groundingHint.floor;
 
   // Committed-state copy bundle (Commitment Mode, #5), or null when fresh. The
   // follow-up beat is computed on open (#8) from the commitment's timestamps.
@@ -330,6 +348,9 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
                 ? draft.buildAction(target)
                 : 'Move money into your operating reserve this week.'}
             </p>
+            {groundingHint && (
+              <p className="cfo-assistant-card__grounding">{groundingHint.text}</p>
+            )}
             <label className="cfo-assistant-card__target">
               <span className="cfo-assistant-card__target-label">Amount this week</span>
               <input
@@ -343,6 +364,11 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
                 onChange={(e) => setTargetInput(e.target.value)}
               />
             </label>
+            {belowFloor && groundingHint && (
+              <p className="cfo-assistant-card__floor-warning" role="status">
+                {`Below $${groundingHint.floor}/week may be too small to move your reserve — commit anyway?`}
+              </p>
+            )}
             <div className="cfo-assistant-card__commit-row">
               <button
                 type="button"
