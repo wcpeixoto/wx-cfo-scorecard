@@ -42,4 +42,9 @@ export interface PriorityHistoryRow {
   committed_action?: string;
   outcome_metric?: number;
   resolved_at?: string;
+  // Commitment loop (Phase 2). null on legacy signal-fire rows; set only on
+  // owner-consent commitment rows. status one of open/kept/lapsed/replaced.
+  status?: 'open' | 'kept' | 'lapsed' | 'replaced';
+  committed_at?: string;
+  check_in_at?: string;
 }
