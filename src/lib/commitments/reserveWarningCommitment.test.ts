@@ -5,6 +5,7 @@ import type { DashboardModel } from '../data/contract';
 
 function model(cash: number, reserveTarget: number): DashboardModel {
   return {
+    monthlyRollups: [],
     runway: { currentCashBalance: cash, reserveTarget },
   } as unknown as DashboardModel;
 }

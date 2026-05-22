@@ -4,6 +4,7 @@ import type { Signal, SignalType } from '../priorities/types';
 import type { DashboardModel } from '../data/contract';
 
 const model = {
+  monthlyRollups: [],
   runway: { currentCashBalance: 6600, reserveTarget: 10000 },
 } as unknown as DashboardModel;
 
