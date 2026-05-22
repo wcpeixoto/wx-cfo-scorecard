@@ -119,3 +119,33 @@ export function reserveGroundingHint(grounding: TargetGrounding): ReserveGroundi
       : `Your recent surplus supports about ${amount}/week — a sustainable pace toward your reserve.`;
   return { text, floor };
 }
+
+// TG-3 awareness/STOP copy for an ungroundable target (#3): honest, carries NO
+// number, and is ONE message for every unknownReason (the reason stays on the
+// grounding object for tests/telemetry, never rendered). Production UI — ships in
+// the bundle (unlike the dev seam, which is stripped).
+export const RESERVE_STOP_MESSAGE =
+  'Your operating reserve is below target, but recent cash flow does not yet support a weekly amount worth setting aside. Keep it in view as cash flow strengthens.';
+
+// TG-3: the consent slot's exhaustive read of grounding. The card switches on
+// `mode` and NEVER inspects `classification` itself, so a future classification
+// value can't slip into the STOP branch by negation (the #195 trap). Adding a
+// classification value makes `assertNever` a COMPILE error until it's handled.
+export type GroundingConsentMode =
+  | { mode: 'commit'; hint: ReserveGroundingHint | null } // grounded → consent slot
+  | { mode: 'stop'; message: string }; // unknown → awareness/STOP surface
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled grounding classification: ${String(value)}`);
+}
+
+export function groundingConsentMode(grounding: TargetGrounding): GroundingConsentMode {
+  switch (grounding.classification) {
+    case 'grounded':
+      return { mode: 'commit', hint: reserveGroundingHint(grounding) };
+    case 'unknown':
+      return { mode: 'stop', message: RESERVE_STOP_MESSAGE };
+    default:
+      return assertNever(grounding.classification);
+  }
+}

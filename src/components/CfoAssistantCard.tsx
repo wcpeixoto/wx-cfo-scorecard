@@ -47,10 +47,10 @@ import {
   commitmentFromSignal,
   commitmentTemplate,
   commitmentBeat,
-  reserveGroundingHint,
+  groundingConsentMode,
   type Commitment,
 } from '../lib/commitments';
-import { devCommitment } from '../lib/commitments/devSeam';
+import { devCommitment, devGroundingOverride } from '../lib/commitments/devSeam';
 
 interface CfoAssistantCardProps {
   model: DashboardModel;
@@ -75,7 +75,13 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
 
   // A commitment-ready draft for the hero, or null (the STOP rule — only
   // reserve_warning is commitment-ready this slice). Drives the consent slot.
-  const draft = useMemo(() => commitmentFromSignal(hero, model), [hero, model]);
+  // The DEV-only override (?devGrounding=unknown) forces the grounding to unknown
+  // so the STOP surface is browser-verifiable; the `import.meta.env.DEV ? … : d`
+  // site lets the minifier drop it from prod (proven by the dist grep).
+  const draft = useMemo(() => {
+    const d = commitmentFromSignal(hero, model);
+    return import.meta.env.DEV ? devGroundingOverride(d) : d;
+  }, [hero, model]);
 
   // Commitment loop. The single open commitment is global (not per-signal), read
   // once on mount: while null the consent affordance shows; once set, the slot
@@ -99,17 +105,19 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   const target = Number.parseFloat(targetInput);
   const validTarget = Number.isFinite(target) && target > 0;
 
-  // TG-2: the grounded weekly target as adjacent guidance for the consent slot.
-  // null when there's no grounded number to show — the helper keys off the
-  // recommendation, never the classification, so the card never defines the
-  // unknown branch (TG-3 owns that). null ⇒ the slot is unchanged: generic
-  // placeholder, owner types freely.
-  const groundingHint = useMemo(
-    () => (draft ? reserveGroundingHint(draft.grounding) : null),
+  // TG-3: exhaustive consent routing off the draft's grounding. `commit` → the
+  // consent slot (carrying the TG-2 grounded hint); `stop` → the awareness/STOP
+  // surface. The card switches on `mode` and never reads `grounding.classification`
+  // itself, so it can't define the unknown branch by negation (the #195 trap);
+  // adding a classification value is a compile error in the helper, not here.
+  const consent = useMemo(
+    () => (draft ? groundingConsentMode(draft.grounding) : null),
     [draft]
   );
+  const hint = consent && consent.mode === 'commit' ? consent.hint : null;
+  const stopMessage = consent && consent.mode === 'stop' ? consent.message : null;
   // Soft-warn only (not a hard gate, per TG-0): commit stays enabled below floor.
-  const belowFloor = groundingHint !== null && validTarget && target < groundingHint.floor;
+  const belowFloor = hint !== null && validTarget && target < hint.floor;
 
   // Committed-state copy bundle (Commitment Mode, #5), or null when fresh. The
   // follow-up beat is computed on open (#8) from the commitment's timestamps.
@@ -341,15 +349,15 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
             )}
           </div>
         )}
-        {!activeCommitment && draft && !dismissed && (
+        {!activeCommitment && draft && consent?.mode === 'commit' && !dismissed && (
           <div className="cfo-assistant-card__consent">
             <p className="cfo-assistant-card__recommendation">
               {validTarget
                 ? draft.buildAction(target)
                 : 'Move money into your operating reserve this week.'}
             </p>
-            {groundingHint && (
-              <p className="cfo-assistant-card__grounding">{groundingHint.text}</p>
+            {hint && (
+              <p className="cfo-assistant-card__grounding">{hint.text}</p>
             )}
             <label className="cfo-assistant-card__target">
               <span className="cfo-assistant-card__target-label">Amount this week</span>
@@ -364,9 +372,9 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
                 onChange={(e) => setTargetInput(e.target.value)}
               />
             </label>
-            {belowFloor && groundingHint && (
+            {belowFloor && hint && (
               <p className="cfo-assistant-card__floor-warning" role="status">
-                {`Below $${groundingHint.floor}/week may be too small to move your reserve — commit anyway?`}
+                {`Below $${hint.floor}/week may be too small to move your reserve — commit anyway?`}
               </p>
             )}
             <div className="cfo-assistant-card__commit-row">
@@ -387,6 +395,14 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
               </button>
             </div>
           </div>
+        )}
+        {!activeCommitment && stopMessage && (
+          // TG-3: a reserve_warning whose weekly target can't be honestly grounded
+          // (#3 STOP). No consent ask and no committed summary — a calm awareness
+          // paragraph is its only recommendation surface (#11). Reuses the
+          // recommendation paragraph shape; copy is the single generic STOP message
+          // (same for every unknownReason).
+          <p className="cfo-assistant-card__recommendation">{stopMessage}</p>
         )}
         {!activeCommitment && !draft && (
           // Awareness-only signals (e.g. reserve_critical) are not commitment-ready

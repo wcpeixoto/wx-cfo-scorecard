@@ -1,4 +1,5 @@
 import type { PriorityHistoryRow } from '../priorities/types';
+import type { CommitmentDraft } from './types';
 
 // DEV-only preview seam (Phase 2c PR-D). Every entry is guarded by
 // import.meta.env.DEV, so the whole module dead-code-eliminates from prod and the
@@ -69,5 +70,28 @@ export function devCommitment(currentCash: number, phase?: DevPhase): PriorityHi
     deadline_date: new Date(deadline).toISOString(),
     committed_at: new Date(committedAt).toISOString(),
     status: 'open',
+  };
+}
+
+// DEV-only: `?devGrounding=unknown` forces the hero draft's grounding to the
+// unknown classification so the TG-3 STOP/awareness surface can be browser-
+// verified without a fixture that produces <6mo history / non-positive surplus.
+// Same prod-safety contract as devCommitment: import.meta.env.DEV-gated AND only
+// ever called behind an `import.meta.env.DEV ? … : …` site, so the minifier drops
+// the call and tree-shakes this out of prod (no `devGrounding` string ships).
+// Returns the draft unchanged when not DEV / param absent / no draft. Carries no
+// production copy — the STOP message is real UI and lives in the helper, not here.
+export function devGroundingOverride(draft: CommitmentDraft | null): CommitmentDraft | null {
+  if (!import.meta.env.DEV) return draft;
+  if (!draft) return draft;
+  if (new URLSearchParams(location.search).get('devGrounding') !== 'unknown') return draft;
+  return {
+    ...draft,
+    grounding: {
+      ...draft.grounding,
+      classification: 'unknown',
+      recommended: null,
+      unknownReason: 'insufficient_history',
+    },
   };
 }

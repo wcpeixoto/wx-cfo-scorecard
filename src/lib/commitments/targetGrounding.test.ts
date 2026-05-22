@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { groundReserveWarningTarget, reserveGroundingHint } from './targetGrounding';
+import {
+  groundReserveWarningTarget,
+  reserveGroundingHint,
+  groundingConsentMode,
+  RESERVE_STOP_MESSAGE,
+} from './targetGrounding';
 import type { DashboardModel, MonthlyRollup } from '../data/contract';
+import type { TargetGrounding } from './types';
 
 // Reference date 2026-05-15 → the current (incomplete) month is 2026-05, excluded.
 const REF = new Date(2026, 4, 15);
@@ -199,5 +205,52 @@ describe('reserveGroundingHint (TG-2 consumption contract)', () => {
     );
     expect(farOff).not.toContain('141');
     expect(farOff).not.toContain('weeks');
+  });
+});
+
+describe('groundingConsentMode (TG-3 exhaustive routing)', () => {
+  const make = (over: Partial<TargetGrounding>): TargetGrounding => ({
+    classification: 'grounded',
+    recommended: 225,
+    floor: 25,
+    ceiling: 2025,
+    weeklyCapacity: 700,
+    unknownReason: null,
+    ...over,
+  });
+
+  it('routes a grounded target to commit, carrying the TG-2 hint', () => {
+    const result = groundingConsentMode(make({ classification: 'grounded' }));
+    expect(result.mode).toBe('commit');
+    if (result.mode === 'commit') {
+      expect(result.hint).not.toBeNull();
+      expect(result.hint!.text).toContain('$225/week');
+    }
+  });
+
+  it('routes an unknown target to stop with the generic STOP message', () => {
+    const result = groundingConsentMode(make({ classification: 'unknown', recommended: null }));
+    expect(result.mode).toBe('stop');
+    if (result.mode === 'stop') {
+      expect(result.message).toBe(RESERVE_STOP_MESSAGE);
+    }
+  });
+
+  it('shows ONE identical STOP message for all three unknownReason values', () => {
+    const reasons = ['insufficient_history', 'nonpositive_capacity', 'below_floor'] as const;
+    const messages = reasons.map((unknownReason) => {
+      const r = groundingConsentMode(make({ classification: 'unknown', recommended: null, unknownReason }));
+      return r.mode === 'stop' ? r.message : null;
+    });
+    expect(messages).toEqual([RESERVE_STOP_MESSAGE, RESERVE_STOP_MESSAGE, RESERVE_STOP_MESSAGE]);
+  });
+
+  it('throws on an unhandled classification (assertNever exhaustiveness guard)', () => {
+    // A future classification value is a COMPILE error at assertNever in the
+    // helper; cast past the type here to prove the runtime guard also throws
+    // rather than silently falling into the STOP/awareness branch.
+    expect(() =>
+      groundingConsentMode(make({ classification: 'future_value' as never }))
+    ).toThrow(/Unhandled grounding classification/);
   });
 });
