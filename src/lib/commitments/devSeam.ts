@@ -95,3 +95,18 @@ export function devGroundingOverride(draft: CommitmentDraft | null): CommitmentD
     },
   };
 }
+
+// DEV-only: `?devExecute=1` reveals the B-1 Execute affordance + slot scaffold in
+// Commitment Mode so it can be browser-verified before B-2 supplies real content
+// (B-1 ships it inert — `hasExecuteHelp` is false in prod). Same prod-safety
+// contract as devCommitment / devGroundingOverride: import.meta.env.DEV-gated AND
+// only ever called behind an `import.meta.env.DEV ? … : …` site, so the minifier
+// drops the call and tree-shakes this out of prod (no `devExecute` string ships).
+// Takes a truthy flag (`=1`), not an enum. Returns `base` unchanged when not DEV /
+// param absent / falsy.
+export function devExecuteOverride(base: boolean): boolean {
+  if (!import.meta.env.DEV) return base;
+  const v = new URLSearchParams(location.search).get('devExecute');
+  if (v === null || v === '' || v === '0' || v === 'false') return base;
+  return true;
+}

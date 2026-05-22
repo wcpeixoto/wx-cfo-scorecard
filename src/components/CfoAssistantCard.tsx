@@ -48,9 +48,10 @@ import {
   commitmentTemplate,
   commitmentBeat,
   groundingConsentMode,
+  hasExecuteHelp,
   type Commitment,
 } from '../lib/commitments';
-import { devCommitment, devGroundingOverride } from '../lib/commitments/devSeam';
+import { devCommitment, devGroundingOverride, devExecuteOverride } from '../lib/commitments/devSeam';
 
 interface CfoAssistantCardProps {
   model: DashboardModel;
@@ -133,6 +134,19 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   // awareness watch.
   const freshWatch = useMemo(() => getWatchMetric(hero, model), [hero, model]);
   const watch = template ? template.watch : freshWatch;
+
+  // B-1 Execute scaffold (#6.1): whether to reveal "Help me execute" inside
+  // Commitment Mode. hasExecuteHelp is false this slice (inert — the slot is empty
+  // until B-2 supplies the reserve_warning money-finding aid), so production shows
+  // no Execute control; ?devExecute= reveals it in dev for browser verification.
+  // The `import.meta.env.DEV ? … : base` site lets the minifier tree-shake
+  // devExecuteOverride (and the `devExecute` string) out of prod.
+  const executeAvailable = useMemo(() => {
+    if (!activeCommitment) return false;
+    const base = hasExecuteHelp();
+    return import.meta.env.DEV ? devExecuteOverride(base) : base;
+  }, [activeCommitment]);
+  const [executeOpen, setExecuteOpen] = useState(false);
 
   // value per chip — also gates the defensive disabled state below.
   const content: Record<ChipId, string> = {
@@ -309,9 +323,40 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
                 </div>
               </div>
             ) : (
-              // Update plan deferred to Phase 3 — requires a PATCH helper in the
-              // locked sharedPersistence.ts. See principle #6.
+              // #6 escape hatches, during-window committed state. "Help me execute"
+              // (#6.1) is the B-1 scaffold below — revealed only when executeAvailable
+              // (false in prod this slice; ?devExecute= reveals it in dev). "Not doing
+              // this" (#6.3) shows the consequence before closing. "Update plan" (#6.2)
+              // stays deferred (needs a PATCH helper in the locked sharedPersistence.ts).
               <div className="cfo-assistant-card__escape">
+                {executeAvailable && !showCloseConfirm && (
+                  <div className="cfo-assistant-card__execute">
+                    <button
+                      type="button"
+                      className={
+                        executeOpen
+                          ? 'cfo-assistant-chip cfo-assistant-chip--is-active'
+                          : 'cfo-assistant-chip'
+                      }
+                      aria-expanded={executeOpen}
+                      onClick={() => setExecuteOpen((open) => !open)}
+                    >
+                      Help me execute
+                    </button>
+                    {executeOpen && (
+                      <div className="cfo-assistant-card__answer" data-testid="execute-slot">
+                        {/* B-1 ships this slot INERT — no owner-facing content. B-2
+                            fills it with the reserve_warning money-finding aid (surface
+                            shape via its own mini-discovery). The marker below is
+                            DEV-only and stripped from prod; it exists solely to verify
+                            the slot opens/closes. */}
+                        {import.meta.env.DEV && (
+                          <p className="cfo-assistant-card__answer-text">dev:execute-slot</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {showCloseConfirm ? (
                   <div className="cfo-assistant-card__close-confirm">
                     <p className="cfo-assistant-card__close-consequence">

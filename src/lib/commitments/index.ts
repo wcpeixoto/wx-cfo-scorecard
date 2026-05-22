@@ -17,6 +17,7 @@ export { commitmentBeat } from './cadence';
 export type { CommitmentBeat, CommitmentPhase } from './cadence';
 export { reserveGroundingHint, groundingConsentMode, RESERVE_STOP_MESSAGE } from './targetGrounding';
 export type { ReserveGroundingHint, GroundingConsentMode } from './targetGrounding';
+export { hasExecuteHelp } from './execute';
 
 // The single factory choke point (Fork A/B). reserve_warning is the only
 // commitment-ready signal this slice; every other type returns null, which IS
