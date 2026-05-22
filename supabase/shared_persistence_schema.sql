@@ -217,3 +217,55 @@ alter table public.forecast_events
 
 create index if not exists forecast_events_workspace_source_contract_idx
   on public.forecast_events (workspace_id, source, contract_id);
+
+-- CFO Assistant — priority history. Records each fired daily-priority signal
+-- and (Phase 2 commitment loop) the operator's committed action and outcome.
+-- One row per signal occurrence; the partial unique index enforces at most one
+-- `status = 'open'` commitment per workspace. RLS policy lives in
+-- first_test_policies.sql and must be applied after this DDL.
+
+create table if not exists public.priority_history (
+  id uuid not null default gen_random_uuid(),
+  workspace_id text not null default 'default',
+  fired_at timestamptz not null default now(),
+  signal_type text null,
+  severity text null,
+  metric_value numeric null,
+  target_value numeric null,
+  category_flagged text null,
+  gap_amount numeric null,
+  recommended_action text null,
+  ai_headline text null,
+  committed_action text null,
+  outcome_metric numeric null,
+  resolved_at timestamptz null,
+  status text null,
+  committed_at timestamptz null,
+  check_in_at timestamptz null,
+  primary key (id),
+  constraint priority_history_status_check
+    check (status is null or status in ('open', 'kept', 'lapsed', 'replaced'))
+);
+
+create unique index if not exists priority_history_one_open_per_workspace
+  on public.priority_history (workspace_id)
+  where status = 'open';
+
+-- CFO Assistant — AI prose cache. Backs getCachedProse/saveCachedProse in
+-- sharedPersistence.ts: the generated card prose (prose_json) is cached per
+-- (workspace_id, cache_key, prompt_version) so repeat renders skip the AI
+-- provider. Upserted on conflict over that key; created_at fires on insert
+-- and is preserved on conflict, updated_at is rewritten on every save. RLS
+-- policy lives in first_test_policies.sql and must be applied after this DDL.
+
+create table if not exists public.priority_prose_cache (
+  workspace_id text not null default 'default',
+  cache_key text not null,
+  prompt_version text not null,
+  signal_type text null,
+  severity text null,
+  prose_json jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (workspace_id, cache_key, prompt_version)
+);

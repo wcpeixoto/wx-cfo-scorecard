@@ -106,6 +106,47 @@ to anon
 using (workspace_id = 'default')
 with check (workspace_id = 'default');
 
+-- CFO Assistant priority tables (priority_history, priority_prose_cache):
+-- these were created out-of-band and use a more permissive pattern than the
+-- tables above — a public-role ALL policy with an unconditional check plus the
+-- Supabase default "Enable read access for all users" SELECT policy, rather
+-- than the anon + workspace_id scoping used elsewhere in this file. Encoded
+-- here to match production. Requires the tables from shared_persistence_schema.sql.
+
+alter table public.priority_history enable row level security;
+
+drop policy if exists "first_test_write_priority_history" on public.priority_history;
+drop policy if exists "Enable read access for all users" on public.priority_history;
+
+create policy "first_test_write_priority_history"
+on public.priority_history
+for all
+to public
+with check (true);
+
+create policy "Enable read access for all users"
+on public.priority_history
+for select
+to public
+using (true);
+
+alter table public.priority_prose_cache enable row level security;
+
+drop policy if exists "first_test_write_priority_prose_cache" on public.priority_prose_cache;
+drop policy if exists "Enable read access for all users" on public.priority_prose_cache;
+
+create policy "first_test_write_priority_prose_cache"
+on public.priority_prose_cache
+for all
+to public
+with check (true);
+
+create policy "Enable read access for all users"
+on public.priority_prose_cache
+for select
+to public
+using (true);
+
 -- Recommended cleanup before any broader rollout:
 -- 1. drop these first-test policies
 -- 2. replace anon access with authenticated policies or a server-side write path
