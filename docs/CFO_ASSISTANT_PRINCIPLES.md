@@ -3,6 +3,9 @@
 Canonical source of truth for the CFO Assistant product loop.
 Memory caches in Claude/Codex sessions may go stale; this doc wins on conflict.
 
+> **These describe the target state.** Shipped surfaces (recommendation
+> bundling, portfolio Watch metric) converge to these in Phase 2.5.
+
 ## 1. Outcome principle (overrides all else)
 
 The outcome is the target. Never lose sight of the outcome.
