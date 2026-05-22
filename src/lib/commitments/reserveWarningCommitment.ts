@@ -3,6 +3,7 @@ import type { Signal } from '../priorities/types';
 import type { CommitmentDraft } from './types';
 import { commitmentDeadline } from './anchor';
 import { watchMetricForSignal } from './watchMetrics';
+import { groundReserveWarningTarget } from './targetGrounding';
 
 const usd = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -33,6 +34,7 @@ export function reserveWarningCommitment(
     deadlineISO: commitmentDeadline(),
     watchMetricId: watch.id,
     baseline: watch.captureBaseline(model),
+    grounding: groundReserveWarningTarget(gapContext, model),
     buildAction: (target) =>
       `Move ${usd.format(target)} into your operating reserve this week.`,
   };
