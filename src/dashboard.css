@@ -8901,13 +8901,78 @@ body {
   text-decoration: underline;
 }
 
-/* Open-commitment state — reuses the consent slot. Calm, body-weight; no
-   resolution chrome (the follow-up taps arrive in 2c). */
+/* Open-commitment state — reuses the consent slot. Calm, body-weight; the
+   time-aware summary line. Resolution chrome (check-in / escape hatch) follows. */
 .cfo-assistant-card__commitment-text {
   margin: 0;
   color: #344054;
   font-size: 14px;
   line-height: 20px;
+}
+
+/* Committed-state resolution chrome (#6/#7/#8). Reuses existing button heights —
+   __commit (44px primary), __dismiss (text-link), and the 36px chips for
+   attribution — so no new control size is introduced. */
+.cfo-assistant-card__checkin {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cfo-assistant-card__attribution {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cfo-assistant-card__attribution-prompt {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* Attribution reuses the chip styling but wraps in a compact row (the four
+   options are short), so the chips size to their label instead of full width. */
+.cfo-assistant-card__attribution-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cfo-assistant-card__attribution-options .cfo-assistant-chip {
+  width: auto;
+}
+
+.cfo-assistant-card__resolve-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.cfo-assistant-card__escape {
+  margin-top: 12px;
+}
+
+.cfo-assistant-card__close-confirm {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cfo-assistant-card__close-consequence {
+  margin: 0;
+  color: #344054;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.cfo-assistant-card__close-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
 }
 
 .cfo-assistant-card__prompt {
