@@ -7,7 +7,8 @@ import type {
   RenewalContractStatus,
   TransactionImportSummary,
 } from './contract';
-import type { Signal, SignalType, PriorityHistoryRow } from '../priorities/types';
+import type { SignalType, PriorityHistoryRow } from '../priorities/types';
+import { commitmentDeadline, type Commitment } from '../commitments';
 import type { AIProse } from '../priorities/ai';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
@@ -1111,12 +1112,6 @@ export async function savePriorityHistory(
 // replaces any open row before inserting — the calm transition), defended at
 // read time (getOpenCommitment orders + limits to 1), and hard-enforced at the
 // DB by a partial unique index on (workspace_id) where status = 'open'.
-const COMMITMENT_DEFAULT_CHECK_IN_DAYS = 14;
-
-function isoDaysFromNow(days: number): string {
-  return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-}
-
 // The single open commitment, or null. Global by design (not filtered by
 // signal_type) — only one commitment is open across all signals at a time.
 export async function getOpenCommitment(): Promise<PriorityHistoryRow | null> {
@@ -1138,9 +1133,7 @@ export async function getOpenCommitment(): Promise<PriorityHistoryRow | null> {
 // created row, or null if nothing was persisted — callers MUST treat null as a
 // soft failure and not render a committed state.
 export async function commitToPriority(
-  signal: Signal,
-  committedAction: string,
-  checkInDays: number = COMMITMENT_DEFAULT_CHECK_IN_DAYS
+  commitment: Commitment
 ): Promise<PriorityHistoryRow | null> {
   if (!isConfigured()) return null;
 
@@ -1158,21 +1151,27 @@ export async function commitToPriority(
     const created = await request<PriorityHistoryRow[]>(PRIORITY_HISTORY_TABLE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      // ── Commitment → priority_history column mapping (Phase 2.5) ────────────
+      // On commitment rows (status != null) these columns carry the COMMITMENT
+      // domain meaning, which differs from signal-fire rows (status null):
+      //   metric_value   = baseline cash at commit   (signal-fire: percentFunded)
+      //   target_value   = owner-entered weekly $T    (signal-fire: target ratio)
+      //   gap_amount     = full reserve gap (context) (signal-fire: same)
+      //   outcome_metric = final cash at resolve      (signal-fire: unused)
+      // The watch-metric id is derived from signal_type, so it needs no column.
+      // This is the ONLY place that maps Commitment domain fields to columns.
       body: JSON.stringify({
         workspace_id: WORKSPACE_ID,
-        signal_type: signal.type,
-        severity: signal.severity,
-        metric_value: signal.metricValue ?? null,
-        target_value: signal.targetValue ?? null,
-        category_flagged: signal.categoryFlagged ?? null,
-        gap_amount: signal.gapAmount ?? null,
-        // recommended_action = the assistant's words; committed_action = what
-        // the owner agreed to. Equal in Phase 2, distinct for the deferred
-        // "I'll do something else" path.
-        recommended_action: signal.recommendedAction ?? null,
-        committed_action: committedAction,
+        signal_type: commitment.signalType,
+        severity: commitment.severity,
+        metric_value: commitment.baseline,
+        target_value: commitment.target,
+        category_flagged: null,
+        gap_amount: commitment.gapContext,
+        recommended_action: commitment.recommendedAction ?? null,
+        committed_action: commitment.action,
         committed_at: new Date().toISOString(),
-        deadline_date: isoDaysFromNow(checkInDays),
+        deadline_date: commitment.deadlineISO,
         status: 'open',
       }),
     });
@@ -1218,13 +1217,9 @@ export async function resolveCommitment(
   }
 }
 
-// Pushes the check-in window out to now + extendDays ("Keep going"). Resets
-// from now (not the existing deadline_date) so day-math lives in one place and
-// the caller never needs to read the current window.
-export async function extendCommitment(
-  id: string,
-  extendDays: number = COMMITMENT_DEFAULT_CHECK_IN_DAYS
-): Promise<boolean> {
+// Pushes the deadline out to a fresh +7d window ("Keep going"), via the shared
+// anchor so the window model lives in one place (commitments/anchor).
+export async function extendCommitment(id: string): Promise<boolean> {
   if (!isConfigured()) return false;
 
   try {
@@ -1233,7 +1228,7 @@ export async function extendCommitment(
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ deadline_date: isoDaysFromNow(extendDays) }),
+        body: JSON.stringify({ deadline_date: commitmentDeadline() }),
       }
     );
     return true;
@@ -1241,6 +1236,18 @@ export async function extendCommitment(
     console.error('[priority-history] extendCommitment failed:', err);
     return false;
   }
+}
+
+// Read-side translation: the inverse of the commitToPriority column mapping.
+// Keeps the column-name knowledge here in the storage adapter so the card and
+// copy layer consume the Commitment domain names (baseline/target), per Fork A.
+export function readCommitmentWatch(
+  row: PriorityHistoryRow
+): { baseline: number | null; target: number | null } {
+  return {
+    baseline: row.metric_value ?? null,
+    target: row.target_value ?? null,
+  };
 }
 
 // AI prose cache — backs priority_prose_cache. Both helpers take

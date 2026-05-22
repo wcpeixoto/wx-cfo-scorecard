@@ -1,18 +1,21 @@
 /**
  * CFO Assistant card — Today page, top-right cell.
  *
- * Phase 2b: the commitment loop's consent surface. Above the context chips the
- * card surfaces the hero's recommended action (copy.action, rendered as-is) with
- * a bare "I'll do this" primary and a "Not this week" text link. Tapping the
- * primary writes a commitment via commitToPriority and the same slot re-renders
- * the open commitment ("Committed: … Checking back ~<date>."); the link
- * is a session-only dismissal that stores nothing. The open commitment is read
- * once on mount (getOpenCommitment) — it's global, not per-signal. steady_state
- * surfaces no consent (nothing to commit to), so the whole slot is gated on it.
+ * Phase 2.5: the structured-commitment consent surface. commitmentFromSignal
+ * turns the hero into a CommitmentDraft, or null when the signal isn't
+ * commitment-ready (the STOP rule — only reserve_warning this slice). When a
+ * draft exists and nothing is open, the consent slot shows the action plus the
+ * one required field — an owner-entered weekly target — and a "Not this week"
+ * session dismissal. Committing builds a Commitment (action denominated in the
+ * target, +7d deadline, watch baseline = cash now) and writes it via
+ * commitToPriority. The open commitment is read once on mount (global, not
+ * per-signal) and renders the committed state until resolved (principle #5),
+ * regardless of the current hero.
  *
- * Phase 1c (unchanged): the three structural chips below — "What should I do
- * next?" / "Why this step?" / "What should I watch?" — answer inline from
- * getFallbackCopy(hero) and getWatchMetric. No fetch, no AI proxy call.
+ * The three structural chips below — "What should I do next?" / "Why this
+ * step?" / "What should I watch?" — answer inline from getFallbackCopy(hero) and
+ * getWatchMetric (the watch routes reserve_warning through the registry; other
+ * types keep their current metric). No fetch, no AI proxy call.
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
@@ -20,7 +23,8 @@ import type { PriorityHistoryRow } from '../lib/priorities/types';
 import { detectSignals } from '../lib/priorities/signals';
 import { rankPriorities } from '../lib/priorities/rank';
 import { getFallbackCopy, getWatchMetric } from '../lib/priorities/copy';
-import { getOpenCommitment, commitToPriority } from '../lib/data/sharedPersistence';
+import { getOpenCommitment, commitToPriority, readCommitmentWatch } from '../lib/data/sharedPersistence';
+import { commitmentFromSignal, type Commitment } from '../lib/commitments';
 
 interface CfoAssistantCardProps {
   model: DashboardModel;
@@ -52,9 +56,34 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   );
 
   const copy = useMemo(() => getFallbackCopy(hero), [hero]);
+
+  // A commitment-ready draft for the hero, or null (the STOP rule — only
+  // reserve_warning is commitment-ready this slice). Drives the consent slot.
+  const draft = useMemo(() => commitmentFromSignal(hero, model), [hero, model]);
+
+  // Commitment loop. The single open commitment is global (not per-signal), read
+  // once on mount: while null the consent affordance shows; once set, the slot
+  // renders the committed state instead and stays until resolved (principle #5).
+  const [openCommitment, setOpenCommitment] = useState<PriorityHistoryRow | null>(null);
+  const [committing, setCommitting] = useState(false);
+  // Session-only "Not this week" dismissal — stores nothing; the recommendation
+  // returns on the next load.
+  const [dismissed, setDismissed] = useState(false);
+  // Owner-entered weekly target $ — the one required consent field. Blank by
+  // default; a pre-filled value would become the answer (re-inventing the
+  // auto-slice we rejected).
+  const [targetInput, setTargetInput] = useState('');
+  const target = Number.parseFloat(targetInput);
+  const validTarget = Number.isFinite(target) && target > 0;
+
   const watch = useMemo(
-    () => getWatchMetric(hero, model.runway.currentCashBalance),
-    [hero, model.runway.currentCashBalance]
+    () =>
+      getWatchMetric(
+        hero,
+        model,
+        openCommitment ? readCommitmentWatch(openCommitment) : null
+      ),
+    [hero, model, openCommitment]
   );
 
   // value per chip — also gates the defensive disabled state below.
@@ -65,15 +94,6 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   };
 
   const [activeChipId, setActiveChipId] = useState<ChipId | null>(null);
-
-  // Commitment loop (Phase 2b). The single open commitment is global (not
-  // per-signal), read once on mount: while null the consent affordance shows;
-  // once set, the slot renders the committed state instead.
-  const [openCommitment, setOpenCommitment] = useState<PriorityHistoryRow | null>(null);
-  const [committing, setCommitting] = useState(false);
-  // Session-only "Not this week" dismissal — stores nothing; the recommendation
-  // returns on the next load.
-  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,18 +106,25 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   }, []);
 
   const handleCommit = async () => {
-    if (committing) return;
+    if (committing || !draft || !validTarget) return;
     setCommitting(true);
-    const row = await commitToPriority(hero, copy.action);
+    const commitment: Commitment = {
+      signalType: draft.signalType,
+      severity: hero.severity,
+      action: draft.buildAction(target),
+      recommendedAction: hero.recommendedAction,
+      target,
+      baseline: draft.baseline,
+      gapContext: draft.gapContext,
+      deadlineISO: draft.deadlineISO,
+      watchMetricId: draft.watchMetricId,
+    };
+    const row = await commitToPriority(commitment);
     setCommitting(false);
     // Non-silent: null means nothing was persisted — stay in the fresh state
     // rather than render an unbacked committed state.
     if (row) setOpenCommitment(row);
   };
-
-  // steady_state surfaces nothing to commit to, so the consent slot is gated out
-  // entirely (no empty-gap placeholder).
-  const showConsentSlot = hero.type !== 'steady_state';
 
   return (
     <section className="card cfo-assistant-card" aria-labelledby="cfo-assistant-title">
@@ -106,7 +133,7 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
         <p className="subtle">Let's make the numbers useful.</p>
       </header>
       <div className="cfo-assistant-card__body">
-        {showConsentSlot && openCommitment && (
+        {openCommitment && (
           <div className="cfo-assistant-card__commitment">
             <p className="cfo-assistant-card__commitment-text">
               Committed: {openCommitment.committed_action}. Checking back ~
@@ -114,15 +141,32 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
             </p>
           </div>
         )}
-        {showConsentSlot && !openCommitment && !dismissed && (
+        {!openCommitment && draft && !dismissed && (
           <div className="cfo-assistant-card__consent">
-            <p className="cfo-assistant-card__recommendation">{copy.action}</p>
+            <p className="cfo-assistant-card__recommendation">
+              {validTarget
+                ? draft.buildAction(target)
+                : 'Move money into your operating reserve this week.'}
+            </p>
+            <label className="cfo-assistant-card__target">
+              <span className="cfo-assistant-card__target-label">Amount this week</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="50"
+                className="cfo-assistant-card__target-input"
+                placeholder="e.g. $500"
+                value={targetInput}
+                onChange={(e) => setTargetInput(e.target.value)}
+              />
+            </label>
             <div className="cfo-assistant-card__commit-row">
               <button
                 type="button"
                 className="cfo-assistant-card__commit"
                 onClick={handleCommit}
-                disabled={committing}
+                disabled={committing || !validTarget}
               >
                 I'll do this
               </button>

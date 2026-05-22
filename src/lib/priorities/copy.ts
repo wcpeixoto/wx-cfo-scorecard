@@ -1,5 +1,7 @@
 import type { Signal, PriorityHistoryRow } from './types';
 import type { AIProse } from './ai';
+import type { DashboardModel } from '../data/contract';
+import { watchMetricForSignal } from '../commitments';
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -60,6 +62,10 @@ export function getFallbackCopy(
   switch (signal.type) {
 
     case 'reserve_critical': {
+      // TODO(phase-2.5+): this action bundles three options ("early renewals, a
+      // short promotion, or collect…") — a principle #2 violation. Deferred:
+      // reserve_critical stays awareness-only this slice (Fork E). Make it
+      // commitment-ready (one action + a registry watch entry) in a later slice.
       const fundedPct = pct(signal.metricValue);
       const gap = fmt(signal.gapAmount);
       return {
@@ -87,7 +93,7 @@ export function getFallbackCopy(
           ? `Your reserve slipped to ${fundedPct} — the direction reversed since last time. Small surprises are manageable, but bigger ones would squeeze you.`
           : `You're at ${fundedPct} of your target. You have a cushion, but not the full buffer you'd want if something unexpected hit.`,
         currentState: `You need ${gap} more to be fully funded. You're in the right zone — just not all the way there yet.`,
-        action: `Direct ${gap} more toward the reserve — even splitting it over the next two months moves the number.`,
+        action: 'Move money into your operating reserve this week — pick an amount you can hit in seven days.',
         alternative: 'Make sure no new discretionary spending cuts into what you\'ve already built.',
         followupNote: 'You\'re heading in the right direction — keep the momentum.',
       };
@@ -246,12 +252,34 @@ const watchCashFormat = new Intl.NumberFormat('en-US', {
 // metricValue, so it falls back to the passed-in current cash balance.
 export function getWatchMetric(
   signal: Signal,
-  currentCashBalance: number
+  model: DashboardModel,
+  committed?: { baseline: number | null; target: number | null } | null
 ): { label: string; value: string } {
+  // Commitment-ready types route through the watch-metric registry (action-tied,
+  // #4). reserve_warning is the only one this slice: committed → progress
+  // "$Y of $X" (signed, honest at any sign — never "you contributed"); fresh →
+  // the baseline-to-be ("starting at $X").
+  const spec = watchMetricForSignal(signal.type);
+  if (spec) {
+    const current = spec.computeCurrent(model);
+    if (committed && committed.baseline !== null && committed.target !== null) {
+      const progress = current - committed.baseline;
+      return {
+        label: spec.label,
+        value: `${watchCashFormat.format(progress)} of ${watchCashFormat.format(committed.target)}`,
+      };
+    }
+    return { label: spec.label, value: `starting at ${watchCashFormat.format(current)}` };
+  }
+
+  // Awareness-only types keep their current (portfolio) watch metric until each
+  // becomes commitment-ready — then it gets a registry entry and leaves this
+  // switch. Migrate per type, in priority order:
+  //   reserve_critical, cash_flow_negative, cash_flow_tight, expense_surge,
+  //   revenue_decline, owner_distributions_high.  (steady_state stays Cash on Hand.)
   switch (signal.type) {
 
     case 'reserve_critical':
-    case 'reserve_warning':
       return { label: 'Reserve funded', value: pct(signal.metricValue) };
 
     case 'cash_flow_negative':
@@ -276,6 +304,6 @@ export function getWatchMetric(
 
     case 'steady_state':
     default:
-      return { label: 'Cash on Hand', value: watchCashFormat.format(currentCashBalance) };
+      return { label: 'Cash on Hand', value: watchCashFormat.format(model.runway.currentCashBalance) };
   }
 }

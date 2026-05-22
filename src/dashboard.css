@@ -8812,6 +8812,40 @@ body {
   line-height: 20px;
 }
 
+/* Owner-entered weekly target (Phase 2.5) — the one required field in the
+   consent slot. Blank by default with a placeholder; a pre-filled value would
+   become the answer and re-invent the auto-slice we rejected. 40px field height
+   (an input, not a button — outside the button-height taxonomy). */
+.cfo-assistant-card__target {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.cfo-assistant-card__target-label {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.cfo-assistant-card__target-input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #344054;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.cfo-assistant-card__target-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 /* Commit + dismiss share one row below the recommendation. __consent stays a
    column at the outer level (recommendation on its own line above); only these
    two buttons sit side by side here, so the primary no longer stretches. */
