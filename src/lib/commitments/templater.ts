@@ -1,5 +1,6 @@
 import type { DashboardModel } from '../data/contract';
 import type { PriorityHistoryRow } from '../priorities/types';
+import type { CommitmentBeat } from './cadence';
 import { watchMetricForSignal } from './watchMetrics';
 
 // The single source of owner-facing commitment-STATE copy (Phase 2c). Commitment
@@ -8,9 +9,9 @@ import { watchMetricForSignal } from './watchMetrics';
 // no async. A domain helper, so it reads the row's columns directly (the "no raw
 // fields" rule binds the UI surfaces, not this file).
 //
-// The bundle grows across 2c: PR-A migrates the committed summary + watch
-// progress; PR-B adds per-beat during-window copy; PR-C adds the after-deadline
-// check-in states + attribution prompt.
+// The bundle grows across 2c: PR-A migrated the committed summary + watch
+// progress; PR-B makes the summary beat-aware (during-window cadence); PR-C adds
+// the after-deadline check-in states + attribution prompt.
 
 const usd = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -25,12 +26,34 @@ export interface CommitmentCopy {
 
 export function commitmentTemplate(
   row: PriorityHistoryRow,
+  beat: CommitmentBeat,
   model: DashboardModel,
 ): CommitmentCopy {
-  return {
-    summary: `Committed: ${row.committed_action ?? ''}. Checking back ~${formatDeadline(row.deadline_date)}.`,
-    watch: watchCopy(row, model),
-  };
+  const watch = watchCopy(row, model);
+  return { summary: summaryFor(row, beat, watch), watch };
+}
+
+// The card-row line, time-aware per the during-window cadence (#8). Day-one
+// states the commitment; midpoint and day-before show progress + time remaining
+// only (Gate 1: no pace judgment, no execute CTA — Execute is hidden until
+// Phase 3); after-deadline states the outcome and hands off to the check-in
+// (PR-C adds the resolution affordances). watch.value is the honest signed
+// "$Y of $X" — never a causation claim.
+function summaryFor(
+  row: PriorityHistoryRow,
+  beat: CommitmentBeat,
+  watch: { label: string; value: string },
+): string {
+  switch (beat.phase) {
+    case 'day_one':
+      return `Committed: ${row.committed_action ?? ''} Checking back ~${formatDeadline(row.deadline_date)}.`;
+    case 'midpoint':
+      return `${watch.label}: ${watch.value} · ${beat.daysRemaining} days left.`;
+    case 'day_before':
+      return `${watch.label}: ${watch.value} · last day.`;
+    case 'after_deadline':
+      return `${watch.label}: ${watch.value} · your week's up.`;
+  }
 }
 
 // "2026-05-29T…" -> "May 29". Short month + day, en-US — the friendly form of

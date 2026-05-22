@@ -30,7 +30,7 @@ import { detectSignals } from '../lib/priorities/signals';
 import { rankPriorities } from '../lib/priorities/rank';
 import { getFallbackCopy, getWatchMetric } from '../lib/priorities/copy';
 import { getOpenCommitment, commitToPriority } from '../lib/data/sharedPersistence';
-import { commitmentFromSignal, commitmentTemplate, type Commitment } from '../lib/commitments';
+import { commitmentFromSignal, commitmentTemplate, commitmentBeat, type Commitment } from '../lib/commitments';
 
 interface CfoAssistantCardProps {
   model: DashboardModel;
@@ -72,9 +72,13 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   const target = Number.parseFloat(targetInput);
   const validTarget = Number.isFinite(target) && target > 0;
 
-  // Committed-state copy bundle (Commitment Mode, #5), or null when fresh.
+  // Committed-state copy bundle (Commitment Mode, #5), or null when fresh. The
+  // follow-up beat is computed on open (#8) from the commitment's timestamps.
   const template = useMemo(
-    () => (openCommitment ? commitmentTemplate(openCommitment, model) : null),
+    () =>
+      openCommitment
+        ? commitmentTemplate(openCommitment, commitmentBeat(openCommitment), model)
+        : null,
     [openCommitment, model]
   );
 
