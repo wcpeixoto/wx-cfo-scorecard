@@ -362,6 +362,13 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
             </div>
           </div>
         )}
+        {!activeCommitment && !draft && (
+          // Awareness-only signals (e.g. reserve_critical) are not commitment-ready
+          // (#3 STOP rule), so they have no consent slot or committed summary — this
+          // is their only home for the recommended action. Without it the card shows
+          // "Understand this recommendation" with nothing to understand.
+          <p className="cfo-assistant-card__recommendation">{copy.action}</p>
+        )}
         <p className="cfo-assistant-card__prompt">Understand this recommendation</p>
         <div
           className="cfo-assistant-card__chips"
