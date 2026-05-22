@@ -48,7 +48,7 @@ import {
   commitmentTemplate,
   commitmentBeat,
   groundingConsentMode,
-  hasExecuteHelp,
+  buildExecuteHelp,
   type Commitment,
 } from '../lib/commitments';
 import { devCommitment, devGroundingOverride, devExecuteOverride } from '../lib/commitments/devSeam';
@@ -135,17 +135,21 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   const freshWatch = useMemo(() => getWatchMetric(hero, model), [hero, model]);
   const watch = template ? template.watch : freshWatch;
 
-  // B-1 Execute scaffold (#6.1): whether to reveal "Help me execute" inside
-  // Commitment Mode. hasExecuteHelp is false this slice (inert — the slot is empty
-  // until B-2 supplies the reserve_warning money-finding aid), so production shows
-  // no Execute control; ?devExecute= reveals it in dev for browser verification.
-  // The `import.meta.env.DEV ? … : base` site lets the minifier tree-shake
-  // devExecuteOverride (and the `devExecute` string) out of prod.
-  const executeAvailable = useMemo(() => {
-    if (!activeCommitment) return false;
-    const base = hasExecuteHelp();
-    return import.meta.env.DEV ? devExecuteOverride(base) : base;
-  }, [activeCommitment]);
+  // B-2 Execute (#6.1 / #10): the reserve_warning money-finding aid. buildExecuteHelp
+  // curates the app's own expense overruns into a guided pick-one-lever (or an honest
+  // "nothing jumped" message); it returns null only when the open commitment isn't a
+  // reserve_warning. Content is informational only — the owner acts outside the app.
+  const executeHelp = useMemo(
+    () => (activeCommitment ? buildExecuteHelp(model, activeCommitment) : null),
+    [activeCommitment, model]
+  );
+  // Visibility stays DEV-gated through B-4 (B stays "Next" until B-4): production
+  // hides the affordance even though content now exists; ?devExecute= reveals it in
+  // dev for browser verification. The prod branch is a literal `false`, so
+  // devExecuteOverride (and the `devExecute` string) tree-shake from prod — B-4
+  // flips this to `executeHelp !== null` to launch.
+  const executeAvailable =
+    executeHelp !== null && (import.meta.env.DEV ? devExecuteOverride(false) : false);
   const [executeOpen, setExecuteOpen] = useState(false);
 
   // value per chip — also gates the defensive disabled state below.
@@ -324,10 +328,10 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
               </div>
             ) : (
               // #6 escape hatches, during-window committed state. "Help me execute"
-              // (#6.1) is the B-1 scaffold below — revealed only when executeAvailable
-              // (false in prod this slice; ?devExecute= reveals it in dev). "Not doing
-              // this" (#6.3) shows the consequence before closing. "Update plan" (#6.2)
-              // stays deferred (needs a PATCH helper in the locked sharedPersistence.ts).
+              // (#6.1) is the B-2 money-finding aid below — DEV-gated through B-4
+              // (?devExecute= reveals it; hidden in prod). "Not doing this" (#6.3)
+              // shows the consequence before closing. "Update plan" (#6.2) stays
+              // deferred (needs a PATCH helper in the locked sharedPersistence.ts).
               <div className="cfo-assistant-card__escape">
                 {executeAvailable && !showCloseConfirm && (
                   <div className="cfo-assistant-card__execute">
@@ -343,15 +347,35 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
                     >
                       Help me execute
                     </button>
-                    {executeOpen && (
+                    {executeOpen && executeHelp && (
                       <div className="cfo-assistant-card__answer" data-testid="execute-slot">
-                        {/* B-1 ships this slot INERT — no owner-facing content. B-2
-                            fills it with the reserve_warning money-finding aid (surface
-                            shape via its own mini-discovery). The marker below is
-                            DEV-only and stripped from prod; it exists solely to verify
-                            the slot opens/closes. */}
-                        {import.meta.env.DEV && (
-                          <p className="cfo-assistant-card__answer-text">dev:execute-slot</p>
+                        {/* Shape C: a guided pick-one-lever over the app's own expense
+                            overruns, or an honest "nothing jumped" line. Informational
+                            only — no action button, no selected-lever state. */}
+                        {executeHelp.kind === 'none' ? (
+                          <p className="cfo-assistant-card__answer-text">{executeHelp.text}</p>
+                        ) : (
+                          <>
+                            <p className="cfo-assistant-card__answer-text">{executeHelp.lead}</p>
+                            <p className="cfo-assistant-card__execute-pick">
+                              <span className="cfo-assistant-card__execute-pick-label">
+                                Start here:
+                              </span>{' '}
+                              {executeHelp.recommended.text}
+                            </p>
+                            {executeHelp.alternates.length > 0 && (
+                              <ul className="cfo-assistant-card__execute-alts">
+                                {executeHelp.alternates.map((alt) => (
+                                  <li
+                                    key={alt.category}
+                                    className="cfo-assistant-card__execute-alt"
+                                  >
+                                    {alt.text}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </>
                         )}
                       </div>
                     )}

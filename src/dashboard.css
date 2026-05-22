@@ -8975,11 +8975,11 @@ body {
   margin-top: 12px;
 }
 
-/* B-1 Execute affordance scaffold (#6.1, Item B Stage 1). The "Help me execute"
-   toggle reuses the 36px chip control (no new button size) and the opened slot
-   reuses the __answer surface; this only spaces the affordance from the "Not doing
-   this" hatch below it. Rendered only when execution help is available — false in
-   production this slice, so prod shows nothing; revealed in dev via ?devExecute=. */
+/* Execute affordance (#6.1, Item B). The "Help me execute" toggle reuses the 36px
+   chip control (no new button size) and the opened slot reuses the __answer surface;
+   this only spaces the affordance from the "Not doing this" hatch below it. B-2 fills
+   the slot with the money-finding aid; visibility stays DEV-gated through B-4
+   (hidden in prod, revealed in dev via ?devExecute=). */
 .cfo-assistant-card__execute {
   margin-bottom: 12px;
 }
@@ -9066,6 +9066,34 @@ body {
   color: #344054;
   font-size: 14px;
   font-weight: 400;
+  line-height: 20px;
+}
+
+/* B-2 Execute money-finding aid (Shape C). The recommended "Start here:" pick sits
+   just under the lead line with a brand label; the alternates are a quiet, reset
+   list below it. All within the existing __answer surface — no new chrome. */
+.cfo-assistant-card__execute-pick {
+  margin: 8px 0 0;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.cfo-assistant-card__execute-pick-label {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.cfo-assistant-card__execute-alts {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cfo-assistant-card__execute-alt {
+  color: var(--text-secondary);
+  font-size: 13px;
   line-height: 20px;
 }
 
