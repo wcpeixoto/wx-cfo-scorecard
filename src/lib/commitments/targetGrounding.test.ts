@@ -169,4 +169,35 @@ describe('reserveGroundingHint (TG-2 consumption contract)', () => {
     expect(hint).not.toBeNull();
     expect(hint!.text).toContain('$200/week');
   });
+
+  const grounded = (recommended: number, ceiling: number) =>
+    reserveGroundingHint({
+      classification: 'grounded',
+      recommended,
+      ceiling,
+      floor: 25,
+      weeklyCapacity: 700,
+      unknownReason: null,
+    })!;
+
+  it('keeps the finish-line copy through the 12-week boundary', () => {
+    // ceil(1200/100) = 12 → still within ~a quarter
+    expect(grounded(100, 1200).text).toBe(
+      'Your recent surplus supports about $100/week — that fully funds your reserve in ~12 weeks.'
+    );
+  });
+
+  it('reframes a far-off horizon to a sustainable pace (no discouraging week count)', () => {
+    // ceil(1300/100) = 13 → just past the boundary
+    expect(grounded(100, 1300).text).toBe(
+      'Your recent surplus supports about $100/week — a sustainable pace toward your reserve.'
+    );
+    // The real fixture case (gap ~$14.1K, $100/wk → ~141 weeks) takes this branch.
+    const farOff = grounded(100, 14100).text;
+    expect(farOff).toBe(
+      'Your recent surplus supports about $100/week — a sustainable pace toward your reserve.'
+    );
+    expect(farOff).not.toContain('141');
+    expect(farOff).not.toContain('weeks');
+  });
 });

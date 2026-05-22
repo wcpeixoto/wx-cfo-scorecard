@@ -90,13 +90,19 @@ export function groundReserveWarningTarget(
 }
 
 // TG-2: the consent slot's read of a grounded target. Adjacent guidance only —
-// a single number + horizon ("supports ~$X/week — funds your reserve in ~N
-// weeks"), never a pre-fill (the input keeps its generic placeholder). The
-// `floor` rides along so the card can soft-warn (not block) below it.
+// a single number + horizon, never a pre-fill (the input keeps its generic
+// placeholder). The `floor` rides along so the card can soft-warn (not block)
+// below it.
 export interface ReserveGroundingHint {
   text: string;
   floor: number; // weekly $ below which to soft-warn
 }
+
+// Within ~a quarter the finish line motivates ("…in ~N weeks"); past it a precise
+// week count reads as discouraging on a weekly card (real data hit ~141 weeks),
+// so the copy reframes to the sustainable pace instead. Boundary inclusive: ≤ 12
+// → finish line, > 12 → pace.
+const FINISH_LINE_WEEKS_MAX = 12;
 
 // Keyed on `recommended`, NOT `classification`: a positive "do we have a number
 // to show?" test. The card therefore never branches on classification, so it
@@ -105,9 +111,11 @@ export interface ReserveGroundingHint {
 export function reserveGroundingHint(grounding: TargetGrounding): ReserveGroundingHint | null {
   const { recommended, ceiling, floor } = grounding;
   if (recommended === null) return null;
+  const amount = usd.format(recommended);
   const weeks = Math.max(1, Math.ceil(ceiling / recommended));
-  return {
-    text: `Your recent surplus supports about ${usd.format(recommended)}/week — that fully funds your reserve in ~${weeks} week${weeks === 1 ? '' : 's'}.`,
-    floor,
-  };
+  const text =
+    weeks <= FINISH_LINE_WEEKS_MAX
+      ? `Your recent surplus supports about ${amount}/week — that fully funds your reserve in ~${weeks} week${weeks === 1 ? '' : 's'}.`
+      : `Your recent surplus supports about ${amount}/week — a sustainable pace toward your reserve.`;
+  return { text, floor };
 }
