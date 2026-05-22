@@ -43,6 +43,12 @@ accountability loop and violates the outcome principle.
 
 Watch metric must match the action. Reserve % belongs in Purpose, not Watch.
 
+Watch metrics live in a per-type registry (`src/lib/commitments/watchMetrics.ts`).
+Entries are added per type as each becomes commitment-ready; awareness-only types
+retain their current watch metric until then. Per-type commitment generators MUST
+build deadlines via the shared anchor (`commitments/anchor`) and watch values via
+the registry — never re-derive them — so action, deadline, and watch can't drift apart.
+
 ## 5. Commitment is an accountability surface
 
 Once committed, the card becomes Commitment Mode and stays fixed on Today
