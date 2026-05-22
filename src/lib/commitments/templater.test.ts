@@ -17,6 +17,7 @@ function row(overrides: Partial<PriorityHistoryRow> = {}): PriorityHistoryRow {
     committed_action: 'Move $500 into your operating reserve this week.',
     metric_value: 6600, // baseline cash at commit
     target_value: 500, // owner-entered weekly target
+    gap_amount: 3400, // full reserve gap (context / close consequence)
     deadline_date: '2026-05-29T12:00:00.000Z', // noon UTC — date is TZ-stable in UTC + US
     status: 'open',
     committed_at: '2026-05-22T12:00:00.000Z',
@@ -51,9 +52,15 @@ describe('commitmentTemplate — beat-aware summary', () => {
     );
   });
 
-  it('after_deadline states the outcome and hands off to check-in', () => {
+  it('after_deadline (unclear) asks how it went', () => {
     expect(commitmentTemplate(row(), beat('after_deadline'), model(6800)).summary).toBe(
-      "Cash toward reserve: $200 of $500 · your week's up."
+      "Cash toward reserve: $200 of $500 · time's up — how did it go?"
+    );
+  });
+
+  it('after_deadline (target hit) celebrates instead of asking', () => {
+    expect(commitmentTemplate(row(), beat('after_deadline'), model(7100)).summary).toBe(
+      'Cash toward reserve: $500 of $500 · you hit your target.'
     );
   });
 });
@@ -69,5 +76,50 @@ describe('commitmentTemplate — watch progress', () => {
     expect(commitmentTemplate(row(), beat('midpoint', 3), model(6000)).watch.value).toBe(
       '-$600 of $500'
     );
+  });
+});
+
+describe('commitmentTemplate — check-in (after deadline)', () => {
+  it('no check-in during the window', () => {
+    expect(commitmentTemplate(row(), beat('day_one', 6), model(6800)).checkIn).toBeNull();
+    expect(commitmentTemplate(row(), beat('midpoint', 3), model(6800)).checkIn).toBeNull();
+    expect(commitmentTemplate(row(), beat('day_before', 1), model(6800)).checkIn).toBeNull();
+  });
+
+  it('achieved when progress reaches target — celebrate, no attribution', () => {
+    const c = commitmentTemplate(row(), beat('after_deadline'), model(7100)).checkIn;
+    expect(c?.state).toBe('achieved');
+    expect(c?.attribution).toBeNull();
+  });
+
+  it('partial when there is some progress — asks for honest attribution', () => {
+    const c = commitmentTemplate(row(), beat('after_deadline'), model(6800)).checkIn;
+    expect(c?.state).toBe('partial');
+    expect(c?.attribution?.prompt).toBe('Did your actions drive this?');
+    expect(c?.attribution?.options).toEqual(['Yes, mostly', 'Partly', 'No', 'Not sure']);
+  });
+
+  it('missed when there is no progress', () => {
+    expect(commitmentTemplate(row(), beat('after_deadline'), model(6600)).checkIn?.state).toBe(
+      'missed'
+    );
+    expect(commitmentTemplate(row(), beat('after_deadline'), model(6000)).checkIn?.state).toBe(
+      'missed'
+    );
+  });
+});
+
+describe('commitmentTemplate — close consequence (#6)', () => {
+  it('states the real business consequence from the reserve gap', () => {
+    expect(commitmentTemplate(row(), beat('midpoint', 3), model(6800)).closeConsequence).toBe(
+      'Stopping leaves your reserve about $3,400 short of target. Stop anyway?'
+    );
+  });
+
+  it('falls back when no gap is recorded', () => {
+    expect(
+      commitmentTemplate(row({ gap_amount: undefined }), beat('midpoint', 3), model(6800))
+        .closeConsequence
+    ).toBe("Stopping ends this week's reserve push. Stop anyway?");
   });
 });

@@ -76,6 +76,19 @@ No guilt language anywhere.
 Attribution when unclear: compare actual vs forecast, ask owner to confirm
 (Yes mostly / Partly / No / Not sure). Never claim the system knows intent.
 
+### Closed vs Missed — storage convention (Phase 2c)
+
+"Not doing this" (Closed, #6) and a passed deadline (Missed, #7) both resolve to
+`status='lapsed'` — Closed does not get its own status value (a live schema
+change wasn't justified when the distinction is recoverable). They stay
+distinguishable by timestamp: `resolved_at < deadline_date` is Closed (resolved
+before the window ended); `resolved_at >= deadline_date` is Missed.
+
+This holds only because Closed fires strictly pre-deadline (#6) and Missed
+strictly post-deadline (#7). Any new path that writes `status='lapsed'` must
+preserve that partition, or promote `status` to an explicit `closed` value with a
+backfill first — otherwise the distinction is lost retroactively.
+
 ## 8. During-window follow-ups
 
 Follow-ups happen during the commitment window, not only after.

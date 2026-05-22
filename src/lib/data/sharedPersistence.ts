@@ -1190,6 +1190,13 @@ export async function commitToPriority(
 
 // Resolves the open commitment to a terminal state. The status=eq.open guard
 // makes this idempotent — a row already resolved/replaced is left untouched.
+//
+// Gate-3 invariant (Phase 2c): Closed vs Missed is recoverable as
+// resolved_at < deadline_date. This relies on Closed (principle #6) firing only
+// pre-deadline and Missed (principle #7) only post-deadline. If you add any new
+// path that writes status='lapsed', you must either preserve this partition or
+// promote status to an explicit closed value with a backfill first — otherwise
+// the distinction is lost retroactively.
 export async function resolveCommitment(
   id: string,
   outcome: 'kept' | 'lapsed',
