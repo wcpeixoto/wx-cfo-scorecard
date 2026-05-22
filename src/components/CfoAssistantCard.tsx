@@ -49,6 +49,7 @@ import {
   commitmentBeat,
   groundingConsentMode,
   buildExecuteHelp,
+  executeLabelFor,
   type Commitment,
 } from '../lib/commitments';
 import { devCommitment, devGroundingOverride, devExecuteOverride } from '../lib/commitments/devSeam';
@@ -150,6 +151,12 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
   // flips this to `executeHelp !== null` to launch.
   const executeAvailable =
     executeHelp !== null && (import.meta.env.DEV ? devExecuteOverride(false) : false);
+  // B-3 (#8): the Execute offer's label follows the cadence beat — day_one and
+  // midpoint open with "Help me execute", day_before escalates to "Final push".
+  // Recomputed inline per render (cheap ms math); null when fresh or post-deadline.
+  const executeLabel = activeCommitment
+    ? executeLabelFor(commitmentBeat(activeCommitment).phase)
+    : null;
   const [executeOpen, setExecuteOpen] = useState(false);
 
   // value per chip — also gates the defensive disabled state below.
@@ -345,7 +352,7 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
                       aria-expanded={executeOpen}
                       onClick={() => setExecuteOpen((open) => !open)}
                     >
-                      Help me execute
+                      {executeLabel}
                     </button>
                     {executeOpen && executeHelp && (
                       <div className="cfo-assistant-card__answer" data-testid="execute-slot">

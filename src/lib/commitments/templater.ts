@@ -1,6 +1,6 @@
 import type { DashboardModel } from '../data/contract';
 import type { PriorityHistoryRow } from '../priorities/types';
-import type { CommitmentBeat } from './cadence';
+import type { CommitmentBeat, CommitmentPhase } from './cadence';
 import { watchMetricForSignal } from './watchMetrics';
 
 // The single source of owner-facing commitment-STATE copy (Phase 2c). Commitment
@@ -91,6 +91,25 @@ function summaryFor(
       return state === 'achieved'
         ? `${watch.label}: ${watch.value} · you hit your target.`
         : `${watch.label}: ${watch.value} · time's up — how did it go?`;
+  }
+}
+
+// The "Help me execute" chip label, beat-aware (#8 / B-3). A surface distinct
+// from summaryFor: the Execute slot is hidden after the deadline (the check-in
+// replaces it), so this offers no after-deadline label. day_one and midpoint
+// share the opening offer — midpoint differentiation (a pace nudge) is
+// deliberately deferred (Gate 1 forbids during-window pace judgment); day_before
+// escalates to the final push. Total over CommitmentPhase (so it is unit-testable
+// at every phase); null encodes "no offer here".
+export function executeLabelFor(phase: CommitmentPhase): string | null {
+  switch (phase) {
+    case 'day_one':
+    case 'midpoint':
+      return 'Help me execute';
+    case 'day_before':
+      return 'Final push';
+    case 'after_deadline':
+      return null; // slot hidden post-deadline — no offer
   }
 }
 

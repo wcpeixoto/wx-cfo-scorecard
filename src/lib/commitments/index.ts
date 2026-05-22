@@ -11,7 +11,7 @@ export type {
 } from './types';
 export { WATCH_METRICS, watchMetricForSignal } from './watchMetrics';
 export { commitmentDeadline } from './anchor';
-export { commitmentTemplate } from './templater';
+export { commitmentTemplate, executeLabelFor } from './templater';
 export type { CommitmentCopy } from './templater';
 export { commitmentBeat } from './cadence';
 export type { CommitmentBeat, CommitmentPhase } from './cadence';
