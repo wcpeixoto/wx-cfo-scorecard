@@ -11,6 +11,8 @@ export type {
 } from './types';
 export { WATCH_METRICS, watchMetricForSignal } from './watchMetrics';
 export { commitmentDeadline } from './anchor';
+export { commitmentTemplate } from './templater';
+export type { CommitmentCopy } from './templater';
 
 // The single factory choke point (Fork A/B). reserve_warning is the only
 // commitment-ready signal this slice; every other type returns null, which IS
