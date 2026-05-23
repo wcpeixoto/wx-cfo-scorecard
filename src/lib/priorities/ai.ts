@@ -113,7 +113,11 @@ function stripJsonFences(raw: string): string {
   return fenceMatch ? fenceMatch[1].trim() : trimmed;
 }
 
-async function callAIProvider(
+// Exported so the commitment grounded-copy generator (commitments/groundedSummary.ts)
+// reuses the same proxy transport — timeout categorization, content-shape
+// validation, fence strip — instead of duplicating it. Returns the already
+// fence-stripped provider text.
+export async function callAIProvider(
   systemPrompt: string,
   userMessage: string
 ): Promise<string> {
