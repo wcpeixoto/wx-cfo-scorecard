@@ -439,7 +439,7 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
                 min="0"
                 step="50"
                 className="cfo-assistant-card__target-input"
-                placeholder="e.g. $500"
+                placeholder="$"
                 value={targetInput}
                 onChange={(e) => setTargetInput(e.target.value)}
               />
