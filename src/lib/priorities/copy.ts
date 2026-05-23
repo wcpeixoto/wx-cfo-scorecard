@@ -128,7 +128,7 @@ export function getFallbackCopy(
           ? `The forward picture has tightened since last check — your lowest projected balance is ${lowest}. You won't run dry, but the cushion is thinner.`
           : `Your projected cash stays positive, but could fall ${gap} below your Operating Reserve. You're not in danger, but you'd be cutting it close.`,
         currentState: `The lowest your balance gets is ${lowest} in ${troughMonth} — just below the Operating Reserve you've set.`,
-        action: 'Identify one payment you can shift out by 2–4 weeks — smoothing the timing is usually enough here.',
+        action: 'Identify one payment you can shift out by 2–4 weeks — smoothing the timing relieves the squeeze.',
         alternative: 'Even smoothing out when bills are paid can help — timing matters as much as amount.',
         followupNote: 'You\'re in control here — a small adjustment now keeps you comfortable.',
       };
