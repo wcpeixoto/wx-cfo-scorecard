@@ -76,8 +76,6 @@ export function getFallbackCopy(
           : `Your reserve is at ${fundedPct} — below the level that keeps you safe when something unexpected hits. Right now, there's not much buffer between you and a real squeeze.`,
         currentState: `You need ${gap} more to get above the halfway mark. Every dollar you add here buys real breathing room.`,
         action: 'Find one expense to cut this month — the fastest controllable move when reserves are critical.',
-        alternative: 'If revenue can\'t move quickly, identify one expense you can delay by 30 days.',
-        followupNote: 'Getting above 50% funded is the first milestone — let\'s close that gap.',
       };
     }
 
@@ -93,8 +91,6 @@ export function getFallbackCopy(
           : `You're at ${fundedPct} of your target. You have a cushion, but not the full buffer you'd want if something unexpected hit.`,
         currentState: `You need ${gap} more to be fully funded. You're in the right zone — just not all the way there yet.`,
         action: 'Move money into your operating reserve this week — pick an amount you can hit in seven days.',
-        alternative: 'Make sure no new discretionary spending cuts into what you\'ve already built.',
-        followupNote: 'You\'re heading in the right direction — keep the momentum.',
       };
     }
 
@@ -111,8 +107,6 @@ export function getFallbackCopy(
           : `Based on your current pace, your balance is projected to go negative. That's not just a warning — it means bills don't get paid on time.`,
         currentState: `Your lowest projected balance is ${lowest} in ${troughMonth}. You need ${gap} more to stay above zero through the forecast window.`,
         action: 'Send any outstanding invoices today — collecting what you\'re already owed is the fastest cash you can pull in.',
-        alternative: 'Pulling forward any annual renewals or a short promotion could bridge the gap.',
-        followupNote: 'This is the most time-sensitive signal on the dashboard right now.',
       };
     }
 
@@ -129,8 +123,6 @@ export function getFallbackCopy(
           : `Your projected cash stays positive, but could fall ${gap} below your Operating Reserve. You're not in danger, but you'd be cutting it close.`,
         currentState: `The lowest your balance gets is ${lowest} in ${troughMonth} — just below the Operating Reserve you've set.`,
         action: 'Identify one payment you can shift out by 2–4 weeks — smoothing the timing relieves the squeeze.',
-        alternative: 'Even smoothing out when bills are paid can help — timing matters as much as amount.',
-        followupNote: 'You\'re in control here — a small adjustment now keeps you comfortable.',
       };
     }
 
@@ -149,8 +141,6 @@ export function getFallbackCopy(
             : `Last month's ${category} spending was ${surgeTotal} — more than double your normal level of ${baseline}. A jump this size usually has a specific driver.`,
           currentState: `That's ${delta} above your average. This is the largest spending increase across all categories right now.`,
           action: `Open last month's ${category} transactions and find the single largest item driving the spike.`,
-          alternative: 'If the increase was intentional — a one-time purchase or seasonal event — note it and move on.',
-          followupNote: 'If this continues at the same level next month, it becomes a structural expense increase.',
         };
       }
       return {
@@ -162,8 +152,6 @@ export function getFallbackCopy(
           : `Last month's ${category} spending was ${surgeTotal}, about ${pct(signal.gapAmount && signal.targetValue ? signal.gapAmount / signal.targetValue : undefined)} above your normal average of ${baseline}.`,
         currentState: `The increase is ${delta} above your baseline. It's not alarming on its own, but it broke the pattern.`,
         action: `Check last month's ${category} transactions this week — is it a one-time charge or something recurring?`,
-        alternative: 'If it\'s a recurring change, update your expense expectations for coming months.',
-        followupNote: 'One more month at this level and it starts to look structural.',
       };
     }
 
@@ -183,8 +171,6 @@ export function getFallbackCopy(
             : `Your average monthly revenue over the last 3 months is ${trailing}, compared to ${prior} the 3 months before — a decline of more than 15%.`,
           currentState: `That's a real shift in your revenue base. Something in your income mix has changed.`,
           action: 'Find the single largest revenue source that declined — memberships, classes, or event revenue — and dig into why.',
-          alternative: 'If this is seasonal, compare to the same period last year before making changes.',
-          followupNote: 'Revenue trends of this size usually have a clear root cause — finding it is the first step.',
         };
       }
       return {
@@ -196,8 +182,6 @@ export function getFallbackCopy(
           : `Average monthly revenue is down about ${declineRate} compared to the prior three months, from ${prior} to ${trailing}.`,
         currentState: `It's not a crisis, but the direction matters. Two more months of this and it becomes structural.`,
         action: 'Check your membership count and renewal rate this week — those are the first place a softening trend shows up.',
-        alternative: 'A quick look at any pricing or promotional changes in the past 60 days might explain it.',
-        followupNote: 'If this continues for another month or two, it\'ll need a more direct response.',
       };
     }
 
@@ -213,8 +197,6 @@ export function getFallbackCopy(
           : `At your current pace, you're on track to take out ${annualized} this year — compared to ${baseline} last year. That's above the 120% benchmark.`,
         currentState: 'The business can sustain this if cash flow is strong, but it tightens the cushion for surprises.',
         action: 'Compare your current cash balance to your Operating Reserve — if it\'s below, level your draw rate until it recovers.',
-        alternative: 'If the increase is planned — personal investment or a one-time need — log it so the forward cash picture stays accurate.',
-        followupNote: 'This isn\'t a red flag on its own — it\'s a calibration check to keep the business healthy as you grow.',
       };
     }
 
@@ -227,8 +209,6 @@ export function getFallbackCopy(
         why: 'No urgent signals are firing across your reserve, cash flow, or expenses. The business looks stable.',
         currentState: 'Reserve is healthy, the forward cash picture looks solid, and nothing unusual has surfaced.',
         action: 'Stay consistent — and consider moving some surplus toward the reserve while conditions are good.',
-        alternative: 'Use this window to review your next quarter\'s plan or push for a strategic revenue goal.',
-        followupNote: 'We\'ll keep watching and surface anything that needs attention.',
       };
     }
   }

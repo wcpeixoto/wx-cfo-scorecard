@@ -77,8 +77,8 @@ function steady(overrides: Partial<Signal> = {}): Signal {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 describe('AI_PROSE_PROMPT_VERSION', () => {
-  it('is "v2"', () => {
-    expect(AI_PROSE_PROMPT_VERSION).toBe('v2');
+  it('is "v3"', () => {
+    expect(AI_PROSE_PROMPT_VERSION).toBe('v3');
   });
 });
 
