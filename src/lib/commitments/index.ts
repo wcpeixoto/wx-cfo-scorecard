@@ -13,6 +13,7 @@ export { WATCH_METRICS, watchMetricForSignal } from './watchMetrics';
 export { commitmentDeadline } from './anchor';
 export { commitmentTemplate, executeLabelFor } from './templater';
 export type { CommitmentCopy } from './templater';
+export { generateGroundedDayOneSummary } from './groundedSummary';
 export { commitmentBeat } from './cadence';
 export type { CommitmentBeat, CommitmentPhase } from './cadence';
 export { reserveGroundingHint, groundingConsentMode, RESERVE_STOP_MESSAGE } from './targetGrounding';

@@ -50,6 +50,7 @@ import {
   groundingConsentMode,
   buildExecuteHelp,
   executeLabelFor,
+  generateGroundedDayOneSummary,
   type Commitment,
 } from '../lib/commitments';
 import { devCommitment, devGroundingOverride } from '../lib/commitments/devSeam';
@@ -130,6 +131,25 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
         : null,
     [activeCommitment, model]
   );
+
+  // Constrained-generator Slice 1: the day_one summary's tone layer. While the
+  // commitment sits at day_one, an AI generator may re-tone the confirmation line;
+  // it is grounded against the code target and falls back to template.summary on
+  // any contradiction or proxy failure, so this only ever swaps in a safe
+  // rendering. null until a grounded AI line resolves — first paint and every
+  // other beat stay deterministic.
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  useEffect(() => {
+    setAiSummary(null);
+    if (!activeCommitment || commitmentBeat(activeCommitment).phase !== 'day_one') return;
+    let cancelled = false;
+    generateGroundedDayOneSummary(activeCommitment).then((s) => {
+      if (!cancelled) setAiSummary(s);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCommitment]);
 
   // Committed → progress from the templater; fresh → the signal-derived
   // awareness watch.
@@ -252,7 +272,7 @@ export function CfoAssistantCard({ model, txns, forecastProjection }: CfoAssista
       <div className="cfo-assistant-card__body">
         {template && (
           <div className="cfo-assistant-card__commitment">
-            <p className="cfo-assistant-card__commitment-text">{template.summary}</p>
+            <p className="cfo-assistant-card__commitment-text">{aiSummary ?? template.summary}</p>
 
             {template.checkIn ? (
               <div className="cfo-assistant-card__checkin">

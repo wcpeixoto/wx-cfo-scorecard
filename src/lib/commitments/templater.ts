@@ -9,6 +9,11 @@ import { watchMetricForSignal } from './watchMetrics';
 // I/O, no async. A domain helper, so it reads the row's columns directly (the
 // "no raw fields" rule binds the UI surfaces, not this file).
 //
+// As of the constrained-generator Slice 1, the day_one summary line may be
+// re-toned by an AI generator (commitments/groundedSummary.ts); the exported
+// dayOneSummary below is that generator's deterministic fallback. The other beats
+// remain deterministic-only.
+//
 // Built up across 2c: PR-A migrated the committed summary + watch progress; PR-B
 // made the summary beat-aware (during-window cadence); PR-C adds the
 // after-deadline check-in state, the attribution prompt, and the close
@@ -82,7 +87,7 @@ function summaryFor(
 ): string {
   switch (beat.phase) {
     case 'day_one':
-      return `Committed: ${row.committed_action ?? ''} Checking back ~${formatDeadline(row.deadline_date)}.`;
+      return dayOneSummary(row);
     case 'midpoint':
       return `${watch.label}: ${watch.value} · ${beat.daysRemaining} days left.`;
     case 'day_before':
@@ -92,6 +97,13 @@ function summaryFor(
         ? `${watch.label}: ${watch.value} · you hit your target.`
         : `${watch.label}: ${watch.value} · time's up — how did it go?`;
   }
+}
+
+// The deterministic day_one summary line, extracted so the grounded generator
+// (commitments/groundedSummary.ts) can use it verbatim as its fallback. Pure,
+// row-only.
+export function dayOneSummary(row: PriorityHistoryRow): string {
+  return `Committed: ${row.committed_action ?? ''} Checking back ~${formatDeadline(row.deadline_date)}.`;
 }
 
 // The "Help me execute" chip label, beat-aware (#8 / B-3). A surface distinct
