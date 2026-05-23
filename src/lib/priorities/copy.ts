@@ -110,7 +110,7 @@ export function getFallbackCopy(
           ? `The forward outlook has gotten worse since last time — your projected low point is now ${lowest}. This needs attention before it becomes a real constraint.`
           : `Based on your current pace, your balance is projected to go negative. That's not just a warning — it means bills don't get paid on time.`,
         currentState: `Your lowest projected balance is ${lowest} in ${troughMonth}. You need ${gap} more to stay above zero through the forecast window.`,
-        action: 'Send any outstanding invoices today and identify one upcoming payment you can push out by 30 days.',
+        action: 'Send any outstanding invoices today — collecting what you\'re already owed is the fastest cash you can pull in.',
         alternative: 'Pulling forward any annual renewals or a short promotion could bridge the gap.',
         followupNote: 'This is the most time-sensitive signal on the dashboard right now.',
       };
@@ -128,7 +128,7 @@ export function getFallbackCopy(
           ? `The forward picture has tightened since last check — your lowest projected balance is ${lowest}. You won't run dry, but the cushion is thinner.`
           : `Your projected cash stays positive, but could fall ${gap} below your Operating Reserve. You're not in danger, but you'd be cutting it close.`,
         currentState: `The lowest your balance gets is ${lowest} in ${troughMonth} — just below the Operating Reserve you've set.`,
-        action: 'Identify any payment that can shift out 2–4 weeks, or one revenue item you can pull forward.',
+        action: 'Identify one payment you can shift out by 2–4 weeks — smoothing the timing is usually enough here.',
         alternative: 'Even smoothing out when bills are paid can help — timing matters as much as amount.',
         followupNote: 'You\'re in control here — a small adjustment now keeps you comfortable.',
       };
