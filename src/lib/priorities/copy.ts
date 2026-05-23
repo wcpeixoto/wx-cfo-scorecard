@@ -74,7 +74,7 @@ export function getFallbackCopy(
         why: worsened
           ? `Your reserve has dropped further — now at ${fundedPct} of where it needs to be. Right now there's not much between you and a real squeeze if something unexpected hits.`
           : `Your reserve is at ${fundedPct} — below the level that keeps you safe when something unexpected hits. Right now, there's not much buffer between you and a real squeeze.`,
-        currentState: `You need ${gap} more to get above the halfway mark. Every dollar you add here buys real breathing room.`,
+        currentState: `You're ${gap} short of the halfway mark — that's how far you are from real breathing room.`,
         action: 'Find one expense to cut this month — the fastest controllable move when reserves are critical.',
       };
     }
