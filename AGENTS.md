@@ -5,6 +5,33 @@ quick verification over heavy process.
 
 ---
 
+## Agent roles
+
+Four AI surfaces work on this repo, with **disconnected memory** — which is
+why these repo docs are canonical: they're the one place all four reconcile.
+Use the **handle** in day-to-day reference. Never call the Anthropic CLI
+"Codex" or the OpenAI agent "Claude Code."
+
+- **Strategist** — Claude Chat (Anthropic, claude.ai). Planning, framing,
+  product thinking. Anthropic-app memory (its own silo). No repo access;
+  works in prose + pasted artifacts.
+- **Builder** — Claude Code (Anthropic, CLI). The **committer**: discovery,
+  implements slices, opens PRs, browser-verifies, reads/persists the
+  `.claude` repo memory. Drafts the self-contained prompts the Reviewer runs.
+- **Reviewer** — Codex (OpenAI). Cross-vendor **review + read-only/sandbox
+  execution**; **memory-blind** — every prompt must be self-contained (full
+  paths, required reading, locked-files list). **Does not commit.**
+- **Advisor** — ChatGPT (OpenAI). External second opinion; no memory, no
+  repo; prose in/out.
+
+**Shared protocols.** Repo docs are canonical, memory is cache (docs win on
+conflict). Two-AI gate for irreversible actions: Builder drafts → Reviewer
+*or* Advisor validates → Builder runs the final step → verify. Notion Backlog
+is the priority authority for "what's next." Direction decisions stay with
+Wesley; agents recommend, they don't auto-pick.
+
+---
+
 ## Stack
 
 - React + TypeScript + Vite
