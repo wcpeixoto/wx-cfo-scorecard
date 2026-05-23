@@ -187,3 +187,17 @@ The answer determines where the fix lives.
 
 See `AGENTS.md` → "Architecture: deterministic + AI layers" for the
 mechanical contract.
+
+### Voice quality vs. variety (Slice 1c)
+
+Slice 1 proved the substrate; live verification then showed temp-0
+generation opening every `day_one` summary with the same phrase. Slice 1c
+iterated the prompt to fix voice **quality** — calm frame, owner as the
+subject, no generic openers — and changed no grounding behavior.
+
+The boundary it surfaced: prompt iteration lifts voice *quality*, but real
+cross-*time* variety (a fresh opener week to week) needs per-commitment
+caching plus temp > 0 — not a prompt tweak. `generateGroundedDayOneSummary`
+neither caches nor varies, so temp > 0 alone would re-roll the frozen
+confirmation on every reload. Not in scope for Slice 1c; queued as an
+architecture decision.
