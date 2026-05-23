@@ -62,9 +62,10 @@ export function getFallbackCopy(
   switch (signal.type) {
 
     case 'reserve_critical': {
-      // TODO(phase-2.5+): reserve_critical stays awareness-only this slice
-      // (Fork E). Make it commitment-ready (one action + a registry watch
-      // entry) in a later slice.
+      // Awareness fallback (headline/why/currentState/action) for non-commitment
+      // contexts — e.g. reserve_critical as a secondary priority. As a
+      // commitment-ready hero it now routes through the consent/STOP surface, so
+      // this prose no longer renders there.
       const fundedPct = pct(signal.metricValue);
       const gap = fmt(signal.gapAmount);
       return {
@@ -245,13 +246,10 @@ export function getWatchMetric(
 
   // Awareness-only types keep their current (portfolio) watch metric until each
   // becomes commitment-ready — then it gets a registry entry and leaves this
-  // switch. Migrate per type, in priority order:
-  //   reserve_critical, cash_flow_negative, cash_flow_tight, expense_surge,
+  // switch (routed through watchMetricForSignal above). Migrate per type, in
+  // priority order: cash_flow_negative, cash_flow_tight, expense_surge,
   //   revenue_decline, owner_distributions_high.  (steady_state stays Cash on Hand.)
   switch (signal.type) {
-
-    case 'reserve_critical':
-      return { label: 'Reserve funded', value: pct(signal.metricValue) };
 
     case 'cash_flow_negative':
     case 'cash_flow_tight': {

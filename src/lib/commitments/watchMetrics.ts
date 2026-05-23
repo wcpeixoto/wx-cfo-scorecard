@@ -19,11 +19,13 @@ export const WATCH_METRICS: Record<WatchMetricId, WatchMetricSpec> = {
 };
 
 // Which watch metric a commitment-ready signal type uses. Derived, not stored,
-// so persisting the id needs no column. reserve_warning is the only
-// commitment-ready type this slice; every other type is awareness-only and
+// so persisting the id needs no column. The reserve-funding signals
+// (reserve_warning + reserve_critical) share reserve_cash_delta — both track the
+// same cash-toward-reserve movement; every other type is awareness-only and
 // maps to no watch metric.
 const WATCH_METRIC_BY_SIGNAL: Partial<Record<SignalType, WatchMetricId>> = {
   reserve_warning: 'reserve_cash_delta',
+  reserve_critical: 'reserve_cash_delta',
 };
 
 export function watchMetricForSignal(type: SignalType): WatchMetricSpec | null {

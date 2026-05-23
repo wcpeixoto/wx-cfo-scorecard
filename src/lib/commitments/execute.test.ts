@@ -25,11 +25,17 @@ function row(signal_type: SignalType = 'reserve_warning'): PriorityHistoryRow {
 const opp = (title: string, savings: number): OpportunityItem => ({ title, savings, hint: '' });
 
 describe('buildExecuteHelp — B-2 reserve_warning money-finding aid (Shape C)', () => {
-  it('returns null when the commitment is not a reserve_warning (narrow path, lock #1)', () => {
+  it('returns null when the commitment is not a reserve-funding signal (narrow path, lock #1)', () => {
     const m = model([opp('Control Marketing', 1200)]);
-    expect(buildExecuteHelp(m, row('reserve_critical'))).toBeNull();
     expect(buildExecuteHelp(m, row('steady_state'))).toBeNull();
     expect(buildExecuteHelp(m, row('expense_surge'))).toBeNull();
+    expect(buildExecuteHelp(m, row('cash_flow_negative'))).toBeNull();
+  });
+
+  it('reuses the reserve money-finding aid for reserve_critical', () => {
+    const help = buildExecuteHelp(model([opp('Control Marketing', 1200)]), row('reserve_critical'));
+    if (help?.kind !== 'levers') throw new Error('expected levers');
+    expect(help.recommended.category).toBe('Marketing');
   });
 
   it('picks the top overrun as the recommended lever with up to 2 alternates', () => {

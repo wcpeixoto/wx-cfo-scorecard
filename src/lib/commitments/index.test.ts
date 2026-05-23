@@ -16,13 +16,13 @@ const sig = (type: SignalType): Signal => ({
 });
 
 describe('commitmentFromSignal factory (STOP rule)', () => {
-  it('returns a draft only for reserve_warning', () => {
+  it('returns a draft for the reserve-funding signals', () => {
     expect(commitmentFromSignal(sig('reserve_warning'), model)).not.toBeNull();
+    expect(commitmentFromSignal(sig('reserve_critical'), model)).not.toBeNull();
   });
 
-  it('returns null for every other signal type (awareness-only)', () => {
+  it('returns null for every awareness-only signal type', () => {
     const others: SignalType[] = [
-      'reserve_critical',
       'cash_flow_negative',
       'cash_flow_tight',
       'expense_surge',

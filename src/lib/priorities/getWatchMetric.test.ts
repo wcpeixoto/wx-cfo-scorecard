@@ -23,13 +23,13 @@ describe('getWatchMetric — fresh/awareness routing', () => {
     expect(w.value).toBe('starting at $6,600');
   });
 
-  it('reserve_critical stays awareness-only (portfolio % in Watch)', () => {
+  it('reserve_critical, fresh: the baseline-to-be (now commitment-ready, action-tied watch)', () => {
     const w = getWatchMetric(
       sig({ type: 'reserve_critical', severity: 'critical', metricValue: 0.46 }),
       model(6600)
     );
-    expect(w.label).toBe('Reserve funded');
-    expect(w.value).toBe('46%');
+    expect(w.label).toBe('Cash toward reserve');
+    expect(w.value).toBe('starting at $6,600');
   });
 
   it('steady_state shows Cash on Hand from the model', () => {
