@@ -106,6 +106,20 @@ describe('validateGrounding — date grounding (Slice 1b)', () => {
     });
   });
 
+  it('rejects when only one of several stated dates matches (every token must match)', () => {
+    // "by Jun 5, before June 12": Jun 5 matches the deadline, June 12 does not.
+    expect(
+      validateGrounding('Move $100 by Jun 5, before June 12.', { target: 100, deadline: 'Jun 5' })
+    ).toEqual({ ok: false, reason: 'date_mismatch' });
+    // ...and passes only when every stated date matches (locks both .every directions).
+    expect(
+      validateGrounding('Move $100 by Jun 5 — confirmed for June 5.', {
+        target: 100,
+        deadline: 'Jun 5',
+      })
+    ).toEqual({ ok: true });
+  });
+
   it('rejects any stated calendar date when the deadline is unknown ("soon")', () => {
     expect(
       validateGrounding('Move $100. Checking back May 29.', { target: 100, deadline: 'soon' })
