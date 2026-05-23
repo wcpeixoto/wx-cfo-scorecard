@@ -9,8 +9,14 @@ import type { PriorDirectionBucket } from './direction';
  * v2: cache key now includes a prior-direction bucket. v1 rows remain in
  * the table but are no longer reachable; the unique constraint is on
  * (workspace_id, cache_key, prompt_version), so v2 writes do not collide.
+ *
+ * v3: the AIProse contract dropped the unused `alternative` and `followupNote`
+ * fields. This bump intentionally retires every v2 row, whose prose_json still
+ * carries the old 6-field shape — v3 reads miss them (the prompt_version is part
+ * of the unique key) and v3 writes don't collide. No migration: getCachedProse
+ * reads via a tolerant cast, so stranded v2 rows are simply never served.
  */
-export const AI_PROSE_PROMPT_VERSION = 'v2';
+export const AI_PROSE_PROMPT_VERSION = 'v3';
 
 // ASCII Unit Separator (0x1F). Chosen as the cache-key field separator
 // because it is a non-printable control character that does not appear

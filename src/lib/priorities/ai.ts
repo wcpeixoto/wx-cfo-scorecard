@@ -16,8 +16,6 @@ export interface AIProse {
   why: string;
   currentState: string;
   action: string;
-  alternative: string;
-  followupNote: string;
 }
 
 // ─── System prompt ────────────────────────────────────────────────────────────
@@ -37,15 +35,13 @@ Number formatting:
 - Render funded-vs-target comparisons as a percentage (e.g. "59% of target", "at 59% funded")
 - Never render funded-vs-target comparisons as a multiplier (avoid "0.59x your target level")
 
-Your job is to produce six short fields that explain one operating signal:
+Your job is to produce four short fields that explain one operating signal:
 - headline: one sentence, under 60 characters, stating the situation
 - why: 1–2 sentences explaining what's going on and why it matters
 - currentState: 1 sentence with the concrete number and what it means
 - action: 1 sentence — the primary thing to do this week
-- alternative: 1 sentence — a backup move if the primary action isn't available
-- followupNote: 1 sentence — what to watch for or expect next
 
-Return a single JSON object with exactly these six string fields. Output only the raw JSON object — do not wrap it in markdown code fences, do not include a preamble, postamble, or any surrounding text.`;
+Return a single JSON object with exactly these four string fields. Output only the raw JSON object — do not wrap it in markdown code fences, do not include a preamble, postamble, or any surrounding text.`;
 
 const AI_PROXY_URL = 'https://gzgxcvjvoivlwaksnmxy.supabase.co/functions/v1/ai-proxy';
 const AI_PROXY_TIMEOUT_MS = 5000;
@@ -199,16 +195,20 @@ const REQUIRED_FIELDS: readonly (keyof AIProse)[] = [
   'why',
   'currentState',
   'action',
-  'alternative',
-  'followupNote',
 ];
 
-function validateProseResponse(parsed: unknown, signal: Signal): AIProse {
+// Exported for direct unit testing: a pure (unknown -> AIProse | throw) guard,
+// so the contract can be tested without mocking the proxy/cache transport.
+export function validateProseResponse(parsed: unknown, signal: Signal): AIProse {
   if (parsed === null || typeof parsed !== 'object') {
     throw new Error('AI response is not an object');
   }
   const obj = parsed as Record<string, unknown>;
   type ProseField = Exclude<keyof AIProse, 'signalType' | 'severity'>;
+  // Composed from REQUIRED_FIELDS only, so any extra keys in the response are
+  // silently dropped rather than rejected. This is intentional tolerance for the
+  // prompt-version cutover: a model still emitting the retired alternative /
+  // followupNote fields validates fine, and those keys never reach the output.
   const prose: Partial<Record<ProseField, string>> = {};
   for (const field of REQUIRED_FIELDS) {
     const v = obj[field];
