@@ -1326,3 +1326,75 @@ export async function saveCachedProse(
     console.error('[priority-prose-cache] Write failed:', err);
   }
 }
+
+// Commitment day_one summary cache. Backs the SAME priority_prose_cache table as
+// getCachedProse, but stores a single grounded sentence as prose_json: { summary }
+// instead of an AIProse — a deliberately separate, non-AIProse-typed pair so
+// commitment copy never couples to the hero-prose shape (the rejected Path A).
+// Keyed by the caller's (workspaceId, cacheKey, promptVersion); the commitments
+// layer builds a cacheKey from the commitment id + a facts hash and uses its own
+// promptVersion namespace, so these rows can't alias hero-prose rows. Read errors
+// degrade to a cache miss (null); the caller then regenerates.
+export async function getCachedCommitmentSummary(
+  workspaceId: string,
+  cacheKey: string,
+  promptVersion: string,
+): Promise<string | null> {
+  if (!isConfigured()) return null;
+
+  try {
+    const path =
+      `${PRIORITY_PROSE_CACHE_TABLE}?select=prose_json` +
+      `&workspace_id=eq.${encodeURIComponent(workspaceId)}` +
+      `&cache_key=eq.${encodeURIComponent(cacheKey)}` +
+      `&prompt_version=eq.${encodeURIComponent(promptVersion)}` +
+      `&limit=1`;
+    const rows = await request<Array<{ prose_json: { summary?: unknown } }>>(path);
+    const summary = rows?.[0]?.prose_json?.summary;
+    return typeof summary === 'string' ? summary : null;
+  } catch (err) {
+    // Table-missing, network, or JSON-parse failure: degrade as a cache miss.
+    console.warn('[commitment-summary-cache] Read failed (table may not exist yet):', err);
+    return null;
+  }
+}
+
+// Companion writer. signal_type/severity come from the commitment row facts (the
+// NOT NULL columns) — never fabricated AIProse values — and the sentence is stored
+// as prose_json: { summary }. Upserts on the (workspace_id, cache_key,
+// prompt_version) unique triple. Write errors degrade silently: the owner has
+// already been shown this (grounding-validated) line, so a failed write only costs
+// a future regeneration. CALLER CONTRACT (never-cache-fallback, P0): pass only an
+// AI summary that passed grounding — never the deterministic fallback.
+export async function saveCachedCommitmentSummary(
+  workspaceId: string,
+  cacheKey: string,
+  promptVersion: string,
+  facts: { signalType: string; severity: string; summary: string },
+): Promise<void> {
+  if (!isConfigured()) return;
+
+  try {
+    await request<unknown>(
+      `${PRIORITY_PROSE_CACHE_TABLE}?on_conflict=workspace_id,cache_key,prompt_version`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal,resolution=merge-duplicates',
+        },
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          cache_key: cacheKey,
+          prompt_version: promptVersion,
+          signal_type: facts.signalType,
+          severity: facts.severity,
+          prose_json: { summary: facts.summary },
+          updated_at: new Date().toISOString(),
+        }),
+      }
+    );
+  } catch (err) {
+    console.error('[commitment-summary-cache] Write failed:', err);
+  }
+}

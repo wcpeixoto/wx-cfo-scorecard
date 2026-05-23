@@ -10,6 +10,13 @@
 // the deadline fact passed to validateGrounding ENFORCES that — a model that
 // disobeys with a wrong date is rejected (Slice 1b), not merely discouraged.
 //
+// Stable-per-commitment: a validated AI summary is cached (read-first, then
+// write-through ONLY on a grounding pass) so the day_one confirmation reads like
+// a receipt — generated once, served verbatim on every reload, no re-roll. The
+// never-cache-fallback invariant is structural: the cache write lives on the sole
+// success path, so no fallback / proxy error / malformed / grounding rejection
+// can ever be persisted.
+//
 // Why a commitment-specific prompt rather than the hero card's: the hero prompt
 // rounds amounts to $NK, which for a precise commitment target would itself be a
 // contradiction ($1,200 -> "$1K"). This prompt pins the exact figure.
@@ -17,6 +24,7 @@ import type { PriorityHistoryRow } from '../priorities/types';
 import { callAIProvider } from '../priorities/ai';
 import { dayOneSummary, formatDeadline } from './templater';
 import { validateGrounding } from './copyGrounding';
+import { readCachedCommitmentSummary, writeCachedCommitmentSummary } from './summaryCache';
 
 const SYSTEM_PROMPT = `You are a calm, steady CFO advisor. The owner has just committed to move an exact amount of money into their operating reserve this week. Reflect their decision back in one short sentence and let them know you'll check in this week.
 
@@ -64,6 +72,13 @@ export async function generateGroundedDayOneSummary(row: PriorityHistoryRow): Pr
   // No target to ground against — the deterministic line stands.
   if (target == null || !Number.isFinite(target)) return fallback;
 
+  // Cache read first: a previously-validated summary for this exact commitment
+  // (id + facts) is served verbatim — no proxy call, no re-roll. A hit needs no
+  // re-validation: the grounded facts (target, deadline) are part of the cache
+  // key, so the cached sentence was validated against these exact values.
+  const cached = await readCachedCommitmentSummary(row);
+  if (cached !== null) return cached;
+
   try {
     const raw = await callAIProvider(SYSTEM_PROMPT, buildUserMessage(row, target));
     const parsed: unknown = JSON.parse(raw);
@@ -85,6 +100,11 @@ export async function generateGroundedDayOneSummary(row: PriorityHistoryRow): Pr
       warnGroundingFallback(verdict.reason);
       return fallback;
     }
+    // Sole success path → the only place a summary is cached (never-cache-fallback
+    // P0). Fire-and-forget: the write swallows its own errors and the owner is
+    // already getting this validated line, so a failed write only costs a future
+    // regeneration. Mirrors the hero cache write in priorities/ai.ts.
+    void writeCachedCommitmentSummary(row, candidate);
     return candidate;
   } catch {
     // callAIProvider already DEV-warns the transport failure category

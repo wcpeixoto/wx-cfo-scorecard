@@ -2,6 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { generateGroundedDayOneSummary } from './groundedSummary';
 import { dayOneSummary, formatDeadline } from './templater';
 import type { PriorityHistoryRow } from '../priorities/types';
+import { readCachedCommitmentSummary, writeCachedCommitmentSummary } from './summaryCache';
+
+// The cache wrapper is mocked so these tests control hit/miss and assert writes
+// with no network. (The real wrapper degrades to a miss when Supabase is
+// unconfigured, but mocking lets us force a hit and inspect the write path.)
+vi.mock('./summaryCache', () => ({
+  readCachedCommitmentSummary: vi.fn(),
+  writeCachedCommitmentSummary: vi.fn(),
+}));
 
 function row(overrides: Partial<PriorityHistoryRow> = {}): PriorityHistoryRow {
   return {
@@ -33,6 +42,11 @@ describe('generateGroundedDayOneSummary — fail-closed wiring', () => {
   beforeEach(() => {
     // Silence the DEV fallback warnings; restored after each test.
     vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Default every test to a cache MISS so the existing fail-closed cases behave
+    // exactly as before (read → null → proceed to the proxy). The cache tests
+    // below override per-case.
+    vi.mocked(readCachedCommitmentSummary).mockResolvedValue(null);
+    vi.mocked(writeCachedCommitmentSummary).mockResolvedValue(undefined);
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -110,5 +124,51 @@ describe('generateGroundedDayOneSummary — fail-closed wiring', () => {
     const r = row({ target_value: undefined });
     expect(await generateGroundedDayOneSummary(r)).toBe(dayOneSummary(r));
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  // ── Stable-per-commitment cache ──────────────────────────────────────────
+
+  it('caches the AI summary on a cache miss + grounding success (write-through)', async () => {
+    vi.mocked(readCachedCommitmentSummary).mockResolvedValue(null);
+    const summary = "You're moving $100 into your reserve. I'll check back in about a week.";
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(proxyOk(JSON.stringify({ summary }))));
+    const r = row();
+    expect(await generateGroundedDayOneSummary(r)).toBe(summary);
+    expect(writeCachedCommitmentSummary).toHaveBeenCalledWith(r, summary);
+  });
+
+  it('serves the cached summary on a hit without calling the proxy or re-writing', async () => {
+    const cached = 'Cached — you’re moving $100 into your reserve this week.';
+    vi.mocked(readCachedCommitmentSummary).mockResolvedValue(cached);
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    expect(await generateGroundedDayOneSummary(row())).toBe(cached);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(writeCachedCommitmentSummary).not.toHaveBeenCalled();
+  });
+
+  it('does NOT cache when grounding fails — fallback returned, cache untouched (P0)', async () => {
+    vi.mocked(readCachedCommitmentSummary).mockResolvedValue(null);
+    // $500 contradicts the $100 target → grounding rejects.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        proxyOk(JSON.stringify({ summary: 'Move $500 into your operating reserve this week.' }))
+      )
+    );
+    const r = row();
+    expect(await generateGroundedDayOneSummary(r)).toBe(dayOneSummary(r));
+    expect(writeCachedCommitmentSummary).not.toHaveBeenCalled();
+  });
+
+  it('does NOT cache on a proxy failure / timeout — fallback returned, cache untouched (P0)', async () => {
+    vi.mocked(readCachedCommitmentSummary).mockResolvedValue(null);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(Object.assign(new Error('timed out'), { name: 'TimeoutError' }))
+    );
+    const r = row();
+    expect(await generateGroundedDayOneSummary(r)).toBe(dayOneSummary(r));
+    expect(writeCachedCommitmentSummary).not.toHaveBeenCalled();
   });
 });
