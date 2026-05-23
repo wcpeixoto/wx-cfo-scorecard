@@ -1,17 +1,21 @@
-// Constrained-generator Slice 1: the AI tone layer for the committed day_one
-// summary. Code owns what is true (the exact weekly target, the action, the
-// ~one-week check-back); the AI only re-tones the confirmation sentence. Every
-// AI rendering is grounded (validateGrounding) against the code target before it
+// Constrained-generator: the AI tone layer for the committed day_one summary.
+// Code owns what is true (the exact weekly target, the action, the check-back
+// deadline); the AI only re-tones the confirmation sentence. Every AI rendering
+// is grounded (validateGrounding) against the code target AND deadline before it
 // reaches the owner — any contradiction, malformed response, or proxy failure
 // falls back verbatim to the deterministic dayOneSummary. Fail closed: the owner
-// never sees an AI-invented number, and never sees an error.
+// never sees an AI-invented number or date, and never sees an error.
+//
+// The prompt asks for relative timing ("this week") and forbids invented dates;
+// the deadline fact passed to validateGrounding ENFORCES that — a model that
+// disobeys with a wrong date is rejected (Slice 1b), not merely discouraged.
 //
 // Why a commitment-specific prompt rather than the hero card's: the hero prompt
 // rounds amounts to $NK, which for a precise commitment target would itself be a
 // contradiction ($1,200 -> "$1K"). This prompt pins the exact figure.
 import type { PriorityHistoryRow } from '../priorities/types';
 import { callAIProvider } from '../priorities/ai';
-import { dayOneSummary } from './templater';
+import { dayOneSummary, formatDeadline } from './templater';
 import { validateGrounding } from './copyGrounding';
 
 const SYSTEM_PROMPT = `You are a calm, steady CFO advisor. The owner has just committed to move an exact amount of money into their operating reserve this week. Reflect their decision back in one short sentence and let them know you'll check in this week.
@@ -73,7 +77,10 @@ export async function generateGroundedDayOneSummary(row: PriorityHistoryRow): Pr
       warnGroundingFallback('malformed_response');
       return fallback;
     }
-    const verdict = validateGrounding(candidate, { target });
+    const verdict = validateGrounding(candidate, {
+      target,
+      deadline: formatDeadline(row.deadline_date),
+    });
     if (!verdict.ok) {
       warnGroundingFallback(verdict.reason);
       return fallback;

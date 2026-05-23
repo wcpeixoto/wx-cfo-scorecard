@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { generateGroundedDayOneSummary } from './groundedSummary';
-import { dayOneSummary } from './templater';
+import { dayOneSummary, formatDeadline } from './templater';
 import type { PriorityHistoryRow } from '../priorities/types';
 
 function row(overrides: Partial<PriorityHistoryRow> = {}): PriorityHistoryRow {
@@ -72,6 +72,30 @@ describe('generateGroundedDayOneSummary — fail-closed wiring', () => {
     );
     const r = row();
     expect(await generateGroundedDayOneSummary(r)).toBe(dayOneSummary(r));
+  });
+
+  it('falls back when the AI invents a wrong date despite a correct amount (Slice 1b)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        proxyOk(
+          JSON.stringify({
+            summary: "You're moving $100 into your reserve — I'll check back December 15.",
+          })
+        )
+      )
+    );
+    const r = row();
+    expect(await generateGroundedDayOneSummary(r)).toBe(dayOneSummary(r));
+  });
+
+  it('returns the AI sentence when it states the correct deadline date', async () => {
+    const r = row();
+    // Build the correct date from the same formatter the generator grounds against
+    // (timezone-robust — no hardcoded "May 29").
+    const summary = `You're moving $100 into your reserve. I'll check back ${formatDeadline(r.deadline_date)}.`;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(proxyOk(JSON.stringify({ summary }))));
+    expect(await generateGroundedDayOneSummary(r)).toBe(summary);
   });
 
   it('falls back when the proxy returns a non-JSON / malformed body', async () => {

@@ -71,3 +71,74 @@ describe('validateGrounding — amount grounding (Slice 1)', () => {
     ).toEqual({ ok: true });
   });
 });
+
+describe('validateGrounding — date grounding (Slice 1b)', () => {
+  // `deadline` is the canonical formatDeadline display the caller passes in.
+  const facts = { target: 100, deadline: 'May 29' };
+
+  it('passes relative timing with no calendar date', () => {
+    expect(
+      validateGrounding('Move $100 this week — checking back in about a week.', facts)
+    ).toEqual({ ok: true });
+  });
+
+  it('passes a correct date that matches the deadline (truth, not voice)', () => {
+    // The prompt prefers relative timing, but a correct date is not a lie — the
+    // deterministic fallback itself says "May 29" — so the validator must pass it.
+    expect(validateGrounding('Move $100 this week. Checking back May 29.', facts)).toEqual({
+      ok: true,
+    });
+  });
+
+  it('passes a correct date in long-month and ordinal forms', () => {
+    expect(validateGrounding('Move $100. I will check in on May 29th.', facts)).toEqual({
+      ok: true,
+    });
+    expect(
+      validateGrounding('Move $100. Back on June 5.', { target: 100, deadline: 'Jun 5' })
+    ).toEqual({ ok: true });
+  });
+
+  it('rejects a wrong date even when the amount is correct (the gap Slice 1b closes)', () => {
+    expect(validateGrounding('Move $100 this week. Checking back May 30.', facts)).toEqual({
+      ok: false,
+      reason: 'date_mismatch',
+    });
+  });
+
+  it('rejects when only one of several stated dates matches (every token must match)', () => {
+    // "by Jun 5, before June 12": Jun 5 matches the deadline, June 12 does not.
+    expect(
+      validateGrounding('Move $100 by Jun 5, before June 12.', { target: 100, deadline: 'Jun 5' })
+    ).toEqual({ ok: false, reason: 'date_mismatch' });
+    // ...and passes only when every stated date matches (locks both .every directions).
+    expect(
+      validateGrounding('Move $100 by Jun 5 — confirmed for June 5.', {
+        target: 100,
+        deadline: 'Jun 5',
+      })
+    ).toEqual({ ok: true });
+  });
+
+  it('rejects any stated calendar date when the deadline is unknown ("soon")', () => {
+    expect(
+      validateGrounding('Move $100. Checking back May 29.', { target: 100, deadline: 'soon' })
+    ).toEqual({ ok: false, reason: 'date_mismatch' });
+  });
+
+  it('does not read a non-month word followed by a number as a date', () => {
+    expect(validateGrounding('Set aside $100 over the next 7 days.', facts)).toEqual({ ok: true });
+  });
+
+  it('checks amount before date (a wrong amount reports amount_mismatch)', () => {
+    expect(validateGrounding('Move $500 by May 30.', facts)).toEqual({
+      ok: false,
+      reason: 'amount_mismatch',
+    });
+  });
+
+  it('does not enforce the date axis when no deadline fact is supplied', () => {
+    // Amount-only callers opt out of date checking by omitting `deadline`.
+    expect(validateGrounding('Move $100 by May 30.', { target: 100 })).toEqual({ ok: true });
+  });
+});
