@@ -26,7 +26,20 @@
 //   - Natural-language dates ("next Thursday", "end of the month") — verifying
 //     these needs date parsing against a reference "today"; explicitly out of
 //     scope, and the prompt permits relative timing, so they're voice not a lie.
-//   - Structural "one action" validation — a separate future slice.
+//   - Structural "one action" validation — investigated 2026-05-23 and
+//     deliberately NOT built (a verified no-op, NOT a pending slice). The
+//     committed action is code-owned: buildAction (reserveWarningCommitment.ts)
+//     returns ONE string, and the AI day_one summary only CONFIRMS that
+//     already-selected action — it never authors a recommendation, so there is
+//     no second action for it to bundle. A syntactic guard would also misfire:
+//     it would false-reject legitimate connectives ("moving $X and I'll check in
+//     this week" — that "and" is the check-in, not a second action), suppressing
+//     valid output for zero benefit. If a future session proposes a third
+//     grounding axis here, STOP: the real bundled-action risk lives on the
+//     free-form hero card (priorities/ai.ts getAIProse, with its free `action`
+//     plus `alternative` fields), and the fix there is structural (typed slot),
+//     not a validator — a separate hero-card initiative, not a constrained-
+//     generator slice.
 //
 // Distinct from targetGrounding.ts: that DERIVES the target number; this
 // VALIDATES copy against the code-owned facts.
