@@ -132,7 +132,7 @@ recommendation" with nothing to understand.)
 
 ## Substrate: where each principle lives
 
-The 10 principles above do not change. Their *implementation home*
+The principles above do not change. Their *implementation home*
 has been clarified as the CFO Assistant matures past hand-authored
 templates.
 
@@ -158,6 +158,9 @@ or accountability:
   commitment-state copy, AI generation should not run in
   keystroke-interactive consent slots. The first shipped
   commitment-state AI surface is the post-commit `day_one` summary.
+- **Principle #11 (recommendation always visible — render invariant):**
+  the recommendation surface is always present in commitment-state UI.
+  Render contract, enforced by the card's state machine.
 
 ### Voice — AI layer (with deterministic fallback)
 
