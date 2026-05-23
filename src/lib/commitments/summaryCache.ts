@@ -84,7 +84,9 @@ export async function readCachedCommitmentSummary(
 }
 
 // Cache write. CALLER CONTRACT (never-cache-fallback, P0): only call this with an
-// AI summary that has passed grounding — never the deterministic fallback.
+// AI summary that has passed grounding — never the deterministic fallback. The
+// stored signal_type is a fixed descriptor set inside saveCachedCommitmentSummary;
+// only the commitment's own severity is carried through from the row.
 export async function writeCachedCommitmentSummary(
   row: PriorityHistoryRow,
   summary: string,
@@ -93,6 +95,6 @@ export async function writeCachedCommitmentSummary(
     getSharedPersistenceWorkspaceId(),
     buildCommitmentSummaryCacheKey(row),
     COMMITMENT_SUMMARY_PROMPT_VERSION,
-    { signalType: row.signal_type, severity: row.severity, summary },
+    { severity: row.severity, summary },
   );
 }

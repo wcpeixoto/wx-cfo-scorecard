@@ -25,6 +25,27 @@ describe('buildCommitmentSummaryCacheKey — facts hash', () => {
     expect(buildCommitmentSummaryCacheKey(row())).toBe(buildCommitmentSummaryCacheKey(row()));
   });
 
+  it('produces the same key for two semantically-equal commitments (normalization)', () => {
+    // Same id/target, but the deadline is written in a different (equivalent) ISO
+    // form and the action carries surrounding whitespace. Normalization (trim +
+    // ISO canonicalization) must collapse these to one key.
+    const a = buildCommitmentSummaryCacheKey(
+      row({
+        committed_action: 'Move $100 into your operating reserve this week.',
+        deadline_date: '2026-05-29T12:00:00.000Z',
+        target_value: 100,
+      })
+    );
+    const b = buildCommitmentSummaryCacheKey(
+      row({
+        committed_action: '   Move $100 into your operating reserve this week.   ',
+        deadline_date: '2026-05-29T12:00:00Z',
+        target_value: 100,
+      })
+    );
+    expect(a).toBe(b);
+  });
+
   it('treats the same deadline instant in different ISO forms as equal', () => {
     const a = buildCommitmentSummaryCacheKey(row({ deadline_date: '2026-05-29T12:00:00.000Z' }));
     const b = buildCommitmentSummaryCacheKey(row({ deadline_date: '2026-05-29T12:00:00Z' }));
