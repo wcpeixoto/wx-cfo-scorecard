@@ -148,8 +148,10 @@ function closeConsequenceFor(row: PriorityHistoryRow): string {
 
 // "2026-05-29T…" -> "May 29". Short month + day, en-US — the friendly form of
 // the stored deadline_date. (Relocated from CfoAssistantCard so deadline copy
-// lives with the rest of the commitment-state language.)
-function formatDeadline(iso: string | undefined): string {
+// lives with the rest of the commitment-state language.) Exported so the grounded
+// generator can pass this exact display form to the date grounding validator —
+// the validator's "truth" is then identical to the fallback's, no timezone drift.
+export function formatDeadline(iso: string | undefined): string {
   if (!iso) return 'soon';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return 'soon';
