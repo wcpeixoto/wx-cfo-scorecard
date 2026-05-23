@@ -129,3 +129,61 @@ branch; the others stay blank until production hits them.
 (Added after #195: dropping the "do-next" chip in #191 left awareness-only
 signals — reserve_critical, the prod default — showing "Understand this
 recommendation" with nothing to understand.)
+
+## Substrate: where each principle lives
+
+The principles above do not change. Their *implementation home*
+has been clarified as the CFO Assistant matures past hand-authored
+templates.
+
+### Invariants — deterministic layer (code)
+
+These principles belong in code because violations would break trust
+or accountability:
+
+- **Principle #1 (outcome-anchored):** code chooses which signal fires
+  and what business outcome the assistant is trying to improve.
+- **Principle #2 (one primary action with target + deadline):** code
+  owns the action shape, target, deadline, and fallback. AI may
+  re-tone the message only inside those bounds. Current shipped
+  validation enforces exact amount grounding for the `reserve_warning`
+  `day_one` summary; structural one-action validation and date
+  grounding remain separate future slices.
+- **Principle #4 (action-tied watch metric):** code wires the watch
+  metric to the action. This is not a copy concern.
+- **Principle #5 (anchor to active commitment):** the card's state
+  machine must pin commitment-mode copy to the active commitment.
+  This is a wiring concern, not a generation concern.
+- **Principle #10 (calm advisor frame, including AI placement):** for
+  commitment-state copy, AI generation should not run in
+  keystroke-interactive consent slots. The first shipped
+  commitment-state AI surface is the post-commit `day_one` summary.
+- **Principle #11 (recommendation always visible — render invariant):**
+  the recommendation surface is always present in commitment-state UI.
+  Render contract, enforced by the card's state machine.
+
+### Voice — AI layer (with deterministic fallback)
+
+These principles describe the *feel* of owner-facing copy. They are
+expressed by the AI layer within the deterministic bounds the code
+sets:
+
+- **Principle #3 (no fake precision, no fake levers):** AI is prompted
+  to surface honest STOP states when no real lever exists. The
+  deterministic fallback enforces the floor.
+- **Principle #6 (no guilt, no judgment):** prompt-shaped. Fallback
+  copy holds the same standard.
+- **Principle #7 (plain language, no jargon):** prompt-shaped.
+- **Principle #8 (owner as hero):** prompt-shaped.
+- **Principle #9 (calm, low cognitive load):** prompt-shaped.
+
+### Implication
+
+Hand-authored template copy in `copy.ts` is the **deterministic
+fallback**, not the primary owner-facing surface for committed-state
+fields. Future copy work should ask: "is this principle an invariant
+(enforce in code) or a voice quality (express in prompt + validator)?"
+The answer determines where the fix lives.
+
+See `AGENTS.md` → "Architecture: deterministic + AI layers" for the
+mechanical contract.
