@@ -80,7 +80,7 @@ function buildUserMessage(signal: Signal, priorHistory?: PriorityHistoryRow): st
   }
 
   lines.push('');
-  lines.push('Write the six fields as specified. Respond with JSON only.');
+  lines.push('Write the four fields as specified. Respond with JSON only.');
 
   return lines.join('\n');
 }
