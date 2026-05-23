@@ -199,4 +199,5 @@ The boundary it surfaced: prompt iteration lifts voice *quality*, but real
 cross-*time* variety (a fresh opener week to week) needs per-commitment
 caching plus temp > 0 — not a prompt tweak. `generateGroundedDayOneSummary`
 neither caches nor varies, so temp > 0 alone would re-roll the frozen
-confirmation on every reload. Left unsolved by design.
+confirmation on every reload. Not in scope for Slice 1c; queued as an
+architecture decision.
