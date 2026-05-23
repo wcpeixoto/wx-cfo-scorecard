@@ -21,15 +21,17 @@ export type { ReserveGroundingHint, GroundingConsentMode } from './targetGroundi
 export { buildExecuteHelp } from './execute';
 export type { ExecuteHelp, ExecuteLever } from './execute';
 
-// The single factory choke point (Fork A/B). reserve_warning is the only
-// commitment-ready signal this slice; every other type returns null, which IS
-// the STOP rule (#3) expressed as the absence of the object.
+// The single factory choke point (Fork A/B). The reserve-funding signals
+// (reserve_warning + reserve_critical) are commitment-ready — the same content
+// type, served by one generator; every other type returns null, which IS the
+// STOP rule (#3) expressed as the absence of the object.
 export function commitmentFromSignal(
   signal: Signal,
   model: DashboardModel
 ): CommitmentDraft | null {
   switch (signal.type) {
     case 'reserve_warning':
+    case 'reserve_critical':
       return reserveWarningCommitment(signal, model);
     default:
       return null;

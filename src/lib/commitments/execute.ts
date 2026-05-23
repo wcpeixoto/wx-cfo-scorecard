@@ -1,4 +1,4 @@
-// Execute Stage 1 (Item B) — the reserve_warning "money-finding aid" (#6.1).
+// Execute Stage 1 (Item B) — the reserve "money-finding aid" (#6.1).
 //
 // Shape C (locked): a guided pick-one-lever surface. It curates the app's own
 // pre-computed expense overruns — `model.opportunities`, the categories whose
@@ -7,12 +7,13 @@
 // framed as a single decision. Deterministic, no AI. Informational only: the
 // owner acts outside the app — no writes, no selected-lever state, no persistence.
 //
-// Deliberately narrow — reserve_warning only. This is a money-finding aid, NOT a
-// generic Execute framework; the second commitment type that needs execution help
-// is what would force that abstraction.
+// Deliberately narrow — reserve-funding commitments only (reserve_warning +
+// reserve_critical, the same content type). This is a money-finding aid, NOT a
+// generic Execute framework; a second, *different* content type that needs
+// execution help is what would force that abstraction.
 //
 // Availability is reduce-to-content: buildExecuteHelp returns null ONLY when the
-// open commitment isn't a reserve_warning. When it is, it always returns help —
+// open commitment isn't a reserve-funding signal. When it is, it always returns help —
 // either `levers` (real overruns found) or an honest `none` message (#3: never
 // fake a lever). The card derives the affordance's availability from
 // `help !== null`. (B-1 shipped this seam as `hasExecuteHelp(): boolean`; B-2
@@ -96,8 +97,14 @@ export function buildExecuteHelp(
   model: DashboardModel,
   commitment: PriorityHistoryRow
 ): ExecuteHelp | null {
-  // Narrow path (lock #1): money-finding help only applies to a reserve_warning.
-  if (commitment.signal_type !== 'reserve_warning') return null;
+  // Narrow path (lock #1): money-finding help applies only to a reserve-funding
+  // commitment (reserve_warning or reserve_critical — the same content type), not
+  // a generic Execute layer across all signals.
+  if (
+    commitment.signal_type !== 'reserve_warning' &&
+    commitment.signal_type !== 'reserve_critical'
+  )
+    return null;
 
   // compute.ts already sorts by savings desc; apply a deterministic secondary
   // (category asc) so equal-overrun ties render stably.

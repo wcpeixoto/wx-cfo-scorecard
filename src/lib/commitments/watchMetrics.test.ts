@@ -7,12 +7,12 @@ function modelWithCash(cash: number): DashboardModel {
 }
 
 describe('watch metric registry', () => {
-  it('reserve_warning maps to reserve_cash_delta', () => {
+  it('both reserve-funding signals map to reserve_cash_delta', () => {
     expect(watchMetricForSignal('reserve_warning')?.id).toBe('reserve_cash_delta');
+    expect(watchMetricForSignal('reserve_critical')?.id).toBe('reserve_cash_delta');
   });
 
   it('awareness-only types map to no watch metric', () => {
-    expect(watchMetricForSignal('reserve_critical')).toBeNull();
     expect(watchMetricForSignal('steady_state')).toBeNull();
     expect(watchMetricForSignal('expense_surge')).toBeNull();
   });
