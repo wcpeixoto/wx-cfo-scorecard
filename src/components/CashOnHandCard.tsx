@@ -66,40 +66,41 @@ interface CashOnHandCardProps {
   txns: Txn[];
   forecastProjection: ScenarioPoint[];
   cashTrendData: CashTrendDeltaResult;
+  /**
+   * First month the Forecast's projected ending cash balance goes below zero
+   * (ForecastDecisionSignals.negativeCashMonth, format YYYY-MM), or null when
+   * cash never goes negative across the forecast. Canonical run-out date,
+   * shared with the Forecast page so the two surfaces cannot disagree.
+   */
+  negativeCashMonth: string | null;
 }
 
-export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData }: CashOnHandCardProps) {
+export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData, negativeCashMonth }: CashOnHandCardProps) {
   const signals = useMemo(
     () => detectSignals(model, txns, forecastProjection),
     [model, txns, forecastProjection]
   );
   const hero = useMemo(() => rankPriorities(signals).hero, [signals]);
 
-  // Cash-run-out projection (when cash is projected to go negative). Picked
-  // from the same detectSignals output, regardless of which signal ranked
-  // hero. Returns both months-from-now and the long-form date; the JSX layer
-  // picks the format based on a 10-month threshold.
+  // Cash-run-out date. Sourced from the Forecast's canonical negativeCashMonth
+  // (first month projected ending cash goes below zero) so the Today card and
+  // the Forecast page can never show different run-out dates. Rendered as
+  // month + year to match the Forecast page. null when cash never goes
+  // negative — the row is hidden, not replaced with a positive message.
   const cashRunOut = useMemo(() => {
-    const negative = signals.find(s => s.type === 'cash_flow_negative');
-    const month = negative?.troughMonth;
-    if (!month) return null;
-    const match = month.match(/^(\d{4})-(\d{2})$/);
+    if (!negativeCashMonth) return null;
+    const match = negativeCashMonth.match(/^(\d{4})-(\d{2})$/);
     if (!match) return null;
-    const troughYear = Number.parseInt(match[1], 10);
-    const troughMonthIndex = Number.parseInt(match[2], 10) - 1;
-    if (!Number.isFinite(troughYear) || troughMonthIndex < 0 || troughMonthIndex > 11) return null;
-    const now = new Date();
-    const months = Math.max(
-      0,
-      (troughYear * 12 + troughMonthIndex) - (now.getUTCFullYear() * 12 + now.getUTCMonth())
-    );
-    const date = new Date(Date.UTC(troughYear, troughMonthIndex, 1)).toLocaleDateString('en-US', {
+    const runOutYear = Number.parseInt(match[1], 10);
+    const runOutMonthIndex = Number.parseInt(match[2], 10) - 1;
+    if (!Number.isFinite(runOutYear) || runOutMonthIndex < 0 || runOutMonthIndex > 11) return null;
+    const date = new Date(Date.UTC(runOutYear, runOutMonthIndex, 1)).toLocaleDateString('en-US', {
       month: 'long',
       year: 'numeric',
       timeZone: 'UTC',
     });
-    return { months, date };
-  }, [signals]);
+    return { date };
+  }, [negativeCashMonth]);
 
   // True end-of-month cash balances (up to 6 points feed the sparkline)
   // plus the 30-day rolling-average delta that drives the trend label/arrow.
@@ -184,35 +185,19 @@ export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData 
       </div>
 
       <div className="priority-card-v2__body">
-        <p className="priority-card-v2__body-row">
-          <span className="priority-card-v2__body-row-icon" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              {cashRunOut === null ? (
-                <>
-                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" stroke="currentColor" />
-                  <polyline points="16 7 22 7 22 13" stroke="currentColor" />
-                </>
-              ) : (
-                <>
-                  <polyline points="22 17 13.5 8.5 8.5 13.5 2 7" stroke="currentColor" />
-                  <polyline points="16 17 22 17 22 11" stroke="currentColor" />
-                </>
-              )}
-            </svg>
-          </span>
-          <span>
-            {(() => {
-              if (cashRunOut === null) return 'At your current pace, cash stays positive through the forecast window.';
-              const { months, date } = cashRunOut;
-              if (months === 0) return 'At this pace, you are projected to run out of cash this month.';
-              // Close horizons (<10 months) read as a duration; farther
-              // horizons read as an absolute date to keep the sentence
-              // from feeling distant or abstract.
-              if (months < 10) return `At this pace, you are projected to run out of cash in ${months} ${months === 1 ? 'month' : 'months'}.`;
-              return `At this pace, you are projected to run out of cash in ${date}.`;
-            })()}
-          </span>
-        </p>
+        {cashRunOut !== null && (
+          <p className="priority-card-v2__body-row">
+            <span className="priority-card-v2__body-row-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 17 13.5 8.5 8.5 13.5 2 7" stroke="currentColor" />
+                <polyline points="16 17 22 17 22 11" stroke="currentColor" />
+              </svg>
+            </span>
+            <span>
+              At this pace, you are projected to run out of cash in {cashRunOut.date}.
+            </span>
+          </p>
+        )}
         {cashBreakEven && (
           <p className="priority-card-v2__body-row">
             <span className="priority-card-v2__body-row-icon" aria-hidden="true">
