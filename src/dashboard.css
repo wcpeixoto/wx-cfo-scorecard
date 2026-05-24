@@ -920,6 +920,7 @@ body {
 
 .top-categories-legend {
   flex: 1;
+  min-width: 0; /* let the legend shrink so names truncate instead of overflowing the card at narrow widths */
   list-style: none;
   margin: 0;
   padding: 0;
