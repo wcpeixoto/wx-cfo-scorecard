@@ -5218,9 +5218,10 @@ body {
   display: block;
   padding: 24px 24px 32px;
   background: #FFFFFF;
-  border: none;
-  border-radius: 12px;
-  box-shadow: none;
+  /* Bordered shell matching Operating Reserve's .card frame. */
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
   font-family: 'Outfit', sans-serif;
 }
 
@@ -6345,8 +6346,10 @@ body {
 
 .owner-dist-card {
   background: #FFFFFF;
-  border: 1px solid #E4E7EC;
+  /* Bordered shell matching Operating Reserve's .card frame. */
+  border: 1px solid var(--line);
   border-radius: 16px;
+  box-shadow: var(--shadow-card);
   overflow: visible;
   padding: 16px 20px 0 20px;
 }
@@ -6465,8 +6468,8 @@ body {
 .owner-dist-footer {
   display: flex;
   align-items: center;
-  /* Symmetric vertical padding so the CTA centers within the footer. */
-  padding: 6px 20px;
+  /* Extra bottom padding gives the CTA breathing room above the card edge. */
+  padding: 6px 20px 24px;
   /* Pull the footer up into the chart's internal bottom padding (~27px
      of empty space Apex renders below the year labels). Lands the CTA
      visually centered between the year labels and the card bottom,

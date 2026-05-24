@@ -340,7 +340,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         if (Number(year) > currentYear && total <= 0) {
           return `<div class="owl-tooltip-inner">
             <div class="apexcharts-tooltip-title">${year}</div>
-            <div class="owl-tooltip-note">No forecast<br>surplus to distribute.</div>
+            <div class="owl-tooltip-note">No forecast surplus<br>to distribute.</div>
           </div>`;
         }
 
@@ -454,7 +454,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
           </div>
         </div>
         <div className="owner-dist-chart">
-          <Chart options={options} series={series} type="bar" height={229} />
+          <Chart options={options} series={series} type="bar" height={210} />
         </div>
       </div>
       {actualYears.length > 0 && (
