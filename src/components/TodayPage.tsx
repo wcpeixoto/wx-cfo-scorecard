@@ -7,7 +7,6 @@ import { CashOnHandCard } from './CashOnHandCard';
 import { OperatingReserveCard } from './OperatingReserveCard';
 import { OwnerDistributionsCard } from './OwnerDistributionsCard';
 import { NextOwnerDistributionCard } from './NextOwnerDistributionCard';
-import { CfoAssistantCard } from './CfoAssistantCard';
 
 type ReprojectOwnerPay = (revenueGrowthPct: number) => ScenarioPoint[];
 
@@ -71,17 +70,16 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
           forecastProjection={forecastProjection}
           cashTrendData={cashTrendData}
         />
-        <CfoAssistantCard model={model} txns={txns} forecastProjection={forecastProjection} />
+        <OperatingReserveCard
+          currentCashBalance={model.runway.currentCashBalance}
+          reserveTarget={model.runway.reserveTarget}
+          reserveCoverageDelta={reserveCoverageDelta}
+        />
       </div>
 
       {/* Context section */}
       <div className="today-context-section">
         <div className="today-context-grid">
-          <OperatingReserveCard
-            currentCashBalance={model.runway.currentCashBalance}
-            reserveTarget={model.runway.reserveTarget}
-            reserveCoverageDelta={reserveCoverageDelta}
-          />
           <NextOwnerDistributionCard
             ownerPayProjection={ownerPayProjection}
             reserveFloor={ownerPayReserveFloor}
