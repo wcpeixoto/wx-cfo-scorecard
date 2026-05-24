@@ -539,8 +539,6 @@ Dark variants follow the global mappings in Part 1 — Dark Mode.
 | Select | Same height/radius/border/focus as Input default; `appearance-none pr-11` for the chevron. |
 | Label | `mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400`. |
 | Avatar | `rounded-full object-cover`, 6 sizes 24px (xsmall) → 64px (xxlarge); status dot bottom-right, `border-[1.5px]` (online success-500 / offline error-400 / busy warning-500). |
-| ComponentCard | Showcase/demo wrapper only: `rounded-2xl border bg-white`; header `px-6 py-5` (`h3 text-base font-medium` + optional `p mt-1 text-sm text-gray-500`); body `p-4 sm:p-6 border-t`. |
-
 ---
 
 ## Dropdown
@@ -589,8 +587,6 @@ TailAdmin primitives `Table` / `TableHeader` / `TableBody` / `TableRow` / `Table
 | Radial / gauge card | F |
 | Table card | G |
 | Profile / content info card | I |
-| UI element showcase card | ComponentCard (Part 3) |
-
 ---
 
 ## Pattern A — Chart Card: Title + MoreDot
