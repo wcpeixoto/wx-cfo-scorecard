@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useId } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import type { ScenarioPoint, Txn } from '../lib/data/contract';
+import type { MonthlyRollup, ScenarioPoint, Txn } from '../lib/data/contract';
 import { classifyTxn } from '../lib/cashFlow';
 import { chartTokens } from '../lib/ui/chartTokens';
 
@@ -98,6 +98,22 @@ function buildOwnerDistSeries(
   return { years, actual, forecast, projectedFullYearCapacity };
 }
 
+/** Annual income (revenue) by calendar year, summed from the canonical
+ *  monthly rollups (`model.monthlyRollups[].revenue` — the same series every
+ *  other revenue surface reads). Keyed by calendar year ("YYYY-MM" → YYYY) so
+ *  it aligns with the chart's calendar-year x-axis. Current year is YTD, which
+ *  matches the YTD actual-distribution bar. No new income computation path. */
+function incomeByYear(monthlyRollups: MonthlyRollup[]): Map<number, number> {
+  const byYear = new Map<number, number>();
+  for (const rollup of monthlyRollups) {
+    const match = rollup.month.match(/^(\d{4})-\d{2}$/);
+    if (!match) continue;
+    const year = Number.parseInt(match[1], 10);
+    byYear.set(year, (byYear.get(year) ?? 0) + (rollup.revenue ?? 0));
+  }
+  return byYear;
+}
+
 type PillVariant = 'insufficient' | 'above-avg' | 'below-avg' | 'on-track';
 type PillConfig = { label: string; variant: PillVariant };
 
@@ -148,6 +164,9 @@ type Props = {
   reserveTarget: number;
   currentCashBalance: number;
   onCompareYear?: (year: number) => void;
+  /** Canonical monthly rollups; powers the optional "Compare to income"
+   *  annual-income bars. Defaults to [] (income comparison simply unavailable). */
+  monthlyRollups?: MonthlyRollup[];
 };
 
 const TARGET_BADGE_CONFIG: Record<DistributionStatus, { label: string; className: string }> = {
@@ -171,7 +190,7 @@ function getTargetBadgeLabel(
   return TARGET_BADGE_CONFIG[status].label;
 }
 
-export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, distributionActualAmount, targetNetMargin, forecastProjection, reserveTarget, currentCashBalance, onCompareYear }: Props) {
+export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, distributionActualAmount, targetNetMargin, forecastProjection, reserveTarget, currentCashBalance, onCompareYear, monthlyRollups = [] }: Props) {
   const { years, actual, forecast, projectedFullYearCapacity } = buildOwnerDistSeries(
     transactions,
     today,
@@ -186,6 +205,14 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // "Compare to income" toggle — default OFF (chart behaves as before). When
+  // ON, an adjacent annual-income bar renders per year (revenue from the
+  // canonical monthly rollups), keyed to the same calendar-year axis.
+  const [showIncome, setShowIncome] = useState(false);
+  const incomeMap = incomeByYear(monthlyRollups);
+  const incomeData = years.map((y) => incomeMap.get(y) ?? 0);
+  const canCompareIncome = incomeData.some((v) => v > 0);
 
   // Historical years only: year < currentYear with actual data, sorted descending
   const actualYears = years
@@ -217,7 +244,9 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       fontFamily: 'Outfit, sans-serif',
       background: 'transparent',
     },
-    colors: [chartTokens.brand, chartTokens.brandSecondary],
+    colors: showIncome && canCompareIncome
+      ? [chartTokens.brand, chartTokens.brandSecondary, chartTokens.success]
+      : [chartTokens.brand, chartTokens.brandSecondary],
     plotOptions: {
       bar: {
         horizontal: false,
@@ -282,6 +311,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       custom: ({ series, dataPointIndex, w }: { series: number[][], dataPointIndex: number, w: any }) => {
         const actualVal = Number(series[0]?.[dataPointIndex] ?? 0);
         const forecastVal = Number(series[1]?.[dataPointIndex] ?? 0);
+        const incomeVal = Number(series[2]?.[dataPointIndex] ?? 0);
         const total = actualVal + forecastVal;
         const year = w.globals.labels?.[dataPointIndex] ?? '';
 
@@ -315,19 +345,39 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
             </div>`
           : '';
 
+        const incomeRow = incomeVal > 0
+          ? `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
+            ${dot(chartTokens.success)}
+            <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
+              <span class="apexcharts-tooltip-text-y-label">Income</span>
+              <span class="apexcharts-tooltip-text-y-value">${formatCompact(incomeVal)}</span>
+            </div>
+          </div>`
+          : '';
+
         return `<div class="owl-tooltip-inner">
           <div class="apexcharts-tooltip-title">${year}</div>
           ${rows}
           ${totalRow}
+          ${incomeRow}
         </div>`;
       },
     },
   };
 
-  const series = [
-    { name: 'Actual', data: actual },
-    { name: 'Forecast', data: forecast },
-  ];
+  // Grouped-stacked bars: Actual + Forecast stack together as "distributions";
+  // Income (when toggled on) is a separate adjacent stack so the owner can
+  // compare yearly income against distributions side by side.
+  const series = showIncome && canCompareIncome
+    ? [
+        { name: 'Actual', group: 'distributions', data: actual },
+        { name: 'Forecast', group: 'distributions', data: forecast },
+        { name: 'Income', group: 'income', data: incomeData },
+      ]
+    : [
+        { name: 'Actual', data: actual },
+        { name: 'Forecast', data: forecast },
+      ];
 
   return (
     <article className="owner-dist-card">
@@ -364,14 +414,32 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       </div>
       <div>
         <div className="owner-dist-legend-row">
-          <span className="owner-dist-legend-item">
-            <span className="owner-dist-legend-dot actual"></span>
-            Actual
-          </span>
-          <span className="owner-dist-legend-item">
-            <span className="owner-dist-legend-dot forecast"></span>
-            Forecast
-          </span>
+          <div className="owner-dist-legend-items">
+            <span className="owner-dist-legend-item">
+              <span className="owner-dist-legend-dot actual"></span>
+              Actual
+            </span>
+            <span className="owner-dist-legend-item">
+              <span className="owner-dist-legend-dot forecast"></span>
+              Forecast
+            </span>
+            {showIncome && canCompareIncome && (
+              <span className="owner-dist-legend-item">
+                <span className="owner-dist-legend-dot income"></span>
+                Income
+              </span>
+            )}
+          </div>
+          {canCompareIncome && (
+            <button
+              type="button"
+              className="btn-secondary-card"
+              aria-pressed={showIncome}
+              onClick={() => setShowIncome((v) => !v)}
+            >
+              Compare to income
+            </button>
+          )}
         </div>
         <div className="owner-dist-chart">
           <Chart options={options} series={series} type="bar" height={229} />

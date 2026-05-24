@@ -6433,12 +6433,20 @@ body {
 .owner-dist-legend-row {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  /* Labels (Actual / Forecast / Income) on the left; "Compare to income"
+     control on the right. The status badge stays in the card header. */
+  justify-content: space-between;
   gap: 20px;
   padding-top: 8px;
   padding-left: 0;
   margin-top: 0;
   width: 100%;
+}
+
+.owner-dist-legend-items {
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
 .owner-dist-footer {
@@ -6482,6 +6490,43 @@ body {
 
 .owner-dist-legend-dot.forecast {
   background: #9CB9FF;
+}
+
+.owner-dist-legend-dot.income {
+  background: #12B76A;
+}
+
+/* Card-level secondary button (40px) — TailAdmin "Secondary" outline style:
+   white surface, #D0D5DD trigger border, 8px radius, 14px/500 label. Named for
+   card-level scope (not a global .btn-secondary). aria-pressed="true" marks the
+   toggled-on/active state with the brand-soft fill (UI_RULES active state). */
+.btn-secondary-card {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  background: #FFFFFF;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #344054;
+  cursor: pointer;
+  transition: background-color 150ms ease-in-out, color 150ms ease-in-out, border-color 150ms ease-in-out;
+}
+
+.btn-secondary-card:hover {
+  background: #F9FAFB;
+}
+
+.btn-secondary-card[aria-pressed="true"] {
+  background: #ECF3FF;
+  border-color: #465FFF;
+  color: #465FFF;
 }
 
 .owner-dist-forecast-action {

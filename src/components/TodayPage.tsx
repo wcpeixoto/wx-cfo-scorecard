@@ -95,6 +95,7 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
             reserveTarget={model.runway.reserveTarget}
             currentCashBalance={model.runway.currentCashBalance}
             onCompareYear={onCompareYear}
+            monthlyRollups={model.monthlyRollups}
           />
         </div>
       </div>
