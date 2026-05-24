@@ -3175,6 +3175,14 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               )}
             </div>
           </div>
+          {activeTab === 'big-picture' && hasImportedData && (
+            <>
+              <div className="bp-overview-tray">
+                <KpiCards cards={selectedKpiCards} vsLabel={kpiVsLabel} />
+              </div>
+              <p className="data-trust-note">Excludes transfers &amp; financing · operating cash flow only</p>
+            </>
+          )}
         </header>}
 
         {bootLoadError && (
@@ -3255,8 +3263,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
         {hasImportedData && activeTab === 'big-picture' && (
           <>
-            <KpiCards cards={selectedKpiCards} vsLabel={kpiVsLabel} />
-            <p className="data-trust-note">Excludes transfers &amp; financing · operating cash flow only</p>
             <NetCashFlowChart
               data={netCashFlowChartModel.trend}
               cashFlowMode={netCashFlowChartMode}
