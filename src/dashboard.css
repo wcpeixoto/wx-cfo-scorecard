@@ -2456,6 +2456,13 @@ body {
   color: #101828;
 }
 
+.owl-tooltip-note {
+  font-size: 12px;
+  font-family: 'Outfit', sans-serif;
+  color: #667085;
+  padding-top: 2px;
+}
+
 .tooltip-row-label {
   fill: #667085;
   font-size: 10px;
@@ -6430,17 +6437,23 @@ body {
   display: none !important;
 }
 
+/* Positioning context so the legend can overlay the chart's empty top band. */
+.owner-dist-plot {
+  position: relative;
+}
+
 .owner-dist-legend-row {
+  /* Overlaid at the top-right of the chart, above the top gridline. Anchored to
+     the very top so it clears the Revenue bars' value labels (which reach high
+     into this band). Status badge stays in the card header; past-year compare is
+     the footer link below the chart. */
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
-  /* Labels (Actual / Forecast / Income) on the left; "Compare to income"
-     control on the right. The status badge stays in the card header. */
-  justify-content: space-between;
   gap: 20px;
-  padding-top: 8px;
-  padding-left: 0;
-  margin-top: 0;
-  width: 100%;
 }
 
 .owner-dist-legend-items {
@@ -6468,6 +6481,19 @@ body {
   left: 0;
 }
 
+.owner-dist-forecast-action {
+  all: unset;
+  font-size: 12px;
+  font-weight: 500;
+  /* Default to the Tail Admin muted-text gray; brand blue on hover. */
+  color: #667085;
+  cursor: pointer;
+}
+
+.owner-dist-forecast-action:hover {
+  color: #465FFF;
+}
+
 .owner-dist-legend-item {
   display: flex;
   align-items: center;
@@ -6490,10 +6516,6 @@ body {
 
 .owner-dist-legend-dot.forecast {
   background: #9CB9FF;
-}
-
-.owner-dist-legend-dot.income {
-  background: #12B76A;
 }
 
 /* Card-level secondary button (40px) — TailAdmin "Secondary" outline style:
@@ -6526,19 +6548,6 @@ body {
 .btn-secondary-card[aria-pressed="true"] {
   background: #ECF3FF;
   border-color: #465FFF;
-  color: #465FFF;
-}
-
-.owner-dist-forecast-action {
-  all: unset;
-  font-size: 12px;
-  font-weight: 500;
-  /* Default to the Tail Admin muted-text gray; brand blue on hover. */
-  color: #667085;
-  cursor: pointer;
-}
-
-.owner-dist-forecast-action:hover {
   color: #465FFF;
 }
 

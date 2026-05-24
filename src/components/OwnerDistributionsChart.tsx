@@ -53,13 +53,23 @@ function buildOwnerDistSeries(
 
   // Last forecasted end-of-year cash balance per year inside the horizon.
   const endOfYearBalance = new Map<number, number>();
+  const monthsInHorizon = new Set<string>();
   for (const p of forecastProjection) {
     const y = Number(p.month.slice(0, 4));
     if (!Number.isFinite(y)) continue;
     endOfYearBalance.set(y, p.endingCashBalance);
+    monthsInHorizon.add(p.month);
   }
 
-  const forecastYears = [...endOfYearBalance.keys()].filter((y) => y >= currentYear);
+  // Show the current year and the next year (next year's forecast is partial —
+  // the horizon ends mid-year — but it's still plotted). Beyond next year, only
+  // plot a forecast year when the horizon covers its full calendar year (Dec).
+  const forecastYears = [...endOfYearBalance.keys()].filter(
+    (y) =>
+      y === currentYear ||
+      y === currentYear + 1 ||
+      (y > currentYear + 1 && monthsInHorizon.has(`${y}-12`)),
+  );
   const yearSet = new Set<number>([...byYear.keys(), ...forecastYears]);
   const years = [...yearSet].sort((a, b) => a - b);
 
@@ -205,21 +215,18 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // "Compare to income" toggle — default OFF (chart behaves as before). When
-  // ON, an adjacent annual-income bar renders per year (net Business Income),
-  // keyed to the same calendar-year axis.
-  const [showIncome, setShowIncome] = useState(false);
-  const incomeMap = incomeByYear(transactions);
-  const incomeData = years.map((y) => incomeMap.get(y) ?? 0);
-  const canCompareIncome = incomeData.some((v) => v > 0);
-  const comparing = showIncome && canCompareIncome;
+  // Revenue is NOT plotted — it appears only in the bar tooltip. "Revenue" here =
+  // net Business Income (matches the books); NOT the app's positive-only
+  // `revenue` metric — see incomeByYear. Keyed to the chart's year axis.
+  const revenueMap = incomeByYear(transactions);
+  const revenueData = years.map((y) => revenueMap.get(y) ?? 0);
 
   // Historical years only: year < currentYear with actual data, sorted descending
   const actualYears = years
     .filter((y, i) => y < currentYear && actual[i] > 0)
     .sort((a, b) => b - a);
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click or Escape
   useEffect(() => {
     if (!isDropdownOpen) return;
     function handleOutside(e: MouseEvent) {
@@ -227,10 +234,19 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         setIsDropdownOpen(false);
       }
     }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setIsDropdownOpen(false);
+    }
     document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
   }, [isDropdownOpen]);
 
+  // Past-year comparison opens the modal ProjectionCompareDrawer (parent-owned).
+  // Independent of the Revenue toggle — selecting a year does not change it.
   function handleYearSelect(year: number) {
     setIsDropdownOpen(false);
     onCompareYear?.(year);
@@ -244,9 +260,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       fontFamily: 'Outfit, sans-serif',
       background: 'transparent',
     },
-    colors: comparing
-      ? [chartTokens.brand, chartTokens.brandSecondary, chartTokens.success]
-      : [chartTokens.brand, chartTokens.brandSecondary],
+    colors: [chartTokens.brand, chartTokens.brandSecondary],
     plotOptions: {
       bar: {
         horizontal: false,
@@ -257,10 +271,8 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         dataLabels: {
           position: 'top',
           total: {
-            // Stack total. In compare mode this would sum BOTH groups
-            // (distributions + income) onto the income bar — wrong — so it is
-            // disabled there; the income bar is labelled directly below.
-            enabled: !comparing,
+            // Stack total (Distribution + Forecast) above each bar.
+            enabled: true,
             formatter: (val: string | undefined) => formatCompactWhole(Number(val ?? 0)),
             offsetY: -4,
             style: {
@@ -273,27 +285,10 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         },
       },
     },
-    dataLabels: comparing
-      ? {
-          enabled: true,
-          // Label only the Income series (index 2) so the income bar shows its
-          // own value rather than a cross-group total.
-          enabledOnSeries: [2],
-          formatter: (val) => formatCompactWhole(Number(val ?? 0)),
-          offsetY: -4,
-          style: {
-            fontSize: '11px',
-            fontFamily: 'Outfit, sans-serif',
-            fontWeight: 500,
-            colors: ['#475467'],
-          },
-        }
-      : { enabled: false },
-    stroke: {
-      show: true,
-      width: 2,
-      colors: ['transparent'],
-    },
+    // No per-point labels; the distribution total sits above the bars via
+    // plotOptions.bar.dataLabels.total.
+    dataLabels: { enabled: false },
+    stroke: { show: true, width: 2, colors: ['transparent'] },
     xaxis: {
       categories: years.map(String),
       axisBorder: { show: false },
@@ -328,22 +323,53 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       intersect: false,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       custom: ({ series, dataPointIndex, w }: { series: number[][], dataPointIndex: number, w: any }) => {
-        const actualVal = Number(series[0]?.[dataPointIndex] ?? 0);
-        const forecastVal = Number(series[1]?.[dataPointIndex] ?? 0);
-        const incomeVal = Number(series[2]?.[dataPointIndex] ?? 0);
+        // Bar series (Distribution/Forecast) are looked up by name so the
+        // tooltip stays correct regardless of series order.
+        const valueByName = (name: string) => {
+          const idx = w?.globals?.seriesNames?.indexOf(name) ?? -1;
+          return idx >= 0 ? Number(series[idx]?.[dataPointIndex] ?? 0) : 0;
+        };
+        const actualVal = valueByName('Distribution');
+        const forecastVal = valueByName('Forecast');
+        // Revenue isn't a plotted series — read it from the closure by point index.
+        const revenueVal = revenueData[dataPointIndex] ?? 0;
         const total = actualVal + forecastVal;
         const year = w.globals.labels?.[dataPointIndex] ?? '';
 
+        // A future year with no projected surplus to distribute.
+        if (Number(year) > currentYear && total <= 0) {
+          return `<div class="owl-tooltip-inner">
+            <div class="apexcharts-tooltip-title">${year}</div>
+            <div class="owl-tooltip-note">No forecast<br>surplus to distribute.</div>
+          </div>`;
+        }
+
         const dot = (color: string) =>
           `<span style="background-color:${color};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;flex-shrink:0;vertical-align:middle;"></span>`;
+
+        // Distributions show as a margin (share of revenue), not a dollar value.
+        // Falls back to the dollar amount when revenue is unavailable (e.g. a
+        // future year with no income yet).
+        const marginPct = (val: number) =>
+          revenueVal > 0 ? `${Math.round((val / revenueVal) * 100)}%` : formatCompactWhole(val);
+
+        const revenueRow = revenueVal > 0
+          ? `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
+            ${dot(chartTokens.info)}
+            <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
+              <span class="apexcharts-tooltip-text-y-label">Revenue</span>
+              <span class="apexcharts-tooltip-text-y-value">${formatCompact(revenueVal)}</span>
+            </div>
+          </div>`
+          : '';
 
         let rows = '';
         if (actualVal > 0) {
           rows += `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
             ${dot(chartTokens.brand)}
             <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
-              <span class="apexcharts-tooltip-text-y-label">Actual</span>
-              <span class="apexcharts-tooltip-text-y-value">${formatCompact(actualVal)}</span>
+              <span class="apexcharts-tooltip-text-y-label">Distribution</span>
+              <span class="apexcharts-tooltip-text-y-value">${marginPct(actualVal)}</span>
             </div>
           </div>`;
         }
@@ -352,7 +378,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
             ${dot(chartTokens.brandSecondary)}
             <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
               <span class="apexcharts-tooltip-text-y-label">Forecast</span>
-              <span class="apexcharts-tooltip-text-y-value">${formatCompact(forecastVal)}</span>
+              <span class="apexcharts-tooltip-text-y-value">${marginPct(forecastVal)}</span>
             </div>
           </div>`;
         }
@@ -360,43 +386,26 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         const totalRow = (actualVal > 0 && forecastVal > 0)
           ? `<div class="owl-tooltip-total">
               <span class="owl-tooltip-total-label">Total</span>
-              <span class="owl-tooltip-total-value">${formatCompact(total)}</span>
+              <span class="owl-tooltip-total-value">${marginPct(total)}</span>
             </div>`
-          : '';
-
-        const incomeRow = incomeVal > 0
-          ? `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
-            ${dot(chartTokens.success)}
-            <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
-              <span class="apexcharts-tooltip-text-y-label">Income</span>
-              <span class="apexcharts-tooltip-text-y-value">${formatCompact(incomeVal)}</span>
-            </div>
-          </div>`
           : '';
 
         return `<div class="owl-tooltip-inner">
           <div class="apexcharts-tooltip-title">${year}</div>
+          ${revenueRow}
           ${rows}
           ${totalRow}
-          ${incomeRow}
         </div>`;
       },
     },
   };
 
-  // Grouped-stacked bars: Actual + Forecast stack together as "distributions";
-  // Income (when toggled on) is a separate adjacent stack so the owner can
-  // compare yearly income against distributions side by side.
-  const series = comparing
-    ? [
-        { name: 'Actual', group: 'distributions', data: actual },
-        { name: 'Forecast', group: 'distributions', data: forecast },
-        { name: 'Income', group: 'income', data: incomeData },
-      ]
-    : [
-        { name: 'Actual', data: actual },
-        { name: 'Forecast', data: forecast },
-      ];
+  // Stacked bars: Distribution + Forecast. Revenue is not plotted — it
+  // appears only in the bar tooltip.
+  const series = [
+    { name: 'Distribution', data: actual },
+    { name: 'Forecast', data: forecast },
+  ];
 
   return (
     <article className="owner-dist-card">
@@ -422,7 +431,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
           </div>
           {targetNetMargin && targetNetMargin > 0 && distributionTargetAmount && distributionTargetAmount > 0 && (
             <p className="owner-dist-subtitle">
-              {Math.round(targetNetMargin * 100)}% net profit goal: ${Math.round(distributionTargetAmount / 1000)}K
+              {Math.round(targetNetMargin * 100)}% net profit goal for {currentYear}: ${Math.round(distributionTargetAmount / 1000)}K
             </p>
           )}
         </div>
@@ -431,34 +440,18 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
           : <span className={`card-status-badge ${ownerDistBadgeClass(pill.variant)}`}>{pill.label}</span>
         }
       </div>
-      <div>
+      <div className="owner-dist-plot">
         <div className="owner-dist-legend-row">
           <div className="owner-dist-legend-items">
             <span className="owner-dist-legend-item">
               <span className="owner-dist-legend-dot actual"></span>
-              Actual
+              Distribution
             </span>
             <span className="owner-dist-legend-item">
               <span className="owner-dist-legend-dot forecast"></span>
               Forecast
             </span>
-            {comparing && (
-              <span className="owner-dist-legend-item">
-                <span className="owner-dist-legend-dot income"></span>
-                Income
-              </span>
-            )}
           </div>
-          {canCompareIncome && (
-            <button
-              type="button"
-              className="btn-secondary-card"
-              aria-pressed={showIncome}
-              onClick={() => setShowIncome((v) => !v)}
-            >
-              Compare to income
-            </button>
-          )}
         </div>
         <div className="owner-dist-chart">
           <Chart options={options} series={series} type="bar" height={229} />
@@ -468,16 +461,21 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         <div className="owner-dist-footer">
           <div className="action-dropdown" ref={dropdownRef}>
             <button
+              type="button"
               className="owner-dist-forecast-action"
-              onClick={() => setIsDropdownOpen(prev => !prev)}
+              onClick={() => setIsDropdownOpen((prev) => !prev)}
+              aria-haspopup="menu"
+              aria-expanded={isDropdownOpen}
             >
               Compare {currentYear} to a past year
             </button>
             {isDropdownOpen && (
-              <ul className="action-dropdown-menu">
-                {actualYears.map(year => (
+              <ul className="action-dropdown-menu" role="menu" aria-label={`Compare ${currentYear} to a past year`}>
+                {actualYears.map((year) => (
                   <li key={year}>
-                    <button onClick={() => handleYearSelect(year)}>{year}</button>
+                    <button type="button" role="menuitem" onClick={() => handleYearSelect(year)}>
+                      {year}
+                    </button>
                   </li>
                 ))}
               </ul>

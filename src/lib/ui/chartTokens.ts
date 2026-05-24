@@ -20,6 +20,7 @@ export const chartTokens = {
   brand400:        '#637AEA',
 
   // Semantic
+  info:                 '#0BA5EC',
   success:              '#12B76A',
   successGradientEnd:   '#89DBB5',
   successText:          '#039855',

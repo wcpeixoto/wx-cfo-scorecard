@@ -157,15 +157,15 @@ export function NextOwnerDistributionCard({
   const hasSlider = reprojectOwnerPay != null;
 
   return (
-    <article className="card nod-card" aria-label="Next Owner Distribution">
+    <article className="card nod-card" aria-label="Owner Distribution Forecast">
       <div className="nod-header">
         <div className="nod-title-row">
-          <h3 className="nod-title">Next Owner Distribution</h3>
+          <h3 className="nod-title">Owner Distribution Forecast</h3>
           <span className="db-tooltip-wrap">
             <button
               type="button"
               className="db-tooltip-btn"
-              aria-label="Next Owner Distribution explanation"
+              aria-label="Owner Distribution Forecast explanation"
               aria-describedby={tooltipId}
             >
               &#9432;
