@@ -3224,6 +3224,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
             model={model}
             txns={filteredTxns}
             forecastProjection={scenarioProjection}
+            negativeCashMonth={forecastDecisionSignals.negativeCashMonth}
             ownerPayProjection={ownerPayProjection}
             ownerPayReserveFloor={ownerPayReserveFloor}
             targetNetMargin={businessRules.targetNetMargin}

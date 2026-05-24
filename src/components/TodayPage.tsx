@@ -17,6 +17,8 @@ interface TodayPageProps {
   model: DashboardModel;
   txns: Txn[];
   forecastProjection: ScenarioPoint[];
+  /** Forecast's canonical first-negative-cash month (YYYY-MM) or null. */
+  negativeCashMonth: string | null;
   ownerPayProjection: ScenarioPoint[];
   ownerPayReserveFloor: number;
   targetNetMargin?: number;
@@ -26,7 +28,7 @@ interface TodayPageProps {
   reserveCoverageDelta: ReserveCoverageDelta | null;
 }
 
-export function TodayPage({ model, txns, forecastProjection, ownerPayProjection, ownerPayReserveFloor, targetNetMargin, onCompareYear, reprojectOwnerPay, cashTrendData, reserveCoverageDelta }: TodayPageProps) {
+export function TodayPage({ model, txns, forecastProjection, negativeCashMonth, ownerPayProjection, ownerPayReserveFloor, targetNetMargin, onCompareYear, reprojectOwnerPay, cashTrendData, reserveCoverageDelta }: TodayPageProps) {
   const distributionStatus = useMemo(() => {
     if (
       !model.monthlyRollups ||
@@ -68,6 +70,7 @@ export function TodayPage({ model, txns, forecastProjection, ownerPayProjection,
           model={model}
           txns={txns}
           forecastProjection={forecastProjection}
+          negativeCashMonth={negativeCashMonth}
           cashTrendData={cashTrendData}
         />
         <OperatingReserveCard
