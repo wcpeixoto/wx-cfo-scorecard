@@ -84,10 +84,9 @@ export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData,
 
   // Cash-run-out date. Sourced from the Forecast's canonical negativeCashMonth
   // (first month projected ending cash goes below zero) so the Today card and
-  // the Forecast page can never show different run-out dates. null when cash
-  // never goes negative — the row is hidden, not replaced with a positive
-  // message. Returns months-from-now and the long-form date; the JSX layer
-  // picks the format based on a 10-month threshold.
+  // the Forecast page can never show different run-out dates. Rendered as
+  // month + year to match the Forecast page. null when cash never goes
+  // negative — the row is hidden, not replaced with a positive message.
   const cashRunOut = useMemo(() => {
     if (!negativeCashMonth) return null;
     const match = negativeCashMonth.match(/^(\d{4})-(\d{2})$/);
@@ -95,17 +94,12 @@ export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData,
     const runOutYear = Number.parseInt(match[1], 10);
     const runOutMonthIndex = Number.parseInt(match[2], 10) - 1;
     if (!Number.isFinite(runOutYear) || runOutMonthIndex < 0 || runOutMonthIndex > 11) return null;
-    const now = new Date();
-    const months = Math.max(
-      0,
-      (runOutYear * 12 + runOutMonthIndex) - (now.getUTCFullYear() * 12 + now.getUTCMonth())
-    );
     const date = new Date(Date.UTC(runOutYear, runOutMonthIndex, 1)).toLocaleDateString('en-US', {
       month: 'long',
       year: 'numeric',
       timeZone: 'UTC',
     });
-    return { months, date };
+    return { date };
   }, [negativeCashMonth]);
 
   // True end-of-month cash balances (up to 6 points feed the sparkline)
@@ -200,15 +194,7 @@ export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData,
               </svg>
             </span>
             <span>
-              {(() => {
-                const { months, date } = cashRunOut;
-                if (months === 0) return 'At this pace, you are projected to run out of cash this month.';
-                // Close horizons (<10 months) read as a duration; farther
-                // horizons read as an absolute date to keep the sentence
-                // from feeling distant or abstract.
-                if (months < 10) return `At this pace, you are projected to run out of cash in ${months} ${months === 1 ? 'month' : 'months'}.`;
-                return `At this pace, you are projected to run out of cash in ${date}.`;
-              })()}
+              At this pace, you are projected to run out of cash in {cashRunOut.date}.
             </span>
           </p>
         )}
