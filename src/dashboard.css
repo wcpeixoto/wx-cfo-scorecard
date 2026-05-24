@@ -270,6 +270,8 @@ body {
 .top-bar--big-picture {
   padding: 32px;
   box-shadow: var(--shadow-card);
+  flex-direction: column;
+  gap: 20px;
 }
 
 .top-bar--big-picture .top-bar-main {
@@ -9183,4 +9185,40 @@ body {
   font-size: 16px;
   font-weight: 600;
   line-height: 24px;
+}
+
+/* ── Big Picture overview block — KPI cards tray ───────────────────────────
+   Approach-1 unification (TailAdmin Sales Dashboard pattern): the
+   .top-bar--big-picture block stacks the header row over a gray tray that
+   holds the four KPI cards. Scoped to the big-picture block so the shared
+   .top-bar (Trends / Where to Focus), the Today page, and the loading
+   skeleton's .kpi-grid/.kpi-card stay untouched — the tray/card overrides win
+   by specificity (.bp-overview-tray ...), never by editing the base classes. */
+.bp-overview-tray {
+  background: var(--bg-muted);
+  border-radius: 16px;
+  padding: 4px;
+}
+
+.bp-overview-tray .kpi-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+@media (max-width: 1279px) {
+  .bp-overview-tray .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 639px) {
+  .bp-overview-tray .kpi-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.bp-overview-tray .kpi-card {
+  border: none;
+  border-radius: 12px;
+  padding: 20px;
 }
