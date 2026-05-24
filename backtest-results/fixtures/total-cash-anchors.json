@@ -1,0 +1,8 @@
+{
+  "_comment": "Total bank-cash anchor for the CFO Assistant reserve replay. Values from production's authoritative shared_account_settings (Supabase, workspace_id='default'), read-only lookup 2026-05-23. cashIncludedAccounts = the accounts with include_in_cash_forecast=true (Bank of America + Card Amex). anchor.totalCashBalance = sum of those accounts' starting_balance ($27,367.27 + $0.00), dated 2021-12-01 (before the first fixture txn 2021-12-08) so it serves as the ledger-start anchor. Reconstruction = anchor + Σ rawAmount of cash-included txns from the anchor date forward, which matches Dashboard currentCashBalance.",
+  "source": "production shared_account_settings (read-only lookup 2026-05-23)",
+  "cashIncludedAccounts": ["Bank of America", "Card Amex"],
+  "anchors": [
+    { "asOfDate": "2021-12-01", "totalCashBalance": 27367.27 }
+  ]
+}

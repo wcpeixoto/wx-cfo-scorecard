@@ -1,0 +1,640 @@
+{
+  "meta": {
+    "generatedAt": "2026-05-23T17:49:54.405Z",
+    "fixturePath": "/Users/wesley/Code/wx-cfo-scorecard/backtest-results/fixtures/transactions-snapshot.jsonl",
+    "fixtureRows": 4851,
+    "cashIncludedAccounts": [
+      "Bank of America",
+      "Card Amex"
+    ],
+    "excludedNotable": [
+      "Cash (petty)",
+      "Wodify",
+      "CC Corp 8839",
+      "CC Deborah",
+      "CC Marcio",
+      "S/T Loan SH",
+      "Merchant Fee"
+    ],
+    "cashDefinitionSource": "production shared_account_settings (read-only lookup 2026-05-23)",
+    "totalAnchorSummary": "2021-12-01=$27,367",
+    "operatingAvailable": true
+  },
+  "records": [
+    {
+      "asOfDate": "2025-01-01",
+      "txnCount": 3243,
+      "totalCash": 33947.93000000001,
+      "reserveTarget": 40639.58,
+      "percentFundedTotal": 0.84,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2024-12",
+      "hero": {
+        "type": "reserve_warning",
+        "severity": "warning",
+        "recommendedAction": "Keep building your Operating Reserve — you're funded but below the full target.",
+        "gapAmount": 6502.332800000002,
+        "metricValue": 0.84,
+        "targetValue": 1
+      },
+      "commitmentDraft": {
+        "illustrativeActionAtRecommended": "Move $225 into your operating reserve this week.",
+        "grounding": {
+          "classification": "grounded",
+          "recommended": 225,
+          "floor": 25,
+          "ceiling": 6502.332800000002,
+          "weeklyCapacity": 647.1399153194765,
+          "unknownReason": null
+        }
+      },
+      "execute": {
+        "kind": "levers",
+        "lead": "Here's where spending ran above its recent norm this month — pick one to pull back:",
+        "recommended": "W-2 Staff ran $3,284 above its recent average.",
+        "alternates": [
+          "Federal Tax — $1,923 above average",
+          "Merchant Fees — $1,328 above average"
+        ]
+      },
+      "operatingComparison": {
+        "operatingCash": 33947.93,
+        "percentFundedOperating": 0.84,
+        "heroType": "reserve_warning",
+        "heroSeverity": "warning"
+      }
+    },
+    {
+      "asOfDate": "2025-02-01",
+      "txnCount": 3325,
+      "totalCash": 21327.28,
+      "reserveTarget": 39012.79,
+      "percentFundedTotal": 0.55,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2025-01",
+      "hero": {
+        "type": "reserve_warning",
+        "severity": "warning",
+        "recommendedAction": "Keep building your Operating Reserve — you're funded but below the full target.",
+        "gapAmount": 17555.7555,
+        "metricValue": 0.55,
+        "targetValue": 1
+      },
+      "commitmentDraft": {
+        "illustrativeActionAtRecommended": "Move $150 into your operating reserve this week.",
+        "grounding": {
+          "classification": "grounded",
+          "recommended": 150,
+          "floor": 25,
+          "ceiling": 17555.7555,
+          "weeklyCapacity": 449.4811393379522,
+          "unknownReason": null
+        }
+      },
+      "execute": {
+        "kind": "levers",
+        "lead": "Here's where spending ran above its recent norm this month — pick one to pull back:",
+        "recommended": "Federal Tax ran $1,963 above its recent average.",
+        "alternates": [
+          "1099 Front Desk — $457 above average",
+          "Marketing Agencies — $250 above average"
+        ]
+      },
+      "operatingComparison": {
+        "operatingCash": 33262.28,
+        "percentFundedOperating": 0.85,
+        "heroType": "reserve_warning",
+        "heroSeverity": "warning"
+      }
+    },
+    {
+      "asOfDate": "2025-03-01",
+      "txnCount": 3403,
+      "totalCash": 30450.22,
+      "reserveTarget": 37053.63,
+      "percentFundedTotal": 0.82,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2025-02",
+      "hero": {
+        "type": "reserve_warning",
+        "severity": "warning",
+        "recommendedAction": "Keep building your Operating Reserve — you're funded but below the full target.",
+        "gapAmount": 6669.653400000001,
+        "metricValue": 0.82,
+        "targetValue": 1
+      },
+      "commitmentDraft": {
+        "illustrativeActionAtRecommended": "Move $100 into your operating reserve this week.",
+        "grounding": {
+          "classification": "grounded",
+          "recommended": 100,
+          "floor": 25,
+          "ceiling": 6669.653400000001,
+          "weeklyCapacity": 314.1957274826791,
+          "unknownReason": null
+        }
+      },
+      "execute": {
+        "kind": "levers",
+        "lead": "Here's where spending ran above its recent norm this month — pick one to pull back:",
+        "recommended": "Uniforms & Retail ran $2,968 above its recent average.",
+        "alternates": [
+          "Ads — $777 above average",
+          "State Tax — $215 above average"
+        ]
+      },
+      "operatingComparison": {
+        "operatingCash": 40970.56,
+        "percentFundedOperating": 1.11,
+        "heroType": "expense_surge",
+        "heroSeverity": "critical"
+      }
+    },
+    {
+      "asOfDate": "2025-04-01",
+      "txnCount": 3488,
+      "totalCash": 34730.83,
+      "reserveTarget": 33223.33,
+      "percentFundedTotal": 1.05,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2025-03",
+      "hero": {
+        "type": "expense_surge",
+        "severity": "critical",
+        "recommendedAction": "Review \"Payroll:1099 Instructors\" — spending spiked above your normal range last month.",
+        "gapAmount": 1593.02,
+        "metricValue": 2713.52,
+        "targetValue": 1120.5
+      },
+      "commitmentDraft": null,
+      "execute": {
+        "kind": "n/a",
+        "detail": "hero is not reserve-funding (Execute is reserve-only)"
+      },
+      "operatingComparison": {
+        "operatingCash": 52144.719999999994,
+        "percentFundedOperating": 1.57,
+        "heroType": "expense_surge",
+        "heroSeverity": "critical"
+      }
+    },
+    {
+      "asOfDate": "2025-05-01",
+      "txnCount": 3577,
+      "totalCash": 28465.13,
+      "reserveTarget": 40318.05,
+      "percentFundedTotal": 0.71,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2025-04",
+      "hero": {
+        "type": "reserve_warning",
+        "severity": "warning",
+        "recommendedAction": "Keep building your Operating Reserve — you're funded but below the full target.",
+        "gapAmount": 11692.234500000002,
+        "metricValue": 0.71,
+        "targetValue": 1
+      },
+      "commitmentDraft": {
+        "illustrativeActionAtRecommended": "Move $175 into your operating reserve this week.",
+        "grounding": {
+          "classification": "grounded",
+          "recommended": 175,
+          "floor": 25,
+          "ceiling": 11692.234500000002,
+          "weeklyCapacity": 557.511739799846,
+          "unknownReason": null
+        }
+      },
+      "execute": {
+        "kind": "levers",
+        "lead": "Here's where spending ran above its recent norm this month — pick one to pull back:",
+        "recommended": "Other, Cash ran $8,855 above its recent average.",
+        "alternates": [
+          "1099 Instructors — $7,056 above average",
+          "State Tax — $6,986 above average"
+        ]
+      },
+      "operatingComparison": {
+        "operatingCash": 45625.77999999999,
+        "percentFundedOperating": 1.13,
+        "heroType": "expense_surge",
+        "heroSeverity": "critical"
+      }
+    },
+    {
+      "asOfDate": "2025-06-01",
+      "txnCount": 3678,
+      "totalCash": 29554.750000000004,
+      "reserveTarget": 40199.21,
+      "percentFundedTotal": 0.74,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2025-05",
+      "hero": {
+        "type": "reserve_warning",
+        "severity": "warning",
+        "recommendedAction": "Keep building your Operating Reserve — you're funded but below the full target.",
+        "gapAmount": 10451.7946,
+        "metricValue": 0.74,
+        "targetValue": 1
+      },
+      "commitmentDraft": {
+        "illustrativeActionAtRecommended": "Move $150 into your operating reserve this week.",
+        "grounding": {
+          "classification": "grounded",
+          "recommended": 150,
+          "floor": 25,
+          "ceiling": 10451.7946,
+          "weeklyCapacity": 437.51616628175526,
+          "unknownReason": null
+        }
+      },
+      "execute": {
+        "kind": "levers",
+        "lead": "Here's where spending ran above its recent norm this month — pick one to pull back:",
+        "recommended": "1099 Instructors ran $6,018 above its recent average.",
+        "alternates": [
+          "Refunds & Allowances — $3,206 above average",
+          "Rent or Lease — $1,000 above average"
+        ]
+      },
+      "operatingComparison": {
+        "operatingCash": 45772.40999999999,
+        "percentFundedOperating": 1.14,
+        "heroType": "expense_surge",
+        "heroSeverity": "critical"
+      }
+    },
+    {
+      "asOfDate": "2025-07-01",
+      "txnCount": 3808,
+      "totalCash": 23602.24000000001,
+      "reserveTarget": 42819.39,
+      "percentFundedTotal": 0.55,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2025-06",
+      "hero": {
+        "type": "reserve_warning",
+        "severity": "warning",
+        "recommendedAction": "Keep building your Operating Reserve — you're funded but below the full target.",
+        "gapAmount": 19268.725499999997,
+        "metricValue": 0.55,
+        "targetValue": 1
+      },
+      "commitmentDraft": {
+        "illustrativeActionAtRecommended": "Move $100 into your operating reserve this week.",
+        "grounding": {
+          "classification": "grounded",
+          "recommended": 100,
+          "floor": 25,
+          "ceiling": 19268.725499999997,
+          "weeklyCapacity": 331.589299461124,
+          "unknownReason": null
+        }
+      },
+      "execute": {
+        "kind": "levers",
+        "lead": "Here's where spending ran above its recent norm this month — pick one to pull back:",
+        "recommended": "Refunds & Allowances ran $1,945 above its recent average.",
+        "alternates": [
+          "Ads — $1,665 above average",
+          "1099 Instructors — $1,526 above average"
+        ]
+      },
+      "operatingComparison": {
+        "operatingCash": 40843.88999999999,
+        "percentFundedOperating": 0.95,
+        "heroType": "reserve_warning",
+        "heroSeverity": "warning"
+      }
+    },
+    {
+      "asOfDate": "2025-08-01",
+      "txnCount": 3939,
+      "totalCash": 36174.890000000014,
+      "reserveTarget": 37699.64,
+      "percentFundedTotal": 0.96,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2025-07",
+      "hero": {
+        "type": "reserve_warning",
+        "severity": "warning",
+        "recommendedAction": "Keep building your Operating Reserve — you're funded but below the full target.",
+        "gapAmount": 1507.9856000000013,
+        "metricValue": 0.96,
+        "targetValue": 1
+      },
+      "commitmentDraft": {
+        "illustrativeActionAtRecommended": "Move $125 into your operating reserve this week.",
+        "grounding": {
+          "classification": "grounded",
+          "recommended": 125,
+          "floor": 25,
+          "ceiling": 1507.9856000000013,
+          "weeklyCapacity": 409.6391454965358,
+          "unknownReason": null
+        }
+      },
+      "execute": {
+        "kind": "levers",
+        "lead": "Here's where spending ran above its recent norm this month — pick one to pull back:",
+        "recommended": "Ads ran $3,799 above its recent average.",
+        "alternates": [
+          "Payroll Fees — $2,497 above average",
+          "Telephone & Internet — $476 above average"
+        ]
+      },
+      "operatingComparison": {
+        "operatingCash": 54432.22,
+        "percentFundedOperating": 1.44,
+        "heroType": "expense_surge",
+        "heroSeverity": "critical"
+      }
+    },
+    {
+      "asOfDate": "2025-09-01",
+      "txnCount": 4039,
+      "totalCash": 28686.230000000014,
+      "reserveTarget": 37565.02,
+      "percentFundedTotal": 0.76,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2025-08",
+      "hero": {
+        "type": "reserve_warning",
+        "severity": "warning",
+        "recommendedAction": "Keep building your Operating Reserve — you're funded but below the full target.",
+        "gapAmount": 9015.6048,
+        "metricValue": 0.76,
+        "targetValue": 1
+      },
+      "commitmentDraft": {
+        "illustrativeActionAtRecommended": "Move $150 into your operating reserve this week.",
+        "grounding": {
+          "classification": "grounded",
+          "recommended": 150,
+          "floor": 25,
+          "ceiling": 9015.6048,
+          "weeklyCapacity": 476.22729022324864,
+          "unknownReason": null
+        }
+      },
+      "execute": {
+        "kind": "levers",
+        "lead": "Here's where spending ran above its recent norm this month — pick one to pull back:",
+        "recommended": "1099 Instructors ran $2,201 above its recent average.",
+        "alternates": [
+          "W-2 Staff — $1,598 above average",
+          "Gas & Electric — $621 above average"
+        ]
+      },
+      "operatingComparison": {
+        "operatingCash": 50002.420000000006,
+        "percentFundedOperating": 1.33,
+        "heroType": "expense_surge",
+        "heroSeverity": "warning"
+      }
+    },
+    {
+      "asOfDate": "2025-10-01",
+      "txnCount": 4163,
+      "totalCash": 37966.580000000016,
+      "reserveTarget": 38062.18,
+      "percentFundedTotal": 1,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2025-09",
+      "hero": {
+        "type": "cash_flow_tight",
+        "severity": "warning",
+        "recommendedAction": "Cash stays positive but dips below your Operating Reserve — watch for timing gaps.",
+        "gapAmount": 95.59999999999854,
+        "metricValue": 37966.58,
+        "targetValue": 38062.18
+      },
+      "commitmentDraft": null,
+      "execute": {
+        "kind": "n/a",
+        "detail": "hero is not reserve-funding (Execute is reserve-only)"
+      },
+      "operatingComparison": {
+        "operatingCash": 59205.90000000001,
+        "percentFundedOperating": 1.56,
+        "heroType": "expense_surge",
+        "heroSeverity": "critical"
+      }
+    },
+    {
+      "asOfDate": "2025-11-01",
+      "txnCount": 4266,
+      "totalCash": 31432.530000000017,
+      "reserveTarget": 38445.07,
+      "percentFundedTotal": 0.82,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2025-10",
+      "hero": {
+        "type": "reserve_warning",
+        "severity": "warning",
+        "recommendedAction": "Keep building your Operating Reserve — you're funded but below the full target.",
+        "gapAmount": 6920.112600000002,
+        "metricValue": 0.82,
+        "targetValue": 1
+      },
+      "commitmentDraft": {
+        "illustrativeActionAtRecommended": "Move $175 into your operating reserve this week.",
+        "grounding": {
+          "classification": "grounded",
+          "recommended": 175,
+          "floor": 25,
+          "ceiling": 6920.112600000002,
+          "weeklyCapacity": 538.1364511162433,
+          "unknownReason": null
+        }
+      },
+      "execute": {
+        "kind": "levers",
+        "lead": "Here's where spending ran above its recent norm this month — pick one to pull back:",
+        "recommended": "W-2 Staff ran $6,930 above its recent average.",
+        "alternates": [
+          "Uniforms & Retail — $1,769 above average",
+          "Payroll Taxes — $1,495 above average"
+        ]
+      },
+      "operatingComparison": {
+        "operatingCash": 53717.28000000003,
+        "percentFundedOperating": 1.4,
+        "heroType": "expense_surge",
+        "heroSeverity": "critical"
+      }
+    },
+    {
+      "asOfDate": "2025-12-01",
+      "txnCount": 4362,
+      "totalCash": 16682.000000000022,
+      "reserveTarget": 39196.23,
+      "percentFundedTotal": 0.43,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2025-11",
+      "hero": {
+        "type": "reserve_critical",
+        "severity": "critical",
+        "recommendedAction": "Build your Operating Reserve — current level is below your goal.",
+        "gapAmount": 22341.851100000003,
+        "metricValue": 0.43,
+        "targetValue": 1
+      },
+      "commitmentDraft": {
+        "illustrativeActionAtRecommended": "Move $50 into your operating reserve this week.",
+        "grounding": {
+          "classification": "grounded",
+          "recommended": 50,
+          "floor": 25,
+          "ceiling": 22341.851100000003,
+          "weeklyCapacity": 187.03040800615858,
+          "unknownReason": null
+        }
+      },
+      "execute": {
+        "kind": "levers",
+        "lead": "Here's where spending ran above its recent norm this month — pick one to pull back:",
+        "recommended": "Insurance ran $2,857 above its recent average.",
+        "alternates": [
+          "W-2 Staff — $2,166 above average",
+          "Refunds & Allowances — $2,140 above average"
+        ]
+      },
+      "operatingComparison": {
+        "operatingCash": 46861.43000000003,
+        "percentFundedOperating": 1.2,
+        "heroType": "expense_surge",
+        "heroSeverity": "warning"
+      }
+    },
+    {
+      "asOfDate": "2026-01-01",
+      "txnCount": 4493,
+      "totalCash": 21480.20000000002,
+      "reserveTarget": 43901.63,
+      "percentFundedTotal": 0.49,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2025-12",
+      "hero": {
+        "type": "reserve_critical",
+        "severity": "critical",
+        "recommendedAction": "Build your Operating Reserve — current level is below your goal.",
+        "gapAmount": 22389.831299999998,
+        "metricValue": 0.49,
+        "targetValue": 1
+      },
+      "commitmentDraft": {
+        "illustrativeActionAtRecommended": "Move $150 into your operating reserve this week.",
+        "grounding": {
+          "classification": "grounded",
+          "recommended": 150,
+          "floor": 25,
+          "ceiling": 22389.831299999998,
+          "weeklyCapacity": 432.61893764434177,
+          "unknownReason": null
+        }
+      },
+      "execute": {
+        "kind": "levers",
+        "lead": "Here's where spending ran above its recent norm this month — pick one to pull back:",
+        "recommended": "Rent or Lease ran $9,000 above its recent average.",
+        "alternates": [
+          "Uniforms & Retail — $4,100 above average",
+          "Immigration Instructors — $4,012 above average"
+        ]
+      },
+      "operatingComparison": {
+        "operatingCash": 56426.81000000004,
+        "percentFundedOperating": 1.29,
+        "heroType": "expense_surge",
+        "heroSeverity": "critical"
+      }
+    },
+    {
+      "asOfDate": "2026-02-01",
+      "txnCount": 4604,
+      "totalCash": 18337.94000000002,
+      "reserveTarget": 41980.22,
+      "percentFundedTotal": 0.44,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2026-01",
+      "hero": {
+        "type": "reserve_critical",
+        "severity": "critical",
+        "recommendedAction": "Build your Operating Reserve — current level is below your goal.",
+        "gapAmount": 23508.9232,
+        "metricValue": 0.44,
+        "targetValue": 1
+      },
+      "commitmentDraft": {
+        "illustrativeActionAtRecommended": "Move $175 into your operating reserve this week.",
+        "grounding": {
+          "classification": "grounded",
+          "recommended": 175,
+          "floor": 25,
+          "ceiling": 23508.9232,
+          "weeklyCapacity": 527.1837952270977,
+          "unknownReason": null
+        }
+      },
+      "execute": {
+        "kind": "levers",
+        "lead": "Here's where spending ran above its recent norm this month — pick one to pull back:",
+        "recommended": "Employee Benefit (other than pension or profit-sharing) ran $1,681 above its recent average.",
+        "alternates": [
+          "Uniforms & Retail — $979 above average",
+          "Immigration Mgt Staff — $667 above average"
+        ]
+      },
+      "operatingComparison": {
+        "operatingCash": 60654.75000000003,
+        "percentFundedOperating": 1.44,
+        "heroType": "expense_surge",
+        "heroSeverity": "warning"
+      }
+    },
+    {
+      "asOfDate": "2026-03-01",
+      "txnCount": 4695,
+      "totalCash": 8023.510000000006,
+      "reserveTarget": 42079.12,
+      "percentFundedTotal": 0.19,
+      "runwayStatus": "self-funded",
+      "latestDataMonth": "2026-02",
+      "hero": {
+        "type": "reserve_critical",
+        "severity": "critical",
+        "recommendedAction": "Build your Operating Reserve — current level is below your goal.",
+        "gapAmount": 34084.0872,
+        "metricValue": 0.19,
+        "targetValue": 1
+      },
+      "commitmentDraft": {
+        "illustrativeActionAtRecommended": "Move $50 into your operating reserve this week.",
+        "grounding": {
+          "classification": "grounded",
+          "recommended": 50,
+          "floor": 25,
+          "ceiling": 34084.0872,
+          "weeklyCapacity": 143.64722863741335,
+          "unknownReason": null
+        }
+      },
+      "execute": {
+        "kind": "levers",
+        "lead": "Here's where spending ran above its recent norm this month — pick one to pull back:",
+        "recommended": "Uniforms & Retail ran $645 above its recent average.",
+        "alternates": [
+          "Other, Cash — $579 above average",
+          "Office Expenses — $519 above average"
+        ]
+      },
+      "operatingComparison": {
+        "operatingCash": 48434.47000000003,
+        "percentFundedOperating": 1.15,
+        "heroType": "expense_surge",
+        "heroSeverity": "critical"
+      }
+    }
+  ]
+}
