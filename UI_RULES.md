@@ -503,9 +503,6 @@ Fixed left, `h-screen`, white (`dark:bg-gray-900`), right border, `px-5`.
 - ⌘K (`metaKey/ctrlKey + K`) focuses the search input.
 - Notification/user triggers are `h-11 w-11 rounded-full` buttons opening
   `shadow-theme-lg` panels; the notification dot uses an `animate-ping` ring.
-- Reference dims (TailAdmin source): search `xl:w-[430px]`; notification panel
-  `w-[350px] sm:w-[361px] h-[480px]`; user panel `w-[260px]`; ⌘K pill
-  `px-[7px] py-[4.5px]`.
 
 ## Backdrop
 `fixed inset-0 z-40 bg-gray-900/50 lg:hidden`, rendered only when the mobile
@@ -1668,8 +1665,7 @@ They specify what is allowed in each zone and what happens in edge cases.
 - The anonymous wrapper has no class and is `display: block` — both legend and chart stretch to full content width naturally
 - **TailAdmin base alignment: left-aligned** — `flex items-center gap-5` on the legend container, no justify-center, no justify-end
 - Left edge of legend dots aligns exactly with left edge of title and subtitle (all share card `padding-left` origin)
-- Subtitle → legend gap is **20px via `pt-5` on the legend container** — never margin-top, never flex gap on a parent
-- Legend → chart gap is **0px** — chart container is flush directly below legend container
+- Spacing: subtitle→legend and legend→chart gaps follow Pattern C — the single source for those values; do not restate or diverge here
 - Legend container must be **full content width** — never `inline-flex`, never `width: fit-content`
 - Each item: `flex items-center gap-1.5` — dot (10×10px rounded-full) + label (text-sm text-gray-500)
 - Right-aligned or centered legend rows are **not TailAdmin-native** — any project that needs them must declare this explicitly in Part 6 as a named overlay deviation
@@ -1743,8 +1739,7 @@ The constraints below are calibrated to the actual TailAdmin source — not stri
 - [ ] Submenu items use `menu-dropdown-item` utilities
 - [ ] Dropdown triggers have `dropdown-toggle` class
 - [ ] Modals use `useModal()` hook
-- [ ] `PageBreadcrumb` is first element in every AppLayout page (exception: Calendar)
-- [ ] Charts on dedicated pages are wrapped in `ComponentCard`
+- [ ] `PageBreadcrumb` is first element in every AppLayout page
 
 **Project Overlay**
 - [ ] All rules from Part 6 applied
