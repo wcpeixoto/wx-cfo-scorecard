@@ -1,6 +1,5 @@
 # UI_RULES.md
 # TailAdmin Free React — Complete Visual & Structural Standard
-# Sourced directly from free-react-tailwind-admin-dashboard-main
 # Single source of truth for tokens, anatomy, patterns, and page compositions.
 
 ---
@@ -13,7 +12,9 @@
 **Part 4 — Card & Chart Patterns** — card headers, chart anatomy, legends, KPI cards.
 **Part 5 — Page Compositions** — how pages assemble primitives and cards.
 **Part 6 — Project Overlay** — project-specific rules that override or extend this base.
-**Part 7 — Hard Rules & Checklist** — constraints and pre-commit gate.
+**Part 6B — Card Coherence Rule** — numbers within one card must reconcile.
+**Part 7 — Decision Rules** — card-header, text-role, and alignment decision systems.
+**Part 8 — Hard Rules & Checklist** — constraints and pre-commit gate.
 
 Token drift and structure drift are equally harmful. Both are prevented here.
 
@@ -68,11 +69,6 @@ Weights: 400 Regular · 500 Medium · 600 Semibold · 700 Bold
 | Chart grid lines | #e0e0e0 |
 | Divider (inside dropdowns, rows) | #F2F4F7 |
 
-> Chart grid `#e0e0e0` is the TailAdmin Sales/Pro dashboard native value (DevTools-extracted).
-> The earlier value `#EAECF0` came from the free React demo and is superseded. Per the source-of-truth
-> rule, DevTools-extracted Pro values win. Update `chartTokens.ts` when applying to new chart components.
-> Production charts updated in commit `95820db` (May 7, 2026).
-
 ### Text
 | Role | Hex |
 |------|-----|
@@ -83,13 +79,10 @@ Weights: 400 Regular · 500 Medium · 600 Semibold · 700 Bold
 | Muted / metadata | #98A2B3 (gray-400) |
 | Inverse (on dark bg) | white/90 |
 
-> **Note on `#101828` (Primary strong):** Reserved. Not used on card content
-> per TailAdmin reference inspection (2026-05-20). Every KPI value on
-> demo.tailadmin.com/crm — top-strip 30px heroes and inline 20px Statistics
-> KPIs — renders at `#1D2939` (`text-gray-800`), same as titles. Role for
-> `#101828` is under review — do not apply to card titles, KPI values, or
-> hero metrics without re-inspection. (Known non-card uses: dropdown hover
-> color, segmented-control active text, table row hover/active state.)
+> **Note on `#101828` (Primary strong):** Reserved. Not used on card content —
+> every KPI value renders at `#1D2939` (`text-gray-800`), same as titles. Do not
+> apply to card titles, KPI values, or hero metrics. (Known non-card uses:
+> dropdown hover color, segmented-control active text, table row hover/active state.)
 
 ### Chart-specific text
 | Role | Hex |
@@ -153,10 +146,8 @@ Every component requires dark variants.
 
 ## Type Scale
 
-**Sourced from** TailAdmin demo dashboards: `demo.tailadmin.com/sales`,
-`demo.tailadmin.com/finance`, and `demo.tailadmin.com/ai`. Font family is
-**Outfit** across all pages. The roles below are the canonical source of
-truth — pick the role first, then the size/weight follows.
+Font family is **Outfit** across all pages. The roles below are the canonical
+source of truth — pick the role first, then the size/weight follows.
 
 | Token | px | Role |
 |-------|----|------|
@@ -194,11 +185,6 @@ not by visual size.
 text is requested (metric, card title, label, body, etc.), confirm which
 role above it serves so the correct size and weight are chosen. Do not
 introduce a size or weight that is not on this table.
-
-> **Pending classification — do not treat as canonical.** `13px` and
-> `1.06rem` usages currently exist in `src/dashboard.css`; their
-> classification is pending the Stage 3 CSS sweep. Do not treat either
-> as a canonical role until reviewed per site.
 
 ### Card title roles
 
@@ -254,14 +240,14 @@ Any value not in this table is off-grid. Flag in code review.
 
 ### Page and layout level
 
-**Page content wrapper** *(TailAdmin observed)*
+**Page content wrapper**
 `p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6` — 16px mobile, 24px desktop.
 
-**Page grid** *(TailAdmin observed)*
+**Page grid**
 `grid grid-cols-12 gap-4 md:gap-6` — 16px mobile, 24px desktop.
 `align-items` is not declared — browser default `normal` (stretch) applies.
 
-**Vertical rhythm between sections** *(TailAdmin observed)*
+**Vertical rhythm between sections**
 TailAdmin uses `space-y-6` (24px) between sibling blocks inside a column.
 This project uses `margin-top` instead — functionally equivalent.
 Either is acceptable. Do not mix both on the same page or section level.
@@ -271,8 +257,6 @@ Never use `gap` on a parent grid for vertical rhythm between sections —
 ---
 
 ### Card padding
-
-*(TailAdmin observed — confirmed via DevTools)*
 
 | Card type | Class | Mobile | Desktop |
 |-----------|-------|--------|---------|
@@ -287,23 +271,21 @@ Do not normalize it to uniform padding.
 
 #### Fixed-scale card shells (canonical components — not responsive)
 
-Some canonical cards use a fixed, non-responsive padding. These are DevTools-extracted from
-specific TailAdmin Pro dashboard tiles and do not use the responsive `sm:p-6` pattern.
+Some canonical cards use a fixed, non-responsive padding and do not use the responsive
+`sm:p-6` pattern. See Part 6 — Canonical card shells for the binding spec.
 
-| Shell | Padding | Border radius | Border | Source |
-|-------|---------|---------------|--------|--------|
-| Metric card (`.metric-card`) | 20px fixed | 16px | 1px `#E4E7EC` | TailAdmin /ai "Users" |
-| Revenue card (`.revenue-card`) | 20px fixed | 12px | **none** | TailAdmin /sales "Total Revenue" |
-| Chart-card (`.statistics-card` family) | 24px fixed | 16px | 1px `#E4E7EC` | TailAdmin /sales "Statistics" |
+| Shell | Padding | Border radius | Border |
+|-------|---------|---------------|--------|
+| Metric card (`.metric-card`) | 20px fixed | 16px | 1px `#E4E7EC` |
+| Revenue card (`.revenue-card`) | 20px fixed | 12px | **none** |
+| Chart-card (`.statistics-card` family) | 24px fixed | 16px | 1px `#E4E7EC` |
 
 > Use fixed-scale shells for components built as UI Lab canonical references. These do not vary
-> with viewport — the TailAdmin Pro tiles are fixed-width layout tiles, not fluid-width cards.
+> with viewport.
 
 ---
 
 ### Card internal spacing
-
-*(TailAdmin observed)*
 
 | Element | Class | Value |
 |---------|-------|-------|
@@ -321,8 +303,6 @@ specific TailAdmin Pro dashboard tiles and do not use the responsive `sm:p-6` pa
 ---
 
 ### Grid gap
-
-*(TailAdmin observed — confirmed via DevTools)*
 
 **Card grid standard: `gap-4 md:gap-6`** — 16px mobile, 24px desktop.
 
@@ -444,10 +424,6 @@ Shadows appear on specific interactive surfaces only.
 ---
 
 ## Button height taxonomy (canonical — three sizes only)
-
-**Sourced from** TailAdmin demo dashboards: `demo.tailadmin.com/sales`,
-`demo.tailadmin.com/finance`, and `demo.tailadmin.com/ai`. Verified via
-DevTools computed-style inspection across all visible buttons on those pages.
 
 There are **three approved button heights** in this design system. No
 other heights are allowed for new buttons. Pick the role first, then the
@@ -791,15 +767,9 @@ class is aliased to the same styles, so existing timeframe menus
 (Forecast horizon **More ▾**, NetCashFlow timeframe, Big Picture range)
 inherit the canonical look automatically.
 
-Panel: `padding: 4px; min-width: 100%; bg #FFFFFF; border 1px #E4E7EC;
-border-radius: 8px; box-shadow: 0 4px 16px rgba(16,24,40,0.08); z-index: 200`.
-
-Option: `padding: 8px 12px; border-radius: 6px; Outfit 14px/500 #344054;
-hover & active bg #F2F4F7 / color #101828`.
-
 Trigger varies by surface (pill, segmented-toggle-btn, .action-dropdown-trigger);
-only the panel + options are canonicalized here. Any older mismatched
-dropdown menu styles should be migrated to this pattern.
+only the panel + options are canonicalized. See Part 6 — Action dropdown
+(standard pattern) for the full trigger / menu spec.
 
 ---
 
@@ -985,7 +955,7 @@ Subtitle at `mt-1` (4px) directly below title. RIGHT column holds only controls 
 ---
 
 ## Pattern C — Chart Card: Custom Legend Row
-*Source: TailAdmin Delivery Statistics card — pixel-perfect DOM extraction*
+*Source: TailAdmin Delivery Statistics card*
 
 ```
 card  [p-6, block, 2 direct children only]
@@ -1010,7 +980,6 @@ card  [p-6, block, 2 direct children only]
 
 **Alignment — all three share the same left edge:**
 Title left edge = subtitle left edge = legend left edge = card `padding-left` origin.
-`allAligned: true` — confirmed by `getBoundingClientRect()` on the TailAdmin source.
 
 **Legend item spec:**
 - Container: `flex items-center gap-5` (20px between items) + `pt-5` (20px top padding)
@@ -1077,8 +1046,6 @@ Always in header-right column or above chart. Never below chart.
 > is not used here. A single canonical scale applies everywhere: 44px track / 40px buttons /
 > 10px×12px padding / 8px+6px radii. The chart-card class `.statistics-card__tab*` uses the
 > same spec, locally scoped so it can sit inside a chart card without inheriting layout overrides.
-> Deprecated patterns (chart-style blue pill, outlined button-group) are scheduled for replacement;
-> do not replicate.
 >
 > See Part 6 — Segmented toggle for the full spec.
 
@@ -1160,7 +1127,6 @@ Edit button uses `rounded-full`. This is profile-card specific — not `rounded-
 | Header-block → content below (chart-card) | mb-8 (32px) | margin-bottom on header-block |
 | **Subtitle → legend row** | **20px** | **`pt-5` on legend container — NOT margin** |
 | Legend → chart | 0px | chart-container is flush sibling, no gap |
-| Legend row → chart (old pattern) | mb-4 (16px) | only applies when legend is a standalone sibling, not in anonymous wrapper |
 | Subtitle → next element (general) | mt-1 (4px) | when no legend row present |
 | Icon-box → value row (KPI) | mt-5 (20px) | margin-top on value row |
 | Label → value (KPI) | mt-2 (8px) | margin-top on value |
@@ -1199,10 +1165,6 @@ sandbox where the page font does not cascade reliably.
 
 Series colors: primary `#465FFF` · secondary `#9CB9FF` · success `#12B76A` · error `#F04438`.
 Area opacity: 0.15–0.25. No 3D. No decorative gradients.
-
-> `grid.borderColor` updated to `#e0e0e0` (TailAdmin Sales/Pro DevTools-extracted value).
-> Prior value `#EAECF0` from the free React demo is superseded. Update `chartTokens.ts` to match.
-> Production charts updated in commit `95820db` (May 7, 2026).
 
 ---
 
@@ -1296,7 +1258,7 @@ exception section in Part 6 for the full policy.
 - Never set tooltip background to `transparent`
 - Never size the `::before` glyph — use `background-color: currentColor`
 - The global `.apexcharts-tooltip` transparent reset block must
-  not exist in `dashboard.css` — it was removed in Phase 4.13
+  not exist in `dashboard.css`
 - Every ApexCharts bar chart must have `crosshairs: { width: 'barWidth' }`
 
 ---
@@ -1314,7 +1276,7 @@ exception section in Part 6 for the full policy.
 9. **Modal state via raw useState.** Use `useModal()`.
 10. **Shadow added to card or panel without justification.** Pattern F is the only valid exception.
 11. **`rounded-md` or `rounded-sm` on cards.** Cards are always `rounded-2xl`.
-12. **Toggle pattern other than the standard segmented control.** For new toggle work, use `.segmented-toggle` — the single canonical 44/40/10 scale (chart-card consumers use the locally scoped `.statistics-card__tab*` class with the same spec). See Part 6 Segmented toggle for the spec. The existing outlined button-group toggle (e.g. Big Picture "This Month / Last Month") is deprecated; do not replicate it. Note: there is no `.chart-tab` class in this codebase — the TailAdmin source component is named ChartTab.tsx but the project implementation is `.segmented-toggle`. Do not introduce `.chart-tab` as a new class.
+12. **Toggle pattern other than the standard segmented control.** For new toggle work, use `.segmented-toggle` — the single canonical 44/40/10 scale (chart-card consumers use the locally scoped `.statistics-card__tab*` class with the same spec). See Part 6 Segmented toggle for the spec. Do not introduce `.chart-tab` as a new class.
 
 ---
 
@@ -1517,14 +1479,6 @@ toggle exactly.
 Global consumers: Settings page (`#/settings`) Data / Accounts / Rules; Forecast horizon
 toggle; Trends timeframe; Contracts cadence; Net Cash Flow chart mode; Rules-row controls.
 
-### Deprecated patterns
-
-The following patterns exist in the codebase and are scheduled for replacement. Do not replicate:
-
-- **Chart-style blue pill** — e.g. Operating / Total toggle on Monthly Net Cash Flow.
-- **Outlined button-group toggle** — e.g. This Month / Last Month on Big Picture.
-- Any toggle that uses a different visual treatment from the canonical spec above.
-
 ---
 
 ## Action dropdown (standard pattern)
@@ -1533,7 +1487,6 @@ A single compact dropdown trigger that opens a small menu — used for card- or 
 actions where a segmented toggle is too heavy (e.g. 4+ mutually-exclusive options that
 don't need to all be visible at rest).
 
-**Source spec:** TailAdmin June 2025 Total Balance card dropdown.
 **Reference implementation:** Forecast header scenario selector — `.action-dropdown`
 (see [src/dashboard.css](src/dashboard.css)).
 
@@ -1575,8 +1528,7 @@ don't need to all be visible at rest).
 (card-header action, page-header action, split-button caret, Export, Add,
 Compare, etc.) must use `#D0D5DD` for its 1px border. Do not use `#E4E7EC`
 for trigger borders — that color is reserved for card shells, menu panels,
-and input fields. Verified against the June 2025 Total Balance card "Month"
-button via DevTools computed styles.
+and input fields.
 
 ### Menu spec
 
@@ -1632,7 +1584,7 @@ replace any hardcoded `stroke` or `fill` hex attrs with `currentColor`.
 ## Sparkline canonical config
 
 Standard sparkline pattern for all inline chart components (revenue-card, future KPI cards with
-trend line). DevTools-extracted from TailAdmin /sales "Total Revenue" tile.
+trend line).
 
 ```ts
 // Series
@@ -1676,14 +1628,13 @@ const SPARKLINE_OPTIONS: ApexCharts.ApexOptions = {
 
 ## Canonical card shells
 
-Three canonical shells built from DevTools-extracted TailAdmin Pro specs. Classes are locked
-references — do not modify without explicit instruction.
+Three canonical shells. Classes are locked references — do not modify without explicit instruction.
 
-| Shell class | Radius | Border | Padding | Source |
-|-------------|--------|--------|---------|--------|
-| `.metric-card` | 16px | 1px `#E4E7EC` | 20px | TailAdmin /ai "Users" |
-| `.revenue-card` | 12px | none | 20px | TailAdmin /sales "Total Revenue" |
-| `.statistics-card` | 16px | 1px `#E4E7EC` | 24px | TailAdmin /sales "Statistics" |
+| Shell class | Radius | Border | Padding |
+|-------------|--------|--------|---------|
+| `.metric-card` | 16px | 1px `#E4E7EC` | 20px |
+| `.revenue-card` | 12px | none | 20px |
+| `.statistics-card` | 16px | 1px `#E4E7EC` | 24px |
 
 All three are in `src/dashboard.css`. Their UI Lab canonical variants live in `src/pages/UILab.tsx`.
 
@@ -1740,16 +1691,10 @@ shadow, spacing). This exception is narrowly scoped — it does not
 authorize custom tooltips on Cartesian charts (line, bar, area, column).
 
 ### Current exceptions
-- Top Expense Categories donut (TopCategoriesCard.tsx) — uses
-  custom HTML tooltip to avoid series stacking
-- OwnerDistributionsChart: uses `tooltip: { custom: ... }` to
-  render a Total row (Actual + Forecast = full year distribution).
-  This is a deliberate, documented exception to the no-custom-tooltip
-  rule. The custom renderer wrapper must include `.apexcharts-theme-light`
-  so global tooltip CSS applies.
+- Top Expense Categories donut (TopCategoriesCard.tsx) — custom HTML tooltip to avoid series stacking
+- OwnerDistributionsChart — custom tooltip for a Total row
 
-### Per-chart exceptions (document here when added)
-- OwnerDistributionsChart: see Current exceptions above
+See Part 4 — Tooltips (ApexCharts) for the full description of both exceptions.
 
 ---
 
@@ -1774,7 +1719,7 @@ Example structure:
     error:           '#F04438',
     warning:         '#F79009',
     pressure:        '#DC6803',
-    gridBorder:      '#e0e0e0',   // updated from #EAECF0 (TailAdmin Sales DevTools)
+    gridBorder:      '#e0e0e0',   // chart grid lines
     crosshairStroke: '#b6b6b6',   // x-axis crosshair on hover
     axisText:        '#667085',   // standard charts
     axisTextSales:   '#373d3f',   // Sales-family chart-cards
@@ -1818,21 +1763,12 @@ color in ApexCharts. This requires the `colors` array to be recomputed
 from `result.monthlyBars` on every render — do not memoize separately.
 Positive months: `#12B76A`. Negative months: `#F04438`.
 
-### ApexCharts bar chart source
-Sourced from TailAdmin `chart-01.js` (Bar Chart 1) with these overrides:
-- Cash Trend bar chart uses fontFamily: 'Outfit, sans-serif' to match the rest of the dashboard.
-- `distributed: true` (per-bar color — not in source)
+### ApexCharts bar chart config
+- `fontFamily: 'Outfit, sans-serif'` (do not use Inter unless an explicit project-wide visual migration is approved)
+- `distributed: true` (per-bar color)
 - `borderRadiusApplication: 'end'` (rounds top only — correct for zero-crossing data)
 - `colors`: dynamic array from `result.monthlyBars`
-
-All other values (`columnWidth: '39%'`, `borderRadius: 5`,
-`stroke: { show: true, width: 4, colors: ['transparent'] }`) match
-the TailAdmin source exactly.
-
-### Font override
-Project font is Outfit. All ApexCharts instances must set
-fontFamily: 'Outfit, sans-serif'. Do not use Inter unless an explicit
-project-wide visual migration is approved.
+- `columnWidth: '39%'`, `borderRadius: 5`, `stroke: { show: true, width: 4, colors: ['transparent'] }`
 
 ### Operating cash definition
 Cash Trend's T6M metrics are computed from `computeMonthlyRollups('operating')`.
@@ -1847,7 +1783,7 @@ for backtesting against any month. Always use local-time date constructor
 `new Date(y, m, 1)` — never ISO string `new Date('YYYY-MM-DD')`, which
 parses as UTC midnight and shifts the window one month early in US timezones.
 
-### Cash Trend thresholds (verified against 47-month backtest)
+### Cash Trend thresholds
 - Building Cash: T6M Margin ≥ 10% AND neg months ≤ 2
 - Burning Cash: T6M Margin ≤ -1.5% AND neg months ≥ 3
 - Under Pressure: margin between -1.5% and +5% AND neg months ≥ 3
@@ -1884,7 +1820,7 @@ Use this pattern when the table is the primary content of its card — header, r
 - Title:
   - `font-size: 1.06rem`
   - `font-weight: 700`
-  - `color: #1D2939` (card title — see §6 Card title roles; source `--text-primary` is currently `#101828` and pending a follow-up source PR to align with this spec)
+  - `color: #1D2939` (card title — see §6 Card title roles)
 - Right-side controls (Compare toggle, Export CSV, etc.) align with the title row and remain outside the table itself
 - Segmented toggles follow the standard pattern (`.projection-compare-toggle*` — see "Segmented toggle (standard pattern)" above)
 
@@ -1921,7 +1857,7 @@ Use this pattern when the table is the primary content of its card — header, r
 
 All columns are **left-aligned** — headers, body cells, and total cells all `text-align: left`. This is the universal default; **UI Lab cards are the source of truth for alignment**, and they ship left-aligned (the Projection Table V2 simple-mode `.ui-lab-projection-table-shell` scope is the reference).
 
-Right-aligned numeric ("financial-table convention") is **not used** in this project. It was considered earlier for tables with many numeric columns but caused implementation-vs-docs drift on PR #41; the spec was simplified to one rule.
+Right-aligned numeric ("financial-table convention") is **not used** in this project.
 
 **Forbidden:** mixing left-aligned headers with right-aligned values, or vice versa. The header label must sit directly above its values — left-aligned on both.
 
