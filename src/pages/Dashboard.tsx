@@ -3049,7 +3049,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
           onUpdatedClick={() => navigateToTab('settings')}
         />
       <section className="main-zone">
-        {activeTab !== 'today' && activeTab !== 'what-if' && activeTab !== 'settings' && activeTab !== 'ui-lab' && <header className="top-bar glass-panel">
+        {activeTab !== 'today' && activeTab !== 'what-if' && activeTab !== 'settings' && activeTab !== 'ui-lab' && <header className={`top-bar glass-panel${activeTab === 'big-picture' ? ' top-bar--big-picture' : ''}`}>
           <div className="top-bar-main">
             <div className="top-bar-copy">
               <h2>

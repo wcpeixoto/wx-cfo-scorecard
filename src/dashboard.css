@@ -262,6 +262,20 @@ body {
   gap: 14px;
 }
 
+/* Big Picture header only — reads as one deliberate section block: a subtle
+   card lift (same token as the app's cards), generous 32px section padding
+   (28px would be off-grid per UI_RULES, so rounded up to 32), and the timeframe
+   toggle vertically centered against the title block. Scoped via the modifier
+   so the shared .top-bar on Trends / Where to Focus is untouched. */
+.top-bar--big-picture {
+  padding: 32px;
+  box-shadow: var(--shadow-card);
+}
+
+.top-bar--big-picture .top-bar-main {
+  align-items: center;
+}
+
 .top-bar-main {
   width: 100%;
   display: grid;
