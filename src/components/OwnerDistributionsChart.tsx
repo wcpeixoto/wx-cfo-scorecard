@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, useId } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { ScenarioPoint, Txn } from '../lib/data/contract';
-import { classifyTxn } from '../lib/cashFlow';
+import { classifyTxn, isBusinessIncomeCategory } from '../lib/cashFlow';
 import { chartTokens } from '../lib/ui/chartTokens';
 
 function formatCompact(value: number): string {
@@ -98,6 +98,24 @@ function buildOwnerDistSeries(
   return { years, actual, forecast, projectedFullYearCapacity };
 }
 
+/** Annual income by calendar year = NET Business Income (Sales + Other Income,
+ *  signed), summed from the same transactions the card already receives. This
+ *  matches the owner's accounting "Total Business Income" line exactly —
+ *  including the occasional negative entry (reversal/correction) that the app's
+ *  positive-only `revenue` rollup omits. Keyed by calendar year
+ *  ("YYYY-MM" → YYYY) to align with the chart's year axis; current year is YTD. */
+function incomeByYear(transactions: Txn[]): Map<number, number> {
+  const byYear = new Map<number, number>();
+  for (const txn of transactions) {
+    if (!isBusinessIncomeCategory(txn.category)) continue;
+    const match = txn.month.match(/^(\d{4})-\d{2}$/);
+    if (!match) continue;
+    const year = Number.parseInt(match[1], 10);
+    byYear.set(year, (byYear.get(year) ?? 0) + (txn.rawAmount ?? 0));
+  }
+  return byYear;
+}
+
 type PillVariant = 'insufficient' | 'above-avg' | 'below-avg' | 'on-track';
 type PillConfig = { label: string; variant: PillVariant };
 
@@ -187,6 +205,15 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // "Compare to income" toggle — default OFF (chart behaves as before). When
+  // ON, an adjacent annual-income bar renders per year (net Business Income),
+  // keyed to the same calendar-year axis.
+  const [showIncome, setShowIncome] = useState(false);
+  const incomeMap = incomeByYear(transactions);
+  const incomeData = years.map((y) => incomeMap.get(y) ?? 0);
+  const canCompareIncome = incomeData.some((v) => v > 0);
+  const comparing = showIncome && canCompareIncome;
+
   // Historical years only: year < currentYear with actual data, sorted descending
   const actualYears = years
     .filter((y, i) => y < currentYear && actual[i] > 0)
@@ -217,7 +244,9 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       fontFamily: 'Outfit, sans-serif',
       background: 'transparent',
     },
-    colors: [chartTokens.brand, chartTokens.brandSecondary],
+    colors: comparing
+      ? [chartTokens.brand, chartTokens.brandSecondary, chartTokens.success]
+      : [chartTokens.brand, chartTokens.brandSecondary],
     plotOptions: {
       bar: {
         horizontal: false,
@@ -226,8 +255,12 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         borderRadiusApplication: 'end',
         borderRadiusWhenStacked: 'last',
         dataLabels: {
+          position: 'top',
           total: {
-            enabled: true,
+            // Stack total. In compare mode this would sum BOTH groups
+            // (distributions + income) onto the income bar — wrong — so it is
+            // disabled there; the income bar is labelled directly below.
+            enabled: !comparing,
             formatter: (val: string | undefined) => formatCompactWhole(Number(val ?? 0)),
             offsetY: -4,
             style: {
@@ -240,7 +273,22 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         },
       },
     },
-    dataLabels: { enabled: false },
+    dataLabels: comparing
+      ? {
+          enabled: true,
+          // Label only the Income series (index 2) so the income bar shows its
+          // own value rather than a cross-group total.
+          enabledOnSeries: [2],
+          formatter: (val) => formatCompactWhole(Number(val ?? 0)),
+          offsetY: -4,
+          style: {
+            fontSize: '11px',
+            fontFamily: 'Outfit, sans-serif',
+            fontWeight: 500,
+            colors: ['#475467'],
+          },
+        }
+      : { enabled: false },
     stroke: {
       show: true,
       width: 2,
@@ -282,6 +330,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       custom: ({ series, dataPointIndex, w }: { series: number[][], dataPointIndex: number, w: any }) => {
         const actualVal = Number(series[0]?.[dataPointIndex] ?? 0);
         const forecastVal = Number(series[1]?.[dataPointIndex] ?? 0);
+        const incomeVal = Number(series[2]?.[dataPointIndex] ?? 0);
         const total = actualVal + forecastVal;
         const year = w.globals.labels?.[dataPointIndex] ?? '';
 
@@ -315,19 +364,39 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
             </div>`
           : '';
 
+        const incomeRow = incomeVal > 0
+          ? `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
+            ${dot(chartTokens.success)}
+            <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
+              <span class="apexcharts-tooltip-text-y-label">Income</span>
+              <span class="apexcharts-tooltip-text-y-value">${formatCompact(incomeVal)}</span>
+            </div>
+          </div>`
+          : '';
+
         return `<div class="owl-tooltip-inner">
           <div class="apexcharts-tooltip-title">${year}</div>
           ${rows}
           ${totalRow}
+          ${incomeRow}
         </div>`;
       },
     },
   };
 
-  const series = [
-    { name: 'Actual', data: actual },
-    { name: 'Forecast', data: forecast },
-  ];
+  // Grouped-stacked bars: Actual + Forecast stack together as "distributions";
+  // Income (when toggled on) is a separate adjacent stack so the owner can
+  // compare yearly income against distributions side by side.
+  const series = comparing
+    ? [
+        { name: 'Actual', group: 'distributions', data: actual },
+        { name: 'Forecast', group: 'distributions', data: forecast },
+        { name: 'Income', group: 'income', data: incomeData },
+      ]
+    : [
+        { name: 'Actual', data: actual },
+        { name: 'Forecast', data: forecast },
+      ];
 
   return (
     <article className="owner-dist-card">
@@ -364,14 +433,32 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       </div>
       <div>
         <div className="owner-dist-legend-row">
-          <span className="owner-dist-legend-item">
-            <span className="owner-dist-legend-dot actual"></span>
-            Actual
-          </span>
-          <span className="owner-dist-legend-item">
-            <span className="owner-dist-legend-dot forecast"></span>
-            Forecast
-          </span>
+          <div className="owner-dist-legend-items">
+            <span className="owner-dist-legend-item">
+              <span className="owner-dist-legend-dot actual"></span>
+              Actual
+            </span>
+            <span className="owner-dist-legend-item">
+              <span className="owner-dist-legend-dot forecast"></span>
+              Forecast
+            </span>
+            {comparing && (
+              <span className="owner-dist-legend-item">
+                <span className="owner-dist-legend-dot income"></span>
+                Income
+              </span>
+            )}
+          </div>
+          {canCompareIncome && (
+            <button
+              type="button"
+              className="btn-secondary-card"
+              aria-pressed={showIncome}
+              onClick={() => setShowIncome((v) => !v)}
+            >
+              Compare to income
+            </button>
+          )}
         </div>
         <div className="owner-dist-chart">
           <Chart options={options} series={series} type="bar" height={229} />

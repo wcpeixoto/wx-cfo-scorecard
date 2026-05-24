@@ -22,6 +22,7 @@ import NetCashFlowChart from '../components/NetCashFlowChart';
 import { TodayPage } from '../components/TodayPage';
 import { NextOwnerDistributionCardLab } from '../components/NextOwnerDistributionCardLab';
 import { SecondaryPrioritiesLab } from '../components/SecondaryPrioritiesLab';
+import { CfoAssistantCard } from '../components/CfoAssistantCard';
 import { ProjectionCompareDrawer } from '../components/ProjectionCompareDrawer';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
 import ContractsSettingsPane from '../components/ContractsSettingsPane';
@@ -4927,6 +4928,18 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 txns={filteredTxns}
                 forecastProjection={scenarioProjection}
               />
+            </div>
+
+            <div className="ui-lab-section">
+              <h3 className="ui-lab-section-title">CFO Assistant</h3>
+              <p className="ui-lab-section-subtitle">Moved off the Today page while assistant work is paused (see docs/CFO_ASSISTANT_PAUSED.md). Rendered here live from the same signal → commitment pipeline so it stays exercisable.</p>
+              <div className="ui-lab-preview-width--medium">
+                <CfoAssistantCard
+                  model={model}
+                  txns={filteredTxns}
+                  forecastProjection={scenarioProjection}
+                />
+              </div>
             </div>
           </div>
         )}
