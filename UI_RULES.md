@@ -8,9 +8,9 @@
 
 **Part 1 — Tokens** — colors, type, spacing, radius, shadows, sizing.
 **Part 2 — Shell** — app layout, sidebar, header, backdrop.
-**Part 3 — Primitives** — every component with exact prop contracts and DOM anatomy.
+**Part 3 — Primitives** — component roles and DOM anatomy; project badge/tag specs live in Part 6.
 **Part 4 — Card & Chart Patterns** — card headers, chart anatomy, legends, KPI cards.
-**Part 5 — Page Compositions** — how pages assemble primitives and cards.
+**Part 5 — Page Compositions** — this app ships one Dashboard page; TailAdmin demo layouts are reference only.
 **Part 6 — Project Overlay** — project-specific rules that override or extend this base.
 **Part 6B — Card Coherence Rule** — numbers within one card must reconcile.
 **Part 7 — Decision Rules** — card-header, text-role, and alignment decision systems.
@@ -20,6 +20,9 @@ Token drift and structure drift are equally harmful. Both are prevented here.
 
 > This file documents TailAdmin-native patterns only in Parts 1–5.
 > All project-specific overrides belong in Part 6 only.
+>
+> Source citations in earlier versions referenced the TailAdmin reference
+> repo (per AGENTS.md), not files in this project.
 
 ## Card design
 
@@ -469,128 +472,44 @@ rule; the confirmation step is what keeps it from drifting.
 
 ---
 
+The shell is built once and rarely changes. `AppSidebar.tsx` and
+`AppHeader.tsx` are the real project files; the structural facts below are
+load-bearing — the full TailAdmin DOM/Tailwind anatomy is reference only.
+
 ## App Layout
-*Source: AppLayout.tsx*
-
-```
-div.min-h-screen.xl:flex
-├── div
-│   ├── AppSidebar (fixed, left)
-│   └── Backdrop (mobile only, z-40)
-└── div.flex-1 [transition-all duration-300 ease-in-out]
-    ├── AppHeader (sticky top, z-99999)
-    └── div [p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6]
-        └── <Outlet />
-```
-
-Main column shift: `lg:ml-[290px]` when expanded, `lg:ml-[90px]` when collapsed.
-
----
+Sidebar (fixed, left) + Backdrop (mobile, `z-40`) beside a `flex-1` main
+column (`transition-all duration-300`) holding a sticky `AppHeader` and the
+page content wrapper (`p-4 md:p-6`, `max-w-(--breakpoint-2xl)`, centered).
+Main column shift: `ml-[290px]` expanded, `ml-[90px]` collapsed.
 
 ## Sidebar
-*Source: AppSidebar.tsx + SidebarContext.tsx*
-
-Fixed left, `h-screen`, `bg-white dark:bg-gray-900`, `border-r border-gray-200`, `px-5`.
-
-**Width states:**
-- Expanded: `w-[290px]` — labels visible
-- Collapsed: `w-[90px]` — icons only, items lg:justify-center
-- Hovered while collapsed: `w-[290px]` temporarily (mouseenter/leave)
-- Mobile: `-translate-x-full` hidden, `translate-x-0` open, always 290px wide
-
-**Logo area:** `py-8`. Full logo when expanded/hovered, icon-only when collapsed.
-
-**Section header:** `text-xs uppercase text-gray-400 leading-[20px] mb-4`.
-When collapsed: replaced by `HorizontaLDots` icon, centered.
-
-### Nav Item Anatomy
-```
-button/link.menu-item.group
-├── span.menu-item-icon-size   [forces svg to size-6]
-├── span.menu-item-text        [hidden when collapsed]
-└── ChevronDownIcon.ml-auto   [submenu items only — rotates 180° when open]
-```
-
-**CSS utility classes (defined as @utility in index.css):**
-
-| Class | Visual |
-|-------|--------|
-| menu-item | relative flex items-center w-full gap-3 px-3 py-2 font-medium rounded-lg text-theme-sm |
-| menu-item-active | bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400 |
-| menu-item-inactive | text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5 |
-| menu-item-icon-active | text-brand-500 dark:text-brand-400 |
-| menu-item-icon-inactive | text-gray-500 group-hover:text-gray-700 dark:text-gray-400 |
-
-### Submenu Anatomy
-```
-div [overflow-hidden, height animated via scrollHeight inline style, transition-all duration-300]
-└── ul.mt-2.space-y-1.ml-9
-    └── li → Link.menu-dropdown-item
-        ├── item name
-        └── optional badge span [menu-dropdown-badge, "new"/"pro", rounded-full, text-xs, uppercase]
-```
-
-**Submenu item states:**
-- Active: `menu-dropdown-item menu-dropdown-item-active` → `bg-brand-50 text-brand-500`
-- Inactive: `menu-dropdown-item menu-dropdown-item-inactive` → `text-gray-700 hover:bg-gray-100`
-
-**SidebarWidget (footer promo):**
-`mx-auto mb-10 w-full max-w-60 rounded-2xl bg-gray-50 px-4 py-5 text-center dark:bg-white/[0.03]`.
-Only renders when expanded/hovered/mobile-open.
-
----
+Fixed left, `h-screen`, white (`dark:bg-gray-900`), right border, `px-5`.
+- Width: expanded `290px` (labels) · collapsed `90px` (icons, centered) ·
+  hover-while-collapsed expands to `290px` temporarily · mobile slides in at `290px`.
+- Logo area `py-8`. Section header: 12px uppercase gray-400; collapses to a
+  centered dots icon.
+- Nav items use the `menu-item` / `menu-item-active` / `menu-item-inactive`
+  utility classes (active = brand-50 bg + brand-500 text; inactive = gray-700,
+  hover gray-100). Submenu items use the `menu-dropdown-item*` classes with the
+  same active/inactive coloring, plus an optional "new"/"pro" badge.
+- `SidebarWidget` footer promo renders only when expanded/hovered/mobile-open.
 
 ## Header
-*Source: AppHeader.tsx*
-
-`header.sticky.top-0.bg-white.border-gray-200.z-99999.dark:bg-gray-900.lg:border-b`
-
-### Desktop layout
-```
-header
-└── div.flex.grow [lg:flex-row lg:px-6]
-    ├── ROW-LEFT [flex items-center gap-2 sm:gap-4 px-3 py-3 border-b lg:border-b-0 lg:py-4 lg:px-0]
-    │   ├── Hamburger [w-10 h-10 lg:w-11 lg:h-11 lg:border rounded-lg text-gray-500]
-    │   ├── Logo link (mobile only, lg:hidden)
-    │   ├── ApplicationMenuToggle (mobile only, 3-dot icon, lg:hidden)
-    │   └── Search block (desktop only, hidden lg:block)
-    │       └── div.relative
-    │           ├── SearchIcon [absolute left-4 pointer-events-none fill-gray-500]
-    │           ├── input.h-11 [rounded-lg border border-gray-200 pl-12 pr-14 text-sm
-    │           │              xl:w-[430px] shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10]
-    │           └── ⌘K pill [absolute right-2.5 rounded-lg border border-gray-200 bg-gray-50
-    │                         px-[7px] py-[4.5px] text-xs text-gray-500]
-    └── ROW-RIGHT [flex items-center gap-2 2xsm:gap-3 justify-between px-5 py-4 lg:justify-end lg:px-0]
-        ├── ThemeToggleButton
-        ├── NotificationDropdown
-        └── UserDropdown
-```
-
-### Mobile layout
-ROW-LEFT always visible, separated by border-b: hamburger | centered logo | 3-dot toggle.
-ROW-RIGHT: conditionally shown (`flex`/`hidden`) on 3-dot tap. Has `shadow-theme-md` on mobile, `lg:shadow-none`.
-
-**⌘K global listener:** `metaKey/ctrlKey + K` focuses search input.
-
-### NotificationDropdown
-Trigger: `h-11 w-11 rounded-full border border-gray-200 bg-white dropdown-toggle`.
-Dot badge: `absolute h-2 w-2 rounded-full bg-orange-400` with `animate-ping` ring.
-Panel: `rounded-2xl w-[350px] sm:w-[361px] h-[480px] p-3 shadow-theme-lg`.
-Interior: title + close button row → scrollable item list (`custom-scrollbar`) → "View All" link button.
-Item: `flex gap-3 rounded-lg border-b border-gray-100 px-4.5 py-3 hover:bg-gray-100`.
-
-### UserDropdown
-Trigger: `h-11 w-11 rounded-full` avatar + `font-medium text-theme-sm` name + chevron.
-Panel: `rounded-2xl w-[260px] p-3 shadow-theme-lg`.
-Interior: name/email → `border-b` divider → `ul.flex.flex-col.gap-1` with icon items → sign-out link.
-Item: `flex items-center gap-3 px-3 py-2 rounded-lg text-theme-sm hover:bg-gray-100 group`.
-
----
+`sticky top-0`, white, `z-99999`, `border-b` on `lg`.
+- Desktop: left = hamburger + desktop search (with ⌘K shortcut); right = theme
+  toggle, `NotificationDropdown`, `UserDropdown`.
+- Mobile: left row always visible (hamburger | logo | 3-dot toggle); right row
+  toggles open on the 3-dot tap.
+- ⌘K (`metaKey/ctrlKey + K`) focuses the search input.
+- Notification/user triggers are `h-11 w-11 rounded-full` buttons opening
+  `shadow-theme-lg` panels; the notification dot uses an `animate-ping` ring.
+- Reference dims (TailAdmin source): search `xl:w-[430px]`; notification panel
+  `w-[350px] sm:w-[361px] h-[480px]`; user panel `w-[260px]`; ⌘K pill
+  `px-[7px] py-[4.5px]`.
 
 ## Backdrop
-*Source: Backdrop.tsx*
-
-`fixed inset-0 z-40 bg-gray-900/50 lg:hidden`. Renders only when `isMobileOpen`. Click → close sidebar.
+`fixed inset-0 z-40 bg-gray-900/50 lg:hidden`, rendered only when the mobile
+sidebar is open; click closes it.
 
 ---
 
@@ -598,302 +517,59 @@ Item: `flex items-center gap-3 px-3 py-2 rounded-lg text-theme-sm hover:bg-gray-
 
 ---
 
-## Badge
-*Source: Badge.tsx*
+This project uses **no TailAdmin React primitives and no Tailwind** — every
+component is custom CSS in `src/dashboard.css`. The specs below are TailAdmin
+reference values to translate into a `dashboard.css` class; never paste
+Tailwind into JSX. **Bold** items are the load-bearing project rules.
 
-`span.inline-flex.items-center.rounded-full.font-medium.gap-1.px-2.5.py-0.5`
-
-| Prop | Options |
-|------|---------|
-| variant | light (tinted bg + colored text) · solid (full bg + white text) |
-| size | sm → text-theme-xs · md → text-sm |
-| color | primary · success · error · warning · info · light · dark |
-| startIcon | optional, wrapped in span.mr-1 |
-| endIcon | optional, wrapped in span.ml-1 |
-
-Light primary example: `bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400`
-
-### Shared badge primitive
-
-All card-level status badges use `.card-status-badge` with variants:
-- `.is-critical` — red (`#F04438` / `#FEF3F2`)
-- `.is-warning` — amber (`#F79009` / `#FFFAEB`)
-- `.is-healthy` — green (`#12B76A` / `#ECFDF3`)
-- `.is-neutral` — gray (`#667085` / `#F2F4F7`)
-
-### `.is-pressure` — Under Pressure (project overlay)
-- Background: `#FEF3E2`
-- Text: `#DC6803`
-- Dark bg: `rgba(220, 104, 3, 0.15)`
-- Dark text: `#FDB022`
-- Used exclusively on: CashTrendHero status badge when status = 'pressure'
-- This is the only case that uses project pressure orange instead of the
-  standard amber `.is-warning`. Do not reach for it for generic warnings.
-
-Badge spec (matches shipped `.card-status-badge` in `src/dashboard.css`):
-
-```
-display: inline-flex;
-align-items: center;
-gap: 4px;
-padding: 4px 10px;
-border-radius: 999px;
-font-size: 12px;       /* the size .card-status-badge already uses — do not introduce a new one */
-font-weight: 500;
-white-space: nowrap;
-flex-shrink: 0;
-```
-
-> The shipped base sets `inline-flex` (auto-width, single-line via
-> `white-space: nowrap`), so it does not set `justify-content`; centering
-> is moot for nowrap label content. TailAdmin's pill/badge utilities are
-> the visual source of inspiration, but the canonical implementation in
-> this repo is the `.card-status-badge` CSS class and its `.is-*`
-> variants — never Tailwind utility strings in JSX, and never a new
-> parallel pill-prefixed CSS namespace.
-
-### Status pill labels
-
-`.card-status-badge` is a **label-visible pill framework**: the visible
-text label carries the precise state, and color collapses six labels
-onto the existing three color bands (plus neutral gray). No per-label
-`.is-*` modifier is needed — reuse the variants above:
-
-| Label          | Variant       | Band            | Bg / Text             |
-|----------------|---------------|-----------------|-----------------------|
-| Critical       | `.is-critical`| red             | `#FEF3F2` / `#F04438` |
-| Vulnerable     | `.is-warning` | warning / amber | `#FFFAEB` / `#F79009` |
-| Below target   | `.is-warning` | warning / amber | `#FFFAEB` / `#F79009` |
-| Nearly funded  | `.is-neutral` | neutral gray    | `#F2F4F7` / `#667085` |
-| Fully funded   | `.is-healthy` | success green   | `#ECFDF3` / `#12B76A` |
-| Above target   | `.is-healthy` | success green   | `#ECFDF3` / `#12B76A` |
-
-> This is a label-visible pill framework. Vulnerable/Below target share
-> warning styling, and Funded/Above target share success styling; labels
-> and thresholds distinguish them. If a future visualization has no
-> visible label, collapse to critical / warning / healthy / neutral
-> instead of trying to encode all six states by color alone.
-
-Never create a new *status* badge pattern — reuse `.card-status-badge`.
-The only sanctioned non-status pill is `.card-domain-tag`, defined below.
-
-### `.card-domain-tag` — domain tag (distinct primitive)
-
-A domain tag answers "*which area?*", not "*what state?*". The visible
-label is a **domain** (Reserve, Cash Flow, Expenses, Revenue, Owner
-Draws, On Track); the `.is-*` variant **tints** it by severity using
-the same three bands as `.card-status-badge`. It is the only pill where
-the label is NOT a status string — the color carries severity, the
-label carries domain.
-
-- Used by: `SecondaryPriority` (Today secondary cards).
-- **No glyph.** The universal ↓/✓ glyph rule applies to status pills
-  only; domain tags are explicitly exempt.
-- Variants (same hex pairs as `.card-status-badge` — no new colors):
-
-| Variant        | Band            | Bg / Text             |
-|----------------|-----------------|-----------------------|
-| `.is-critical` | red             | `#FEF3F2` / `#F04438` |
-| `.is-warning`  | warning / amber | `#FFFAEB` / `#F79009` |
-| `.is-healthy`  | success green   | `#ECFDF3` / `#12B76A` |
-
-Base spec (matches shipped `.card-domain-tag` in `src/dashboard.css` —
-intentionally distinct from `.card-status-badge`, not a drifted copy):
-
-```
-display: inline-flex;
-align-items: center;
-gap: 6px;
-padding: 4px 10px;
-border-radius: 999px;
-font-size: 12px;
-font-weight: 500;
-line-height: 1;
-```
-
-Reconcile exactly with `src/dashboard.css`. Never encode the domain in
-color alone — the label is load-bearing.
+## Badge → moved to Part 6
+Project status badges (`.card-status-badge`, `.is-pressure`) and domain tags
+(`.card-domain-tag`) are a project overlay — the binding spec is **Part 6 —
+Status badges & domain tags**. The TailAdmin `Badge.tsx` primitive
+(light/solid variants, `rounded-full px-2.5 py-0.5`) is not used here.
 
 ---
 
-## Button
-*Source: Button.tsx*
+## Reference primitives
+Compact specs for the TailAdmin primitives this project re-implements in CSS.
+Dark variants follow the global mappings in Part 1 — Dark Mode.
 
-`button.inline-flex.items-center.justify-center.gap-2.rounded-lg.transition`
-
-| Variant | Classes |
-|---------|---------|
-| primary | bg-brand-500 text-white shadow-theme-xs hover:bg-brand-600 disabled:bg-brand-300 |
-| outline | bg-white text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-800 |
-
-Sizes: sm = `px-4 py-3`, md = `px-5 py-3.5`. Both `text-sm`.
-Disabled: `cursor-not-allowed opacity-50`.
-
----
-
-## Alert
-*Source: Alert.tsx*
-
-`div.rounded-xl.border.p-4` with variant-specific border and bg.
-`div.flex.items-start.gap-3` → 24×24 icon + content `div`.
-Content: `h4.text-sm.font-semibold.text-gray-800` + `p.text-sm.text-gray-500` + optional `Link.mt-3.underline`.
-Border + bg: `border-{color}-500 bg-{color}-50 dark:border-{color}-500/30 dark:bg-{color}-500/15`.
+| Primitive | Spec |
+|-----------|------|
+| Button | `inline-flex items-center justify-center gap-2 rounded-lg transition`; primary = `bg-brand-500 text-white shadow-theme-xs hover:bg-brand-600 disabled:bg-brand-300`; outline = `bg-white text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50`; sizes sm `px-4 py-3` / md `px-5 py-3.5`, both `text-sm`; disabled `cursor-not-allowed opacity-50`. Heights: Part 1 button taxonomy. |
+| Alert | `rounded-xl border p-4`; `flex items-start gap-3` → 24×24 icon + content (`h4 text-sm font-semibold text-gray-800` + `p text-sm text-gray-500` + optional `Link mt-3 underline`); border/bg `border-{color}-500 bg-{color}-50`. |
+| Input | `h-11 w-full rounded-lg border px-4 py-2.5 text-sm shadow-theme-xs`; default `border-gray-300`, focus `border-brand-300 ring-brand-500/20`; error/success swap to the semantic border + ring; disabled `opacity-40 bg-gray-100 cursor-not-allowed`; hint `mt-1.5 text-xs`. |
+| Select | Same height/radius/border/focus as Input default; `appearance-none pr-11` for the chevron. |
+| Label | `mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400`. |
+| Avatar | `rounded-full object-cover`, 6 sizes 24px (xsmall) → 64px (xxlarge); status dot bottom-right, `border-[1.5px]` (online success-500 / offline error-400 / busy warning-500). |
+| ComponentCard | Showcase/demo wrapper only: `rounded-2xl border bg-white`; header `px-6 py-5` (`h3 text-base font-medium` + optional `p mt-1 text-sm text-gray-500`); body `p-4 sm:p-6 border-t`. |
 
 ---
 
 ## Dropdown
-*Source: Dropdown.tsx + DropdownItem.tsx*
-
-`div.absolute.z-40.right-0.mt-2.rounded-xl.border.border-gray-200.bg-white.shadow-theme-lg`
-
-- Closes on outside mousedown; trigger must have class `dropdown-toggle` to be excluded
-- DropdownItem: `<button>` by default, `<Link>` when `tag="a"` + `to` prop
-
-**Card MoreDot pattern:**
-```
-div.relative.inline-block
-├── button.dropdown-toggle → MoreDotIcon [size-6 text-gray-400 hover:text-gray-700]
-└── Dropdown [w-40 p-2]
-    └── DropdownItem [flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100]
-```
-
-### Canonical in-app dropdown menu — `.action-dropdown`
-
-The Forecast **Scenario** picker (Base / Best / Worst / Custom Case) is the
-canonical pattern for any in-app dropdown menu — timeframe pickers, range
-selectors, scope toggles. Use `.action-dropdown-menu` styles for the panel
-and `.action-dropdown-menu button` for options. The shared `.timeframe-list`
-class is aliased to the same styles, so existing timeframe menus
-(Forecast horizon **More ▾**, NetCashFlow timeframe, Big Picture range)
-inherit the canonical look automatically.
-
-Trigger varies by surface (pill, segmented-toggle-btn, .action-dropdown-trigger);
-only the panel + options are canonicalized. See Part 6 — Action dropdown
-(standard pattern) for the full trigger / menu spec.
+Panel: `absolute z-40 right-0 mt-2 rounded-xl border bg-white shadow-theme-lg`; closes on outside mousedown. **Triggers must carry the `dropdown-toggle` class** so the outside-click handler excludes them. `DropdownItem` is a `<button>` by default, `<Link>` when `tag="a"` + `to`.
+- **Card MoreDot:** `div.relative.inline-block` → `button.dropdown-toggle` (MoreDot icon `size-6 text-gray-400 hover:text-gray-700`) + a `w-40 p-2` panel of left-aligned `text-gray-500 rounded-lg hover:bg-gray-100` items.
+- **In-app menus (`.action-dropdown`):** the Forecast Scenario picker (Base/Best/Worst/Custom) is canonical for timeframe / range / scope menus; `.action-dropdown-menu` styles the panel and the `.timeframe-list` alias inherits it (Forecast horizon, NetCashFlow timeframe, Big Picture range). Trigger varies by surface. See **Part 6 — Action dropdown** for the full trigger + menu spec.
 
 ---
 
 ## Modal
-*Source: modal/index.tsx + useModal.ts*
-
-```
-div.fixed.inset-0.flex.items-center.justify-center.overflow-y-auto.z-99999
-├── backdrop overlay [fixed inset-0 bg-gray-400/50 backdrop-blur-[32px]]
-└── content [rounded-3xl bg-white dark:bg-gray-900 + className]
-    ├── Close button [absolute right-3 top-3 sm:right-6 sm:top-6
-    │                 rounded-full bg-gray-100 h-9.5 w-9.5 sm:h-11 sm:w-11 text-gray-400]
-    └── div → children
-```
-
-ESC closes. Body overflow hidden while open.
-**Always use `useModal()`** hook — `{ isOpen, openModal, closeModal, toggleModal }`.
-
-**Large modal form anatomy (max-w-[700px]):**
-```
-div.no-scrollbar.rounded-3xl.bg-white.p-4.lg:p-11
-├── header [px-2 pr-14]
-│   ├── h4.text-2xl.font-semibold  [title]
-│   └── p.text-sm.text-gray-500  [description]
-├── scrollable body [custom-scrollbar h-[450px] overflow-y-auto px-2 pb-3]
-│   └── form sections: h5.text-lg.font-medium sectioned, grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2
-└── footer [flex items-center gap-3 px-2 mt-6 lg:justify-end]
-    ├── Button variant=outline "Close"
-    └── Button variant=primary "Save Changes"
-```
-
----
-
-## Input
-*Source: InputField.tsx*
-
-`input.h-11.w-full.rounded-lg.border.px-4.py-2.5.text-sm.shadow-theme-xs`
-
-| State | Border | Focus |
-|-------|--------|-------|
-| Default | border-gray-300 | border-brand-300 ring-brand-500/20 |
-| Error | border-error-500 | ring-error-500/20 |
-| Success | border-success-500 | ring-success-500/20 |
-| Disabled | border-gray-300 opacity-40 bg-gray-100 cursor-not-allowed | — |
-
-Hint: `p.mt-1.5.text-xs` colored by state. Dark: `dark:bg-gray-900 dark:border-gray-700 dark:text-white/90`.
-
----
-
-## Select
-*Source: Select.tsx*
-
-Same height/radius/border as Input default. `appearance-none pr-11` for chevron space.
-Same focus ring as Input default state.
+**Always use the `useModal()` hook** (`{ isOpen, openModal, closeModal, toggleModal }`) — never raw `useState`. Backdrop `fixed inset-0 bg-gray-400/50 backdrop-blur-[32px]`; container `z-99999`; content `rounded-3xl bg-white`; close button `rounded-full bg-gray-100`. ESC closes; body overflow hidden while open. Large form variant (`max-w-[700px]`, `p-4 lg:p-11`): header (`h4 text-2xl font-semibold` + `p text-sm`) → scrollable body (`custom-scrollbar h-[450px]`, grid `gap-x-6 gap-y-5 lg:grid-cols-2`) → footer (`mt-6 lg:justify-end`) with outline "Close" + primary "Save Changes".
 
 ---
 
 ## Switch / Toggle
-*Source: Switch.tsx*
-
-```
-label.flex.cursor-pointer.items-center.gap-3.text-sm.font-medium
-├── div.relative
-│   ├── track [h-6 w-11 rounded-full transition] — brand-500/gray-200 (blue) or gray-800/gray-200 (gray)
-│   └── knob [absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-theme-sm
-│              transform duration-150 — translate-x-full on, translate-x-0 off]
-└── label text
-```
-
----
-
-## Label
-*Source: Label.tsx*
-
-`label.mb-1.5.block.text-sm.font-medium.text-gray-700.dark:text-gray-400`
+A single on/off control (to switch between views of the same data use the segmented toggle — **Part 6**). `label.flex.items-center.gap-3.text-sm.font-medium` → track (`h-6 w-11 rounded-full`, brand-500 on / gray-200 off) + knob (`absolute h-5 w-5 rounded-full bg-white shadow-theme-sm`, `translate-x-full` on / `translate-x-0` off).
 
 ---
 
 ## Table
-*Source: table/index.tsx*
-
-Primitives: `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableCell` (`isHeader` prop renders `<th>`).
-
-**Table in card (RecentOrders):**
-Card: `overflow-hidden rounded-2xl border px-4 pb-3 pt-4 sm:px-6`.
-Header row: `flex flex-col sm:flex-row gap-2 mb-4 items-center justify-between`.
-Action buttons: `inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium shadow-theme-xs hover:bg-gray-50`.
-Header cells: `py-3 font-medium text-gray-500 text-theme-xs text-start`. Border: `border-y border-gray-100`.
-Body cells: `py-3 text-theme-sm text-gray-500`. Dividers: `divide-y divide-gray-100`.
-
-**Standalone table (BasicTableOne):**
-Wrapper: `rounded-xl border border-gray-200 bg-white` (xl not 2xl, no outer padding).
-Header cells: `px-5 py-3 font-medium text-gray-500 text-theme-xs text-start`. Border: `border-b`.
-Body cells: `px-4 py-3 text-theme-sm text-gray-500`. Dividers: `divide-y divide-gray-100 dark:divide-white/[0.05]`.
-
----
-
-## Avatar
-*Source: Avatar.tsx*
-
-6 sizes: xsmall (24px) → xxlarge (64px). Always `rounded-full object-cover`.
-Status dot: `absolute bottom-0 right-0 rounded-full border-[1.5px] border-white dark:border-gray-900`.
-Colors: online=success-500, offline=error-400, busy=warning-500.
-
----
-
-## ComponentCard
-*Source: ComponentCard.tsx*
-
-For showcase / demo pages only.
-`div.rounded-2xl.border.border-gray-200.bg-white.dark:border-gray-800.dark:bg-white/[0.03]`
-Header: `px-6 py-5` → `h3.text-base.font-medium.text-gray-800` + optional `p.mt-1.text-sm.text-gray-500`.
-Body: `p-4 sm:p-6 border-t border-gray-100 dark:border-gray-800` → `div.space-y-6`.
+TailAdmin primitives `Table` / `TableHeader` / `TableBody` / `TableRow` / `TableCell` (`isHeader` → `<th>`); header cells `py-3 font-medium text-gray-500 text-theme-xs text-start`, body cells `py-3 text-theme-sm text-gray-500`, dividers `divide-gray-100`. **The canonical project table spec is Part 6 — Data Table Pattern (Projection Table V2)** — use it for any dense data table.
 
 ---
 
 ## PageBreadcrumb
-*Source: PageBreadCrumb.tsx*
-
-`div.flex.flex-wrap.items-center.justify-between.gap-3.mb-6`
-Left: `h2.text-xl.font-semibold.text-gray-800.dark:text-white/90` (page title).
-Right: `nav > ol.flex.items-center.gap-1.5` → Home link + chevron SVG + current page name `text-sm text-gray-800`.
-
-Always the **first element** inside every AppLayout page component.
+`flex flex-wrap items-center justify-between gap-3 mb-6`: left `h2 text-xl font-semibold` page title, right Home-link → chevron → current-page name `text-sm`. **When used, it is the first element inside an AppLayout page.**
 
 ---
 
@@ -903,25 +579,24 @@ Always the **first element** inside every AppLayout page component.
 
 ## Pattern Lookup Table
 
-| Surface | Source |
-|---------|--------|
-| Chart card — title + MoreDot | MonthlySalesChart.tsx — Pattern A |
-| Chart card — title + subtitle + right controls | StatisticsChart.tsx — Pattern B |
-| Chart card — title + subtitle + MoreDot | DemographicCard.tsx, MonthlyTarget.tsx — Pattern B variant |
-| Chart card — multi-series + custom legend | Derived — Pattern C |
-| Chart card — metrics embedded in header | PDF dashboards — Pattern H |
-| KPI card — icon + label + value + delta badge | EcommerceMetrics.tsx — Pattern D |
-| KPI card — value-first with inline delta | PDF dashboards — Pattern D2 |
-| Inline segmented toggle | ChartTab.tsx — Pattern E |
-| Radial / gauge card | MonthlyTarget.tsx — Pattern F |
-| Table card | RecentOrders.tsx — Pattern G |
-| Profile / content info card | UserInfoCard.tsx, UserMetaCard.tsx — Pattern I |
-| UI element showcase card | ComponentCard.tsx |
+| Surface | Pattern |
+|---------|---------|
+| Chart card — title + MoreDot | A |
+| Chart card — title + subtitle + right controls | B |
+| Chart card — title + subtitle + MoreDot | B variant |
+| Chart card — multi-series + custom legend | C |
+| Chart card — metrics embedded in header | H |
+| KPI card — icon + label + value + delta badge | D |
+| KPI card — value-first with inline delta | D2 |
+| Inline segmented toggle | E |
+| Radial / gauge card | F |
+| Table card | G |
+| Profile / content info card | I |
+| UI element showcase card | ComponentCard (Part 3) |
 
 ---
 
 ## Pattern A — Chart Card: Title + MoreDot
-*Source: MonthlySalesChart.tsx*
 
 ```
 card [rounded-2xl border bg-white px-5 pt-5 sm:px-6 sm:pt-6 overflow-hidden]
@@ -937,7 +612,6 @@ No subtitle. No legend. No bottom padding — chart extends to card edge.
 ---
 
 ## Pattern B — Chart Card: Title + Subtitle + Right Controls
-*Source: StatisticsChart.tsx*
 
 ```
 card
@@ -955,7 +629,6 @@ Subtitle at `mt-1` (4px) directly below title. RIGHT column holds only controls 
 ---
 
 ## Pattern C — Chart Card: Custom Legend Row
-*Source: TailAdmin Delivery Statistics card*
 
 ```
 card  [p-6, block, 2 direct children only]
@@ -999,7 +672,6 @@ Title left edge = subtitle left edge = legend left edge = card `padding-left` or
 ---
 
 ## Pattern D — KPI Card: Icon Variant
-*Source: EcommerceMetrics.tsx*
 
 ```
 card [p-5 md:p-6]
@@ -1015,7 +687,6 @@ card [p-5 md:p-6]
 ---
 
 ## Pattern D2 — KPI Card: Value-First with Inline Delta
-*Source: PDF dashboards (Analytics, CRM, Marketing, SaaS, Stocks)*
 
 ```
 card [p-5 md:p-6]
@@ -1029,30 +700,17 @@ card [p-5 md:p-6]
 ---
 
 ## Pattern E — Segmented Toggle (Inline)
-*Source: ChartTab.tsx (TailAdmin-native) → implemented as `.segmented-toggle` in this project*
 
-```
-track [flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5 dark:bg-gray-900]
-├── button.active   [rounded-md bg-white text-gray-900 shadow-theme-xs px-3 py-2 text-theme-sm font-medium
-│                    dark:bg-gray-800 dark:text-white]
-└── button.inactive [rounded-md text-gray-500 hover:text-gray-900 px-3 py-2 text-theme-sm font-medium]
-```
-
-Track: `bg-gray-100 rounded-lg (8px)`, no border. Pill: `rounded-md (6px)`.
-Always in header-right column or above chart. Never below chart.
-
-> **Implementation note:** This project implements Pattern E as `.segmented-toggle` in `dashboard.css`.
-> There is no `.chart-tab` class in this codebase — that is the TailAdmin source class name and
-> is not used here. A single canonical scale applies everywhere: 44px track / 40px buttons /
-> 10px×12px padding / 8px+6px radii. The chart-card class `.statistics-card__tab*` uses the
-> same spec, locally scoped so it can sit inside a chart card without inheriting layout overrides.
->
-> See Part 6 — Segmented toggle for the full spec.
+A horizontal control for switching between mutually-exclusive views of the
+same data. In-card placement only — header-right column or above the chart,
+**never below the chart**. The canonical spec (single scale: 44px track /
+40px buttons / 10px×12px padding / 8px+6px radii; `.segmented-toggle` global
++ `.statistics-card__tab*` scoped) lives in **Part 6 — Segmented toggle
+(standard pattern)**. There is no `.chart-tab` class in this codebase.
 
 ---
 
 ## Pattern F — Radial / Gauge Card
-*Source: MonthlyTarget.tsx*
 
 ```
 outer [rounded-2xl border bg-gray-100 dark:bg-white/[0.03]]
@@ -1074,7 +732,6 @@ footer [flex items-center justify-center gap-5 sm:gap-8 px-6 py-3.5 sm:py-5]
 ---
 
 ## Pattern G — Table Card
-*Source: RecentOrders.tsx*
 
 ```
 card [overflow-hidden rounded-2xl border px-4 pb-3 pt-4 sm:px-6]
@@ -1089,7 +746,6 @@ card [overflow-hidden rounded-2xl border px-4 pb-3 pt-4 sm:px-6]
 ---
 
 ## Pattern H — Chart Card: Metrics Embedded in Header
-*Source: PDF dashboards (CRM Statistics card)*
 
 ```
 card
@@ -1104,7 +760,6 @@ Used when 2–3 key values are tightly coupled to the chart context.
 ---
 
 ## Pattern I — Profile / Content Info Card
-*Source: UserInfoCard.tsx, UserMetaCard.tsx*
 
 ```
 card [p-5 border rounded-2xl lg:p-6]
@@ -1121,19 +776,20 @@ Edit button uses `rounded-full`. This is profile-card specific — not `rounded-
 
 ## Card Spacing Reference
 
+Header-block→content spacing is specified in Part 1 — Spacing (Card internal
+spacing: `mb-6`/24px standard, `mb-8`/32px chart-card); the legend-row gaps
+(subtitle→legend 20px via `pt-5`, legend→chart 0px) are specified once in
+Pattern C. This table covers the remaining KPI / modal / form transitions.
+
 | Transition | Value | Implementation |
 |---|---|---|
-| Header-block → content below (standard) | mb-6 (24px) | margin-bottom on header-block |
-| Header-block → content below (chart-card) | mb-8 (32px) | margin-bottom on header-block |
-| **Subtitle → legend row** | **20px** | **`pt-5` on legend container — NOT margin** |
-| Legend → chart | 0px | chart-container is flush sibling, no gap |
 | Subtitle → next element (general) | mt-1 (4px) | when no legend row present |
 | Icon-box → value row (KPI) | mt-5 (20px) | margin-top on value row |
 | Label → value (KPI) | mt-2 (8px) | margin-top on value |
 | Chart → text action link below | mt-4 to mt-6 | margin-top on action |
-| Modal header → body | mt-8 | margin-top on body |
-| Modal body → footer | mt-6 | margin-top on footer |
-| Form field rows | gap-y-5 | grid gap |
+| Modal header → body | mt-8 (32px) | margin-top on body |
+| Modal body → footer | mt-6 (24px) | margin-top on footer |
+| Form field rows | gap-y-5 (20px) | grid gap |
 
 ---
 
@@ -1284,121 +940,16 @@ exception section in Part 6 for the full policy.
 
 ---
 
-## Dashboard (eCommerce)
-*Source: pages/Dashboard/Home.tsx*
+This project ships a single application page — `src/pages/Dashboard.tsx` —
+which composes the card components specified in Parts 3–4. The TailAdmin
+demo page layouts (eCommerce dashboard, Charts/Tables/Forms demos, Profile,
+Calendar, Auth) are not used here; they remain in the TailAdmin reference
+repo (per AGENTS.md) and are not replicated in this project.
 
-```
-grid.grid-cols-12.gap-4.md:gap-6
-├── col-span-12 xl:col-span-7 [space-y-6]
-│   ├── EcommerceMetrics (Pattern D × 2 in 2-col grid)
-│   └── MonthlySalesChart (Pattern A)
-├── col-span-12 xl:col-span-5
-│   └── MonthlyTarget (Pattern F)
-├── col-span-12
-│   └── StatisticsChart (Pattern B)
-├── col-span-12 xl:col-span-5
-│   └── DemographicCard (Pattern B variant + map content)
-└── col-span-12 xl:col-span-7
-    └── RecentOrders (Pattern G)
-```
-
----
-
-## Chart Pages
-*Source: pages/Charts/BarChart.tsx, LineChart.tsx*
-
-```
-PageMeta
-PageBreadcrumb
-div.space-y-6
-└── ComponentCard [title="Chart Name"]
-    └── ChartComponent
-```
-
-Charts on dedicated pages are always wrapped in `ComponentCard`.
-
----
-
-## Table Page
-*Source: pages/Tables/BasicTables.tsx*
-
-```
-PageMeta
-PageBreadcrumb
-div.space-y-6
-└── ComponentCard [title="Basic Table 1"]
-    └── BasicTableOne
-```
-
----
-
-## Form Page
-*Source: pages/Forms/FormElements.tsx*
-
-```
-PageMeta
-PageBreadcrumb
-div.grid.grid-cols-1.gap-6.xl:grid-cols-2
-├── LEFT col [space-y-6] — DefaultInputs, SelectInputs, TextAreaInput, InputStates
-└── RIGHT col [space-y-6] — InputGroup, FileInput, Checkboxes, RadioButtons, Toggles, Dropzone
-```
-
-All form element groups wrapped in `ComponentCard`.
-
----
-
-## Profile Page
-*Source: pages/UserProfiles.tsx*
-
-```
-PageMeta
-PageBreadcrumb
-div.rounded-2xl.border.bg-white.p-5.dark:bg-white/[0.03].lg:p-6
-├── h3.text-lg.font-semibold.mb-5.lg:mb-7  ["Profile"]
-└── div.space-y-6
-    ├── UserMetaCard (Pattern I — avatar + socials + Edit modal)
-    ├── UserInfoCard (Pattern I — info grid + Edit modal)
-    └── UserAddressCard (Pattern I — address grid + Edit modal)
-```
-
-Profile wraps all sub-cards in a single outer card. This is different from dashboard grid layout.
-
----
-
-## Calendar Page
-*Source: pages/Calendar.tsx*
-
-```
-PageMeta  [no PageBreadcrumb on this page]
-div.rounded-2xl.border.bg-white.dark:bg-white/[0.03]
-├── div.custom-calendar → FullCalendar
-└── Modal [max-w-[700px] p-6 lg:p-10]  (Add/Edit event — modal form pattern from Part 3)
-```
-
-No PageBreadcrumb. FullCalendar fills the card directly.
-
----
-
-## Auth Pages
-*Source: AuthPageLayout.tsx + SignInForm.tsx*
-
-```
-div.relative.p-6.bg-white.z-1 [sm:p-0]
-└── div.flex.flex-col.lg:flex-row.h-screen
-    ├── LEFT: form panel [flex-1 flex flex-col]
-    │   ├── Back link [inline-flex items-center text-sm text-gray-500 w-full max-w-md pt-10 mx-auto]
-    │   └── form container [flex-1 flex flex-col justify-center w-full max-w-md mx-auto]
-    │       ├── heading [h1.font-semibold.text-title-sm sm:text-title-md + p.text-sm.text-gray-500]
-    │       ├── OAuth buttons [grid grid-cols-2 gap-3 sm:gap-5]
-    │       │   └── button [rounded-lg bg-gray-100 px-7 py-3 text-sm hover:bg-gray-200]
-    │       ├── "Or" divider [absolute inset border-t + centered span on bg-white]
-    │       └── form [space-y-6 → Label + Input + footer row]
-    └── RIGHT: brand panel [hidden lg:grid lg:w-1/2 bg-brand-950]
-        └── GridShape + logo + tagline text-gray-400
-```
-
-Auth pages live outside AppLayout — no sidebar, no header, no PageBreadcrumb.
-ThemeTogglerTwo: `fixed bottom-6 right-6 z-50 hidden sm:block`.
+Page-level layout tokens — content-wrapper padding, the 12-column grid, grid
+gap, and vertical rhythm between sections — are specified in Part 1 — Spacing
+(Page and layout level). Charts rendered on their own surface follow the
+chart-card patterns in Part 4.
 
 ---
 
@@ -1555,6 +1106,113 @@ and input fields.
 
 ---
 
+## Status badges & domain tags
+
+*Relocated from Part 3 by the "UI_RULES Parts 2–5 condense" PR — these are
+project-specific overrides, so they belong in Part 6. Search history for
+`.card-status-badge` / `.card-domain-tag` may point at the old Part 3 home.*
+
+### Shared badge primitive
+
+All card-level status badges use `.card-status-badge` with variants:
+- `.is-critical` — red (`#F04438` / `#FEF3F2`)
+- `.is-warning` — amber (`#F79009` / `#FFFAEB`)
+- `.is-healthy` — green (`#12B76A` / `#ECFDF3`)
+- `.is-neutral` — gray (`#667085` / `#F2F4F7`)
+
+### `.is-pressure` — Under Pressure (project overlay)
+- Background: `#FEF3E2`
+- Text: `#DC6803`
+- Dark bg: `rgba(220, 104, 3, 0.15)`
+- Dark text: `#FDB022`
+- Used exclusively on: CashTrendHero status badge when status = 'pressure'
+- This is the only case that uses project pressure orange instead of the
+  standard amber `.is-warning`. Do not reach for it for generic warnings.
+
+Badge spec (matches shipped `.card-status-badge` in `src/dashboard.css`):
+
+```
+display: inline-flex;
+align-items: center;
+gap: 4px;
+padding: 4px 10px;
+border-radius: 999px;
+font-size: 12px;       /* the size .card-status-badge already uses — do not introduce a new one */
+font-weight: 500;
+white-space: nowrap;
+flex-shrink: 0;
+```
+
+> The shipped base sets `inline-flex` (auto-width, single-line via
+> `white-space: nowrap`), so it does not set `justify-content`; centering
+> is moot for nowrap label content. TailAdmin's pill/badge utilities are
+> the visual source of inspiration, but the canonical implementation in
+> this repo is the `.card-status-badge` CSS class and its `.is-*`
+> variants — never Tailwind utility strings in JSX, and never a new
+> parallel pill-prefixed CSS namespace.
+
+### Status pill labels
+
+`.card-status-badge` is a **label-visible pill framework**: the visible
+text label carries the precise state, and color collapses six labels
+onto the existing three color bands (plus neutral gray). No per-label
+`.is-*` modifier is needed — reuse the variants above:
+
+| Label          | Variant       | Band            | Bg / Text             |
+|----------------|---------------|-----------------|-----------------------|
+| Critical       | `.is-critical`| red             | `#FEF3F2` / `#F04438` |
+| Vulnerable     | `.is-warning` | warning / amber | `#FFFAEB` / `#F79009` |
+| Below target   | `.is-warning` | warning / amber | `#FFFAEB` / `#F79009` |
+| Nearly funded  | `.is-neutral` | neutral gray    | `#F2F4F7` / `#667085` |
+| Fully funded   | `.is-healthy` | success green   | `#ECFDF3` / `#12B76A` |
+| Above target   | `.is-healthy` | success green   | `#ECFDF3` / `#12B76A` |
+
+> This is a label-visible pill framework. Vulnerable/Below target share
+> warning styling, and Funded/Above target share success styling; labels
+> and thresholds distinguish them. If a future visualization has no
+> visible label, collapse to critical / warning / healthy / neutral
+> instead of trying to encode all six states by color alone.
+
+Never create a new *status* badge pattern — reuse `.card-status-badge`.
+The only sanctioned non-status pill is `.card-domain-tag`, defined below.
+
+### `.card-domain-tag` — domain tag (distinct primitive)
+
+A domain tag answers "*which area?*", not "*what state?*". The visible
+label is a **domain** (Reserve, Cash Flow, Expenses, Revenue, Owner
+Draws, On Track); the `.is-*` variant **tints** it by severity using
+the same three bands as `.card-status-badge`. It is the only pill where
+the label is NOT a status string — the color carries severity, the
+label carries domain.
+
+- Used by: `SecondaryPriority` (Today secondary cards).
+- **No glyph.** The universal ↓/✓ glyph rule applies to status pills
+  only; domain tags are explicitly exempt.
+- Variants (same hex pairs as `.card-status-badge` — no new colors):
+
+| Variant        | Band            | Bg / Text             |
+|----------------|-----------------|-----------------------|
+| `.is-critical` | red             | `#FEF3F2` / `#F04438` |
+| `.is-warning`  | warning / amber | `#FFFAEB` / `#F79009` |
+| `.is-healthy`  | success green   | `#ECFDF3` / `#12B76A` |
+
+Base spec (matches shipped `.card-domain-tag` in `src/dashboard.css` —
+intentionally distinct from `.card-status-badge`, not a drifted copy):
+
+```
+display: inline-flex;
+align-items: center;
+gap: 6px;
+padding: 4px 10px;
+border-radius: 999px;
+font-size: 12px;
+font-weight: 500;
+line-height: 1;
+```
+
+Reconcile exactly with `src/dashboard.css`. Never encode the domain in
+color alone — the label is load-bearing.
+
 ---
 
 ## Icon implementation pattern
@@ -1691,10 +1349,9 @@ shadow, spacing). This exception is narrowly scoped — it does not
 authorize custom tooltips on Cartesian charts (line, bar, area, column).
 
 ### Current exceptions
-- Top Expense Categories donut (TopCategoriesCard.tsx) — custom HTML tooltip to avoid series stacking
-- OwnerDistributionsChart — custom tooltip for a Total row
-
-See Part 4 — Tooltips (ApexCharts) for the full description of both exceptions.
+The two sanctioned custom-tooltip exceptions (TopCategoriesCard donut,
+OwnerDistributionsChart Total row) are described in full — with the rationale
+for each — in **Part 4 — Tooltips (ApexCharts)**.
 
 ---
 
