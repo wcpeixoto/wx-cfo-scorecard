@@ -25,9 +25,18 @@ const TIMEFRAME_OPTIONS: PeriodOption[] = [
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function formatAxisLabel(key: string, granularity: IncomeExpenseGranularity): string {
-  if (granularity === 'yearly') return `'${key.slice(2)}`;
+  if (granularity === 'yearly') return key.slice(2);
   const [year, month] = key.split('-');
-  return `${MONTH_ABBR[Number(month) - 1]} '${year.slice(2)}`;
+  return `${MONTH_ABBR[Number(month) - 1]} ${year.slice(2)}`;
+}
+
+// Y-axis ticks: whole-number compact (no decimal). Distinct from the shared
+// formatCompact used by the tooltip + footer totals, which keep one decimal.
+function formatYAxisCompact(val: number): string {
+  const abs = Math.abs(val);
+  const sign = val < 0 ? '-' : '';
+  if (abs < 1000) return `${sign}$${Math.round(abs)}`;
+  return `${sign}$${Math.round(abs / 1000)}K`;
 }
 
 type Props = {
@@ -77,6 +86,7 @@ export default function IncomeExpenseCard({ monthlyRollups }: Props) {
         fontFamily: 'Outfit, sans-serif',
         fontSize: '12px',
         labels: { colors: chartTokens.axisText },
+        markers: { shape: 'circle' },
       },
       xaxis: {
         categories,
@@ -89,7 +99,7 @@ export default function IncomeExpenseCard({ monthlyRollups }: Props) {
         tickAmount: 4,
         forceNiceScale: true,
         labels: {
-          formatter: (val: number) => formatCompact(val),
+          formatter: (val: number) => formatYAxisCompact(val),
           style: { fontSize: '12px', colors: chartTokens.axisText },
         },
       },
