@@ -7,6 +7,26 @@
 -- so the current client-only integration can be tested across browsers.
 -- Do not use this policy file for production rollout.
 
+-- Table grants — expose these tables to the Data API (PostgREST/GraphQL) for
+-- the `anon` role the browser client connects as. Required because Supabase is
+-- removing the automatic GRANT on `public` tables (new projects: 2026-05-30;
+-- existing projects: 2026-10-30). Existing tables on the live project keep
+-- their current grants, so these statements are a no-op there — their purpose
+-- is to (a) make this snapshot replayable onto a fresh project and (b) make
+-- explicit the access the default privileges previously provided implicitly.
+-- RLS below remains the actual access control. Scoped to `anon` only because
+-- the app has no server/service_role path; add `authenticated`/`service_role`
+-- here if one is introduced. When you add a new table exposed to the app, add
+-- a matching grant here.
+grant select, insert, update, delete on public.shared_imported_transactions to anon;
+grant select, insert, update, delete on public.shared_import_batches to anon;
+grant select, insert, update, delete on public.shared_account_settings to anon;
+grant select, insert, update, delete on public.forecast_events to anon;
+grant select, insert, update, delete on public.renewal_contracts to anon;
+grant select, insert, update, delete on public.priority_history to anon;
+grant select, insert, update, delete on public.priority_prose_cache to anon;
+grant select, insert, update, delete on public.shared_workspace_settings to anon;
+
 alter table public.shared_imported_transactions enable row level security;
 alter table public.shared_import_batches enable row level security;
 alter table public.shared_account_settings enable row level security;
