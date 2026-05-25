@@ -159,7 +159,7 @@ export default function PayrollEfficiencyCard({
 
       <div className="pe-chart">
         {hasData ? (
-          <Chart options={options} series={series} type="area" height={180} />
+          <Chart options={options} series={series} type="area" height={144} />
         ) : (
           <div className="pe-empty">No payroll data available.</div>
         )}

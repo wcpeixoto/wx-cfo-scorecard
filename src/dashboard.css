@@ -8662,7 +8662,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: 14px;
+  margin-top: 30px;
 }
 
 .pe-hero-line {
@@ -8697,7 +8697,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 180px;
+  min-height: 144px;
   font-size: 14px;
   color: var(--text-secondary);
 }
