@@ -174,11 +174,6 @@ export default function PayrollEfficiencyCard({
             {bestYear ? ` in ${bestYear.year}` : ''}
           </p>
         </div>
-        <button type="button" className="pe-menu" aria-label="Card options">
-          <span />
-          <span />
-          <span />
-        </button>
       </div>
 
       <div className="pe-hero">

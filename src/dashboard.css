@@ -8653,32 +8653,6 @@ body {
   gap: 6px;
 }
 
-/* Three-dot (kebab) menu, top-right — matches the Active Users card affordance. */
-.pe-menu {
-  flex: 0 0 auto;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  cursor: pointer;
-}
-
-.pe-menu:hover { background: var(--bg-muted); }
-
-.pe-menu span {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--text-secondary);
-}
-
 .pe-hero {
   display: flex;
   flex-direction: column;
@@ -8777,8 +8751,6 @@ body {
 .dark .pe-kpi-label,
 .dark .pe-kpi-helper,
 .dark .pe-empty { color: #98A2B3; }
-.dark .pe-menu span { background: #98A2B3; }
-.dark .pe-menu:hover { background: #344054; }
 .dark .pe-chart { background: #101828; }
 .dark .pe-footer,
 .dark .pe-kpi + .pe-kpi { border-color: #344054; }
