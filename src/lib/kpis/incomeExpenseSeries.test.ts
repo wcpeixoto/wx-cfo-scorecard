@@ -79,11 +79,12 @@ describe('selectMonthlyIncomeExpense', () => {
     expect(s.netIncome).toBe(-300);
   });
 
-  it('caps to the most recent 12 months', () => {
-    const s = selectMonthlyIncomeExpense(SIXTEEN, '2025-01', '2026-04');
-    expect(s.labels.length).toBe(12);
-    expect(s.labels[0]).toBe('2025-05');
-    expect(s.labels[11]).toBe('2026-04');
+  it('caps to the most recent 18 months', () => {
+    const twentyFour = monthsRange('2024-01', '2025-12', (month) => mk(month, 1000, 400)); // 24 months
+    const s = selectMonthlyIncomeExpense(twentyFour, '2024-01', '2025-12');
+    expect(s.labels.length).toBe(18);
+    expect(s.labels[0]).toBe('2024-07');
+    expect(s.labels[17]).toBe('2025-12');
   });
 });
 
@@ -109,12 +110,12 @@ describe('selectYearlyIncomeExpense', () => {
     expect(s.netIncome).toBe(800 + 1200 + 400 - (320 + 480 + 160));
   });
 
-  it('caps to the most recent 12 calendar years', () => {
-    const many = monthsRange('2010-01', '2026-12', (month) => mk(month, 12, 12)); // 17 calendar years
-    const s = selectYearlyIncomeExpense(many, '2010-01', '2026-12');
-    expect(s.labels.length).toBe(12);
-    expect(s.labels[0]).toBe('2015');
-    expect(s.labels[11]).toBe('2026');
+  it('caps to the most recent 18 calendar years', () => {
+    const many = monthsRange('2000-01', '2026-12', (month) => mk(month, 12, 12)); // 27 calendar years
+    const s = selectYearlyIncomeExpense(many, '2000-01', '2026-12');
+    expect(s.labels.length).toBe(18);
+    expect(s.labels[0]).toBe('2009');
+    expect(s.labels[17]).toBe('2026');
   });
 
   it('handles an empty window safely', () => {
@@ -134,9 +135,9 @@ describe('resolveWindow — latest-month anchoring', () => {
     });
   });
 
-  it('keeps 3/6/12m monthly and 24/36m/5y yearly', () => {
-    expect(resolveWindow(SIXTEEN, '3m')).toMatchObject({ startMonth: '2026-02', granularity: 'monthly' });
+  it('keeps 6/12/18m monthly and 24/36m/5y yearly', () => {
     expect(resolveWindow(SIXTEEN, '6m')).toMatchObject({ startMonth: '2025-11', granularity: 'monthly' });
+    expect(resolveWindow(SIXTEEN, '18m')).toMatchObject({ startMonth: '2024-11', granularity: 'monthly' });
     expect(resolveWindow(SIXTEEN, '24m')).toEqual({ startMonth: '2024-05', endMonth: '2026-04', granularity: 'yearly' });
     expect(resolveWindow(SIXTEEN, '36m')).toMatchObject({ startMonth: '2023-05', granularity: 'yearly' });
     expect(resolveWindow(SIXTEEN, '5y')).toMatchObject({ startMonth: '2021-05', granularity: 'yearly' });
@@ -176,6 +177,19 @@ describe('selectIncomeExpense — one-shot resolver', () => {
     expect(twentyFour.series.labels).toEqual(['2025', '2026']);
     // 2025: 12 months; 2026: Jan–Apr = 4 months (data starts 2025-01).
     expect(twentyFour.series.income).toEqual([12000, 4000]);
+  });
+
+  it('renders 18 monthly bars with totals reconciling to the full 18-month range', () => {
+    // 24 months of data → latest is 2025-12; 18m window = 2024-07 .. 2025-12 (no cap loss).
+    const data = monthsRange('2024-01', '2025-12', (month) => mk(month, 1000, 400));
+    const r = selectIncomeExpense(data, '18m');
+    expect(r.granularity).toBe('monthly');
+    expect(r.series.labels.length).toBe(18);
+    expect(r.series.labels[0]).toBe('2024-07');
+    expect(r.series.labels[17]).toBe('2025-12');
+    expect(r.series.totalIncome).toBe(18 * 1000);
+    expect(r.series.totalExpense).toBe(18 * 400);
+    expect(r.series.netIncome).toBe(18 * 600);
   });
 
   it('returns an empty series (no throw) for empty rollups', () => {

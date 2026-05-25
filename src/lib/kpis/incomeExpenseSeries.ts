@@ -1,7 +1,7 @@
 import type { MonthlyRollup } from '../data/contract';
 
 /** Card-local timeframe options — independent from the Big Picture page header timeframe. */
-export type IncomeExpenseTimeframe = '3m' | '6m' | '12m' | '24m' | '36m' | '5y' | 'all';
+export type IncomeExpenseTimeframe = '6m' | '12m' | '18m' | '24m' | '36m' | '5y' | 'all';
 
 export type IncomeExpenseGranularity = 'monthly' | 'yearly';
 
@@ -23,16 +23,16 @@ export type ResolvedWindow = {
 
 /** Nominal span in months for each fixed timeframe ('all' is data-driven). */
 const SPAN_MONTHS: Record<Exclude<IncomeExpenseTimeframe, 'all'>, number> = {
-  '3m': 3,
   '6m': 6,
   '12m': 12,
+  '18m': 18,
   '24m': 24,
   '36m': 36,
   '5y': 60,
 };
 
-/** Never render more than 12 bars on screen (keeps yearly 'All' legible). */
-const MAX_BARS = 12;
+/** Never render more than 18 bars on screen (18m is the widest monthly view; keeps yearly 'All' legible). */
+const MAX_BARS = 18;
 
 function monthIndex(month: string): number {
   const [y, m] = month.split('-');
@@ -66,7 +66,7 @@ function earliestRollupMonth(rollups: readonly MonthlyRollup[]): string | null {
  * Resolve the visible window for a card timeframe, anchored to the LATEST
  * available rollup month (not real today) so the card stays data-grounded.
  *
- * Granularity: 3/6/12m are monthly; 24/36m and 5y are yearly; 'All' is monthly
+ * Granularity: 6/12/18m are monthly; 24/36m and 5y are yearly; 'All' is monthly
  * only when the full data span is ≤12 months, otherwise yearly.
  */
 export function resolveWindow(
@@ -82,7 +82,7 @@ export function resolveWindow(
       : addMonths(end, -(SPAN_MONTHS[timeframe] - 1));
 
   const granularity: IncomeExpenseGranularity =
-    timeframe === '3m' || timeframe === '6m' || timeframe === '12m'
+    timeframe === '6m' || timeframe === '12m' || timeframe === '18m'
       ? 'monthly'
       : timeframe === 'all'
         ? spanInclusive(start, end) <= 12
