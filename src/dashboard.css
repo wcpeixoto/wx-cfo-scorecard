@@ -8518,6 +8518,86 @@ body {
 
 .dark .cth-placeholder-text { color: #667085; }
 
+/* ── Income & Expense card (Big Picture — right of Cash Trend) ──────────── */
+.ie-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+  font-family: 'Outfit', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.ie-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.ie-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ie-chart {
+  min-height: 200px;
+}
+
+.ie-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.ie-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.ie-total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ie-total-label {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.ie-total-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ie-total-value.is-positive { color: #12B76A; }
+.ie-total-value.is-negative { color: #F04438; }
+
+.dark .ie-card {
+  background: #1D2939;
+  border-color: #344054;
+}
+.dark .ie-title,
+.dark .ie-total-value { color: rgba(255, 255, 255, 0.9); }
+.dark .ie-total-label,
+.dark .ie-empty { color: #98A2B3; }
+.dark .ie-footer { border-color: #344054; }
+
 /* === Phase 5.1 Branch 5 — Contracts & Renewals settings pane === */
 
 .contracts-card-header {
