@@ -13,9 +13,9 @@ import { formatCompact } from '../lib/utils/formatCompact';
 
 // Card-local timeframe options — independent from the Big Picture header timeframe.
 const TIMEFRAME_OPTIONS: PeriodOption[] = [
-  { value: '3m', label: '3 Months' },
   { value: '6m', label: '6 Months' },
   { value: '12m', label: '12 Months' },
+  { value: '18m', label: '18 Months' },
   { value: '24m', label: '24 Months' },
   { value: '36m', label: '36 Months' },
   { value: '5y', label: '5 Years' },
