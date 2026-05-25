@@ -211,6 +211,18 @@ function getForecastScenarioPresets(
     },
   };
 }
+
+function openNativeDatePicker(event: React.MouseEvent<HTMLInputElement>) {
+  const input = event.currentTarget;
+  if (typeof input.showPicker === 'function') {
+    try {
+      input.showPicker();
+    } catch {
+      // showPicker may be blocked (no user activation) or unsupported; native typing still works.
+    }
+  }
+}
+
 const BIG_PICTURE_FRAME_OPTIONS: KpiFrameOption[] = [
   { value: 'thisMonth', label: 'This Month' },
   { value: 'lastMonth', label: 'Last Month' },
@@ -3143,6 +3155,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                         <span>Start</span>
                         <input
                           type="date"
+                          onClick={openNativeDatePicker}
                           value={customStartDate}
                           min={earliestAvailableDate || undefined}
                           max={latestAvailableDate || undefined}
@@ -3159,6 +3172,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                         <span>End</span>
                         <input
                           type="date"
+                          onClick={openNativeDatePicker}
                           value={customEndDate}
                           min={customStartDate || earliestAvailableDate || undefined}
                           max={latestAvailableDate || undefined}
