@@ -143,10 +143,15 @@ type SharedWorkspaceSettingRow = {
   scenario_base_expense_change_pct?: number | null;
   scenario_worst_revenue_growth_pct?: number | null;
   scenario_worst_expense_change_pct?: number | null;
+  // Optional for the same reason as the columns above (added via later
+  // migration). Pre-migration reads default to 35.
+  payroll_target_percent?: number | null;
 };
 
 export type WorkspaceSettings = {
   targetNetMargin: number;
+  // Stored as whole-number percent (35 = 35%), unlike targetNetMargin which is a ratio.
+  payrollTargetPercent: number;
   safetyReserveMethod: 'monthly' | 'fixed';
   safetyReserveAmount: number;
   suppressDuplicateWarnings: boolean;
@@ -162,6 +167,7 @@ export type WorkspaceSettings = {
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   targetNetMargin: 0.25,
+  payrollTargetPercent: 35,
   safetyReserveMethod: 'monthly',
   safetyReserveAmount: 0,
   suppressDuplicateWarnings: false,
@@ -936,6 +942,7 @@ export async function deleteSharedRenewalContract(contractId: string): Promise<b
 function fromSharedWorkspaceSettingRow(row: SharedWorkspaceSettingRow): WorkspaceSettings {
   return {
     targetNetMargin: typeof row.target_net_margin === 'number' ? row.target_net_margin : DEFAULT_WORKSPACE_SETTINGS.targetNetMargin,
+    payrollTargetPercent: typeof row.payroll_target_percent === 'number' ? row.payroll_target_percent : DEFAULT_WORKSPACE_SETTINGS.payrollTargetPercent,
     safetyReserveMethod: row.safety_reserve_method === 'fixed' ? 'fixed' : 'monthly',
     safetyReserveAmount: typeof row.safety_reserve_amount === 'number' ? row.safety_reserve_amount : DEFAULT_WORKSPACE_SETTINGS.safetyReserveAmount,
     suppressDuplicateWarnings: row.suppress_duplicate_warnings === true,
@@ -974,6 +981,7 @@ function toSharedWorkspaceSettingRow(settings: WorkspaceSettings): SharedWorkspa
   return {
     workspace_id: WORKSPACE_ID,
     target_net_margin: settings.targetNetMargin,
+    payroll_target_percent: settings.payrollTargetPercent,
     safety_reserve_method: settings.safetyReserveMethod,
     safety_reserve_amount: settings.safetyReserveAmount,
     suppress_duplicate_warnings: settings.suppressDuplicateWarnings,

@@ -8598,6 +8598,120 @@ body {
 .dark .ie-empty { color: #98A2B3; }
 .dark .ie-footer { border-color: #344054; }
 
+/* === Payroll Health card (Big Picture Row 6) === */
+.ph-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+  font-family: 'Outfit', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.ph-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.ph-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ph-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 8px 0 4px;
+}
+
+.ph-hero-value {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ph-hero-label {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.ph-hero-target {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.ph-chart {
+  min-height: 200px;
+  margin-top: 8px;
+}
+
+.ph-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.ph-footer {
+  display: flex;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.ph-kpi {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  text-align: center;
+}
+
+.ph-kpi + .ph-kpi {
+  border-left: 1px solid var(--line);
+}
+
+.ph-kpi-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ph-kpi-label {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.dark .ph-card {
+  background: #1D2939;
+  border-color: #344054;
+}
+.dark .ph-title,
+.dark .ph-hero-value,
+.dark .ph-kpi-value { color: rgba(255, 255, 255, 0.9); }
+.dark .ph-hero-label,
+.dark .ph-hero-target,
+.dark .ph-kpi-label,
+.dark .ph-empty { color: #98A2B3; }
+.dark .ph-footer,
+.dark .ph-kpi + .ph-kpi { border-color: #344054; }
+
 /* === Phase 5.1 Branch 5 — Contracts & Renewals settings pane === */
 
 .contracts-card-header {
