@@ -222,6 +222,11 @@ const BIG_PICTURE_FRAME_OPTIONS: KpiFrameOption[] = [
   { value: 'allDates', label: 'All Dates' },
   { value: 'custom', label: 'Custom' },
 ];
+// Top Expense Categories has its own timeframe, independent of the header.
+// No 'custom' — the card has no date inputs of its own.
+const TOP_CATEGORIES_FRAME_OPTIONS: KpiFrameOption[] = BIG_PICTURE_FRAME_OPTIONS.filter(
+  (option) => option.value !== 'custom',
+);
 const BIG_PICTURE_VISIBLE_FRAME_OPTIONS: Array<KpiFrameOption & { value: BigPictureVisibleFrameValue }> = [
   { value: 'thisMonth', label: 'This Month' },
   { value: 'lastMonth', label: 'Last Month' },
@@ -815,6 +820,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   // Recovery → Split Conservative. See sub-phase 2c.1.
   const [customScenarioInput, setCustomScenarioInput] = useState<ScenarioInput>(DEFAULT_CUSTOM_SCENARIO);
   const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('lastMonth');
+  const [topCategoriesTimeframe, setTopCategoriesTimeframe] = useState<KpiComparisonTimeframe>('lastMonth');
   const [netCashFlowChartMode, setNetCashFlowChartMode] = useState<CashFlowMode>('operating');
   const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
@@ -2565,15 +2571,16 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     ];
   }, [selectedKpiComparison, model.kpiCards]);
 
-  const kpiExpenseBreakdown = useMemo(() => {
-    const startMonth = selectedKpiComparison?.currentStartMonth;
-    const endMonth = selectedKpiComparison?.currentEndMonth;
+  const topCategoriesBreakdown = useMemo(() => {
+    const comparison = model.kpiYoYComparisonByTimeframe[topCategoriesTimeframe];
+    const startMonth = comparison?.currentStartMonth;
+    const endMonth = comparison?.currentEndMonth;
     if (!startMonth || !endMonth) {
       return computeExpenseSlices([], profitabilityCashFlowMode);
     }
     const periodTxns = filteredTxns.filter((txn) => txn.month >= startMonth && txn.month <= endMonth);
     return computeExpenseSlices(periodTxns, profitabilityCashFlowMode);
-  }, [selectedKpiComparison, filteredTxns, profitabilityCashFlowMode]);
+  }, [model.kpiYoYComparisonByTimeframe, topCategoriesTimeframe, filteredTxns, profitabilityCashFlowMode]);
 
   const kpiVsLabel = useMemo<string>(() => {
     const labels: Record<BigPictureFrameValue, string> = {
@@ -3269,13 +3276,13 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
             <div className="two-col-grid two-col-grid--income-expense">
               <IncomeExpenseCard monthlyRollups={model.monthlyRollups} />
               <TopCategoriesCard
-                slices={kpiExpenseBreakdown.slices}
-                total={kpiExpenseBreakdown.total}
+                slices={topCategoriesBreakdown.slices}
+                total={topCategoriesBreakdown.total}
                 periodControl={
                   <PeriodDropdown
-                    value={kpiTimeframe}
-                    options={BIG_PICTURE_FRAME_OPTIONS}
-                    onChange={(v) => setKpiTimeframe(v as BigPictureFrameValue)}
+                    value={topCategoriesTimeframe}
+                    options={TOP_CATEGORIES_FRAME_OPTIONS}
+                    onChange={(v) => setTopCategoriesTimeframe(v as KpiComparisonTimeframe)}
                   />
                 }
               />
