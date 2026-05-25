@@ -10,8 +10,7 @@
  * literal is allowed in ApexCharts options objects.
  *
  * Orphan hexes encountered during per-chart migration
- * (#FB5454, etc.) are decided
- * commit-by-commit, not pre-added here.
+ * are decided commit-by-commit, not pre-added here.
  */
 export const chartTokens = {
   // Brand
@@ -27,6 +26,7 @@ export const chartTokens = {
   error:           '#F04438',
   warning:         '#F79009',
   pressure:        '#DC6803',
+  costSpike:       '#FB5454',
 
   // Structural
   gridBorder:      '#e0e0e0',
