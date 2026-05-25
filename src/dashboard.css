@@ -690,6 +690,21 @@ body {
   margin-top: 8px;
 }
 
+/* Payroll Efficiency title tooltip — left-anchored so the panel opens
+   rightward from the ⓘ (the icon sits near the card's left edge). Four
+   prose paragraphs, so give consecutive body lines real separation. */
+.pe-tooltip-panel {
+  right: auto;
+  left: 0;
+  min-width: 260px;
+  max-width: 320px;
+  white-space: normal;
+}
+
+.pe-tooltip-panel .db-tooltip-list li + li {
+  margin-top: 8px;
+}
+
 .dashboard-load-error {
   display: flex;
   align-items: center;
@@ -8630,6 +8645,12 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.pe-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Three-dot (kebab) menu, top-right — matches the Active Users card affordance. */
