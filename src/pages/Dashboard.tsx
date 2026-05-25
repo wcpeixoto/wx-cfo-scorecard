@@ -14,6 +14,7 @@ import LoadingScreen from '../components/LoadingScreen';
 import DigHereHighlights from '../components/DigHereHighlights';
 import CashTrendHero from '../components/CashTrendHero';
 import IncomeExpenseCard from '../components/IncomeExpenseCard';
+import PayrollHealthCard from '../components/PayrollHealthCard';
 import KpiCards from '../components/KpiCards';
 import TopCategoriesCard from '../components/TopCategoriesCard';
 import PeriodDropdown from '../components/PeriodDropdown';
@@ -3341,6 +3342,13 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 </ul>
               </article>
             </div>
+
+            {/* Row 6: Payroll Health — full width */}
+            <PayrollHealthCard
+              txns={filteredTxns}
+              monthlyRollups={model.monthlyRollups}
+              payrollTargetPercent={businessRules.payrollTargetPercent}
+            />
           </>
         )}
 
@@ -4454,6 +4462,34 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                                   const raw = Number.parseFloat(event.target.value);
                                   if (Number.isFinite(raw) && raw > 0 && raw <= 100) {
                                     updateBusinessRules({ targetNetMargin: raw / 100 });
+                                  }
+                                }}
+                              />
+                              <span className="rules-pct-suffix">%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Rule — Payroll target */}
+                        <div className="rules-row">
+                          <div className="rules-row-info">
+                            <span className="rules-row-label">Payroll target</span>
+                            <span className="rules-row-sub">Payroll Health uses this as the % of revenue goal</span>
+                          </div>
+                          <div className="rules-row-control">
+                            <div className="rules-pct-input-wrap">
+                              <input
+                                className="rules-pct-input"
+                                type="number"
+                                min="1"
+                                max="100"
+                                step="1"
+                                aria-label="Payroll target percentage"
+                                value={businessRules.payrollTargetPercent ?? 35}
+                                onChange={(event) => {
+                                  const raw = Number.parseFloat(event.target.value);
+                                  if (Number.isFinite(raw) && raw > 0 && raw <= 100) {
+                                    updateBusinessRules({ payrollTargetPercent: raw });
                                   }
                                 }}
                               />

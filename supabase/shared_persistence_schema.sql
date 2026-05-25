@@ -275,3 +275,27 @@ create table if not exists public.priority_prose_cache (
 
 create index if not exists priority_prose_cache_workspace_id_signal_type_idx
   on public.priority_prose_cache (workspace_id, signal_type);
+
+-- Workspace settings — one row per workspace_id holding the operator's Rules
+-- (profit target, operating-reserve goal, forecast posture/scenario assumptions,
+-- and the Payroll Target). Created out-of-band via the Supabase dashboard; this
+-- is a hand-written snapshot of the current (post-migration) live state. RLS
+-- policies live in first_test_policies.sql.
+
+create table if not exists public.shared_workspace_settings (
+  workspace_id text not null,
+  target_net_margin numeric null default 0.25,
+  safety_reserve_method text null default 'monthly',
+  safety_reserve_amount numeric null default 0,
+  suppress_duplicate_warnings boolean null default false,
+  acknowledged_noncash_accounts jsonb null default '[]'::jsonb,
+  forecast_posture text not null default 'reality',
+  payroll_target_percent numeric not null default 35,
+  scenario_best_revenue_growth_pct numeric not null default 4,
+  scenario_best_expense_change_pct numeric not null default -3,
+  scenario_base_revenue_growth_pct numeric not null default 0,
+  scenario_base_expense_change_pct numeric not null default 0,
+  scenario_worst_revenue_growth_pct numeric not null default -5,
+  scenario_worst_expense_change_pct numeric not null default 4,
+  primary key (workspace_id)
+);

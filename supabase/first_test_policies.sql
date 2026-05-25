@@ -152,6 +152,28 @@ to public
 using (true)
 with check (true);
 
+-- shared_workspace_settings policies — created out-of-band via the Supabase
+-- dashboard alongside the table; hand-written snapshot of current live state.
+-- Same public/using-true shape as the priority_* tables above.
+
+alter table public.shared_workspace_settings enable row level security;
+
+drop policy if exists "first_test_read_shared_workspace_settings" on public.shared_workspace_settings;
+drop policy if exists "first_test_write_shared_workspace_settings" on public.shared_workspace_settings;
+
+create policy "first_test_read_shared_workspace_settings"
+on public.shared_workspace_settings
+for select
+to public
+using (true);
+
+create policy "first_test_write_shared_workspace_settings"
+on public.shared_workspace_settings
+for all
+to public
+using (true)
+with check (true);
+
 -- Recommended cleanup before any broader rollout:
 -- 1. drop these first-test policies
 -- 2. replace anon access with authenticated policies or a server-side write path
