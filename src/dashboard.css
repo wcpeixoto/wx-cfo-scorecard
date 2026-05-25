@@ -2549,6 +2549,13 @@ body {
   }
 }
 
+/* Big Picture — Income & Expense 60% | Top Expense Categories 40% (desktop only; inherits .two-col-grid gaps + ≤960px stacking) */
+@media (min-width: 961px) {
+  .two-col-grid--income-expense {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
 /* Row 2 — Cash Trend 40% | Monthly Net Cash Flow 60%; stretch for equal outer height */
 .cash-trend-row {
   display: grid;

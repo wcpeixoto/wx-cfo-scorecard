@@ -3265,8 +3265,8 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
         {hasImportedData && activeTab === 'big-picture' && (
           <>
-            {/* Row 2: Income & Expense (1/2) | Top Expense Categories (1/2) */}
-            <div className="two-col-grid">
+            {/* Row 2: Income & Expense (60%) | Top Expense Categories (40%) */}
+            <div className="two-col-grid two-col-grid--income-expense">
               <IncomeExpenseCard monthlyRollups={model.monthlyRollups} />
               <TopCategoriesCard
                 slices={kpiExpenseBreakdown.slices}
