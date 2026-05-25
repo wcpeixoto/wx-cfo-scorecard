@@ -8329,6 +8329,15 @@ body {
   flex-shrink: 0;
 }
 
+/* When the ⓘ sits in the title row (left side of the card, the
+   negative-months-as-subtitle layout), open the panel rightward so it
+   doesn't overflow off the card's left edge. The header-right ⓘ keeps the
+   default right-anchored panel. */
+.cth-title-row .db-tooltip-panel {
+  right: auto;
+  left: 0;
+}
+
 /* Quiet info icon — Cash Trend only.
    Compound .cth-info-icon.db-tooltip-btn forces specificity over the
    global .db-tooltip-btn defaults regardless of cascade order. */
