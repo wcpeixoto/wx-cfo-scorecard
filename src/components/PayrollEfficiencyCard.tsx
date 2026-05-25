@@ -63,7 +63,7 @@ export default function PayrollEfficiencyCard({
         type: 'gradient',
         gradient: { shadeIntensity: 1, opacityFrom: 0.32, opacityTo: 0.04, stops: [0, 100] },
       },
-      // Subtle dashed reference line at the wired payroll target.
+      // Subtle dashed reference line + far-right label at the wired payroll target.
       annotations: {
         yaxis: hasData
           ? [
@@ -71,6 +71,22 @@ export default function PayrollEfficiencyCard({
                 y: payrollTargetPercent,
                 borderColor: chartTokens.crosshairStroke,
                 strokeDashArray: 4,
+                label: {
+                  text: `${payrollTargetPercent}% target`,
+                  position: 'right',
+                  textAnchor: 'end',
+                  offsetX: -2,
+                  offsetY: 13,
+                  borderWidth: 0,
+                  borderColor: 'transparent',
+                  style: {
+                    background: 'transparent',
+                    color: chartTokens.axisText,
+                    fontSize: '10px',
+                    fontWeight: 400,
+                    fontFamily: 'Outfit, sans-serif',
+                  },
+                },
               },
             ]
           : [],
@@ -120,7 +136,13 @@ export default function PayrollEfficiencyCard({
   return (
     <article className="pe-card">
       <div className="pe-header">
-        <h3 className="pe-title">Payroll Efficiency</h3>
+        <div className="pe-heading">
+          <h3 className="pe-title">Payroll Efficiency</h3>
+          <p className="subtle">
+            Best year: {formatWholePct(bestYear?.payrollPct ?? null)}
+            {bestYear ? ` in ${bestYear.year}` : ''}
+          </p>
+        </div>
         <button type="button" className="pe-menu" aria-label="Card options">
           <span />
           <span />
@@ -133,10 +155,6 @@ export default function PayrollEfficiencyCard({
           <span className="pe-hero-value">{formatWholePct(current?.payrollPct ?? null)}</span>
           <span className="pe-hero-sub">of revenue</span>
         </div>
-        <span className="pe-hero-best">
-          Best year: {formatWholePct(bestYear?.payrollPct ?? null)}
-          {bestYear ? ` in ${bestYear.year}` : ''}
-        </span>
       </div>
 
       <div className="pe-chart">
@@ -148,10 +166,6 @@ export default function PayrollEfficiencyCard({
       </div>
 
       <div className="pe-footer">
-        <div className="pe-kpi">
-          <span className="pe-kpi-value">{payrollTargetPercent}%</span>
-          <span className="pe-kpi-label">Target</span>
-        </div>
         <div className="pe-kpi">
           <span className="pe-kpi-value">{revCurrent}</span>
           <span className="pe-kpi-label">Revenue per $1 payroll</span>

@@ -773,7 +773,8 @@ body {
    non-card .subtle text — top-bar freshness, body notes — keeps its own
    typography. Child combinator (>) so it does not leak margin-top into
    nested .subtle subtitles (e.g. chart-head, which owns its own gap). */
-.card-head > .subtle {
+.card-head > .subtle,
+.pe-heading > .subtle {
   font-size: 14px;
   margin-top: 4px;
 }
@@ -8623,6 +8624,14 @@ body {
   color: var(--text-primary);
 }
 
+/* Title + canonical card subtitle stacked; menu stays top-right in .pe-header.
+   The subtitle reuses the system .card-head > .subtle spec (see below). */
+.pe-heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 /* Three-dot (kebab) menu, top-right — matches the Active Users card affordance. */
 .pe-menu {
   flex: 0 0 auto;
@@ -8673,12 +8682,6 @@ body {
 .pe-hero-sub {
   font-size: 14px;
   font-weight: 400;
-  color: var(--text-secondary);
-}
-
-.pe-hero-best {
-  font-size: 13px;
-  font-weight: 500;
   color: var(--text-secondary);
 }
 
@@ -8750,7 +8753,6 @@ body {
 .dark .pe-hero-value,
 .dark .pe-kpi-value { color: rgba(255, 255, 255, 0.9); }
 .dark .pe-hero-sub,
-.dark .pe-hero-best,
 .dark .pe-kpi-label,
 .dark .pe-kpi-helper,
 .dark .pe-empty { color: #98A2B3; }
