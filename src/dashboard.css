@@ -731,6 +731,20 @@ body {
   margin-top: 8px;
 }
 
+/* "Your best" column-header tooltip — left-anchored, single sentence. Reset the
+   inherited header typography (14px/600) back to tooltip-body styling. */
+.eff-col-tooltip-panel {
+  right: 0;
+  left: auto;
+  min-width: 240px;
+  max-width: 300px;
+  white-space: normal;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
 .dashboard-load-error {
   display: flex;
   align-items: center;
@@ -5655,29 +5669,47 @@ body {
   line-height: 1.4;
 }
 
-/* Column headers — 4 columns: [1fr] [70px] [70px] [140px]; sentence case */
+/* Column headers — 4 columns; typography matches Projection Table V2 (14px/600,
+   gray-50 band, var(--bg-muted) rules, sentence case, left-aligned). Duplicated
+   locally because the projection rules are <table>-scoped and can't be reused on
+   this div-grid without coupling the two surfaces. */
 .eff-col-headers {
   display: grid;
-  grid-template-columns: 1fr 70px 70px 140px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #E4E7EC;
-  font-size: 12px;    /* text-theme-xs */
-  font-weight: 500;
-  color: #667085;     /* secondary text */
+  grid-template-columns: minmax(0, 1fr) 76px 104px 194px;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #F9FAFB;
+  border-top: 1px solid var(--bg-muted);
+  border-bottom: 1px solid var(--bg-muted);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .eff-col-cat   { /* left-aligned default */ }
-.eff-col-best  { text-align: center; }
-.eff-col-today { text-align: center; }
-.eff-col-extra { text-align: right; }
+.eff-col-best  {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;   /* right-aligned to match its right-aligned values */
+  gap: 4px;
+}
+.eff-col-today { text-align: right; }
+/* Far-right block, same width as the bar+value cell so the title's left edge sits
+   directly above the bar's left edge; the unused track space on the left keeps the
+   bar clear of the Today column. */
+.eff-col-extra {
+  width: 148px;
+  justify-self: end;
+  text-align: left;
+}
 
-/* Data rows — same 4-column grid */
+/* Data rows — same 4-column grid; padding/divider rhythm matches Projection Table V2 */
 .eff-row {
   display: grid;
-  grid-template-columns: 1fr 70px 70px 140px;
+  grid-template-columns: minmax(0, 1fr) 76px 104px 194px;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #E4E7EC;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--bg-muted);
 }
 
 .eff-row-last {
@@ -5707,44 +5739,50 @@ body {
   color: #667085;     /* secondary text */
 }
 
-/* Col 2 — Your best % — center, muted */
+/* Col 2 — Your best % — right-aligned numeric, system table cell typography.
+   padding-right offsets the header's ⓘ so the value aligns under the "Your best"
+   text, not the icon. */
 .eff-row-best-val {
-  font-size: 14px;    /* text-theme-sm */
-  font-weight: 700;   /* bold */
-  color: #667085;     /* secondary — intentionally muted vs Today */
-  text-align: center;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-primary);
+  text-align: right;
+  padding-right: 22px;
 }
 
-/* Col 3 — Today % — center, stronger than Your best */
+/* Col 3 — Today % — right-aligned numeric, system table cell typography (no heavier than Your best) */
 .eff-row-today-val {
-  font-size: 14px;    /* text-theme-sm */
-  font-weight: 700;   /* bold */
-  color: #1D2939;     /* gray-800 — stronger than #667085 */
-  text-align: center;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-primary);
+  text-align: right;
 }
 
-/* Col 4 — Extra amount on top, bar below */
+/* Col 4 — reduced-width block aligned under the right-aligned header; bar grows
+   left-to-right from the title's left edge, dollar value right-anchored at the end */
 .eff-row-extra-col {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 5px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: 148px;
+  justify-self: end;
 }
 
 .eff-row-extra-amt {
-  font-family: Outfit, sans-serif;
-  font-size: 18px;        /* text-lg */
-  font-weight: 600;       /* font-semibold */
-  line-height: 28px;
-  letter-spacing: normal;
-  color: #1D2939;         /* gray-800 */
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+  white-space: nowrap;
 }
 
-/* Progress bar — track + single proportional fill, in Recoverable column below amount */
+/* Progress bar — track fills the cell; single proportional fill grows left-to-right */
 .eff-bar {
   position: relative;
-  width: 100%;
-  max-width: 130px;
+  flex: 1 1 auto;
+  min-width: 0;
   height: 8px;
   border-radius: 4px;
   background: #F2F4F7;  /* muted surface track */
@@ -5771,6 +5809,28 @@ body {
 .dark .eff-row-cat-name--clickable:hover {
   color: #FFFFFF;
   text-decoration: underline;
+}
+
+/* Clickable "Your best" value — reads as interactive data: dotted underline at
+   rest, brand blue + solid underline on hover/focus. */
+.eff-row-best-val--clickable {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-color: #98A2B3;
+  text-underline-offset: 3px;
+}
+.eff-row-best-val--clickable:hover {
+  color: #465FFF;   /* chartTokens.brand */
+  text-decoration: underline solid;
+  text-decoration-color: #465FFF;
+}
+.eff-row-best-val--clickable:focus-visible {
+  color: #465FFF;
+  text-decoration: underline solid;
+  text-decoration-color: #465FFF;
+  outline: 2px solid #465FFF;
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* Combined best→today column header — mobile only; hidden on desktop */
@@ -5800,6 +5860,13 @@ body {
   .eff-row {
     grid-template-columns: 1fr 90px 80px;
     gap: 8px;
+  }
+
+  /* Recoverable column fills the mobile track (reset the desktop fixed-width block) */
+  .eff-col-extra,
+  .eff-row-extra-col {
+    width: auto;
+    justify-self: stretch;
   }
 
   /* Hide separate best/today columns — replaced by combined cell */

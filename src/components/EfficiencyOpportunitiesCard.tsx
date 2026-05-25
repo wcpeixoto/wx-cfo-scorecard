@@ -24,6 +24,7 @@ export function EfficiencyOpportunitiesCard({ result }: Props) {
   const { windowLabel, rows, totalExtraPerMonth } = result;
 
   const tooltipId = useId();
+  const bestTooltipId = useId();
   const [selectedRow, setSelectedRow] = useState<EfficiencyRow | null>(null);
 
   // Bars scale to the largest recoverable monthly amount in the current row set.
@@ -78,10 +79,25 @@ export function EfficiencyOpportunitiesCard({ result }: Props) {
       <div className="eff-col-headers">
         <span className="eff-col-cat">Category</span>
         {/* Desktop: two separate columns. Mobile: single combined column */}
-        <span className="eff-col-best">Your best</span>
         <span className="eff-col-today">Today</span>
+        <span className="eff-col-best">
+          Your best
+          <span className="db-tooltip-wrap">
+            <button
+              type="button"
+              className="db-tooltip-btn"
+              aria-label="Your best column explanation"
+              aria-describedby={bestTooltipId}
+            >
+              &#9432;
+            </button>
+            <span id={bestTooltipId} role="tooltip" className="db-tooltip-panel eff-col-tooltip-panel">
+              {'Click any "Your best" percentage to see the revenue, spend, and % comparison between that best stretch and today.'}
+            </span>
+          </span>
+        </span>
         <span className="eff-col-best-now">Best → Now</span>
-        <span className="eff-col-extra">Recoverable/mo</span>
+        <span className="eff-col-extra">Recoverable per month</span>
       </div>
 
       {/* Data rows */}
@@ -103,16 +119,25 @@ export function EfficiencyOpportunitiesCard({ result }: Props) {
               <span className="eff-row-cat-anchor">{row.bestPeriodLabel}</span>
             </div>
 
-            {/* Col 2 — Your best % — desktop only */}
+            {/* Col 2 — Today % — desktop only */}
+            <span className="eff-row-today-val">{row.todayPct}%</span>
+
+            {/* Col 3 — Your best % — clickable into comparison drawer — desktop only */}
             <span
-              className="eff-row-best-val eff-row-cat-name--clickable"
+              className="eff-row-best-val eff-row-best-val--clickable"
+              role="button"
+              tabIndex={0}
+              aria-label={`Compare ${row.category} best stretch versus today`}
               onClick={() => setSelectedRow(row)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedRow(row);
+                }
+              }}
             >
               {row.bestPct}%
             </span>
-
-            {/* Col 3 — Today % — desktop only */}
-            <span className="eff-row-today-val">{row.todayPct}%</span>
 
             {/* Combined best→today — mobile only */}
             <span
@@ -122,15 +147,15 @@ export function EfficiencyOpportunitiesCard({ result }: Props) {
               {row.bestPct}% → {row.todayPct}%
             </span>
 
-            {/* Col 4 — Recoverable amount (top) + single proportional bar (below) */}
+            {/* Col 4 — bar grows left-to-right, dollar value right-anchored at the end */}
             <div className="eff-row-extra-col">
-              <span className="eff-row-extra-amt">{formatExtra(row.extraPerMonth)}</span>
               <div className="eff-bar">
                 <div
                   className="eff-bar-fill"
                   style={{ width: `${barPct}%`, background: chartTokens.brand }}
                 />
               </div>
+              <span className="eff-row-extra-amt">{formatExtra(row.extraPerMonth)}</span>
             </div>
           </div>
         );
