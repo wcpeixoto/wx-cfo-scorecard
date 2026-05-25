@@ -8,8 +8,10 @@ interface Props {
 }
 
 function formatHeadline(totalPerMonth: number): string {
-  const rounded = Math.round(totalPerMonth / 100) * 100;
-  return `$${rounded.toLocaleString('en-US')}/mo`;
+  if (totalPerMonth >= 1000) {
+    return `$${(totalPerMonth / 1000).toFixed(1)}K/mo`;
+  }
+  return `$${Math.round(totalPerMonth)}/mo`;
 }
 
 function formatExtra(amount: number): string {
@@ -72,7 +74,7 @@ export function EfficiencyOpportunitiesCard({ result }: Props) {
       {/* Headline strip — amount + label on one baseline row */}
       <div className="eff-headline-strip">
         <span className="eff-headline-amount">{formatHeadline(totalExtraPerMonth)}</span>
-        <span className="eff-headline-label">available if these costs matched your best level</span>
+        <span className="eff-headline-label">more than your best efficiency level</span>
       </div>
 
       {/* Column headers */}
