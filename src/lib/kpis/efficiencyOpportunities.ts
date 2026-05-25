@@ -54,6 +54,10 @@ export interface EfficiencyOpportunitiesResult {
   windowLabel: string;        // "Jan – Mar 2026"
   rows: EfficiencyRow[];      // top N by extraPerMonth
   totalExtraPerMonth: number; // sum across ALL qualifying categories
+  // Payroll-specific excess ($/mo), taken from the full (pre-top-N) category
+  // set so it survives display truncation. Same methodology as `rows`; null
+  // when Payroll has no positive excess. Never the all-category total.
+  payrollExtraPerMonth: number | null;
 }
 
 const MONTH_SHORT = [
@@ -167,6 +171,7 @@ export function computeEfficiencyOpportunities(
     windowLabel: '',
     rows: [],
     totalExtraPerMonth: 0,
+    payrollExtraPerMonth: null,
   };
 
   const latestMonth = model.latestMonth;
@@ -344,9 +349,14 @@ export function computeEfficiencyOpportunities(
   const totalExtraPerMonth = rowsAll.reduce((acc, r) => acc + r.extraPerMonth, 0);
   const rows = rowsAll.slice(0, MAX_ROWS);
 
+  // Payroll-specific excess from the FULL set (parent category 'Payroll' matches
+  // PAYROLL_PARENT in payrollSeries.ts) — survives the top-N truncation above.
+  const payrollRow = rowsAll.find((r) => r.category === 'Payroll');
+
   return {
     windowLabel,
     rows,
     totalExtraPerMonth,
+    payrollExtraPerMonth: payrollRow ? payrollRow.extraPerMonth : null,
   };
 }

@@ -130,4 +130,29 @@ describe('selectPayrollHealth', () => {
     expect(points[0].year).toBe('2021');
     expect(points[5].year).toBe('2026');
   });
+
+  it('computes bestYear as the lowest payroll % among years with revenue', () => {
+    const rollups = [...fullYear(2023, 1000), ...fullYear(2024, 1000), ...fullYear(2025, 1000)];
+    const txns = [
+      tx('2023-06', 'Payroll', -3600), // 30%
+      tx('2024-06', 'Payroll', -6000), // 50%
+      tx('2025-06', 'Payroll', -4800), // 40%
+    ];
+
+    const { bestYear } = selectPayrollHealth(txns, rollups);
+
+    expect(bestYear?.year).toBe('2023');
+    expect(bestYear?.payrollPct).toBe(30);
+  });
+
+  it('skips zero-revenue (null %) years when choosing bestYear', () => {
+    const rollups = [...fullYear(2024, 0), ...fullYear(2025, 1000)];
+    const txns = [tx('2024-06', 'Payroll', -1000), tx('2025-06', 'Payroll', -4800)];
+
+    const { points, bestYear } = selectPayrollHealth(txns, rollups);
+
+    expect(points[0].payrollPct).toBeNull();
+    expect(bestYear?.year).toBe('2025');
+    expect(bestYear?.payrollPct).toBe(40);
+  });
 });
