@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { MonthlyRollup, Txn } from '../lib/data/contract';
@@ -40,6 +40,7 @@ export default function PayrollEfficiencyCard({
     () => selectPayrollHealth(txns, monthlyRollups),
     [txns, monthlyRollups],
   );
+  const tooltipId = useId();
 
   const hasData = points.length > 0;
 
@@ -82,7 +83,7 @@ export default function PayrollEfficiencyCard({
                   style: {
                     background: 'transparent',
                     color: chartTokens.axisText,
-                    fontSize: '10px',
+                    fontSize: '11px',
                     fontWeight: 400,
                     fontFamily: 'Outfit, sans-serif',
                   },
@@ -137,7 +138,37 @@ export default function PayrollEfficiencyCard({
     <article className="pe-card">
       <div className="pe-header">
         <div className="pe-heading">
-          <h3 className="pe-title">Payroll Efficiency</h3>
+          <div className="pe-title-row">
+            <h3 className="pe-title">Payroll Efficiency</h3>
+            <div className="db-tooltip-wrap">
+              <button
+                type="button"
+                className="db-tooltip-btn"
+                aria-label="Payroll Efficiency explanation"
+                aria-describedby={tooltipId}
+              >
+                &#9432;
+              </button>
+              <div id={tooltipId} role="tooltip" className="db-tooltip-panel pe-tooltip-panel">
+                <ul className="db-tooltip-list">
+                  <li className="db-tooltip-body">
+                    Payroll is usually the biggest bite out of revenue. This card shows whether that
+                    cost is getting more or less efficient over time.
+                  </li>
+                  <li className="db-tooltip-body">
+                    Best year means your lowest payroll % in the yearly trend.
+                  </li>
+                  <li className="db-tooltip-body">
+                    “More than your best stretch” compares this year's average monthly payroll cost
+                    against your lowest 3-month payroll stretch.
+                  </li>
+                  <li className="db-tooltip-body">
+                    You can adjust the Payroll Target % in Settings → Rules.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
           <p className="subtle">
             Best year: {formatWholePct(bestYear?.payrollPct ?? null)}
             {bestYear ? ` in ${bestYear.year}` : ''}
