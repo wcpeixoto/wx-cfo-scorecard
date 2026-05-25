@@ -3264,30 +3264,33 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
         {hasImportedData && activeTab === 'big-picture' && (
           <>
-            <NetCashFlowChart
-              data={netCashFlowChartModel.trend}
-              cashFlowMode={netCashFlowChartMode}
-              timeframe={netChartTimeframe}
-              onCashFlowModeChange={setNetCashFlowChartMode}
-              onTimeframeChange={setNetChartTimeframe}
-              onMonthPointClick={(month) =>
-                navigateToDigHere({
-                  month,
-                  focusContext: 'month-drilldown',
-                })
-              }
-            />
-
+            {/* Row 2: Cash Trend (1/3) | Monthly Net Cash Flow (2/3) — reuses the .cash-trend-row 1fr/2fr grid */}
             <div className="cash-trend-row">
               <CashTrendHero result={cashTrendResult} negativeMonthsAsSubtitle />
-              <IncomeExpenseCard monthlyRollups={model.monthlyRollups} />
+              <NetCashFlowChart
+                data={netCashFlowChartModel.trend}
+                cashFlowMode={netCashFlowChartMode}
+                timeframe={netChartTimeframe}
+                onCashFlowModeChange={setNetCashFlowChartMode}
+                onTimeframeChange={setNetChartTimeframe}
+                onMonthPointClick={(month) =>
+                  navigateToDigHere({
+                    month,
+                    focusContext: 'month-drilldown',
+                  })
+                }
+              />
             </div>
 
-            <DigHereHighlights result={whatNeedsAttention} />
-
+            {/* Row 3: rising-cost card (1/2) | Cost Spikes to Investigate (1/2) */}
             <div className="two-col-grid">
               <EfficiencyOpportunitiesCard result={efficiencyResult} />
+              <DigHereHighlights result={whatNeedsAttention} />
+            </div>
 
+            {/* Row 4: Income & Expense (1/2) | Top Expense Categories (1/2) */}
+            <div className="two-col-grid">
+              <IncomeExpenseCard monthlyRollups={model.monthlyRollups} />
               <TopCategoriesCard
                 slices={kpiExpenseBreakdown.slices}
                 total={kpiExpenseBreakdown.total}
