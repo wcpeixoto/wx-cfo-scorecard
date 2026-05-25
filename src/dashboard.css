@@ -716,6 +716,21 @@ body {
   margin-top: 8px;
 }
 
+/* Money Left on the Table title tooltip — left-anchored so the panel opens
+   rightward from the ⓘ (the icon sits near the card's left edge). Four prose
+   lines, so give consecutive lines real separation. */
+.eff-tooltip-panel {
+  right: auto;
+  left: 0;
+  min-width: 260px;
+  max-width: 320px;
+  white-space: normal;
+}
+
+.eff-tooltip-panel .db-tooltip-list li + li {
+  margin-top: 8px;
+}
+
 .dashboard-load-error {
   display: flex;
   align-items: center;
@@ -5564,6 +5579,13 @@ body {
   margin-bottom: 20px;
 }
 
+/* Title row — title + ⓘ tooltip side by side */
+.eff-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .eff-opp-title {
   margin: 0;
   font-size: 18px;    /* text-lg */
@@ -5633,7 +5655,7 @@ body {
   line-height: 1.4;
 }
 
-/* Column headers — 4 columns: [1fr] [70px] [70px] [140px] */
+/* Column headers — 4 columns: [1fr] [70px] [70px] [140px]; sentence case */
 .eff-col-headers {
   display: grid;
   grid-template-columns: 1fr 70px 70px 140px;
@@ -5642,15 +5664,12 @@ body {
   font-size: 12px;    /* text-theme-xs */
   font-weight: 500;
   color: #667085;     /* secondary text */
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .eff-col-cat   { /* left-aligned default */ }
 .eff-col-best  { text-align: center; }
 .eff-col-today { text-align: center; }
 .eff-col-extra { text-align: right; }
-.eff-col-extra-sub { text-transform: none; }
 
 /* Data rows — same 4-column grid */
 .eff-row {
@@ -5721,7 +5740,7 @@ body {
   color: #1D2939;         /* gray-800 */
 }
 
-/* Progress bar — track + fill, in Extra column below amount */
+/* Progress bar — track + single proportional fill, in Recoverable column below amount */
 .eff-bar {
   position: relative;
   width: 100%;
@@ -5732,38 +5751,11 @@ body {
   overflow: hidden;
 }
 
-
-/* Two-part bars — shared layout */
-.eff-bar--soft,
-.eff-bar--comparison {
-  display: flex;
-  overflow: hidden;
-  position: relative;
-}
-
-/* Left card — lightly softened */
-.eff-bar--soft .eff-bar-best  { background: #74D3AE; }  /* soft green */
-.eff-bar--soft .eff-bar-extra { background: #F87171; }  /* soft red */
-
-/* Right card — slightly muted */
-.eff-bar--comparison .eff-bar-best  { background: #2FBF7F; }  /* muted green */
-.eff-bar--comparison .eff-bar-extra { background: #E5534B; }  /* muted red */
-
-.eff-bar-best,
-.eff-bar-extra {
+/* Single fill — width scales to the largest recoverable amount in the row set.
+   Color is set inline from chartTokens.brand (#465FFF). */
+.eff-bar-fill {
   height: 100%;
-  flex-shrink: 0;
-}
-
-/* Footnote */
-.eff-footnote {
-  margin: 16px 0 0;
-  padding-top: 12px;
-  border-top: 1px solid #E4E7EC;
-  font-size: 12px;    /* text-theme-xs */
-  font-weight: 400;
-  color: #667085;     /* secondary text */
-  line-height: 1.6;
+  border-radius: 4px;
 }
 
 /* Efficiency card — clickable category name */
