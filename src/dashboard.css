@@ -5588,6 +5588,15 @@ body {
 
 /* ── Efficiency Opportunities Card ───────────────────────────────────── */
 
+/* Query container so the table can switch to its compact layout based on the
+   card's own width, not the viewport. Needed because this card sits half-width
+   in a side-by-side row above 960px, where a viewport media query can't tell the
+   card is narrow. */
+.eff-opp-card {
+  container-type: inline-size;
+  container-name: eff-opp;
+}
+
 /* Card header */
 .eff-opp-header {
   margin-bottom: 20px;
@@ -5853,8 +5862,12 @@ body {
   color: #D1D5DB;
 }
 
-/* Efficiency card — mobile layout */
-@media (max-width: 767px) {
+/* Efficiency card — compact layout. Triggered by the card's own width (container
+   query) so it engages whenever the card is narrow — including the half-width
+   side-by-side state above 960px viewport, where the 4-column layout would crush
+   the Category column. Threshold ≈ the width below which the "was … " anchor can
+   no longer sit on one line. */
+@container eff-opp (max-width: 580px) {
   /* 3-column grid: category | best→now | extra */
   .eff-col-headers,
   .eff-row {
