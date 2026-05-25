@@ -12,7 +12,8 @@ import type { ApexOptions } from 'apexcharts';
 import ProjectionTableV2 from '../components/ProjectionTableV2';
 import LoadingScreen from '../components/LoadingScreen';
 import DigHereHighlights from '../components/DigHereHighlights';
-import CashTrendHero, { CashTrendPlaceholder } from '../components/CashTrendHero';
+import CashTrendHero from '../components/CashTrendHero';
+import IncomeExpenseCard from '../components/IncomeExpenseCard';
 import KpiCards from '../components/KpiCards';
 import TopCategoriesCard from '../components/TopCategoriesCard';
 import PeriodDropdown from '../components/PeriodDropdown';
@@ -3279,7 +3280,7 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
             <div className="cash-trend-row">
               <CashTrendHero result={cashTrendResult} negativeMonthsAsSubtitle />
-              <CashTrendPlaceholder />
+              <IncomeExpenseCard monthlyRollups={model.monthlyRollups} />
             </div>
 
             <DigHereHighlights result={whatNeedsAttention} />
