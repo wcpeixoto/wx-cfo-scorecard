@@ -2,6 +2,14 @@
 -- This schema assumes one logical workspace per `workspace_id`.
 -- Do not treat this as production-ready until Row Level Security policies
 -- and an explicit auth model are added for the anon client.
+--
+-- Data API access: as of the Supabase rollout on 2026-05-30 (new projects) /
+-- 2026-10-30 (existing projects), tables in `public` are no longer exposed to
+-- the Data API (PostgREST/GraphQL) automatically. The required table-level
+-- GRANTs to the `anon` role live in first_test_policies.sql alongside the RLS
+-- policies and must be applied after this DDL. Existing tables on the live
+-- project keep their current grants; the explicit grants matter for fresh
+-- replays of this snapshot and for any new table added here.
 
 create table if not exists public.shared_imported_transactions (
   workspace_id text not null,
