@@ -170,7 +170,7 @@ export default function PayrollEfficiencyCard({
             </div>
           </div>
           <p className="subtle">
-            Best year: {formatWholePct(bestYear?.payrollPct ?? null)}
+            Best: {formatWholePct(bestYear?.payrollPct ?? null)}
             {bestYear ? ` in ${bestYear.year}` : ''}
           </p>
         </div>
