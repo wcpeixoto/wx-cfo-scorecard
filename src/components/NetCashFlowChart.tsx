@@ -181,7 +181,7 @@ export default function NetCashFlowChart({
     return ({
     chart: {
       type: 'area',
-      height: 260,
+      height: 200,
       fontFamily: 'Outfit, sans-serif',
       toolbar: { show: false },
       zoom: { enabled: false },
@@ -376,7 +376,7 @@ export default function NetCashFlowChart({
         </div>
       </div>
       <div className="net-cash-flow-chart-body">
-        <ReactApexChart options={options} series={series} type="line" height={260} />
+        <ReactApexChart options={options} series={series} type="line" height={200} />
       </div>
     </article>
   );
