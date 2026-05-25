@@ -17,8 +17,8 @@ function formatRevPerDollar(revenue: number, payroll: number): string {
 
 function formatExcess(perMonth: number | null): string {
   if (perMonth == null || perMonth <= 0) return '—';
-  if (perMonth >= 1000) return `$${(perMonth / 1000).toFixed(1)}K/mo`;
-  return `$${Math.round(perMonth)}/mo`;
+  if (perMonth >= 1000) return `$${(perMonth / 1000).toFixed(1)}K`;
+  return `$${Math.round(perMonth)}`;
 }
 
 type Props = {
@@ -204,7 +204,7 @@ export default function PayrollEfficiencyCard({
         </div>
         <div className="pe-kpi">
           <span className="pe-kpi-value">{formatExcess(payrollExcessPerMonth)}</span>
-          <span className="pe-kpi-label">More than your best stretch</span>
+          <span className="pe-kpi-label">More per month than your best stretch</span>
         </div>
       </div>
     </article>
