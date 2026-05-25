@@ -41,6 +41,10 @@ export type PayrollSeries = {
   points: PayrollYearPoint[];
   /** Latest year — drives the hero metric. Null when there is no data. */
   current: PayrollYearPoint | null;
+  /** Most efficient year — the lowest payroll-as-%-of-revenue among years
+   *  with revenue. Drives the "Best year" comparisons. Null when no valid
+   *  year exists. Computed, never hardcoded. */
+  bestYear: PayrollYearPoint | null;
 };
 
 function round1(n: number): number {
@@ -110,5 +114,16 @@ export function selectPayrollHealth(
 
   if (points.length > 0) points[points.length - 1].isCurrent = true;
 
-  return { points, current: points.length > 0 ? points[points.length - 1] : null };
+  // Best year = lowest payroll-as-%-of-revenue among years with revenue.
+  let bestYear: PayrollYearPoint | null = null;
+  for (const p of points) {
+    if (p.payrollPct == null) continue;
+    if (bestYear == null || p.payrollPct < (bestYear.payrollPct ?? Infinity)) bestYear = p;
+  }
+
+  return {
+    points,
+    current: points.length > 0 ? points[points.length - 1] : null,
+    bestYear,
+  };
 }

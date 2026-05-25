@@ -1,0 +1,150 @@
+import { useMemo } from 'react';
+import Chart from 'react-apexcharts';
+import type { ApexOptions } from 'apexcharts';
+import type { MonthlyRollup, Txn } from '../lib/data/contract';
+import { selectPayrollHealth } from '../lib/kpis/payrollSeries';
+import { chartTokens } from '../lib/ui/chartTokens';
+
+function formatWholePct(value: number | null): string {
+  if (value == null) return '—';
+  return `${Math.round(value)}%`;
+}
+
+function formatRevPerDollar(revenue: number, payroll: number): string {
+  if (!(payroll > 0)) return '—';
+  return `$${(revenue / payroll).toFixed(2)}`;
+}
+
+function formatExcess(perMonth: number | null): string {
+  if (perMonth == null || perMonth <= 0) return '—';
+  if (perMonth >= 1000) return `$${(perMonth / 1000).toFixed(1)}K/mo`;
+  return `$${Math.round(perMonth)}/mo`;
+}
+
+type Props = {
+  txns: readonly Txn[];
+  monthlyRollups: MonthlyRollup[];
+  payrollTargetPercent: number;
+  /** Payroll-specific excess $/mo, reused from the excess-cost card's
+   *  methodology (computeEfficiencyOpportunities). Null when unavailable. */
+  payrollExcessPerMonth: number | null;
+};
+
+export default function PayrollEfficiencyCard({
+  txns,
+  monthlyRollups,
+  payrollTargetPercent,
+  payrollExcessPerMonth,
+}: Props) {
+  const { points, current, bestYear } = useMemo(
+    () => selectPayrollHealth(txns, monthlyRollups),
+    [txns, monthlyRollups],
+  );
+
+  const hasData = points.length > 0;
+
+  const categories = useMemo(
+    () => points.map((p) => (p.isCurrent && p.isPartial ? `${p.year} YTD` : p.year)),
+    [points],
+  );
+
+  const options: ApexOptions = useMemo(
+    () => ({
+      chart: {
+        type: 'area',
+        sparkline: { enabled: true },
+        fontFamily: 'Outfit, sans-serif',
+        background: 'transparent',
+      },
+      colors: [chartTokens.brand],
+      dataLabels: { enabled: false },
+      stroke: { curve: 'smooth', width: 2 },
+      fill: {
+        type: 'gradient',
+        gradient: { shadeIntensity: 1, opacityFrom: 0.32, opacityTo: 0.04, stops: [0, 100] },
+      },
+      // Subtle marker on the trailing (current / YTD) point only.
+      markers: {
+        size: 0,
+        discrete:
+          hasData && current?.isCurrent
+            ? [
+                {
+                  seriesIndex: 0,
+                  dataPointIndex: points.length - 1,
+                  fillColor: chartTokens.brand,
+                  strokeColor: '#FFFFFF',
+                  size: 4,
+                },
+              ]
+            : [],
+        hover: { size: 4 },
+      },
+      xaxis: { categories },
+      tooltip: {
+        theme: 'light',
+        x: {
+          formatter: (_val: number, opts?: { dataPointIndex: number }) =>
+            opts ? categories[opts.dataPointIndex] ?? '' : '',
+        },
+        y: {
+          formatter: (val: number | null) => (val == null ? 'No revenue' : `${val}%`),
+          title: { formatter: () => 'Payroll' },
+        },
+        marker: { show: false },
+      },
+    }),
+    [categories, hasData, current, points.length],
+  );
+
+  const series = useMemo(
+    () => [{ name: 'Payroll % of revenue', data: points.map((p) => p.payrollPct) }],
+    [points],
+  );
+
+  const revCurrent = current ? formatRevPerDollar(current.revenue, current.payroll) : '—';
+  const revBest = bestYear ? formatRevPerDollar(bestYear.revenue, bestYear.payroll) : '—';
+
+  return (
+    <article className="pe-card">
+      <div className="pe-header">
+        <h3 className="pe-title">Payroll Efficiency</h3>
+        <button type="button" className="pe-menu" aria-label="Card options">
+          <span />
+          <span />
+          <span />
+        </button>
+      </div>
+
+      <div className="pe-hero">
+        <span className="pe-hero-value">{formatWholePct(current?.payrollPct ?? null)}</span>
+        <span className="pe-hero-sub">Payroll as % of revenue</span>
+        <span className="pe-hero-best">Best year: {formatWholePct(bestYear?.payrollPct ?? null)}</span>
+      </div>
+
+      <div className="pe-chart">
+        {hasData ? (
+          <Chart options={options} series={series} type="area" height={180} />
+        ) : (
+          <div className="pe-empty">No payroll data available.</div>
+        )}
+      </div>
+
+      <div className="pe-footer">
+        <div className="pe-kpi">
+          <span className="pe-kpi-value">{payrollTargetPercent}%</span>
+          <span className="pe-kpi-label">Target</span>
+        </div>
+        <div className="pe-kpi">
+          <span className="pe-kpi-value">{revCurrent}</span>
+          <span className="pe-kpi-label">Revenue per $1 payroll</span>
+          <span className="pe-kpi-helper">Best year: {revBest}</span>
+        </div>
+        <div className="pe-kpi">
+          <span className="pe-kpi-value">{formatExcess(payrollExcessPerMonth)}</span>
+          <span className="pe-kpi-label">Excess payroll</span>
+        </div>
+      </div>
+    </article>
+  );
+}

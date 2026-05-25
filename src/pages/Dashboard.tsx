@@ -14,7 +14,7 @@ import LoadingScreen from '../components/LoadingScreen';
 import DigHereHighlights from '../components/DigHereHighlights';
 import CashTrendHero from '../components/CashTrendHero';
 import IncomeExpenseCard from '../components/IncomeExpenseCard';
-import PayrollHealthCard from '../components/PayrollHealthCard';
+import PayrollEfficiencyCard from '../components/PayrollEfficiencyCard';
 import KpiCards from '../components/KpiCards';
 import TopCategoriesCard from '../components/TopCategoriesCard';
 import PeriodDropdown from '../components/PeriodDropdown';
@@ -3343,12 +3343,13 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               </article>
             </div>
 
-            {/* Row 6: Payroll Health (1/3) | placeholder (2/3) */}
+            {/* Row 6: Payroll Efficiency (1/3) | placeholder (2/3) */}
             <div className="bp-split-grid">
-              <PayrollHealthCard
+              <PayrollEfficiencyCard
                 txns={filteredTxns}
                 monthlyRollups={model.monthlyRollups}
                 payrollTargetPercent={businessRules.payrollTargetPercent}
+                payrollExcessPerMonth={efficiencyResult.payrollExtraPerMonth}
               />
               <div className="bp-placeholder-card">Placeholder</div>
             </div>

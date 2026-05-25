@@ -8598,8 +8598,8 @@ body {
 .dark .ie-empty { color: #98A2B3; }
 .dark .ie-footer { border-color: #344054; }
 
-/* === Payroll Health card (Big Picture Row 6) === */
-.ph-card {
+/* === Payroll Efficiency card (Big Picture Row 6) — Active Users-style === */
+.pe-card {
   background: var(--bg-panel);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -8609,108 +8609,151 @@ body {
   flex-direction: column;
 }
 
-.ph-header {
+.pe-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 4px;
 }
 
-.ph-title {
+.pe-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.ph-hero {
+/* Three-dot (kebab) menu, top-right — matches the Active Users card affordance. */
+.pe-menu {
+  flex: 0 0 auto;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pe-menu:hover { background: var(--bg-muted); }
+
+.pe-menu span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
+.pe-hero {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin: 8px 0 4px;
+  margin-top: 14px;
 }
 
-.ph-hero-value {
-  font-size: 30px;
-  font-weight: 600;
+.pe-hero-value {
+  font-size: 36px;
+  font-weight: 700;
   line-height: 1.1;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
-.ph-hero-label {
+.pe-hero-sub {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.pe-hero-best {
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--text-secondary);
 }
 
-.ph-hero-target {
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--text-secondary);
+/* Rounded light-gray chart container holding a clean sparkline/area chart. */
+.pe-chart {
+  margin-top: 18px;
+  background: var(--bg-muted);
+  border-radius: 12px;
+  padding: 14px 14px 6px;
 }
 
-.ph-chart {
-  min-height: 200px;
-  margin-top: 8px;
-}
-
-.ph-empty {
+.pe-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 200px;
+  min-height: 180px;
   font-size: 14px;
   color: var(--text-secondary);
 }
 
-.ph-footer {
+.pe-footer {
   display: flex;
-  margin-top: 16px;
+  margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
 
-.ph-kpi {
+.pe-kpi {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 2px;
   align-items: center;
   text-align: center;
+  padding: 0 6px;
+  min-width: 0;
 }
 
-.ph-kpi + .ph-kpi {
+.pe-kpi + .pe-kpi {
   border-left: 1px solid var(--line);
 }
 
-.ph-kpi-value {
+.pe-kpi-value {
   font-size: 18px;
   font-weight: 700;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
-.ph-kpi-label {
+.pe-kpi-label {
   font-size: 12px;
   font-weight: 400;
   color: var(--text-secondary);
 }
 
-.dark .ph-card {
+.pe-kpi-helper {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+.dark .pe-card {
   background: #1D2939;
   border-color: #344054;
 }
-.dark .ph-title,
-.dark .ph-hero-value,
-.dark .ph-kpi-value { color: rgba(255, 255, 255, 0.9); }
-.dark .ph-hero-label,
-.dark .ph-hero-target,
-.dark .ph-kpi-label,
-.dark .ph-empty { color: #98A2B3; }
-.dark .ph-footer,
-.dark .ph-kpi + .ph-kpi { border-color: #344054; }
+.dark .pe-title,
+.dark .pe-hero-value,
+.dark .pe-kpi-value { color: rgba(255, 255, 255, 0.9); }
+.dark .pe-hero-sub,
+.dark .pe-hero-best,
+.dark .pe-kpi-label,
+.dark .pe-kpi-helper,
+.dark .pe-empty { color: #98A2B3; }
+.dark .pe-menu span { background: #98A2B3; }
+.dark .pe-menu:hover { background: #344054; }
+.dark .pe-chart { background: #101828; }
+.dark .pe-footer,
+.dark .pe-kpi + .pe-kpi { border-color: #344054; }
 
 /* === Phase 5.1 Branch 5 — Contracts & Renewals settings pane === */
 
