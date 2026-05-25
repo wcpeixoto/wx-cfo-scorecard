@@ -63,6 +63,18 @@ export default function PayrollEfficiencyCard({
         type: 'gradient',
         gradient: { shadeIntensity: 1, opacityFrom: 0.32, opacityTo: 0.04, stops: [0, 100] },
       },
+      // Subtle dashed reference line at the wired payroll target.
+      annotations: {
+        yaxis: hasData
+          ? [
+              {
+                y: payrollTargetPercent,
+                borderColor: chartTokens.crosshairStroke,
+                strokeDashArray: 4,
+              },
+            ]
+          : [],
+      },
       // Subtle marker on the trailing (current / YTD) point only.
       markers: {
         size: 0,
@@ -88,13 +100,13 @@ export default function PayrollEfficiencyCard({
             opts ? categories[opts.dataPointIndex] ?? '' : '',
         },
         y: {
-          formatter: (val: number | null) => (val == null ? 'No revenue' : `${val}%`),
+          formatter: (val: number | null) => (val == null ? 'No revenue' : `${Math.round(val)}%`),
           title: { formatter: () => 'Payroll' },
         },
         marker: { show: false },
       },
     }),
-    [categories, hasData, current, points.length],
+    [categories, hasData, current, points.length, payrollTargetPercent],
   );
 
   const series = useMemo(
@@ -117,9 +129,14 @@ export default function PayrollEfficiencyCard({
       </div>
 
       <div className="pe-hero">
-        <span className="pe-hero-value">{formatWholePct(current?.payrollPct ?? null)}</span>
-        <span className="pe-hero-sub">Payroll as % of revenue</span>
-        <span className="pe-hero-best">Best year: {formatWholePct(bestYear?.payrollPct ?? null)}</span>
+        <div className="pe-hero-line">
+          <span className="pe-hero-value">{formatWholePct(current?.payrollPct ?? null)}</span>
+          <span className="pe-hero-sub">of revenue</span>
+        </div>
+        <span className="pe-hero-best">
+          Best year: {formatWholePct(bestYear?.payrollPct ?? null)}
+          {bestYear ? ` in ${bestYear.year}` : ''}
+        </span>
       </div>
 
       <div className="pe-chart">
@@ -142,7 +159,7 @@ export default function PayrollEfficiencyCard({
         </div>
         <div className="pe-kpi">
           <span className="pe-kpi-value">{formatExcess(payrollExcessPerMonth)}</span>
-          <span className="pe-kpi-label">Excess payroll</span>
+          <span className="pe-kpi-label">More than your best stretch</span>
         </div>
       </div>
     </article>
