@@ -303,7 +303,10 @@ body {
   font-size: 14px;
 }
 
-.top-bar p {
+/* Header subtitle text. Scoped to the header's main row so it does NOT reach
+   the .bp-overview-tray KPI cards nested in the big-picture block — there it
+   would override .kpi-value / .kpi-label font-size, color, and margin. */
+.top-bar-main p {
   margin: 0;
   color: var(--text-secondary);
   font-size: 14px;
@@ -9220,5 +9223,4 @@ body {
 .bp-overview-tray .kpi-card {
   border: none;
   border-radius: 12px;
-  padding: 20px;
 }
