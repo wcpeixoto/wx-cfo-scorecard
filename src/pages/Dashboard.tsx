@@ -3343,12 +3343,15 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               </article>
             </div>
 
-            {/* Row 6: Payroll Health — full width */}
-            <PayrollHealthCard
-              txns={filteredTxns}
-              monthlyRollups={model.monthlyRollups}
-              payrollTargetPercent={businessRules.payrollTargetPercent}
-            />
+            {/* Row 6: Payroll Health (1/3) | placeholder (2/3) */}
+            <div className="bp-split-grid">
+              <PayrollHealthCard
+                txns={filteredTxns}
+                monthlyRollups={model.monthlyRollups}
+                payrollTargetPercent={businessRules.payrollTargetPercent}
+              />
+              <div className="bp-placeholder-card">Placeholder</div>
+            </div>
           </>
         )}
 

@@ -9418,3 +9418,48 @@ body {
   border: none;
   border-radius: 12px;
 }
+
+/* === Big Picture Row 6 — Payroll Health (1/3) + placeholder (2/3) split ===
+   Mirrors .cash-trend-row (16px gap, 24px ≥768px, stretch); collapses to one
+   column at the Big Picture breakpoint (max-width 960px). */
+.bp-split-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.bp-split-grid > * {
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .bp-split-grid {
+    gap: 24px;
+  }
+}
+
+@media (max-width: 960px) {
+  .bp-split-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.bp-placeholder-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-panel);
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  padding: 24px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.dark .bp-placeholder-card {
+  background: #1D2939;
+  border-color: #344054;
+  color: #98A2B3;
+}
