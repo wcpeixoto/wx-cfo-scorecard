@@ -17,6 +17,7 @@ import type {
   WhatNeedsAttentionRow,
 } from '../lib/kpis/digHere';
 import { formatCompact } from '../lib/utils/formatCompact';
+import { chartTokens } from '../lib/ui/chartTokens';
 
 type Props = {
   result: WhatNeedsAttentionResult;
@@ -43,7 +44,7 @@ const SPARK_OPTIONS: ApexOptions = {
       stops: [0, 100],
     },
   },
-  colors: ['#FB5454'],
+  colors: [chartTokens.costSpike],
   tooltip: { enabled: false },
   dataLabels: { enabled: false },
 };

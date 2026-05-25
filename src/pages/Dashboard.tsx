@@ -18,8 +18,6 @@ import PayrollEfficiencyCard from '../components/PayrollEfficiencyCard';
 import KpiCards from '../components/KpiCards';
 import TopCategoriesCard from '../components/TopCategoriesCard';
 import PeriodDropdown from '../components/PeriodDropdown';
-import TopPayeesTable from '../components/TopPayeesTable';
-import TrendLineChart from '../components/TrendLineChart';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import { TodayPage } from '../components/TodayPage';
 import { NextOwnerDistributionCardLab } from '../components/NextOwnerDistributionCardLab';
@@ -60,7 +58,6 @@ import {
   buildPrePhase4DebugReport,
   computeDashboardModel,
   computeForecastDecisionSignals,
-  computeDigHereInsights,
   computeExpenseSlices,
   computeKpiComparisons,
   computeMonthlyRollups,
@@ -87,7 +84,6 @@ import type {
   KpiMetricComparison,
   KpiComparisonTimeframe,
   KpiTimeframeComparison,
-  MoverGrouping,
   RenewalContract,
   ScenarioInput,
   ScenarioPoint,
@@ -101,16 +97,12 @@ import { chartTokens } from '../lib/ui/chartTokens';
 type TabId =
   | 'today'
   | 'big-picture'
-  | 'where-to-focus'
-  | 'trends'
   | 'what-if'
   | 'settings'
   | 'ui-lab';
 
 type BigPictureFrameValue = KpiComparisonTimeframe | 'custom';
 type KpiFrameOption = { value: BigPictureFrameValue; label: string };
-type DigHerePeriodValue = KpiComparisonTimeframe | 'custom';
-type DigHerePeriodOption = { value: DigHerePeriodValue; label: string };
 type BigPictureKpiComparison = KpiTimeframeComparison & {
   currentStartDate: string | null;
   currentEndDate: string | null;
@@ -123,8 +115,6 @@ type BigPictureFilterFrameValue = Exclude<BigPictureFrameValue, BigPictureVisibl
 const TAB_TO_PATH: Record<TabId, string> = {
   today: '/',
   'big-picture': '/big-picture',
-  'where-to-focus': '/focus',
-  trends: '/trends',
   'what-if': '/forecast',
   settings: '/settings',
   'ui-lab': '/ui-lab',
@@ -139,13 +129,6 @@ function pathToTab(pathname: string): TabId {
       return 'today';
     case '/big-picture':
       return 'big-picture';
-    case '/focus':
-    case '/where-to-focus':
-    case '/money-left':
-    case '/dig-here':
-      return 'where-to-focus';
-    case '/trends':
-      return 'trends';
     case '/forecast':
     case '/what-if':
       return 'what-if';
@@ -252,25 +235,9 @@ const BIG_PICTURE_FILTER_FRAME_OPTIONS: Array<KpiFrameOption & { value: BigPictu
   { value: 'allDates', label: 'All Dates' },
   { value: 'custom', label: 'Custom' },
 ];
-const DIG_HERE_PERIOD_OPTIONS: DigHerePeriodOption[] = [
-  { value: 'thisMonth', label: 'Month' },
-  { value: 'last3Months', label: '3M' },
-  { value: 'ytd', label: 'YTD' },
-  { value: 'ttm', label: '12M' },
-  { value: 'last24Months', label: '24M' },
-  { value: 'last36Months', label: '36M' },
-  { value: 'custom', label: 'Custom' },
-];
 const EPSILON = 0.00001;
 type TrendTimeframeOption = 6 | 12 | 24 | 36 | 'all';
 const TREND_TIMEFRAMES: TrendTimeframeOption[] = [6, 12, 24, 36, 'all'];
-type TrendsMaWindow = 6 | 12 | 24;
-type TrendsMaOption = { value: TrendsMaWindow; label: string };
-const TRENDS_MA_OPTIONS: TrendsMaOption[] = [
-  { value: 6, label: '6-Month Trend' },
-  { value: 12, label: '12-Month Trend' },
-  { value: 24, label: '24-Month Trend' },
-];
 
 // Illustrative fixture series for UI Lab mini-charts. Reusable by any
 // future UI Lab card that needs a sparkline. Not wired to production data.
@@ -425,19 +392,7 @@ const FORECAST_RANGE_OPTIONS: ForecastRangeOption[] = [
 
 const DEFAULT_FORECAST_EVENTS: ForecastEvent[] = [];
 
-type DigHereFocusContext = 'category-shifts' | 'month-drilldown' | 'custom-period' | 'period-control' | null;
-type DigHereNavigationOptions = {
-  category?: string;
-  month?: string | null;
-  startMonth?: string | null;
-  endMonth?: string | null;
-  focusContext?: DigHereFocusContext;
-};
 
-function parseMonthToken(value: string | null): string | null {
-  if (!value) return null;
-  return /^\d{4}-\d{2}$/.test(value) ? value : null;
-}
 
 function parseDateToken(value: string | null): string | null {
   if (!value) return null;
@@ -521,67 +476,12 @@ function previousEquivalentDateRange(
   return { startDate: previousStartDate, endDate: previousEndDate };
 }
 
-function inclusiveMonthSpan(startMonth: string, endMonth: string): number {
-  const startMatch = startMonth.match(/^(\d{4})-(\d{2})$/);
-  const endMatch = endMonth.match(/^(\d{4})-(\d{2})$/);
-  if (!startMatch || !endMatch) return 0;
-
-  const startYear = Number.parseInt(startMatch[1], 10);
-  const startMonthNumber = Number.parseInt(startMatch[2], 10);
-  const endYear = Number.parseInt(endMatch[1], 10);
-  const endMonthNumber = Number.parseInt(endMatch[2], 10);
-  if (
-    !Number.isFinite(startYear) ||
-    !Number.isFinite(startMonthNumber) ||
-    !Number.isFinite(endYear) ||
-    !Number.isFinite(endMonthNumber)
-  ) {
-    return 0;
-  }
-
-  return (endYear - startYear) * 12 + (endMonthNumber - startMonthNumber) + 1;
-}
-
-function previousEquivalentRange(
-  startMonth: string | null,
-  endMonth: string | null
-): { startMonth: string; endMonth: string } | null {
-  if (!startMonth || !endMonth) return null;
-  const span = inclusiveMonthSpan(startMonth, endMonth);
-  if (span <= 0) return null;
-
-  const previousEndMonth = addMonthsToToken(startMonth, -1);
-  const previousStartMonth = addMonthsToToken(startMonth, -span);
-  if (!previousStartMonth || !previousEndMonth) return null;
-
-  return { startMonth: previousStartMonth, endMonth: previousEndMonth };
-}
-
-function parseDigHereFocusContext(value: string | null): DigHereFocusContext {
-  if (value === 'category-shifts' || value === 'month-drilldown' || value === 'custom-period' || value === 'period-control') {
-    return value;
-  }
-  return null;
-}
-
-function sameMonthRange(
-  startMonth: string | null,
-  endMonth: string | null,
-  targetStartMonth: string | null,
-  targetEndMonth: string | null
-): boolean {
-  return startMonth === targetStartMonth && endMonth === targetEndMonth;
-}
 
 function parseCashFlowMode(value: string | null): CashFlowMode | null {
   if (value === 'operating' || value === 'total') return value;
   return null;
 }
 
-function parseMoverGrouping(value: string | null): MoverGrouping | null {
-  if (value === 'subcategories' || value === 'categories') return value;
-  return null;
-}
 
 function parseForecastRangeValue(value: string): ForecastRangeValue | null {
   if (value === '30d' || value === '60d' || value === '90d' || value === '6m' || value === '1y' || value === '2y' || value === '3y') {
@@ -797,20 +697,8 @@ export default function Dashboard() {
   const { setMobileOpen } = useSidebar();
   const [query, setQuery] = useState('');
   const [netChartTimeframe, setNetChartTimeframe] = useState<TrendTimeframeOption>(12);
-  const [digHereFocusMonth, setDigHereFocusMonth] = useState<string | null>(null);
-  const [digHereStartMonth, setDigHereStartMonth] = useState<string | null>(null);
-  const [digHereEndMonth, setDigHereEndMonth] = useState<string | null>(null);
-  const [digHereFocusContext, setDigHereFocusContext] = useState<DigHereFocusContext>(null);
-  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
-  const [monthPickerMode, setMonthPickerMode] = useState<'month' | 'period'>('month');
-  const [monthPickerDraftMonth, setMonthPickerDraftMonth] = useState<string>('');
-  const [monthPickerDraftStart, setMonthPickerDraftStart] = useState<string>('');
-  const [monthPickerDraftEnd, setMonthPickerDraftEnd] = useState<string>('');
-  const monthPickerRef = useRef<HTMLDivElement>(null);
   const bigPictureFilterMenuRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
-  const [trendsMaWindow, setTrendsMaWindow] = useState<TrendsMaWindow>(12);
-const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [importedDataSet, setImportedDataSet] = useState<DataSet | null>(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -834,7 +722,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
   const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('lastMonth');
   const [topCategoriesTimeframe, setTopCategoriesTimeframe] = useState<KpiComparisonTimeframe>('lastMonth');
   const [netCashFlowChartMode, setNetCashFlowChartMode] = useState<CashFlowMode>('operating');
-  const [digHereMoverGrouping, setDigHereMoverGrouping] = useState<MoverGrouping>('subcategories');
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
   const [forecastEvents, setForecastEvents] = useState<ForecastEvent[]>(DEFAULT_FORECAST_EVENTS);
   // UI Lab — StatisticsCard tab demo state. Local-only, not persisted.
@@ -1229,21 +1116,9 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     const params = new URLSearchParams(location.search);
     const cashFlow = parseCashFlowMode(params.get('cf'));
     const nextQuery = params.get('q');
-    const month = parseMonthToken(params.get('month'));
-    const startMonth = parseMonthToken(params.get('start'));
-    const endMonth = parseMonthToken(params.get('end'));
-    const focusContext = parseDigHereFocusContext(params.get('focus'));
-    const moverGrouping = parseMoverGrouping(params.get('mg'));
-
-    const validRange = startMonth && endMonth && startMonth <= endMonth;
 
     setNetCashFlowChartMode(cashFlow ?? 'operating');
     setQuery(nextQuery ?? '');
-    setDigHereFocusMonth(validRange ? null : month);
-    setDigHereStartMonth(validRange ? startMonth : null);
-    setDigHereEndMonth(validRange ? endMonth : null);
-    setDigHereFocusContext(focusContext);
-    setDigHereMoverGrouping(moverGrouping ?? 'subcategories');
   }, [location.search]);
 
   const activeDataSet = importedDataSet;
@@ -1538,14 +1413,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
       }),
     [currentCalendarMonth, currentCashBalance, filteredTxns, netCashFlowChartMode, previousCalendarMonth]
   );
-  const trendsRangeLabel = useMemo(() => {
-    const sliced = model.trend.slice(-trendsMaWindow);
-    if (sliced.length === 0) return '';
-    const start = toMonthLabel(sliced[0].month);
-    const end = toMonthLabel(sliced[sliced.length - 1].month);
-    return start === end ? start : `${start} – ${end}`;
-  }, [model.trend, trendsMaWindow]);
-
   const customPreviousDateRange = useMemo(
     () => previousEquivalentDateRange(parseDateToken(customStartDate), parseDateToken(customEndDate)),
     [customEndDate, customStartDate]
@@ -1672,96 +1539,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     model.kpiYoYHeaderLabelByTimeframe,
   ]);
   const selectedKpiFrameLabel = BIG_PICTURE_FRAME_OPTIONS.find((option) => option.value === kpiTimeframe)?.label ?? '12M';
-  const digHerePresetComparisons = useMemo(() => {
-    const monthlyRollups = computeMonthlyRollups(baseTxns, profitabilityCashFlowMode);
-    return computeKpiComparisons(monthlyRollups, previousCalendarMonth ?? undefined, currentCalendarMonth);
-  }, [baseTxns, currentCalendarMonth, previousCalendarMonth, profitabilityCashFlowMode]);
-
-  const defaultDigHereRange = useMemo(() => {
-    const ttm = digHerePresetComparisons.ttm;
-    return {
-      startMonth: ttm?.currentStartMonth ?? null,
-      endMonth: ttm?.currentEndMonth ?? null,
-    };
-  }, [digHerePresetComparisons]);
-
-  const activeDigHereMonth = digHereFocusMonth;
-  const activeDigHereStartMonth =
-    !digHereFocusMonth && activeTab === 'where-to-focus'
-      ? digHereStartMonth ?? defaultDigHereRange.startMonth
-      : digHereStartMonth;
-  const activeDigHereEndMonth =
-    !digHereFocusMonth && activeTab === 'where-to-focus'
-      ? digHereEndMonth ?? defaultDigHereRange.endMonth
-      : digHereEndMonth;
-
-  const selectedDigHerePeriod = useMemo<DigHerePeriodValue>(() => {
-    if (activeDigHereMonth) {
-      return 'thisMonth';
-    }
-
-    if (!activeDigHereStartMonth || !activeDigHereEndMonth) {
-      return 'ttm';
-    }
-
-    const standardPeriods: KpiComparisonTimeframe[] = [
-      'last3Months',
-      'ytd',
-      'ttm',
-      'last24Months',
-      'last36Months',
-    ];
-
-    for (const period of standardPeriods) {
-      const comparison = digHerePresetComparisons[period];
-      if (
-        sameMonthRange(
-          activeDigHereStartMonth,
-          activeDigHereEndMonth,
-          comparison?.currentStartMonth ?? null,
-          comparison?.currentEndMonth ?? null
-        )
-      ) {
-        return period;
-      }
-    }
-
-    return 'custom';
-  }, [activeDigHereEndMonth, activeDigHereMonth, activeDigHereStartMonth, digHerePresetComparisons]);
-
-  const digHereCurrentTxns = useMemo(() => {
-    if (activeDigHereStartMonth && activeDigHereEndMonth) {
-      return filteredTxns.filter((txn) => txn.month >= activeDigHereStartMonth && txn.month <= activeDigHereEndMonth);
-    }
-    if (!activeDigHereMonth) return filteredTxns;
-    return filteredTxns.filter((txn) => txn.month === activeDigHereMonth);
-  }, [activeDigHereEndMonth, activeDigHereMonth, activeDigHereStartMonth, filteredTxns]);
-
-  const digHerePreviousTxns = useMemo(() => {
-    if (activeDigHereStartMonth && activeDigHereEndMonth) {
-      const previousRange = previousEquivalentRange(activeDigHereStartMonth, activeDigHereEndMonth);
-      if (!previousRange) return [];
-      return filteredTxns.filter(
-        (txn) => txn.month >= previousRange.startMonth && txn.month <= previousRange.endMonth
-      );
-    }
-    if (!activeDigHereMonth) return [];
-    const previousMonth = previousMonthToken(activeDigHereMonth);
-    if (!previousMonth) return [];
-    return filteredTxns.filter((txn) => txn.month === previousMonth);
-  }, [activeDigHereEndMonth, activeDigHereMonth, activeDigHereStartMonth, filteredTxns]);
-
-  const digHereInsights = useMemo(
-    () =>
-      computeDigHereInsights(
-        digHereCurrentTxns,
-        digHerePreviousTxns,
-        profitabilityCashFlowMode,
-        filteredTxns,
-        digHereMoverGrouping
-      ),
-    [digHereCurrentTxns, digHereMoverGrouping, digHerePreviousTxns, filteredTxns, profitabilityCashFlowMode]
-  );
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -2451,101 +2228,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     console.info('TTM label verification', { timeframeTabLabels, containsTTM });
   }, [model.kpiHeaderLabelByTimeframe, selectedHeaderComparisonLabel, selectedKpiFrameLabel]);
 
-  const digHereHeaderLabel = useMemo(() => {
-    if (selectedDigHerePeriod === 'thisMonth' && activeDigHereMonth) {
-      const previousMonth = previousMonthToken(activeDigHereMonth);
-      return previousMonth
-        ? `${toMonthLabel(activeDigHereMonth)} · vs ${toMonthLabel(previousMonth)}`
-        : `${toMonthLabel(activeDigHereMonth)} · comparison unavailable`;
-    }
-
-    const previousRange = previousEquivalentRange(activeDigHereStartMonth, activeDigHereEndMonth);
-    if (
-      activeDigHereStartMonth &&
-      activeDigHereEndMonth &&
-      previousRange &&
-      (digHereFocusContext === 'category-shifts' || digHereFocusContext === 'custom-period')
-    ) {
-      const currentRange =
-        activeDigHereStartMonth === activeDigHereEndMonth
-          ? toMonthLabel(activeDigHereStartMonth)
-          : `${toMonthLabel(activeDigHereStartMonth)} – ${toMonthLabel(activeDigHereEndMonth)}`;
-      const previousRangeLabel =
-        previousRange.startMonth === previousRange.endMonth
-          ? toMonthLabel(previousRange.startMonth)
-          : `${toMonthLabel(previousRange.startMonth)} – ${toMonthLabel(previousRange.endMonth)}`;
-      return `${currentRange} · vs ${previousRangeLabel}`;
-    }
-
-    if (selectedDigHerePeriod !== 'custom' && selectedDigHerePeriod !== 'thisMonth') {
-      const comparison = digHerePresetComparisons[selectedDigHerePeriod];
-      const currentStartMonth = comparison?.currentStartMonth ?? null;
-      const currentEndMonth = comparison?.currentEndMonth ?? null;
-      const previousStartMonth = comparison?.previousStartMonth ?? null;
-      const previousEndMonth = comparison?.previousEndMonth ?? null;
-
-      if (selectedDigHerePeriod === 'ytd') {
-        if (currentEndMonth && previousEndMonth) {
-          return `YTD through ${toMonthLabel(currentEndMonth)} · vs YTD through ${toMonthLabel(previousEndMonth)}`;
-        }
-        if (currentEndMonth) {
-          return `YTD through ${toMonthLabel(currentEndMonth)} · comparison unavailable`;
-        }
-        return 'YTD · comparison unavailable';
-      }
-
-      if (selectedDigHerePeriod === 'ttm') {
-        if (currentEndMonth) {
-          return `Last 12 Months through ${toMonthLabel(currentEndMonth)} vs prior 12 Months`;
-        }
-        return 'Last 12 Months vs prior period';
-      }
-
-      if (currentStartMonth && currentEndMonth && previousStartMonth && previousEndMonth) {
-        const currentRange =
-          currentStartMonth === currentEndMonth
-            ? toMonthLabel(currentStartMonth)
-            : `${toMonthLabel(currentStartMonth)} – ${toMonthLabel(currentEndMonth)}`;
-        const previousRangeLabel =
-          previousStartMonth === previousEndMonth
-            ? toMonthLabel(previousStartMonth)
-            : `${toMonthLabel(previousStartMonth)} – ${toMonthLabel(previousEndMonth)}`;
-        return `${currentRange} · vs ${previousRangeLabel}`;
-      }
-
-      if (currentStartMonth && currentEndMonth) {
-        const currentRange =
-          currentStartMonth === currentEndMonth
-            ? toMonthLabel(currentStartMonth)
-            : `${toMonthLabel(currentStartMonth)} – ${toMonthLabel(currentEndMonth)}`;
-        return `${currentRange} · comparison unavailable`;
-      }
-
-      return 'Comparison unavailable';
-    }
-
-    if (activeDigHereStartMonth && activeDigHereEndMonth && previousRange) {
-      const currentRange =
-        activeDigHereStartMonth === activeDigHereEndMonth
-          ? toMonthLabel(activeDigHereStartMonth)
-          : `${toMonthLabel(activeDigHereStartMonth)} – ${toMonthLabel(activeDigHereEndMonth)}`;
-      const previousRangeLabel =
-        previousRange.startMonth === previousRange.endMonth
-          ? toMonthLabel(previousRange.startMonth)
-          : `${toMonthLabel(previousRange.startMonth)} – ${toMonthLabel(previousRange.endMonth)}`;
-      return `${currentRange} · vs ${previousRangeLabel}`;
-    }
-
-    return 'Last 12 Months vs prior period';
-  }, [
-    activeDigHereEndMonth,
-    activeDigHereMonth,
-    activeDigHereStartMonth,
-    digHereFocusContext,
-    digHerePresetComparisons,
-    selectedDigHerePeriod,
-  ]);
-
   const whatNeedsAttention = useMemo(
     () => computeWhatNeedsAttention(filteredTxns),
     [filteredTxns]
@@ -2582,6 +2264,19 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
       metricToCard('savingsRate', 'Profit Margin', selectedKpiComparison.savingsRate),
     ];
   }, [selectedKpiComparison, model.kpiCards]);
+
+  // Ambient 12-month trailing series for the Revenue & Expenses mini-card
+  // sparklines. Independent of the header timeframe; sourced from monthly
+  // rollups so no new computation is required.
+  const kpiSparklinesById = useMemo<Record<string, { data: number[]; color: string }>>(() => {
+    const last12 = model.monthlyRollups.slice(-12);
+    if (last12.length < 2) return {};
+    const sparks: Record<string, { data: number[]; color: string }> = {
+      income: { data: last12.map((rollup) => rollup.revenue), color: chartTokens.brand },
+      expense: { data: last12.map((rollup) => rollup.expenses), color: chartTokens.costSpike },
+    };
+    return sparks;
+  }, [model.monthlyRollups]);
 
   const topCategoriesBreakdown = useMemo(() => {
     const comparison = model.kpiYoYComparisonByTimeframe[topCategoriesTimeframe];
@@ -2634,48 +2329,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
 
   useEffect(() => {
-    if (!isMonthPickerOpen) return;
-
-    const preferredMonth = activeDigHereMonth ?? availableMonths[0] ?? '';
-    const preferredStart =
-      activeDigHereStartMonth ??
-      availableMonths[availableMonths.length - 1] ??
-      availableMonths[0] ??
-      '';
-    const preferredEnd = activeDigHereEndMonth ?? preferredMonth;
-
-    setMonthPickerDraftMonth(preferredMonth);
-    setMonthPickerDraftStart(preferredStart);
-    setMonthPickerDraftEnd(preferredEnd);
-    if (activeDigHereStartMonth && activeDigHereEndMonth) {
-      setMonthPickerMode('period');
-    }
-  }, [activeDigHereEndMonth, activeDigHereMonth, activeDigHereStartMonth, availableMonths, isMonthPickerOpen]);
-
-  useEffect(() => {
-    if (!isMonthPickerOpen) return;
-
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (!monthPickerRef.current?.contains(event.target as Node)) {
-        setIsMonthPickerOpen(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsMonthPickerOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleOutsideClick);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isMonthPickerOpen]);
-
-  useEffect(() => {
     if (!isBigPictureFilterOpen) return;
 
     const handleOutsideClick = (event: MouseEvent) => {
@@ -2705,24 +2358,12 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
         tab: TabId;
         cashFlow: CashFlowMode;
         queryText?: string;
-        month?: string | null;
-        startMonth?: string | null;
-        endMonth?: string | null;
-        focusContext?: DigHereFocusContext;
-        moverGrouping?: MoverGrouping;
       },
       mode: 'push' | 'replace' = 'push'
     ) => {
       const params = new URLSearchParams();
       if (next.cashFlow !== 'operating') params.set('cf', next.cashFlow);
       if (next.queryText?.trim()) params.set('q', next.queryText.trim());
-      if (next.month) params.set('month', next.month);
-      if (next.startMonth) params.set('start', next.startMonth);
-      if (next.endMonth) params.set('end', next.endMonth);
-      if (next.focusContext) params.set('focus', next.focusContext);
-      if (next.moverGrouping && next.moverGrouping !== 'subcategories') {
-        params.set('mg', next.moverGrouping);
-      }
 
       const path = TAB_TO_PATH[next.tab] ?? '/';
       const searchString = params.toString();
@@ -2736,204 +2377,13 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
     (nextTab: TabId) => {
       setMobileOpen(false);
 
-      const isFreshDigHereEntry = nextTab === 'where-to-focus';
-
-      setDigHereFocusMonth(isFreshDigHereEntry ? null : digHereFocusMonth);
-      setDigHereStartMonth(isFreshDigHereEntry ? null : digHereStartMonth);
-      setDigHereEndMonth(isFreshDigHereEntry ? null : digHereEndMonth);
-      setDigHereFocusContext(isFreshDigHereEntry ? null : digHereFocusContext);
-
       writeDashboardUrlState({
         tab: nextTab,
         cashFlow: netCashFlowChartMode,
         queryText: query,
-        month: null,
-        startMonth: null,
-        endMonth: null,
-        focusContext: null,
-        moverGrouping: digHereMoverGrouping,
       });
     },
-    [
-      netCashFlowChartMode,
-      digHereEndMonth,
-      digHereFocusContext,
-      digHereFocusMonth,
-      digHereStartMonth,
-      digHereMoverGrouping,
-      query,
-      writeDashboardUrlState,
-    ]
-  );
-
-  const navigateToDigHere = useCallback(
-    (options?: DigHereNavigationOptions) => {
-      const nextQuery = options?.category?.trim() ?? query.trim();
-      const hasCustomRange = Boolean(
-        options?.startMonth &&
-          options?.endMonth &&
-          options.startMonth <= options.endMonth
-      );
-      const focusMonth = hasCustomRange
-        ? null
-        : options?.month ??
-          selectedKpiComparison?.currentEndMonth ??
-          model.latestMonth ??
-          null;
-      const startMonth = hasCustomRange ? options?.startMonth ?? null : null;
-      const endMonth = hasCustomRange ? options?.endMonth ?? null : null;
-      const focusContext =
-        options?.focusContext ?? (hasCustomRange ? 'custom-period' : 'category-shifts');
-
-      writeDashboardUrlState(
-        {
-          tab: activeTab,
-          cashFlow: netCashFlowChartMode,
-          queryText: query,
-          month: digHereFocusMonth,
-          startMonth: digHereStartMonth,
-          endMonth: digHereEndMonth,
-          focusContext: digHereFocusContext,
-          moverGrouping: digHereMoverGrouping,
-        },
-        'replace'
-      );
-
-      setQuery(nextQuery);
-      setDigHereFocusMonth(focusMonth);
-      setDigHereStartMonth(startMonth);
-      setDigHereEndMonth(endMonth);
-      setDigHereFocusContext(focusContext);
-
-      writeDashboardUrlState({
-        tab: 'where-to-focus',
-        cashFlow: netCashFlowChartMode,
-        queryText: nextQuery,
-        month: focusMonth,
-        startMonth,
-        endMonth,
-        focusContext,
-        moverGrouping: digHereMoverGrouping,
-      });
-    },
-    [
-      activeTab,
-      netCashFlowChartMode,
-      digHereFocusContext,
-      digHereEndMonth,
-      digHereFocusMonth,
-      digHereStartMonth,
-      model.latestMonth,
-      digHereMoverGrouping,
-      query,
-      selectedKpiComparison?.currentEndMonth,
-      writeDashboardUrlState,
-    ]
-  );
-
-  const resetDigHereFocus = useCallback(() => {
-    setDigHereFocusMonth(null);
-    setDigHereStartMonth(null);
-    setDigHereEndMonth(null);
-    setDigHereFocusContext(null);
-    writeDashboardUrlState({
-      tab: 'where-to-focus',
-      cashFlow: netCashFlowChartMode,
-      month: null,
-      startMonth: null,
-      endMonth: null,
-      focusContext: null,
-      moverGrouping: digHereMoverGrouping,
-    });
-  }, [digHereMoverGrouping, netCashFlowChartMode, writeDashboardUrlState]);
-
-  const applyDigHerePeriod = useCallback(
-    (period: DigHerePeriodValue) => {
-      if (period === 'custom') {
-        setIsMonthPickerOpen((current) => !current);
-        return;
-      }
-
-      if (period === 'thisMonth') {
-        const month = model.kpiComparisonByTimeframe.thisMonth.currentEndMonth ?? model.latestMonth ?? null;
-        if (!month) return;
-        navigateToDigHere({
-          month,
-          focusContext: 'period-control',
-        });
-        setIsMonthPickerOpen(false);
-        return;
-      }
-
-      const comparison = model.kpiComparisonByTimeframe[period];
-      const startMonth = comparison?.currentStartMonth ?? null;
-      const endMonth = comparison?.currentEndMonth ?? null;
-      if (!startMonth || !endMonth) return;
-
-      navigateToDigHere({
-        startMonth,
-        endMonth,
-        focusContext: 'period-control',
-      });
-      setIsMonthPickerOpen(false);
-    },
-    [model.kpiComparisonByTimeframe, model.latestMonth, navigateToDigHere]
-  );
-
-  const applyMonthChoice = useCallback(() => {
-    if (!monthPickerDraftMonth) return;
-    navigateToDigHere({
-      month: monthPickerDraftMonth,
-      focusContext: 'period-control',
-    });
-    setIsMonthPickerOpen(false);
-  }, [monthPickerDraftMonth, navigateToDigHere]);
-
-  const applyPeriodChoice = useCallback(() => {
-    if (!monthPickerDraftStart || !monthPickerDraftEnd) return;
-    const startMonth =
-      monthPickerDraftStart <= monthPickerDraftEnd
-        ? monthPickerDraftStart
-        : monthPickerDraftEnd;
-    const endMonth =
-      monthPickerDraftStart <= monthPickerDraftEnd
-        ? monthPickerDraftEnd
-        : monthPickerDraftStart;
-
-    navigateToDigHere({
-      startMonth,
-      endMonth,
-      focusContext: 'custom-period',
-    });
-    setIsMonthPickerOpen(false);
-  }, [monthPickerDraftEnd, monthPickerDraftStart, navigateToDigHere]);
-
-  const handleDigHereMoverGroupingChange = useCallback(
-    (nextGrouping: MoverGrouping) => {
-      setDigHereMoverGrouping(nextGrouping);
-      writeDashboardUrlState(
-        {
-          tab: 'where-to-focus',
-          cashFlow: netCashFlowChartMode,
-          queryText: query,
-          month: digHereFocusMonth,
-          startMonth: digHereStartMonth,
-          endMonth: digHereEndMonth,
-          focusContext: digHereFocusContext,
-          moverGrouping: nextGrouping,
-        },
-        'push'
-      );
-    },
-    [
-      netCashFlowChartMode,
-      digHereEndMonth,
-      digHereFocusContext,
-      digHereFocusMonth,
-      digHereStartMonth,
-      query,
-      writeDashboardUrlState,
-    ]
+    [netCashFlowChartMode, query, writeDashboardUrlState]
   );
 
   const handleImportCsvSelection = useCallback(
@@ -3070,16 +2520,14 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
           onUpdatedClick={() => navigateToTab('settings')}
         />
       <section className="main-zone">
-        {activeTab !== 'today' && activeTab !== 'what-if' && activeTab !== 'settings' && activeTab !== 'ui-lab' && <header className={`top-bar glass-panel${activeTab === 'big-picture' ? ' top-bar--big-picture' : ''}`}>
+        {activeTab === 'big-picture' && <header className="top-bar glass-panel top-bar--big-picture">
           <div className="top-bar-main">
             <div className="top-bar-copy">
               <h2>
-                {activeTab === 'where-to-focus' ? 'Where to Focus' : selectedBigPictureTitle}
+                {selectedBigPictureTitle}
               </h2>
               <p className="top-bar-context">
-                {activeTab === 'where-to-focus'
-                  ? "The biggest opportunities to improve your cash right now — and what's driving them"
-                  : selectedHeaderComparisonLabel}
+                {selectedHeaderComparisonLabel}
               </p>
               <button
                 type="button"
@@ -3093,115 +2541,98 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
             </div>
 
             <div className="top-controls top-controls-timeframe">
-              {activeTab === 'where-to-focus' ? null : activeTab === 'trends' ? (
-                <div className="kpi-timeframe-control">
-                  <div className="segmented-toggle" role="group" aria-label="Moving average window selector">
-                    {TRENDS_MA_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={`segmented-toggle-btn${trendsMaWindow === option.value ? ' is-active' : ''}`}
-                        onClick={() => setTrendsMaWindow(option.value)}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
+              <div className="kpi-timeframe-control">
+                <div className="segmented-toggle" role="group" aria-label="KPI timeframe selector">
+                  {BIG_PICTURE_VISIBLE_FRAME_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`segmented-toggle-btn${kpiTimeframe === option.value ? ' is-active' : ''}`}
+                      onClick={() => {
+                        setKpiTimeframe(option.value);
+                        setIsBigPictureFilterOpen(false);
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                  <div className="timeframe-menu" ref={bigPictureFilterMenuRef}>
+                    <button
+                      type="button"
+                      className="segmented-toggle-btn timeframe-trigger"
+                      onClick={() => setIsBigPictureFilterOpen((current) => !current)}
+                      aria-haspopup="menu"
+                      aria-expanded={isBigPictureFilterOpen}
+                    >
+                      More ▾
+                    </button>
+                    {isBigPictureFilterOpen && (
+                      <ul className="timeframe-list" role="menu" aria-label="Select Big Picture filter timeframe">
+                        {BIG_PICTURE_FILTER_FRAME_OPTIONS.map((option) => (
+                          <li key={option.value}>
+                            <button
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={kpiTimeframe === option.value}
+                              className={kpiTimeframe === option.value ? 'is-active' : ''}
+                              onClick={() => {
+                                setKpiTimeframe(option.value);
+                                setIsBigPictureFilterOpen(false);
+                              }}
+                            >
+                              {option.label}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <div className="kpi-timeframe-control">
-                  <div className="segmented-toggle" role="group" aria-label="KPI timeframe selector">
-                    {BIG_PICTURE_VISIBLE_FRAME_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={`segmented-toggle-btn${kpiTimeframe === option.value ? ' is-active' : ''}`}
-                        onClick={() => {
-                          setKpiTimeframe(option.value);
-                          setIsBigPictureFilterOpen(false);
+                {kpiTimeframe === 'custom' && (
+                  <div className="kpi-custom-range" aria-label="Custom Big Picture date range">
+                    <label>
+                      <span>Start</span>
+                      <input
+                        type="date"
+                        onClick={openNativeDatePicker}
+                        value={customStartDate}
+                        min={earliestAvailableDate || undefined}
+                        max={latestAvailableDate || undefined}
+                        onChange={(event) => {
+                          const nextStart = event.target.value;
+                          setCustomStartDate(nextStart);
+                          if (customEndDate && nextStart > customEndDate) {
+                            setCustomEndDate(nextStart);
+                          }
                         }}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                    <div className="timeframe-menu" ref={bigPictureFilterMenuRef}>
-                      <button
-                        type="button"
-                        className="segmented-toggle-btn timeframe-trigger"
-                        onClick={() => setIsBigPictureFilterOpen((current) => !current)}
-                        aria-haspopup="menu"
-                        aria-expanded={isBigPictureFilterOpen}
-                      >
-                        More ▾
-                      </button>
-                      {isBigPictureFilterOpen && (
-                        <ul className="timeframe-list" role="menu" aria-label="Select Big Picture filter timeframe">
-                          {BIG_PICTURE_FILTER_FRAME_OPTIONS.map((option) => (
-                            <li key={option.value}>
-                              <button
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={kpiTimeframe === option.value}
-                                className={kpiTimeframe === option.value ? 'is-active' : ''}
-                                onClick={() => {
-                                  setKpiTimeframe(option.value);
-                                  setIsBigPictureFilterOpen(false);
-                                }}
-                              >
-                                {option.label}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
+                      />
+                    </label>
+                    <label>
+                      <span>End</span>
+                      <input
+                        type="date"
+                        onClick={openNativeDatePicker}
+                        value={customEndDate}
+                        min={customStartDate || earliestAvailableDate || undefined}
+                        max={latestAvailableDate || undefined}
+                        onChange={(event) => {
+                          const nextEnd = event.target.value;
+                          setCustomEndDate(nextEnd);
+                          if (customStartDate && nextEnd < customStartDate) {
+                            setCustomStartDate(nextEnd);
+                          }
+                        }}
+                      />
+                    </label>
                   </div>
-                  {kpiTimeframe === 'custom' && (
-                    <div className="kpi-custom-range" aria-label="Custom Big Picture date range">
-                      <label>
-                        <span>Start</span>
-                        <input
-                          type="date"
-                          onClick={openNativeDatePicker}
-                          value={customStartDate}
-                          min={earliestAvailableDate || undefined}
-                          max={latestAvailableDate || undefined}
-                          onChange={(event) => {
-                            const nextStart = event.target.value;
-                            setCustomStartDate(nextStart);
-                            if (customEndDate && nextStart > customEndDate) {
-                              setCustomEndDate(nextStart);
-                            }
-                          }}
-                        />
-                      </label>
-                      <label>
-                        <span>End</span>
-                        <input
-                          type="date"
-                          onClick={openNativeDatePicker}
-                          value={customEndDate}
-                          min={customStartDate || earliestAvailableDate || undefined}
-                          max={latestAvailableDate || undefined}
-                          onChange={(event) => {
-                            const nextEnd = event.target.value;
-                            setCustomEndDate(nextEnd);
-                            if (customStartDate && nextEnd < customStartDate) {
-                              setCustomStartDate(nextEnd);
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
-          {activeTab === 'big-picture' && hasImportedData && (
+          {hasImportedData && (
             <>
               <div className="bp-overview-tray">
-                <KpiCards cards={selectedKpiCards} vsLabel={kpiVsLabel} />
+                <KpiCards cards={selectedKpiCards} vsLabel={kpiVsLabel} sparklinesById={kpiSparklinesById} />
               </div>
               <p className="data-trust-note">Excludes transfers &amp; financing · operating cash flow only</p>
             </>
@@ -3311,57 +2742,28 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
                 timeframe={netChartTimeframe}
                 onCashFlowModeChange={setNetCashFlowChartMode}
                 onTimeframeChange={setNetChartTimeframe}
-                onMonthPointClick={(month) =>
-                  navigateToDigHere({
-                    month,
-                    focusContext: 'month-drilldown',
-                  })
-                }
               />
             </div>
 
-            {/* Row 4: rising-cost card (1/2) | Cost Spikes to Investigate (1/2) */}
+            <article className="card summary-card">
+              <div className="card-head">
+                <h3>Sustainability</h3>
+                <p className="subtle">Health checks in one glance</p>
+              </div>
+              <ul className="status-list">
+                {sustainability.map((item) => (
+                  <li key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </li>
+                ))}
+              </ul>
+            </article>
+
+            {/* Money Left on the Table (1/2) | Cost Spikes to Investigate (1/2) */}
             <div className="two-col-grid">
               <EfficiencyOpportunitiesCard result={efficiencyResult} />
               <DigHereHighlights result={whatNeedsAttention} />
-            </div>
-
-            <div className="two-col-grid">
-              <article className="card summary-card">
-                <div className="card-head">
-                  <h3>Summary of Results</h3>
-                  <p className="subtle">Narrative snapshot from this period</p>
-                </div>
-
-                <ul className="summary-list">
-                  {model.summaryBullets.map((bullet) => (
-                    <li key={bullet}>{bullet}</li>
-                  ))}
-                </ul>
-
-                {model.uncategorizedWarning ? (
-                  <p className="subtle">
-                    {model.uncategorizedWarning.count} uncategorized row{model.uncategorizedWarning.count === 1 ? '' : 's'} excluded
-                    {' · '}
-                    {formatCurrency(model.uncategorizedWarning.absoluteAmount)} omitted. Fix categories in source data.
-                  </p>
-                ) : null}
-              </article>
-
-              <article className="card summary-card">
-                <div className="card-head">
-                  <h3>Sustainability</h3>
-                  <p className="subtle">Health checks in one glance</p>
-                </div>
-                <ul className="status-list">
-                  {sustainability.map((item) => (
-                    <li key={item.label}>
-                      <span>{item.label}</span>
-                      <strong>{item.value}</strong>
-                    </li>
-                  ))}
-                </ul>
-              </article>
             </div>
 
             {/* Row 6: Payroll Efficiency (1/3) | placeholder (2/3) */}
@@ -3375,199 +2777,6 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               <div className="bp-placeholder-card">Placeholder</div>
             </div>
           </>
-        )}
-
-        {hasImportedData && activeTab === 'where-to-focus' && (() => {
-          // Strip "Control " prefix (from opportunity titles) then normalize
-          // Quicken subcategory colon separators into readable em-dashes.
-          // Display-only transform — compute.ts is untouched.
-          const formatCategoryLabel = (raw: string) =>
-            raw.replace(/^Control\s+/i, '').trim().replace(/:/g, ' — ');
-          const opportunities = model.opportunities;
-          const visibleOpportunities = showAllFocusCategories
-            ? opportunities
-            : opportunities.slice(0, 5);
-          const hasMoreOpportunities = opportunities.length > 5;
-
-          let bannerText: string;
-          if (opportunities.length >= 2) {
-            bannerText = `“${formatCategoryLabel(opportunities[0].title)}” and “${formatCategoryLabel(opportunities[1].title)}” are your biggest opportunities to improve cash this month.`;
-          } else if (opportunities.length === 1) {
-            bannerText = `“${formatCategoryLabel(opportunities[0].title)}” is the main driver of higher costs this month.`;
-          } else {
-            bannerText = "You're in control this month. No major cost overruns detected.";
-          }
-
-          const movers = digHereInsights.movers;
-          const visibleMovers = movers.slice(0, 7);
-          const topIncreases = [...movers]
-            .filter((mover) => mover.delta > 0)
-            .sort((a, b) => b.delta - a.delta)
-            .slice(0, 3);
-
-          const topPayeesSubtitle =
-            selectedDigHerePeriod === 'thisMonth'
-              ? 'Top payees by total spend this month'
-              : 'Top payees by total spend this period';
-
-          return (
-            <div className="stack-grid">
-              <article className="focus-banner">
-                <p>{bannerText}</p>
-              </article>
-
-              <article className="card focus-section">
-                <div className="card-head">
-                  <h3>What needs attention right now</h3>
-                  <p className="subtle">Spending that ran above your normal this month</p>
-                </div>
-                {opportunities.length === 0 ? (
-                  <p className="empty-state">You're in control this month. No major cost overruns detected.</p>
-                ) : (
-                  <>
-                    <ul className="focus-row-list">
-                      {visibleOpportunities.map((item) => (
-                        <li key={item.title} className="focus-row">
-                          <p className="focus-row-title">{formatCategoryLabel(item.title)}</p>
-                          <p className="focus-row-detail">About {formatCurrency(item.savings)} above your recent monthly norm</p>
-                          <p className="focus-row-sub">Higher than usual compared to recent months</p>
-                        </li>
-                      ))}
-                    </ul>
-                    {hasMoreOpportunities && (
-                      <button
-                        type="button"
-                        className="focus-view-all"
-                        onClick={() => setShowAllFocusCategories((current) => !current)}
-                      >
-                        {showAllFocusCategories ? 'Show fewer' : 'View all categories'}
-                      </button>
-                    )}
-                  </>
-                )}
-              </article>
-
-              <p className="focus-bridge">These issues didn't start this month — here's what's been changing over time.</p>
-
-              <article className="card focus-section">
-                <div className="card-head">
-                  <h3>What changed behind the scenes</h3>
-                  <p className="subtle">Biggest shifts compared to last year</p>
-                </div>
-                {movers.length === 0 ? (
-                  <p className="empty-state">No unusual changes compared to last year.</p>
-                ) : (
-                  <>
-                    {topIncreases.length > 0 && (
-                      <p className="focus-interpretation">
-                        Your biggest year-over-year increases were {topIncreases.map((mover) => formatCategoryLabel(mover.category)).join(', ')}.
-                      </p>
-                    )}
-                    <ul className="movers-list focus-movers-list">
-                      {visibleMovers.map((mover) => {
-                        const tone =
-                          mover.delta > 0 ? 'is-up' : mover.delta < 0 ? 'is-down' : 'is-flat';
-                        const arrow = mover.delta > 0 ? '▲' : mover.delta < 0 ? '▼' : '●';
-                        const sign = mover.delta > 0 ? '+' : mover.delta < 0 ? '-' : '';
-                        const pctText =
-                          mover.deltaPercent === null || Number.isNaN(mover.deltaPercent)
-                            ? 'n/a'
-                            : `${mover.deltaPercent > 0 ? '+' : ''}${Math.round(mover.deltaPercent)}%`;
-                        const directionWord =
-                          mover.delta > 0 ? 'Up' : mover.delta < 0 ? 'Down' : 'Flat';
-                        return (
-                          <li key={mover.category}>
-                            <div>
-                              <p>
-                                <span>{formatCategoryLabel(mover.category)}</span>
-                              </p>
-                              <small>
-                                {directionWord} {formatCurrency(Math.abs(mover.delta))} vs last year ({pctText})
-                              </small>
-                              <small className="focus-row-sub">
-                                From {formatCurrency(mover.previous)} to {formatCurrency(mover.current)}
-                              </small>
-                            </div>
-                            <div className={`mover-delta ${tone}`}>
-                              <div className="mover-delta-main">
-                                <span>{arrow}</span>
-                                <strong>{sign}{formatCurrency(Math.abs(mover.delta))}</strong>
-                              </div>
-                              <small>{pctText}</small>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </>
-                )}
-              </article>
-
-              <TopPayeesTable
-                payees={digHereInsights.topPayees}
-                title="Where the money is going"
-                subtitle={topPayeesSubtitle}
-              />
-            </div>
-          );
-        })()}
-
-        {hasImportedData && activeTab === 'trends' && (
-          <div className="stack-grid">
-            <div className="trend-charts-pair">
-              <TrendLineChart data={model.trend} metric="income" title="Revenue Trend" trendWindowOverride={trendsMaWindow} displayWindow={trendsMaWindow} rangeLabelOverride={trendsRangeLabel} interpretationVariant="revenue" yTickLabelStep={2} />
-              <TrendLineChart data={model.trend} metric="expense" title="Expense Trend" trendWindowOverride={trendsMaWindow} displayWindow={trendsMaWindow} rangeLabelOverride={trendsRangeLabel} interpretationVariant="expense" yTickLabelStep={2} />
-            </div>
-
-            {(() => {
-              const rollupRows = model.monthlyRollups
-                .filter((r) => r.month < currentCalendarMonth)
-                .slice(-trendsMaWindow)
-                .reverse();
-              const totalRevenue = rollupRows.reduce((s, r) => s + r.revenue, 0);
-              const totalExpenses = rollupRows.reduce((s, r) => s + r.expenses, 0);
-              const totalNet = rollupRows.reduce((s, r) => s + r.netCashFlow, 0);
-              const periodMargin = totalRevenue > 0 ? (totalNet / totalRevenue) * 100 : 0;
-              return (
-                <article className="card table-card rollups-table-card">
-                  <div className="card-head">
-                    <h3>Monthly Rollups</h3>
-                  </div>
-                  <table className="rollups-table">
-                    <thead>
-                      <tr>
-                        <th>Month</th>
-                        <th>Revenue</th>
-                        <th>Expenses</th>
-                        <th>Net Cash Flow</th>
-                        <th>Profit Margin</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rollupRows.map((rollup) => (
-                        <tr key={rollup.month}>
-                          <td>{toMonthLabel(rollup.month)}</td>
-                          <td>{formatCurrency(rollup.revenue)}</td>
-                          <td>{formatCurrency(rollup.expenses)}</td>
-                          <td className={rollup.netCashFlow < 0 ? 'is-negative' : undefined}>{formatCurrency(rollup.netCashFlow)}</td>
-                          <td className={rollup.savingsRate < 0 ? 'is-negative' : undefined}>{rollup.savingsRate.toFixed(1)}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr>
-                        <td>Period total</td>
-                        <td>{formatCurrency(totalRevenue)}</td>
-                        <td>{formatCurrency(totalExpenses)}</td>
-                        <td className={totalNet < 0 ? 'is-negative' : undefined}>{formatCurrency(totalNet)}</td>
-                        <td className={periodMargin < 0 ? 'is-negative' : undefined}>{periodMargin.toFixed(1)}%</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </article>
-              );
-            })()}
-          </div>
         )}
 
         {hasImportedData && activeTab === 'what-if' && (

@@ -1,11 +1,43 @@
+import ReactApexChart from 'react-apexcharts';
+import type { ApexOptions } from 'apexcharts';
 import type { KpiCard } from '../lib/data/contract';
+
+type KpiCardSparkline = { data: number[]; color: string };
 
 type KpiCardsProps = {
   cards: KpiCard[];
   vsLabel?: string;
+  sparklinesById?: Record<string, KpiCardSparkline>;
 };
 
 const EPSILON = 0.00001;
+
+// Ambient 12-month trailing sparkline. Color is supplied by the caller
+// (brand blue for Revenue, cost-spike coral for Expenses).
+function buildSparkOptions(color: string): ApexOptions {
+  return {
+    chart: {
+      type: 'area',
+      sparkline: { enabled: true },
+      toolbar: { show: false },
+      animations: { enabled: false },
+      fontFamily: 'Outfit, sans-serif',
+    },
+    stroke: { curve: 'smooth', width: 1.5, colors: [color] },
+    fill: {
+      type: 'gradient',
+      gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0, stops: [0, 100] },
+    },
+    colors: [color],
+    dataLabels: { enabled: false },
+    markers: { size: 0 },
+    grid: { show: false },
+    xaxis: { labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
+    yaxis: { labels: { show: false } },
+    tooltip: { enabled: false },
+    legend: { show: false },
+  };
+}
 
 const HEALTH_METRIC_IDS = new Set(['net', 'savingsRate']);
 
@@ -54,7 +86,7 @@ function formatPercentDelta(value: number | null): string {
   return `${prefix}${Math.round(value)}%`;
 }
 
-export default function KpiCards({ cards, vsLabel = 'vs prior period' }: KpiCardsProps) {
+export default function KpiCards({ cards, vsLabel = 'vs prior period', sparklinesById }: KpiCardsProps) {
   return (
     <section className="kpi-grid" aria-label="Key metrics">
       {cards.map((card) => {
@@ -78,19 +110,34 @@ export default function KpiCards({ cards, vsLabel = 'vs prior period' }: KpiCard
               : ''
           : '';
 
+        const spark = sparklinesById?.[card.id];
+
         return (
           <article className="kpi-card" key={card.id}>
-            <p className="kpi-label">{card.label}</p>
-            <p className={`kpi-value${valueColorClass}`}>{formatValue(card.value, card.format)}</p>
-            <div className="kpi-footer">
-              <span className={`kpi-badge ${trendClass}`}>
-                <span aria-hidden="true" className="kpi-change-arrow">
-                  {trendClass === 'is-up' ? '▲' : trendClass === 'is-down' ? '▼' : '●'}
+            <div className="kpi-card-main">
+              <p className="kpi-label">{card.label}</p>
+              <p className={`kpi-value${valueColorClass}`}>{formatValue(card.value, card.format)}</p>
+              <div className="kpi-footer">
+                <span className={`kpi-badge ${trendClass}`}>
+                  <span aria-hidden="true" className="kpi-change-arrow">
+                    {trendClass === 'is-up' ? '▲' : trendClass === 'is-down' ? '▼' : '●'}
+                  </span>
+                  <span className="kpi-change-percent">{percentDelta}</span>
                 </span>
-                <span className="kpi-change-percent">{percentDelta}</span>
-              </span>
-              <span className="kpi-vs-label">{vsLabel}</span>
+                <span className="kpi-vs-label">{vsLabel}</span>
+              </div>
             </div>
+            {spark && spark.data.length > 1 && (
+              <div className="kpi-card-spark" aria-hidden="true">
+                <ReactApexChart
+                  type="area"
+                  series={[{ data: spark.data }]}
+                  options={buildSparkOptions(spark.color)}
+                  width="100%"
+                  height={40}
+                />
+              </div>
+            )}
           </article>
         );
       })}
