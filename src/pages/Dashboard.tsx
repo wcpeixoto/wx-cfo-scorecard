@@ -3265,7 +3265,23 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
 
         {hasImportedData && activeTab === 'big-picture' && (
           <>
-            {/* Row 2: Cash Trend (1/3) | Monthly Net Cash Flow (2/3) — reuses the .cash-trend-row 1fr/2fr grid */}
+            {/* Row 2: Income & Expense (1/2) | Top Expense Categories (1/2) */}
+            <div className="two-col-grid">
+              <IncomeExpenseCard monthlyRollups={model.monthlyRollups} />
+              <TopCategoriesCard
+                slices={kpiExpenseBreakdown.slices}
+                total={kpiExpenseBreakdown.total}
+                periodControl={
+                  <PeriodDropdown
+                    value={kpiTimeframe}
+                    options={BIG_PICTURE_FRAME_OPTIONS}
+                    onChange={(v) => setKpiTimeframe(v as BigPictureFrameValue)}
+                  />
+                }
+              />
+            </div>
+
+            {/* Row 3: Cash Trend (1/3) | Monthly Net Cash Flow (2/3) — reuses the .cash-trend-row 1fr/2fr grid */}
             <div className="cash-trend-row">
               <CashTrendHero result={cashTrendResult} negativeMonthsAsSubtitle />
               <NetCashFlowChart
@@ -3283,26 +3299,10 @@ const [showAllFocusCategories, setShowAllFocusCategories] = useState(false);
               />
             </div>
 
-            {/* Row 3: rising-cost card (1/2) | Cost Spikes to Investigate (1/2) */}
+            {/* Row 4: rising-cost card (1/2) | Cost Spikes to Investigate (1/2) */}
             <div className="two-col-grid">
               <EfficiencyOpportunitiesCard result={efficiencyResult} />
               <DigHereHighlights result={whatNeedsAttention} />
-            </div>
-
-            {/* Row 4: Income & Expense (1/2) | Top Expense Categories (1/2) */}
-            <div className="two-col-grid">
-              <IncomeExpenseCard monthlyRollups={model.monthlyRollups} />
-              <TopCategoriesCard
-                slices={kpiExpenseBreakdown.slices}
-                total={kpiExpenseBreakdown.total}
-                periodControl={
-                  <PeriodDropdown
-                    value={kpiTimeframe}
-                    options={BIG_PICTURE_FRAME_OPTIONS}
-                    onChange={(v) => setKpiTimeframe(v as BigPictureFrameValue)}
-                  />
-                }
-              />
             </div>
 
             <div className="two-col-grid">
