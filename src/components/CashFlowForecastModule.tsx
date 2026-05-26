@@ -175,6 +175,7 @@ type ForecastSliderControlProps = {
   formatTickValue?: (value: number) => string;
   minorTickStep?: number;
   secondaryLabel?: ReactNode;
+  headerExtra?: ReactNode;
 };
 
 function formatDateKey(date: Date): string {
@@ -342,6 +343,7 @@ function ForecastSliderControl({
   formatTickValue = formatValue,
   minorTickStep,
   secondaryLabel,
+  headerExtra,
 }: ForecastSliderControlProps) {
   const safeSpan = Math.max(max - min, 1);
   const sliderPercent = ((value - min) / safeSpan) * 100;
@@ -361,6 +363,7 @@ function ForecastSliderControl({
         {secondaryLabel != null && (
           <span className="forecast-slider-impact">: {secondaryLabel}</span>
         )}
+        {headerExtra}
       </div>
       <div className="forecast-slider-track-wrap">
         <span
@@ -1309,6 +1312,18 @@ export default function CashFlowForecastModule({
               tickValues={[-25, 0, 25]}
               minorTickStep={5}
               secondaryLabel={revenueImpactLabel}
+              headerExtra={
+                <div className="cashflow-help">
+                  <button type="button" className="cashflow-tooltip" aria-label="About these sliders">&#9432;</button>
+                  <div role="tooltip" className="cashflow-tooltip-panel">
+                    <ul className="cashflow-tooltip-list">
+                      <li className="cashflow-tooltip-body">
+                        Sliders change all future months. Use Cash Event for a specific event.
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              }
             />
 
             <ForecastSliderControl
@@ -1323,9 +1338,6 @@ export default function CashFlowForecastModule({
               secondaryLabel={expenseImpactLabel}
             />
           </div>
-          <p className="subtle">
-            Sliders change all future months. Use Cash Event for a specific event.
-          </p>
         </div>
 
         <div className="forecast-events-section">
