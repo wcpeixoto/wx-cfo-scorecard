@@ -148,6 +148,11 @@ type CashFlowForecastModuleProps = {
   onScenarioChange: (nextValue: ForecastScenarioKey) => void;
   revenueGrowthPct: number;
   expenseChangePct: number;
+  /** Settings-saved fine-tune pct, used to compute the slider's $-impact tooltip
+   *  against the Settings-adjusted baseline rather than the raw history baseline.
+   *  Defaults to 0 if not provided. */
+  settingsRevenueFineTunePct?: number;
+  settingsExpenseFineTunePct?: number;
   receivableDays: number;
   payableDays: number;
   onRevenueGrowthChange: (nextValue: number) => void;
@@ -435,6 +440,8 @@ export default function CashFlowForecastModule({
   onScenarioChange,
   revenueGrowthPct,
   expenseChangePct,
+  settingsRevenueFineTunePct = 0,
+  settingsExpenseFineTunePct = 0,
   onRevenueGrowthChange,
   onExpenseChange,
   forecastEvents = [],
@@ -504,8 +511,13 @@ export default function CashFlowForecastModule({
     return recent.reduce((sum, r) => sum + r.expenses, 0) / recent.length;
   }, [monthlyRollups]);
 
-  const revenueImpactLabel = formatRevenueImpact((revenueGrowthPct / 100) * baselineMonthlyRevenue);
-  const expenseImpactLabel = formatExpenseImpact((expenseChangePct / 100) * baselineMonthlyExpense);
+  // Slider tooltip = slider-only delta on the Settings-adjusted baseline.
+  // Answers "what does this slider add on top of my default forecast?",
+  // not "what do Settings + slider add together vs raw history?".
+  const settingsAdjustedMonthlyRevenue = baselineMonthlyRevenue * (1 + settingsRevenueFineTunePct / 100);
+  const settingsAdjustedMonthlyExpense = baselineMonthlyExpense * (1 + settingsExpenseFineTunePct / 100);
+  const revenueImpactLabel = formatRevenueImpact((revenueGrowthPct / 100) * settingsAdjustedMonthlyRevenue);
+  const expenseImpactLabel = formatExpenseImpact((expenseChangePct / 100) * settingsAdjustedMonthlyExpense);
 
   function openAddModal() {
     setEditingEventId(null);
@@ -1303,7 +1315,7 @@ export default function CashFlowForecastModule({
         <div id="forecast-custom-controls" className="forecast-control-stack" aria-label="What-if controls">
           <div className="forecast-slider-grid forecast-slider-grid--main">
             <ForecastSliderControl
-              label="Revenue Growth"
+              label="Revenue Adjustment"
               min={-25}
               max={25}
               step={1}
@@ -1318,7 +1330,7 @@ export default function CashFlowForecastModule({
                   <div role="tooltip" className="cashflow-tooltip-panel">
                     <ul className="cashflow-tooltip-list">
                       <li className="cashflow-tooltip-body">
-                        Sliders change all future months. Use Cash Event for a specific event.
+                        Sliders change all future months. Use Cash Event for a specific event. Sliders stack on your Settings forecast. Zero = use Settings as-is.
                       </li>
                     </ul>
                   </div>
@@ -1327,7 +1339,7 @@ export default function CashFlowForecastModule({
             />
 
             <ForecastSliderControl
-              label="Expense Change"
+              label="Expense Adjustment"
               min={-25}
               max={25}
               step={1}

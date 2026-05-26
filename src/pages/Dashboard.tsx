@@ -71,6 +71,7 @@ import { composeConservativeFloor } from '../lib/kpis/conservativeFloor';
 import { applyEventsOverlay } from '../lib/kpis/applyEventsOverlay';
 import { generateRenewalEvents } from '../lib/forecast/generateRenewalEvents';
 import { expandRecurringEvents } from '../lib/forecast/expandRecurringEvents';
+import { applyForecastFineTune } from '../lib/forecast/scenarioMath';
 import type {
   AccountRecord,
   AccountType,
@@ -153,14 +154,14 @@ const DEFAULT_CUSTOM_SCENARIO: ScenarioInput = {
   ...DEFAULT_SCENARIO,
   scenarioKey: 'custom',
 };
-// Presets derive their revenue/expense % from editable workspace settings
-// (Settings → Rules → Forecast Scenario Assumptions). Other slider fields
+// Presets carry the slider DELTA on top of the Settings-saved fine-tune.
+// Base = 0/0 (no extra adjustment); Best/Worst carry the saved deltas as
+// they did before but now compound multiplicatively with Settings at
+// projection-call time via applyForecastFineTune. Other slider fields
 // remain canonical defaults shared across scenarios.
 function getForecastScenarioPresets(
   settings: Pick<
     BusinessRules,
-    | 'scenarioBaseRevenueGrowthPct'
-    | 'scenarioBaseExpenseChangePct'
     | 'scenarioBestRevenueGrowthPct'
     | 'scenarioBestExpenseChangePct'
     | 'scenarioWorstRevenueGrowthPct'
@@ -170,8 +171,8 @@ function getForecastScenarioPresets(
   return {
     base: {
       scenarioKey: 'base',
-      revenueGrowthPct: settings.scenarioBaseRevenueGrowthPct,
-      expenseChangePct: settings.scenarioBaseExpenseChangePct,
+      revenueGrowthPct: 0,
+      expenseChangePct: 0,
       receivableDays: 3,
       payableDays: 3,
       months: 12,
@@ -787,8 +788,6 @@ export default function Dashboard() {
   const forecastScenarioPresets = useMemo(
     () => getForecastScenarioPresets(businessRules),
     [
-      businessRules.scenarioBaseRevenueGrowthPct,
-      businessRules.scenarioBaseExpenseChangePct,
       businessRules.scenarioBestRevenueGrowthPct,
       businessRules.scenarioBestExpenseChangePct,
       businessRules.scenarioWorstRevenueGrowthPct,
@@ -1851,10 +1850,14 @@ export default function Dashboard() {
       // Compose at 12 months and, for selectors longer than 12 months,
       // extend at the caller layer (see below). Composer files are unchanged.
       const COMPOSER_MONTHS_CAP = 12;
-      const composerInput = {
-        ...scenarioWithMonths,
-        months: Math.min(scenarioWithMonths.months, COMPOSER_MONTHS_CAP),
-      };
+      const composerInput = applyForecastFineTune(
+        {
+          ...scenarioWithMonths,
+          months: Math.min(scenarioWithMonths.months, COMPOSER_MONTHS_CAP),
+        },
+        businessRules.scenarioBaseRevenueGrowthPct ?? 0,
+        businessRules.scenarioBaseExpenseChangePct ?? 0,
+      );
       const engineProj = projectScenario(
         model,
         composerInput,
@@ -1934,7 +1937,7 @@ export default function Dashboard() {
       }
       return result;
     },
-    [filteredTxns, currentCashBalance, businessRules.forecastPosture, expandedForecastEvents, forecastRangeMonths, model, scenarioInput]
+    [filteredTxns, currentCashBalance, businessRules.forecastPosture, businessRules.scenarioBaseRevenueGrowthPct, businessRules.scenarioBaseExpenseChangePct, expandedForecastEvents, forecastRangeMonths, model, scenarioInput]
   );
   const scenarioProjection = useMemo(() => forecastProjection.points, [forecastProjection.points]);
   const forecastSeasonality = useMemo(() => forecastProjection.seasonality, [forecastProjection.seasonality]);
@@ -1965,10 +1968,14 @@ export default function Dashboard() {
       months: Math.max(baseScenario.months, forecastRangeMonths),
     };
     const COMPOSER_MONTHS_CAP = 12;
-    const composerInput = {
-      ...scenarioWithMonths,
-      months: Math.min(scenarioWithMonths.months, COMPOSER_MONTHS_CAP),
-    };
+    const composerInput = applyForecastFineTune(
+      {
+        ...scenarioWithMonths,
+        months: Math.min(scenarioWithMonths.months, COMPOSER_MONTHS_CAP),
+      },
+      businessRules.scenarioBaseRevenueGrowthPct ?? 0,
+      businessRules.scenarioBaseExpenseChangePct ?? 0,
+    );
     const engineProj = projectScenario(
       model,
       composerInput,
@@ -2029,6 +2036,8 @@ export default function Dashboard() {
     forecastScenarioPresets,
     forecastRangeMonths,
     businessRules.forecastPosture,
+    businessRules.scenarioBaseRevenueGrowthPct,
+    businessRules.scenarioBaseExpenseChangePct,
     expandedForecastEvents,
     filteredTxns,
     currentCashBalance,
@@ -2065,10 +2074,14 @@ export default function Dashboard() {
       months: Math.max(baseScenario.months, OWNER_PAY_HORIZON_MONTHS),
     };
     const COMPOSER_MONTHS_CAP = 12;
-    const composerInput = {
-      ...scenarioWithMonths,
-      months: Math.min(scenarioWithMonths.months, COMPOSER_MONTHS_CAP),
-    };
+    const composerInput = applyForecastFineTune(
+      {
+        ...scenarioWithMonths,
+        months: Math.min(scenarioWithMonths.months, COMPOSER_MONTHS_CAP),
+      },
+      businessRules.scenarioBaseRevenueGrowthPct ?? 0,
+      businessRules.scenarioBaseExpenseChangePct ?? 0,
+    );
     const engineProj = projectScenario(
       model,
       composerInput,
@@ -2134,6 +2147,8 @@ export default function Dashboard() {
     filteredTxns,
     currentCashBalance,
     forecastScenarioPresets,
+    businessRules.scenarioBaseRevenueGrowthPct,
+    businessRules.scenarioBaseExpenseChangePct,
     ownerPayExpandedEvents,
     model,
   ]);
@@ -2158,10 +2173,14 @@ export default function Dashboard() {
         months: Math.max(baseScenario.months, OWNER_PAY_HORIZON_MONTHS),
       };
       const COMPOSER_MONTHS_CAP = 12;
-      const composerInput = {
-        ...scenarioWithMonths,
-        months: Math.min(scenarioWithMonths.months, COMPOSER_MONTHS_CAP),
-      };
+      const composerInput = applyForecastFineTune(
+        {
+          ...scenarioWithMonths,
+          months: Math.min(scenarioWithMonths.months, COMPOSER_MONTHS_CAP),
+        },
+        businessRules.scenarioBaseRevenueGrowthPct ?? 0,
+        businessRules.scenarioBaseExpenseChangePct ?? 0,
+      );
       const engineProj = projectScenario(
         model,
         composerInput,
@@ -2224,6 +2243,8 @@ export default function Dashboard() {
       filteredTxns,
       currentCashBalance,
       forecastScenarioPresets,
+      businessRules.scenarioBaseRevenueGrowthPct,
+      businessRules.scenarioBaseExpenseChangePct,
       ownerPayExpandedEvents,
       model,
     ]
@@ -2874,6 +2895,8 @@ export default function Dashboard() {
               onScenarioChange={(scenarioKey) => setSelectedScenarioKey(scenarioKey)}
               revenueGrowthPct={scenarioInput.revenueGrowthPct}
               expenseChangePct={scenarioInput.expenseChangePct}
+              settingsRevenueFineTunePct={businessRules.scenarioBaseRevenueGrowthPct ?? 0}
+              settingsExpenseFineTunePct={businessRules.scenarioBaseExpenseChangePct ?? 0}
               receivableDays={scenarioInput.receivableDays}
               payableDays={scenarioInput.payableDays}
               onRevenueGrowthChange={(nextValue) => updateCustomScenario({ revenueGrowthPct: nextValue })}
