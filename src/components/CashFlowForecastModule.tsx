@@ -16,6 +16,7 @@ import type {
 import { toMonthLabel } from '../lib/kpis/compute';
 import { buildPriorPeriodSeries } from '../lib/forecast/priorPeriodSeries';
 import { buildReserveSeries } from '../lib/forecast/reserveSeries';
+import { formatCompact } from '../lib/utils/formatCompact';
 
 type SelectOption = { value: string; label: string; months: number };
 
@@ -173,6 +174,7 @@ type ForecastSliderControlProps = {
   tickValues?: number[];
   formatTickValue?: (value: number) => string;
   minorTickStep?: number;
+  secondaryLabel?: ReactNode;
 };
 
 function formatDateKey(date: Date): string {
@@ -278,6 +280,16 @@ function formatSignedPercent(value: number): string {
   return `${rounded}%`;
 }
 
+// Slider impact label: signed monthly dollar delta (e.g. "+$2.3K/mo", "-$700/mo").
+// Returns "$0/mo" at the neutral position so the right-hand slot remains
+// visible before the user moves the slider.
+function formatSignedDollarPerMonth(value: number): string {
+  const rounded = Math.round(value);
+  if (rounded === 0) return '$0/mo';
+  const compact = formatCompact(rounded);
+  return rounded > 0 ? `+${compact}/mo` : `${compact}/mo`;
+}
+
 function formatDays(value: number): string {
   return `${Math.round(value)}d`;
 }
@@ -321,6 +333,7 @@ function ForecastSliderControl({
   tickValues,
   formatTickValue = formatValue,
   minorTickStep,
+  secondaryLabel,
 }: ForecastSliderControlProps) {
   const safeSpan = Math.max(max - min, 1);
   const sliderPercent = ((value - min) / safeSpan) * 100;
@@ -335,7 +348,12 @@ function ForecastSliderControl({
 
   return (
     <label className="forecast-slider-control">
-      <span className="forecast-slider-label">{label}</span>
+      <div className="forecast-slider-header">
+        <span className="forecast-slider-label">{label}</span>
+        {secondaryLabel != null && (
+          <span className="forecast-slider-impact">{secondaryLabel}</span>
+        )}
+      </div>
       <div className="forecast-slider-track-wrap">
         <span
           className="forecast-slider-thumb-value"
@@ -459,6 +477,24 @@ export default function CashFlowForecastModule({
       })),
     [forecastRangeOptions],
   );
+
+  // Trailing-6mo average monthly revenue + expenses — close proxy to the
+  // engine's baselineCashIn/Out without re-implementing deriveForecastBaseline.
+  // Used only to translate the slider percent into an at-a-glance $/mo label.
+  const baselineMonthlyRevenue = useMemo(() => {
+    const recent = monthlyRollups.slice(-6);
+    if (recent.length === 0) return 0;
+    return recent.reduce((sum, r) => sum + r.revenue, 0) / recent.length;
+  }, [monthlyRollups]);
+
+  const baselineMonthlyExpense = useMemo(() => {
+    const recent = monthlyRollups.slice(-6);
+    if (recent.length === 0) return 0;
+    return recent.reduce((sum, r) => sum + r.expenses, 0) / recent.length;
+  }, [monthlyRollups]);
+
+  const revenueImpactLabel = `${formatSignedDollarPerMonth((revenueGrowthPct / 100) * baselineMonthlyRevenue)} revenue`;
+  const expenseImpactLabel = `${formatSignedDollarPerMonth((expenseChangePct / 100) * baselineMonthlyExpense)} expenses`;
 
   function openAddModal() {
     setEditingEventId(null);
@@ -1264,6 +1300,7 @@ export default function CashFlowForecastModule({
               onChange={onRevenueGrowthChange}
               tickValues={[-25, 0, 25]}
               minorTickStep={5}
+              secondaryLabel={revenueImpactLabel}
             />
 
             <ForecastSliderControl
@@ -1275,6 +1312,7 @@ export default function CashFlowForecastModule({
               onChange={onExpenseChange}
               tickValues={[-25, 0, 25]}
               minorTickStep={5}
+              secondaryLabel={expenseImpactLabel}
             />
           </div>
         </div>
