@@ -19,6 +19,12 @@ type ProjectedCashBalanceChartProps = {
    *  points (no full 30-day forward window available); the chart renders
    *  those as gaps in the dashed line. Mutually exclusive with priorSeries. */
   reserveSeries?: (number | null)[] | null;
+  /** Optional faded "default forecast" series aligned 1:1 to `data` for the
+   *  What-If baseline overlay. Renders behind the active scenario whenever
+   *  no other overlay is active (priorSeries and reserveSeries take
+   *  precedence — one overlay at a time). Label shown in the tooltip. */
+  baselineSeries?: TrendPoint[] | null;
+  baselineSeriesLabel?: string;
 };
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -111,11 +117,23 @@ export default function ProjectedCashBalanceChart({
   priorSeries = null,
   priorSeriesLabel = 'Prior Year',
   reserveSeries = null,
+  baselineSeries = null,
+  baselineSeriesLabel = 'Default forecast',
 }: ProjectedCashBalanceChartProps) {
   const hasPrior = !!priorSeries && priorSeries.length === data.length && priorSeries.length > 0;
   const hasReserve =
     !hasPrior && !!reserveSeries && reserveSeries.length === data.length && reserveSeries.some((v) => v !== null);
-  const hasOverlay = hasPrior || hasReserve;
+  // Baseline sits at the lowest precedence: prior > reserve > baseline. When
+  // either explicit overlay is active the operator opened it on purpose, so
+  // we suppress the implicit "what changed vs. default" overlay to avoid
+  // stacking two faded series at once.
+  const hasBaseline =
+    !hasPrior &&
+    !hasReserve &&
+    !!baselineSeries &&
+    baselineSeries.length === data.length &&
+    baselineSeries.length > 0;
+  const hasOverlay = hasPrior || hasReserve || hasBaseline;
 
   // Axis categories (short labels for display on x-axis)
   const categories = useMemo(
@@ -186,11 +204,14 @@ export default function ProjectedCashBalanceChart({
   // truncation we want when a reserve point lacks 30 forward days.
   const reserveValues: (number | null)[] = hasReserve ? reserveSeries! : [];
   const reserveValuesForRange = reserveValues.filter((v): v is number => v !== null);
+  const baselineValues = hasBaseline ? baselineSeries!.map((d) => d.net) : [];
   const combinedValues = hasPrior
     ? [...values, ...priorValues]
     : hasReserve
       ? [...values, ...reserveValuesForRange]
-      : values;
+      : hasBaseline
+        ? [...values, ...baselineValues]
+        : values;
   const dataMin = data.length > 0 ? Math.min(initialBalance, ...combinedValues) : 0;
   const dataMax = data.length > 0 ? Math.max(initialBalance, ...combinedValues) : 0;
   const { min: yAxisMin, max: yAxisMax, ticks: yAxisTicks } = useMemo(
@@ -346,15 +367,20 @@ export default function ProjectedCashBalanceChart({
               { name: 'Cash Balance', data: values },
               { name: 'Cash Reserve', data: reserveValues },
             ]
-          : [{ name: 'Cash Balance', data: values }],
-    [values, hasPrior, hasReserve, priorValues, priorSeriesLabel, reserveValues]
+          : hasBaseline
+            ? [
+                { name: 'Cash Balance', data: values },
+                { name: baselineSeriesLabel, data: baselineValues },
+              ]
+            : [{ name: 'Cash Balance', data: values }],
+    [values, hasPrior, hasReserve, hasBaseline, priorValues, priorSeriesLabel, reserveValues, baselineValues, baselineSeriesLabel]
   );
 
   // Remount the chart when the overlay mode changes. Apex retains a
   // tooltip `custom` callback internally and does not always release it
   // when options are replaced, so flipping reserve→past would otherwise
   // continue invoking the reserve renderer.
-  const overlayMode = hasReserve ? 'reserve' : hasPrior ? 'past' : 'off';
+  const overlayMode = hasReserve ? 'reserve' : hasPrior ? 'past' : hasBaseline ? 'baseline' : 'off';
   return (
     <ReactApexChart key={overlayMode} options={options} series={series} type="area" height={height} />
   );

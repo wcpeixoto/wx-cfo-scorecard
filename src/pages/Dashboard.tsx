@@ -1979,6 +1979,98 @@ export default function Dashboard() {
     () => scenarioProjection.slice(0, forecastRangeMonths),
     [forecastRangeMonths, scenarioProjection]
   );
+
+  // Baseline projection — the operator's "default forecast" (the `base`
+  // preset) projected through the same pipeline as scenarioProjection,
+  // for the What-If chart's faded overlay. Two intentional choices:
+  //   (1) "Baseline" = forecastScenarioPresets.base (which IS parameterized
+  //       by businessRules.scenarioBase* settings). When the operator edits
+  //       their business-rules base, they have moved their declared default
+  //       on purpose — the overlay tracks that, not a frozen prior state.
+  //   (2) The pipeline is duplicated inline rather than factored. The only
+  //       difference from forecastProjection is the scenario-input object;
+  //       factoring would touch the shared composer pathway used by the
+  //       active forecast and ownerPayProjection (also inlined). Keeping
+  //       the three call sites independent matches the existing pattern.
+  // Short-circuits to null when the active scenario IS the base preset —
+  // current === baseline → no overlay to draw, no compute cost paid.
+  const baselineProjection = useMemo<ScenarioPoint[] | null>(() => {
+    if (selectedScenarioKey === 'base') return null;
+    const baseScenario = forecastScenarioPresets.base;
+    const scenarioWithMonths = {
+      ...baseScenario,
+      months: Math.max(baseScenario.months, forecastRangeMonths),
+    };
+    const COMPOSER_MONTHS_CAP = 12;
+    const composerInput = {
+      ...scenarioWithMonths,
+      months: Math.min(scenarioWithMonths.months, COMPOSER_MONTHS_CAP),
+    };
+    const engineProj = projectScenario(
+      model,
+      composerInput,
+      forecastCurrentCashBalance,
+      []
+    );
+    const cadenceProj = projectCategoryCadenceScenario(
+      model,
+      composerInput,
+      filteredTxns,
+      forecastCurrentCashBalance,
+      []
+    );
+    const composed =
+      businessRules.forecastPosture === 'recovery'
+        ? composeSplitConservative(engineProj, cadenceProj, forecastCurrentCashBalance)
+        : composeConservativeFloor(engineProj, cadenceProj, forecastCurrentCashBalance);
+
+    const requestedMonths = scenarioWithMonths.months;
+    let result = composed;
+    if (requestedMonths > composed.points.length && composed.points.length > 0) {
+      const sourceByMonthOfYear = new Map<string, ScenarioPoint>();
+      for (const p of composed.points) {
+        const moy = p.month.slice(5, 7);
+        if (!sourceByMonthOfYear.has(moy)) sourceByMonthOfYear.set(moy, p);
+      }
+      const firstMonth = composed.points[0].month;
+      const extended: ScenarioPoint[] = [];
+      let prevBalance = forecastCurrentCashBalance;
+      for (let i = 0; i < requestedMonths; i += 1) {
+        if (i < composed.points.length) {
+          const p = composed.points[i];
+          extended.push(p);
+          prevBalance = p.endingCashBalance;
+          continue;
+        }
+        const monthToken = addMonthsToToken(firstMonth, i) ?? composed.points[i % composed.points.length].month;
+        const sourceMoy = monthToken.slice(5, 7);
+        const source = sourceByMonthOfYear.get(sourceMoy);
+        if (!source) break;
+        const endingCashBalance = prevBalance + source.netCashFlow;
+        extended.push({
+          month: monthToken,
+          operatingCashIn: source.operatingCashIn,
+          operatingCashOut: source.operatingCashOut,
+          cashIn: source.cashIn,
+          cashOut: source.cashOut,
+          netCashFlow: source.netCashFlow,
+          endingCashBalance,
+        });
+        prevBalance = endingCashBalance;
+      }
+      result = { points: extended, seasonality: composed.seasonality };
+    }
+    return applyEventsOverlay(result.points, expandedForecastEvents);
+  }, [
+    selectedScenarioKey,
+    forecastScenarioPresets,
+    forecastRangeMonths,
+    businessRules.forecastPosture,
+    expandedForecastEvents,
+    filteredTxns,
+    forecastCurrentCashBalance,
+    model,
+  ]);
   const forecastDecisionSignals = useMemo(
     () => computeForecastDecisionSignals(scenarioProjection, model.runway.reserveTarget),
     [model.runway.reserveTarget, scenarioProjection]
@@ -2184,6 +2276,15 @@ export default function Dashboard() {
       })),
     [visibleScenarioProjection]
   );
+  const cashFlowForecastBaselineTrend = useMemo<TrendPoint[] | null>(() => {
+    if (!baselineProjection) return null;
+    return baselineProjection.slice(0, forecastRangeMonths).map((point) => ({
+      month: point.month,
+      income: point.cashIn,
+      expense: point.cashOut,
+      net: point.netCashFlow,
+    }));
+  }, [baselineProjection, forecastRangeMonths]);
   const currentForecastYear = new Date().getFullYear();
   const priorYearActuals = useMemo(
     () => computePriorYearActuals(baseTxns, currentForecastYear),
@@ -2781,6 +2882,7 @@ export default function Dashboard() {
           <div className="stack-grid">
             <CashFlowForecastModule
               data={cashFlowForecastTrend}
+              baselineData={cashFlowForecastBaselineTrend}
               monthlyRollups={model.monthlyRollups}
               fullForecast={scenarioProjection}
               reserveTarget={model.runway.reserveTarget}
