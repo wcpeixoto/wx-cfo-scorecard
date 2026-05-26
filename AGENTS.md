@@ -42,9 +42,16 @@ in one read:
   is done.
 - **Why it matters.** What problem, risk, confusion, friction, or
   missed opportunity this reduces.
-- **Premise check.** Is this still necessary today, or was it already
-  solved or made irrelevant by later work? If unclear, the task is
-  **not build-ready** — do a rescope pass first.
+- **Premise check.** Whether the task is still necessary or has been
+  overtaken by later work, with evidence inline (recent PRs, file:line,
+  what was checked). If unclear, the task is **not build-ready** —
+  rescope first.
+
+The point of the schema is **shared evaluation**: the agent fills the
+fields in; Wesley reads them; the two together decide whether the task
+is a priority or whether to look for something else. The fields are
+not an agent-side verdict for the owner to rubber-stamp — direction
+decisions are joint, the fields exist so they're informed.
 
 A card missing any of the three fields is not build-ready. Apply to:
 new cards, existing cards during retrofit, and rescope passes before
