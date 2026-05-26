@@ -195,7 +195,7 @@ export function NextOwnerDistributionCard({
 
       {hasSlider && (
         <div className="nod-scenario-section">
-          <p className="nod-scenario-label">What if revenue changes?</p>
+          <p className="nod-scenario-label">What if revenue changes vs Settings?</p>
 
           <div className="nod-slider-control">
             <div className="nod-slider-track-wrap">

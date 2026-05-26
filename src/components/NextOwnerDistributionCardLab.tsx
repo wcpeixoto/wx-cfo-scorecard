@@ -373,7 +373,7 @@ export function NextOwnerDistributionCardLab({
           <hr className="nodlab-divider" aria-hidden="true" />
 
           <div className="nodlab-scenario-section">
-            <p className="nodlab-scenario-label">What if revenue changes?</p>
+            <p className="nodlab-scenario-label">What if revenue changes vs Settings?</p>
 
             <div className="nodlab-slider-control">
               <div className="nodlab-slider-track-wrap">
