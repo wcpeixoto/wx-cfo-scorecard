@@ -7,7 +7,7 @@ type Props = {
   priorYearActuals: PriorYearActualsResult;
   projectionActiveYears: number[];
   currentForecastYear: number;
-  hasForecastCurrentCashBalance: boolean;
+  hasCurrentCashBalance: boolean;
   formatCurrency: (value: number) => string;
   toMonthLabel: (month: string) => string;
 };
@@ -17,7 +17,7 @@ export default function ProjectionTableV2({
   priorYearActuals,
   projectionActiveYears,
   currentForecastYear,
-  hasForecastCurrentCashBalance,
+  hasCurrentCashBalance,
   formatCurrency,
   toMonthLabel,
 }: Props) {
@@ -80,7 +80,7 @@ export default function ProjectionTableV2({
               <th>Cash In</th>
               <th>Cash Out</th>
               <th>Net</th>
-              <th>{hasForecastCurrentCashBalance ? 'Balance' : 'Cumulative Net'}</th>
+              <th>{hasCurrentCashBalance ? 'Balance' : 'Cumulative Net'}</th>
             </tr>
           </thead>
           <tbody>

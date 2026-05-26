@@ -1293,56 +1293,24 @@ export default function Dashboard() {
     () => includedForecastAccounts.filter((record) => record.accountType !== 'Cash'),
     [includedForecastAccounts]
   );
-  const forecastCashAnchorAccounts = useMemo(() => {
-    if (includedNonCashForecastAccounts.length > 0 || includedCashForecastAccounts.length === 0) {
-      return activeCashAccountRecords;
-    }
-    return includedCashForecastAccounts;
-  }, [activeCashAccountRecords, includedCashForecastAccounts, includedNonCashForecastAccounts]);
-  const forecastCashAnchorAccountIds = useMemo(
-    () => new Set(forecastCashAnchorAccounts.map((record) => record.id)),
-    [forecastCashAnchorAccounts]
-  );
-  const forecastCashAnchorUsesFallback = useMemo(
-    () => includedNonCashForecastAccounts.length > 0 || includedCashForecastAccounts.length === 0,
-    [includedCashForecastAccounts.length, includedNonCashForecastAccounts.length]
-  );
-  const forecastCurrentCashBalance = useMemo(() => {
-    if (forecastCashAnchorAccounts.length === 0) return 0;
-    return forecastCashAnchorAccounts.reduce(
-      (sum, record) => sum + record.startingBalance + (accountBalanceMap.get(record.id) ?? 0),
-      0
-    );
-  }, [accountBalanceMap, forecastCashAnchorAccounts]);
-  const forecastCashAnchorAccountsMissingStartingBalance = useMemo(
-    () => forecastCashAnchorAccounts.filter((record) => Math.abs(record.startingBalance) <= EPSILON),
-    [forecastCashAnchorAccounts]
-  );
-  const hasForecastCurrentCashBalance = useMemo(
-    () => forecastCashAnchorAccounts.some((record) => Math.abs(record.startingBalance) > EPSILON),
-    [forecastCashAnchorAccounts]
-  );
   const includedCashAccountCount = useMemo(
     () => includedForecastAccounts.filter((record) => record.accountType === 'Cash').length,
     [includedForecastAccounts]
   );
   const forecastFoundationWarnings = useMemo(() => {
     const warnings: string[] = [];
-    if (forecastCashAnchorAccounts.length === 0) {
-      warnings.push('No active Cash accounts are available for the forecast starting balance yet.');
+    if (includedForecastAccounts.length === 0) {
+      warnings.push('No accounts are currently marked In Forecast yet.');
       return warnings;
     }
-    if (includedForecastAccounts.length === 0) {
-      warnings.push('No accounts are currently marked In Forecast, so the forecast is falling back to active Cash accounts only.');
-    }
-    if (!hasForecastCurrentCashBalance) {
+    if (!hasCurrentCashBalance) {
       warnings.push(
-        `Forecast cash anchor accounts all have a $0 starting balance, so forecast can only show cumulative change instead of absolute cash in bank.`
+        `All accounts marked In Forecast have a $0 starting balance, so forecast can only show cumulative change instead of absolute cash in bank.`
       );
     }
-    if (forecastCashAnchorAccountsMissingStartingBalance.length > 0) {
+    if (includedForecastAccountsMissingStartingBalance.length > 0) {
       warnings.push(
-        `${summarizeAccountNames(forecastCashAnchorAccountsMissingStartingBalance)} still need a starting balance as of ${forecastWindowStartLabel}.`
+        `${summarizeAccountNames(includedForecastAccountsMissingStartingBalance)} still need a starting balance as of ${forecastWindowStartLabel}.`
       );
     }
     if (includedNonCashForecastAccounts.length > 0) {
@@ -1350,17 +1318,12 @@ export default function Dashboard() {
         `${summarizeAccountNames(includedNonCashForecastAccounts)} are included in forecast even though their account type is not Cash. Double-check that they should contribute to cash balance.`
       );
     }
-    if (forecastCashAnchorUsesFallback && forecastCashAnchorAccounts.length > 0) {
-      warnings.push('Forecast engine uses active Cash accounts only for its starting cash anchor; non-cash forecast accounts are ignored.');
-    }
     return warnings;
   }, [
-    forecastCashAnchorAccounts.length,
-    forecastCashAnchorAccountsMissingStartingBalance,
-    forecastCashAnchorUsesFallback,
     forecastWindowStartLabel,
-    hasForecastCurrentCashBalance,
-    includedForecastAccounts,
+    hasCurrentCashBalance,
+    includedForecastAccounts.length,
+    includedForecastAccountsMissingStartingBalance,
     includedNonCashForecastAccounts,
   ]);
 
@@ -1895,22 +1858,22 @@ export default function Dashboard() {
       const engineProj = projectScenario(
         model,
         composerInput,
-        forecastCurrentCashBalance,
+        currentCashBalance,
         []
       );
       const cadenceProj = projectCategoryCadenceScenario(
         model,
         composerInput,
         filteredTxns,
-        forecastCurrentCashBalance,
+        currentCashBalance,
         []
       );
       // Reality (default) → Conservative Floor; Recovery → Split Conservative.
       // Defensive fallback: any unexpected posture value routes to Reality.
       const composed =
         businessRules.forecastPosture === 'recovery'
-          ? composeSplitConservative(engineProj, cadenceProj, forecastCurrentCashBalance)
-          : composeConservativeFloor(engineProj, cadenceProj, forecastCurrentCashBalance);
+          ? composeSplitConservative(engineProj, cadenceProj, currentCashBalance)
+          : composeConservativeFloor(engineProj, cadenceProj, currentCashBalance);
 
       // 2Y/3Y horizons extend the 12-month composed historical-pattern
       // forecast by repeating the monthly pattern (flat, month-of-year
@@ -1929,7 +1892,7 @@ export default function Dashboard() {
         }
         const firstMonth = composed.points[0].month;
         const extended: ScenarioPoint[] = [];
-        let prevBalance = forecastCurrentCashBalance;
+        let prevBalance = currentCashBalance;
         for (let i = 0; i < requestedMonths; i += 1) {
           if (i < composed.points.length) {
             const p = composed.points[i];
@@ -1971,7 +1934,7 @@ export default function Dashboard() {
       }
       return result;
     },
-    [filteredTxns, forecastCurrentCashBalance, businessRules.forecastPosture, expandedForecastEvents, forecastRangeMonths, model, scenarioInput]
+    [filteredTxns, currentCashBalance, businessRules.forecastPosture, expandedForecastEvents, forecastRangeMonths, model, scenarioInput]
   );
   const scenarioProjection = useMemo(() => forecastProjection.points, [forecastProjection.points]);
   const forecastSeasonality = useMemo(() => forecastProjection.seasonality, [forecastProjection.seasonality]);
@@ -2009,20 +1972,20 @@ export default function Dashboard() {
     const engineProj = projectScenario(
       model,
       composerInput,
-      forecastCurrentCashBalance,
+      currentCashBalance,
       []
     );
     const cadenceProj = projectCategoryCadenceScenario(
       model,
       composerInput,
       filteredTxns,
-      forecastCurrentCashBalance,
+      currentCashBalance,
       []
     );
     const composed =
       businessRules.forecastPosture === 'recovery'
-        ? composeSplitConservative(engineProj, cadenceProj, forecastCurrentCashBalance)
-        : composeConservativeFloor(engineProj, cadenceProj, forecastCurrentCashBalance);
+        ? composeSplitConservative(engineProj, cadenceProj, currentCashBalance)
+        : composeConservativeFloor(engineProj, cadenceProj, currentCashBalance);
 
     const requestedMonths = scenarioWithMonths.months;
     let result = composed;
@@ -2034,7 +1997,7 @@ export default function Dashboard() {
       }
       const firstMonth = composed.points[0].month;
       const extended: ScenarioPoint[] = [];
-      let prevBalance = forecastCurrentCashBalance;
+      let prevBalance = currentCashBalance;
       for (let i = 0; i < requestedMonths; i += 1) {
         if (i < composed.points.length) {
           const p = composed.points[i];
@@ -2068,7 +2031,7 @@ export default function Dashboard() {
     businessRules.forecastPosture,
     expandedForecastEvents,
     filteredTxns,
-    forecastCurrentCashBalance,
+    currentCashBalance,
     model,
   ]);
   const forecastDecisionSignals = useMemo(
@@ -2109,21 +2072,21 @@ export default function Dashboard() {
     const engineProj = projectScenario(
       model,
       composerInput,
-      forecastCurrentCashBalance,
+      currentCashBalance,
       []
     );
     const cadenceProj = projectCategoryCadenceScenario(
       model,
       composerInput,
       filteredTxns,
-      forecastCurrentCashBalance,
+      currentCashBalance,
       []
     );
     // Reality posture only — always Conservative Floor, never Split.
     const composed = composeConservativeFloor(
       engineProj,
       cadenceProj,
-      forecastCurrentCashBalance
+      currentCashBalance
     );
 
     const requestedMonths = scenarioWithMonths.months;
@@ -2136,7 +2099,7 @@ export default function Dashboard() {
       }
       const firstMonth = composed.points[0].month;
       const extended: ScenarioPoint[] = [];
-      let prevBalance = forecastCurrentCashBalance;
+      let prevBalance = currentCashBalance;
       for (let i = 0; i < requestedMonths; i += 1) {
         if (i < composed.points.length) {
           const p = composed.points[i];
@@ -2169,7 +2132,7 @@ export default function Dashboard() {
     return applyEventsOverlay(result.points, ownerPayExpandedEvents);
   }, [
     filteredTxns,
-    forecastCurrentCashBalance,
+    currentCashBalance,
     forecastScenarioPresets,
     ownerPayExpandedEvents,
     model,
@@ -2202,20 +2165,20 @@ export default function Dashboard() {
       const engineProj = projectScenario(
         model,
         composerInput,
-        forecastCurrentCashBalance,
+        currentCashBalance,
         []
       );
       const cadenceProj = projectCategoryCadenceScenario(
         model,
         composerInput,
         filteredTxns,
-        forecastCurrentCashBalance,
+        currentCashBalance,
         []
       );
       const composed = composeConservativeFloor(
         engineProj,
         cadenceProj,
-        forecastCurrentCashBalance
+        currentCashBalance
       );
       const requestedMonths = scenarioWithMonths.months;
       let result = composed;
@@ -2227,7 +2190,7 @@ export default function Dashboard() {
         }
         const firstMonth = composed.points[0].month;
         const extended: ScenarioPoint[] = [];
-        let prevBalance = forecastCurrentCashBalance;
+        let prevBalance = currentCashBalance;
         for (let i = 0; i < requestedMonths; i += 1) {
           if (i < composed.points.length) {
             const p = composed.points[i];
@@ -2259,7 +2222,7 @@ export default function Dashboard() {
     },
     [
       filteredTxns,
-      forecastCurrentCashBalance,
+      currentCashBalance,
       forecastScenarioPresets,
       ownerPayExpandedEvents,
       model,
@@ -2808,7 +2771,7 @@ export default function Dashboard() {
             visibleScenarioProjection={scenarioProjection.slice(0, 12)}
             priorYearActuals={priorYearActuals}
             currentForecastYear={currentForecastYear}
-            hasForecastCurrentCashBalance={hasForecastCurrentCashBalance}
+            hasCurrentCashBalance={hasCurrentCashBalance}
             formatCurrency={formatCurrency}
             toMonthLabel={toMonthLabel}
           />
@@ -2899,7 +2862,7 @@ export default function Dashboard() {
               }
               decisionSignals={forecastDecisionSignals}
               seasonality={forecastSeasonality}
-              currentCashBalance={forecastCurrentCashBalance}
+              currentCashBalance={currentCashBalance}
               forecastRangeMonths={forecastRangeMonths}
               forecastRangeValue={forecastRange}
               forecastRangeOptions={FORECAST_RANGE_OPTIONS.map((option) => ({ value: option.value, label: option.label, months: option.months }))}
@@ -3051,7 +3014,7 @@ export default function Dashboard() {
                             <th>Cash In</th>
                             <th>Cash Out</th>
                             <th>Net</th>
-                            <th>{hasForecastCurrentCashBalance ? 'Balance' : 'Cumulative Net'}</th>
+                            <th>{hasCurrentCashBalance ? 'Balance' : 'Cumulative Net'}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -3284,7 +3247,7 @@ export default function Dashboard() {
                   priorYearActuals={priorYearActuals}
                   projectionActiveYears={projectionActiveYears}
                   currentForecastYear={currentForecastYear}
-                  hasForecastCurrentCashBalance={hasForecastCurrentCashBalance}
+                  hasCurrentCashBalance={hasCurrentCashBalance}
                   formatCurrency={formatCurrency}
                   toMonthLabel={toMonthLabel}
                 />
@@ -3593,7 +3556,7 @@ export default function Dashboard() {
                           </div>
                           <div>
                             <span className="account-setup-summary-label">Current cash basis</span>
-                            <strong>{formatCurrency(forecastCurrentCashBalance)}</strong>
+                            <strong>{formatCurrency(currentCashBalance)}</strong>
                           </div>
                         </div>
                         <ul className="account-setup-summary-notes">
@@ -3666,7 +3629,7 @@ export default function Dashboard() {
                                         }}
                                       />
                                       <span className="account-input-hint">
-                                        {Math.abs(record.startingBalance) <= EPSILON && forecastCashAnchorAccountIds.has(record.id)
+                                        {Math.abs(record.startingBalance) <= EPSILON && record.includeInCashForecast && record.active
                                           ? `Needed for forecast basis as of ${forecastWindowStartLabel}`
                                           : `Balance on ${forecastWindowStartLabel}`}
                                       </span>
