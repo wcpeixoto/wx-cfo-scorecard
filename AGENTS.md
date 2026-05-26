@@ -36,16 +36,33 @@ Wesley; agents recommend, they don't auto-pick.
 
 Every Notion Backlog task — and every "what's next" recommendation in
 chat — uses the same three fields, in plain English an owner can grasp
-in one read:
+in one read. **Keep each field to 1–2 short sentences.**
 
-- **Result.** What the owner will see, get, or benefit from when this
-  is done.
-- **Why it matters.** What problem, risk, confusion, friction, or
-  missed opportunity this reduces.
-- **Premise check.** Whether the task is still necessary or has been
-  overtaken by later work, with evidence inline (recent PRs, file:line,
-  what was checked). If unclear, the task is **not build-ready** —
-  rescope first.
+- **Result.** What will be added or changed — what the owner sees or
+  gets when this is done.
+- **Why.** What problem, risk, friction, or missed opportunity this
+  reduces.
+- **Premise.** Whether the task is still necessary or has been
+  overtaken by later work. If unclear, the task is **not build-ready**
+  — rescope first.
+
+Canonical shape for an in-chat recommendation:
+
+```text
+Option 1 — Find unclassified Quicken categories
+
+Result:
+Add a Settings list showing every Quicken category with no rule, plus
+how many transactions it affects.
+
+Why:
+New Quicken categories can quietly land as "unknown" and throw off the
+dashboard. This gives you a clear place to catch and fix them after
+imports.
+
+Premise:
+Still needed. I found no recent Settings work that solves this.
+```
 
 The point of the schema is **shared evaluation**: the agent fills the
 fields in; Wesley reads them; the two together decide whether the task
@@ -56,7 +73,11 @@ decisions are joint, the fields exist so they're informed.
 A card missing any of the three fields is not build-ready. Apply to:
 new cards, existing cards during retrofit, and rescope passes before
 a card returns to the build queue. In-chat recommendations cap at
-**two options at a time**, each option using the same three fields.
+**two options at a time**.
+
+For Notion cards, the field content can carry more evidence (PR
+numbers, file:line) where it helps a future builder; in chat, keep it
+brief.
 
 ---
 
