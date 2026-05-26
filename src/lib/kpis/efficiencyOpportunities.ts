@@ -11,6 +11,10 @@ const WINDOW_SIZE_MONTHS = 3;
 const LOOKBACK_MONTHS = 24;
 const MAX_ROWS = 4;
 
+// Revenue-qualification of "best" windows (see computeCore).
+const REVENUE_FLOOR_RATIO = 0.7;  // a window's avg revenue must clear 0.7 × floor
+const MIN_WINDOWS = 2;            // ≥2 windows needed for a credible benchmark
+
 // Categories the owner has no near-term operational lever to change.
 // Suppressed from Efficiency Opportunities regardless of gap size.
 // Names are exact matches against parentCategoryName() output — case-sensitive.
@@ -58,6 +62,12 @@ export interface EfficiencyOpportunitiesResult {
   // set so it survives display truncation. Same methodology as `rows`; null
   // when Payroll has no positive excess. Never the all-category total.
   payrollExtraPerMonth: number | null;
+  // True when "best" was chosen from revenue-qualified windows (≥2 windows
+  // clearing the dual revenue floor). False when too few qualified and every
+  // category fell back to the unfiltered best. Globally uniform per run today
+  // (the floor is revenue-only); a per-row field can be added later if
+  // qualification ever becomes category-specific.
+  benchmarkRevenueQualified: boolean;
 }
 
 const MONTH_SHORT = [
@@ -140,6 +150,14 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+// Median of a pre-sorted (ascending) numeric array. 0 for empty input.
+function median(sortedAsc: number[]): number {
+  const n = sortedAsc.length;
+  if (n === 0) return 0;
+  const mid = Math.floor(n / 2);
+  return n % 2 === 1 ? sortedAsc[mid] : (sortedAsc[mid - 1] + sortedAsc[mid]) / 2;
+}
+
 /**
  * Compute efficiency opportunities for the UI Lab card.
  *
@@ -158,6 +176,16 @@ export function computeEfficiencyOpportunities(
   model: DashboardModel,
   txns: Txn[],
 ): EfficiencyOpportunitiesResult {
+  return computeCore(model, txns, new Date());
+}
+
+// Internal core split out so tests can inject a fixed reference date (mirrors
+// digHere.ts). `referenceDate` sets the "last complete month" boundary.
+export function computeCore(
+  model: DashboardModel,
+  txns: Txn[],
+  referenceDate: Date,
+): EfficiencyOpportunitiesResult {
   if (!debugLoggedOnce) {
     // eslint-disable-next-line no-console
     console.debug(
@@ -172,6 +200,7 @@ export function computeEfficiencyOpportunities(
     rows: [],
     totalExtraPerMonth: 0,
     payrollExtraPerMonth: null,
+    benchmarkRevenueQualified: false,
   };
 
   const latestMonth = model.latestMonth;
@@ -180,7 +209,7 @@ export function computeEfficiencyOpportunities(
   // Derive the last complete month from the current date at runtime.
   // A month is complete only if it is strictly before the current calendar month.
   // e.g. on April 21 2026, April is incomplete → last complete month = March 2026.
-  const now = new Date();
+  const now = referenceDate;
   const currentYearMonth = `${String(now.getFullYear()).padStart(4, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   // lastCompleteMonth is one month before the current calendar month.
   const lastCompleteMonth = addMonths(currentYearMonth, -1);
@@ -259,6 +288,34 @@ export function computeEfficiencyOpportunities(
 
   if (validWindows.length === 0) return emptyResult;
 
+  // ── Revenue-qualify the candidate windows ────────────────────────────────
+  // A 3-month window is only a fair "best" benchmark if its revenue scale is
+  // comparable to today's. Qualify each window by avg monthly revenue against a
+  // dual floor:
+  //   Floor 1 = 0.7 × current 6-month avg revenue  (excludes low-revenue eras
+  //             whose ratios look good only because revenue was small)
+  //   Floor 2 = 0.7 × trailing 24-month median     (anchors to the long-run
+  //             normal so a cratered current period can't qualify weak history)
+  // Both inputs count only months with revenue > 0 (matches window validity).
+  const last6Revenue = revenueByMonth.slice(-6).filter((v) => v > 0);
+  const current6moAvgRevenue = last6Revenue.length
+    ? last6Revenue.reduce((a, b) => a + b, 0) / last6Revenue.length
+    : 0;
+  const median24moRevenue = median(
+    revenueByMonth.filter((v) => v > 0).sort((a, b) => a - b),
+  );
+  const revenueFloor = Math.max(
+    REVENUE_FLOOR_RATIO * current6moAvgRevenue,
+    REVENUE_FLOOR_RATIO * median24moRevenue,
+  );
+
+  // ≥2 windows must clear the floor for a credible qualified benchmark.
+  // Otherwise every category falls back to the unfiltered best so the card
+  // never silently empties. The flag is globally uniform for the run.
+  const qualifyingWindows = validWindows.filter((w) => w.avgRevenue >= revenueFloor);
+  const benchmarkRevenueQualified = qualifyingWindows.length >= MIN_WINDOWS;
+  const candidateWindows = benchmarkRevenueQualified ? qualifyingWindows : validWindows;
+
   // Current window = last valid window that ends at windowAnchor (the last complete month)
   const latestIdx = months.length - 1;
   const currentWindow = validWindows.find((w) => w.endIdx === latestIdx);
@@ -281,15 +338,16 @@ export function computeEfficiencyOpportunities(
     // Materiality guard
     if (currentAvgSpend < MATERIALITY_MIN_USD) continue;
 
-    // Windows where category has been observed are all valid windows (we still
-    // compute ratio over each valid window; we require ≥ 2 valid windows total).
-    if (validWindows.length < 2) continue;
+    // Need ≥2 valid windows at all for any credible benchmark.
+    if (validWindows.length < MIN_WINDOWS) continue;
 
     const todayRatio = currentAvgSpend / currentWindow.avgRevenue;
 
+    // Best = lowest cost ratio among the revenue-qualified candidate windows
+    // (or all valid windows when the floor disqualified too many — see fallback).
     let bestRatio = Number.POSITIVE_INFINITY;
     let bestWindow: Window | null = null;
-    for (const w of validWindows) {
+    for (const w of candidateWindows) {
       let sumSpend = 0;
       for (let k = w.startIdx; k <= w.endIdx; k += 1) {
         sumSpend += spendByMonth[k];
@@ -358,5 +416,6 @@ export function computeEfficiencyOpportunities(
     rows,
     totalExtraPerMonth,
     payrollExtraPerMonth: payrollRow ? payrollRow.extraPerMonth : null,
+    benchmarkRevenueQualified,
   };
 }
