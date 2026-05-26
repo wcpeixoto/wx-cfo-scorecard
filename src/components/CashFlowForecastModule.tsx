@@ -101,8 +101,8 @@ function dateInMonth(month: string, desiredDay: number): string {
 // Forecast horizon segmented control split:
 // — primary segments rendered directly in the toggle track (compact, common ranges)
 // — overflow values rendered inside the More dropdown (longer ranges)
-const FORECAST_PRIMARY_VALUES: readonly string[] = ['30d', '60d', '90d'];
-const FORECAST_MORE_VALUES: readonly string[] = ['6m', '1y', '2y', '3y'];
+const FORECAST_PRIMARY_VALUES: readonly string[] = ['6m'];
+const FORECAST_MORE_VALUES: readonly string[] = ['30d', '60d', '90d', '6m', '1y', '2y', '3y'];
 
 // Short labels for the segmented control (parent passes longer "Next ..." labels
 // which are still the canonical option labels — these are display-only).
@@ -1057,7 +1057,7 @@ export default function CashFlowForecastModule({
           const netChange = finalBalance - startingCashBalance;
           const netSign = netChange > 0 ? '+' : netChange < 0 ? '−' : '';
           const netColor = netChange > 0 ? 'is-positive' : netChange < 0 ? 'is-negative' : '';
-          const moreSelected = FORECAST_MORE_VALUES.includes(forecastRangeValue);
+          const moreSelected = !FORECAST_PRIMARY_VALUES.includes(forecastRangeValue);
           const moreLabel = moreSelected
             ? FORECAST_RANGE_SHORT_LABELS[forecastRangeValue] ?? forecastRangeValue
             : 'More';
