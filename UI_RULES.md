@@ -1407,18 +1407,48 @@ class on the card root. Child elements that need status color inherit via
 | `.cth-card--pressure` | `#DC6803` | Under Pressure |
 | `.cth-card--burning`  | `#F04438` | Burning Cash |
 
-### Bar chart — per-bar coloring
-Cash Trend uses `plotOptions.bar.distributed: true` to enable per-bar
-color in ApexCharts. This requires the `colors` array to be recomputed
-from `result.monthlyBars` on every render — do not memoize separately.
-Positive months: `#12B76A`. Negative months: `#F04438`.
+### Compact trend line (right column)
+Under the status pill on the right side of the card, an eyebrow label
+("Trend") sits above a 132×36 inline-SVG best-fit line over the last 6
+monthly net-cash values. The line is the *only* trend visualization on
+the card — there is no bar chart, no full-width chart, no axes, labels,
+dots, or fill.
 
-### ApexCharts bar chart config
-- `fontFamily: 'Outfit, sans-serif'` (do not use Inter unless an explicit project-wide visual migration is approved)
-- `distributed: true` (per-bar color)
-- `borderRadiusApplication: 'end'` (rounds top only — correct for zero-crossing data)
-- `colors`: dynamic array from `result.monthlyBars`
-- `columnWidth: '39%'`, `borderRadius: 5`, `stroke: { show: true, width: 4, colors: ['transparent'] }`
+**Dual-encoding rule.** The pill carries state (Building / Treading /
+Pressure / Burning). The trend line carries one signal only: *is direction
+worsening?* Pill color and line color are intentionally allowed to
+diverge — they answer different questions. Do not retint the line to
+match the pill.
+
+**Two-color slope rule.**
+- Red (`var(--negative)`) when the 6-month least-squares slope ≤
+  −$1,500/month.
+- Neutral brand blue (`var(--accent)`) otherwise — positive, flat, or
+  insufficiently negative.
+- Never green; the pill carries "good" / "healthy" already.
+
+**Threshold evidence.** Backtest of 12 successive 6-month windows on
+the live fixture (Jun 2025 → May 2026) produced slopes in
+[−$1,760, +$2,598]/mo with median −$109/mo. −$1,500/mo flags 3 windows
+— all visually-bad months (Jul 2025, Dec 2025, Mar 2026). Tighter
+thresholds (−$2,000/mo) never trigger on this fixture; looser ones
+(−$1,000/mo) chase noise. Adjacent windows can flicker color when the
+underlying data flickers; this is an accepted edge case (outlier handling
+deferred to a future pass). Re-run the backtest via
+[`scripts/backtest/slopeBacktest.ts`](scripts/backtest/slopeBacktest.ts)
+(`npx tsx scripts/backtest/slopeBacktest.ts`).
+
+**Edge cases.**
+- Fewer than 6 monthly bars: the eyebrow + line are both hidden; the
+  rest of the card renders normally.
+- Slope above the worsening threshold: render neutral blue. Do not
+  flicker between blue and red within a single render.
+
+**Eyebrow label pattern.** "Trend" — 10px, weight 500, color `#98A2B3`
+(matches `.cth-subtitle` muted color), single word, no colon,
+right-aligned, sits 2px above the line. Reuse this pattern for any
+future compact directional indicator: small word above a tiny chart, the
+label explains "this is data" so the chart itself can stay glyph-free.
 
 ### Operating cash definition
 Cash Trend's T6M metrics are computed from `computeMonthlyRollups('operating')`.

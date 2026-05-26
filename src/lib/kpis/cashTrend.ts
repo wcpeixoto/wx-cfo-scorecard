@@ -42,14 +42,14 @@ export interface CashTrendResult {
   priorT6mMargin: number;     // decimal — prior window margin (for diagnostics)
   negativeMonthCount: number;
   interpretation: string;       // status-driven plain-English line shown in the card body
-  monthlyBars: CashTrendBar[];  // retained on the result; not rendered by the card
+  monthlyBars: CashTrendBar[];  // feeds the compact best-fit trend line in the card header (CashTrendHero)
   windowLabel: string;          // 'Nov 2025 – Apr 2026'
 }
 
 const INTERPRETATION_BY_STATUS: Record<CashTrendStatus, string> = {
   building: 'Strong cash generation across the last 6 months.',
   treading: 'Cash is positive, but there is little room for error.',
-  pressure: 'Cash is positive, but the margin cannot absorb a bad month.',
+  pressure: 'Cash is positive, but one bad month could erase the cushion.',
   burning:  'Cash is going out faster than it comes in.',
 };
 
