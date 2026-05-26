@@ -720,7 +720,7 @@ export default function Dashboard() {
   const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('lastMonth');
   const [topCategoriesTimeframe, setTopCategoriesTimeframe] = useState<KpiComparisonTimeframe>('lastMonth');
   const [netCashFlowChartMode, setNetCashFlowChartMode] = useState<CashFlowMode>('operating');
-  const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('90d');
+  const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('6m');
   const [forecastEvents, setForecastEvents] = useState<ForecastEvent[]>(DEFAULT_FORECAST_EVENTS);
   // UI Lab — StatisticsCard tab demo state. Local-only, not persisted.
   const [uiLabStatsTab, setUiLabStatsTab] = useState<'daily' | 'weekly' | 'monthly'>('daily');
