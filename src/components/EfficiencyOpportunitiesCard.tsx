@@ -23,7 +23,7 @@ function formatExtra(amount: number): string {
 }
 
 export function EfficiencyOpportunitiesCard({ result }: Props) {
-  const { windowLabel, rows, totalExtraPerMonth } = result;
+  const { windowLabel, rows, totalExtraPerMonth, benchmarkRevenueQualified } = result;
 
   const tooltipId = useId();
   const bestTooltipId = useId();
@@ -57,6 +57,12 @@ export function EfficiencyOpportunitiesCard({ result }: Props) {
                 <li>
                   “Your best” — your lowest cost % of revenue for that category over a 3-month stretch.
                 </li>
+                {!benchmarkRevenueQualified && (
+                  <li>
+                    Too few 3-month stretches had high enough revenue to be a reliable benchmark, so
+                    “your best” falls back to all of the last 24 months and may be less comparable to today.
+                  </li>
+                )}
                 <li>
                   “Today” — your current 3-month average.
                 </li>
