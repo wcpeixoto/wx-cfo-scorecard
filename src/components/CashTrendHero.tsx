@@ -6,9 +6,17 @@
  * property set per status modifier class.
  *
  * Body content: dominant metric line, status-driven interpretation line,
- * and a single proof line. A compact best-fit trend line sits under the
- * status pill on the right; it carries one signal only — is the 6-month
+ * and a single proof line. A compact best-fit trend line sits in the right
+ * column of the header; it carries one signal only — is the 6-month
  * direction worsening? — leaving the pill to carry state.
+ *
+ * Layout assumes the production prop wiring (negativeMonthsAsSubtitle=true,
+ * the only mount today at Dashboard.tsx). In that mode the ⓘ tooltip sits
+ * in the title row on the left, so the right column is pill → eyebrow →
+ * trend line, stacked top-down via .cth-header-right (flex column,
+ * align-items: flex-end). The negativeMonthsAsSubtitle=false branch still
+ * compiles but stacks the ⓘ tooltip between the pill and the trend block;
+ * not a supported production layout.
  *
  * Interaction model: ⓘ tooltip only.
  */

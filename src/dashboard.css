@@ -2624,7 +2624,9 @@ body {
   }
 }
 
-/* Row 2 — Cash Trend 40% | Monthly Net Cash Flow 60%; stretch for equal outer height */
+/* Row 2 — Cash Trend 40% | Monthly Net Cash Flow 60%. Grid stretches by default so
+   the chart neighbor fills the row height; the .cth-card deliberately opts out via
+   align-self: start (see line 8422) so it stays compact and top-aligned. */
 .cash-trend-row {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
