@@ -1671,9 +1671,23 @@ body {
   width: 100%;
 }
 
+.forecast-slider-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .forecast-slider-label {
   font-size: 14px;
   font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.forecast-slider-impact {
+  font-size: 12px;
+  font-weight: 400;
   color: var(--text-secondary);
   white-space: nowrap;
 }
