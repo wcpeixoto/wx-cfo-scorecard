@@ -127,6 +127,12 @@ const DEFAULT_TARGET_NET_MARGIN = 0.25;
 
 type CashFlowForecastModuleProps = {
   data: TrendPoint[];
+  /** Per-month TrendPoint series for the "base" preset projection, aligned 1:1 with `data`.
+   *  Null when the active scenario IS the base preset (no overlay to draw). When non-null,
+   *  renders as a faded overlay on the cash-balance chart so the operator can see how the
+   *  active scenario differs from the default forecast. Suppressed by the chart layer
+   *  whenever priorSeries or reserveSeries is already active (one overlay at a time). */
+  baselineData?: TrendPoint[] | null;
   /** Historical monthly actuals — drives the optional prior-period overlay. */
   monthlyRollups: MonthlyRollup[];
   fullForecast: ScenarioPoint[];
@@ -388,6 +394,7 @@ function ForecastSliderControl({
 
 export default function CashFlowForecastModule({
   data,
+  baselineData = null,
   monthlyRollups,
   fullForecast,
   reserveTarget,
@@ -624,6 +631,38 @@ export default function CashFlowForecastModule({
     });
   }, [startingCashBalance, weeklySeries]);
 
+  // Baseline overlay accumulation. Mirrors the active-forecast accumulation
+  // exactly (same startingCashBalance, same expandMonthlyToWeekly transform)
+  // so monthly and weekly buckets line up 1:1 with the live series. Returns
+  // null whenever baselineData is null — the chart layer suppresses the
+  // overlay slot in that case.
+  const baselineCumulativeSeries = useMemo<TrendPoint[] | null>(() => {
+    if (!baselineData) return null;
+    let running = startingCashBalance;
+    return baselineData.map((point) => {
+      running += point.net;
+      return {
+        ...point,
+        net: roundCurrency(running),
+      };
+    });
+  }, [baselineData, startingCashBalance]);
+  const baselineWeeklyExpanded = useMemo(
+    () => (baselineData ? expandMonthlyToWeekly(baselineData) : []),
+    [baselineData],
+  );
+  const baselineWeeklyCumulativeSeries = useMemo<TrendPoint[] | null>(() => {
+    if (!baselineData) return null;
+    let running = startingCashBalance;
+    return baselineWeeklyExpanded.map((point) => {
+      running += point.net;
+      return {
+        ...point,
+        net: roundCurrency(running),
+      };
+    });
+  }, [baselineData, baselineWeeklyExpanded, startingCashBalance]);
+
   // Prior series accumulated at the displayed granularity. Monthly path
   // accumulates the raw monthly nets; weekly path runs the same
   // expandMonthlyToWeekly transform the forecast uses, so prior and forecast
@@ -660,6 +699,8 @@ export default function CashFlowForecastModule({
   }, [priorPeriodInput]);
   const displaySeries = granularity === 'week' ? weeklyCumulativeSeries : cumulativeSeries;
   const priorDisplaySeries = granularity === 'week' ? priorWeeklyCumulative : priorMonthlyCumulative;
+  const baselineDisplaySeries =
+    granularity === 'week' ? baselineWeeklyCumulativeSeries : baselineCumulativeSeries;
   const reserveSeries = useMemo(
     () => buildReserveSeries(fullForecast, displaySeries, granularity),
     [fullForecast, displaySeries, granularity],
@@ -1279,6 +1320,7 @@ export default function CashFlowForecastModule({
             priorSeries={priorPeriodActive ? priorDisplaySeries : null}
             priorSeriesLabel="Prior Period"
             reserveSeries={reserveActive ? reserveSeries : null}
+            baselineSeries={baselineDisplaySeries}
           />
         </div>
 
