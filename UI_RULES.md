@@ -1407,25 +1407,75 @@ class on the card root. Child elements that need status color inherit via
 | `.cth-card--pressure` | `#DC6803` | Under Pressure |
 | `.cth-card--burning`  | `#F04438` | Burning Cash |
 
-### Compact trend line (right column)
-Under the status pill on the right side of the card, an eyebrow label
-("Trend") sits above a 132×36 inline-SVG best-fit line over the last 6
-monthly net-cash values. The line is the *only* trend visualization on
-the card — there is no bar chart, no full-width chart, no axes, labels,
-dots, or fill.
+### Compact trend sparkline (right column)
+Bottom-right of the card, a 160×70 ApexCharts area sparkline renders the
+**linear best-fit line** over the last 6 monthly net-cash values — *not*
+the raw month-by-month series. The visual is two endpoints (start and
+end of the best-fit line) drawn as a single straight stroke with a soft
+vertical gradient fill underneath. No bar chart, no full-width chart, no
+axes, gridlines, labels, markers, or tooltip. No visible eyebrow label;
+the chart container carries the accessible name instead.
+
+**Why best-fit, not raw values.** This card is *Cash Trend* — the
+visual must communicate direction, not month-to-month movement. The
+neighboring Monthly Net Cash Flow card already shows the raw monthly
+shape with full chrome (axes, labels, tooltips). A chrome-less
+160×70 best-fit sparkline is a different visual category: an inline
+direction summary, not a second monthly chart.
 
 **Dual-encoding rule.** The pill carries state (Building / Treading /
-Pressure / Burning). The trend line carries one signal only: *is direction
-worsening?* Pill color and line color are intentionally allowed to
-diverge — they answer different questions. Do not retint the line to
-match the pill.
+Pressure / Burning). The sparkline carries one signal only: *is direction
+worsening?* Pill color and sparkline color are intentionally allowed to
+diverge — they answer different questions. Do not retint the sparkline
+to match the pill.
 
-**Two-color slope rule.**
-- Red (`var(--negative)`) when the 6-month least-squares slope ≤
-  −$1,500/month.
-- Neutral brand blue (`var(--accent)`) otherwise — positive, flat, or
-  insufficiently negative.
+**Two-color slope rule (visual).**
+- Red (`chartTokens.error`, `#F04438` — matches `var(--negative)`) when
+  the 6-month least-squares slope ≤ −$1,500/month.
+- Neutral brand blue (`chartTokens.brand`, `#465FFF` — matches
+  `var(--accent)`) otherwise — positive, flat, or insufficiently
+  negative.
+- Gradient under the line uses the same hue as the stroke at reduced
+  opacity (`opacityFrom: 0.6 → opacityTo: 0`).
 - Never green; the pill carries "good" / "healthy" already.
+- ApexCharts options must read hex from `chartTokens.ts` — chart
+  internals can't resolve CSS custom properties.
+
+**Three-state accessible label (semantic).** The chart container has
+an `aria-label` driven by the same slope:
+- `slope ≤ −$1,500/mo`: "Cash trend over 6 months — direction worsening"
+- `slope ≥ +$1,500/mo`: "Cash trend over 6 months — direction improving"
+- otherwise: "Cash trend over 6 months — stable"
+
+The visual stays two-color (no green); the semantic label gets the
+extra "improving" state so screen-reader and color-blind users hear
+direction explicitly without adding a visible third color.
+
+**Y-axis scaling.** Scaled to the two best-fit endpoints with 15%
+padding above and below the higher / lower endpoint. Never forced to
+zero.
+- `chartMin = minY − 0.15 × range`, `chartMax = maxY + 0.15 × range`
+  where `range = |endY − startY| = |slope| × 5`.
+- **Flat fallback:** if `|slope| × 6 < $500` — i.e. the best-fit line
+  moves less than $500 across the 6-month window — render a flat line
+  at the midpoint and widen the y-axis to a fixed ±$1,000 around it.
+  This is a *rendering* concern only; the slope-based color rule still
+  runs independently. (Math: |slope|×6 < $500 implies |slope| < ~$83/mo,
+  well above the −$1,500/mo worsening threshold — flat and red can't
+  co-occur in practice.)
+
+**Card layout.** `.cth-card` is a 2-column CSS grid (`minmax(0, 1fr) auto`).
+Row 1: title block (col 1) + pill (col 2). Row 2: metric block (col 1,
+`align-self: end`) + sparkline (col 2, `align-self: end + justify-self:
+end`). Row 3: verdict, spans both columns. The sparkline's bottom lines
+up with the supporting-metric line's bottom by virtue of both grid
+items sharing row 2 and bottom-aligning — no absolute positioning, no
+hard-coded offsets.
+
+**Responsive.** `.cth-card` declares `container-type: inline-size`. When
+the card is narrower than 380px (`@container (max-width: 380px)`), the
+sparkline hides (`display: none`) so it can't collide with text. Pill
+remains in the right column; metric and verdict reflow naturally.
 
 **Threshold evidence.** Backtest of 12 successive 6-month windows on
 the live fixture (Jun 2025 → May 2026) produced slopes in
@@ -1439,16 +1489,14 @@ deferred to a future pass). Re-run the backtest via
 (`npx tsx scripts/backtest/slopeBacktest.ts`).
 
 **Edge cases.**
-- Fewer than 6 monthly bars: the eyebrow + line are both hidden; the
-  rest of the card renders normally.
+- Fewer than 6 monthly bars: the sparkline is hidden; the rest of the
+  card renders normally.
+- Card narrower than 380px: the sparkline is hidden via container query;
+  the rest of the card renders normally.
 - Slope above the worsening threshold: render neutral blue. Do not
   flicker between blue and red within a single render.
-
-**Eyebrow label pattern.** "Trend" — 10px, weight 500, color `#98A2B3`
-(matches `.cth-subtitle` muted color), single word, no colon,
-right-aligned, sits 2px above the line. Reuse this pattern for any
-future compact directional indicator: small word above a tiny chart, the
-label explains "this is data" so the chart itself can stay glyph-free.
+- Non-finite input values: `leastSquaresSlope` returns `{ slope: 0,
+  intercept: 0 }` and the visual goes blue/flat. No NaN propagation.
 
 ### Operating cash definition
 Cash Trend's T6M metrics are computed from `computeMonthlyRollups('operating')`.

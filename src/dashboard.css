@@ -8430,10 +8430,16 @@ body {
   border-radius: 16px;
   padding: 24px;
   font-family: 'Outfit', sans-serif;
-  display: flex;
-  flex-direction: column;
+  /* 2-column grid: text-bearing column (1fr, can shrink) + auto-sized
+     aside (pill/sparkline). Element margins (e.g. .cth-interpretation
+     margin-top) manage vertical rhythm — no grid row-gap. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 16px;
   /* Card sizes to its content; don't stretch to match the chart neighbor. */
   align-self: start;
+  /* Container query scope for the sparkline (hidden on narrow cards). */
+  container-type: inline-size;
 }
 
 .cth-card--building  { --cth-accent: #12B76A; }
@@ -8441,16 +8447,10 @@ body {
 .cth-card--pressure  { --cth-accent: #DC6803; }
 .cth-card--burning   { --cth-accent: #F04438; }
 
-/* ─── Header (Pattern B) ─────────────────────────────────────────────── */
-.cth-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
+/* ─── Row 1 — Title block + Pill ─────────────────────────────────────── */
 .cth-header-left {
+  grid-column: 1;
+  grid-row: 1;
   min-width: 0;
 }
 
@@ -8477,36 +8477,34 @@ body {
 }
 
 .cth-header-right {
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  flex-direction: row-reverse;
+  align-items: center;
   gap: 8px;
   flex-shrink: 0;
 }
 
-/* Compact best-fit trend line stack — eyebrow above the line, right-aligned
-   directly under the status pill. Hidden entirely when <6 months. */
-.cth-trend-block {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
+/* Compact area sparkline — best-fit line over 6 monthly net-cash values,
+   no axes, labels, markers, or tooltips. Color (brand-blue or red) is
+   set by the ApexCharts options object per the slope/worsening rule;
+   container only constrains size and places the sparkline in row 2
+   col 2 bottom-aligned with the supporting-metric line on the left.
+   Hidden entirely when <6 months OR when the card is narrower than
+   the responsive threshold below. */
+.cth-trend-sparkline {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: end;
+  justify-self: end;
+  width: 160px;
 }
 
-.cth-trend-eyebrow {
-  font-size: 10px;
-  font-weight: 500;
-  color: #98A2B3;
-  line-height: 1;
-}
-
-.cth-trend-line {
-  display: block;
-  stroke: var(--accent);
-}
-
-.cth-trend-line.is-worsening {
-  stroke: var(--negative);
+@container (max-width: 380px) {
+  .cth-trend-sparkline {
+    display: none;
+  }
 }
 
 /* When the ⓘ sits in the title row (left side of the card, the
@@ -8549,18 +8547,15 @@ body {
   outline-offset: 2px;
 }
 
-/* ─── Body ───────────────────────────────────────────────────────────── */
-.cth-body {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 24px;
-  flex: 1;
-}
-
+/* ─── Row 2 — Metric block + Sparkline ───────────────────────────────── */
 .cth-body-left {
-  flex: 1;
+  grid-column: 1;
+  grid-row: 2;
+  /* Align metric block's bottom (= supporting-metric line bottom) with
+     the sparkline's bottom in this same grid row. */
+  align-self: end;
   min-width: 0;
+  margin-top: 16px;
 }
 
 /* Primary metric — amount + noun on shared baseline */
@@ -8599,8 +8594,10 @@ body {
   font-weight: 500;
 }
 
-/* Interpretation line — status-driven plain-English read, accent color */
+/* ─── Row 3 — Verdict (spans both columns) ───────────────────────────── */
 .cth-interpretation {
+  grid-column: 1 / -1;
+  grid-row: 3;
   margin-top: 16px;
   font-size: 14px;
   font-weight: 500;
@@ -8614,9 +8611,12 @@ body {
   color: #344054;
 }
 
-/* Right-side mini-stat container */
+/* ─── Row 4 — Mini-stat (non-production branch only) ─────────────────── */
 .cth-stat-block {
-  flex-shrink: 0;
+  grid-column: 1 / -1;
+  grid-row: 4;
+  justify-self: start;
+  margin-top: 16px;
   text-align: center;
   background: #F9FAFB;
   border: 1px solid #E4E7EC;
@@ -8642,20 +8642,11 @@ body {
   line-height: 16px;
 }
 
-@media (max-width: 639px) {
-  .cth-body {
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
-  }
-  .cth-stat-block {
-    margin-top: 12px;
-    align-self: flex-start;
-  }
-}
-
-/* No-data / empty state */
+/* No-data / empty state — spans both grid columns under the title row */
 .cth-empty {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin-top: 8px;
   font-size: 14px;
   font-weight: 400;
   color: #667085;
