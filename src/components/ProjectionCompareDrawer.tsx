@@ -20,7 +20,7 @@ interface Props {
   visibleScenarioProjection: ScenarioPoint[];
   priorYearActuals: PriorYearActualsResult;
   currentForecastYear: number;
-  hasForecastCurrentCashBalance: boolean;
+  hasCurrentCashBalance: boolean;
   formatCurrency: (value: number) => string;
   toMonthLabel: (month: string) => string;
 }
@@ -33,7 +33,7 @@ export function ProjectionCompareDrawer({
   visibleScenarioProjection,
   priorYearActuals,
   currentForecastYear,
-  hasForecastCurrentCashBalance,
+  hasCurrentCashBalance,
   formatCurrency,
   toMonthLabel,
 }: Props) {
@@ -84,7 +84,7 @@ export function ProjectionCompareDrawer({
             priorYearActuals={priorYearActuals}
             projectionActiveYears={[compareYear]}
             currentForecastYear={currentForecastYear}
-            hasForecastCurrentCashBalance={hasForecastCurrentCashBalance}
+            hasCurrentCashBalance={hasCurrentCashBalance}
             formatCurrency={formatCurrency}
             toMonthLabel={toMonthLabel}
           />
