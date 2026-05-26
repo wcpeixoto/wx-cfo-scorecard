@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FiBarChart2, FiCheck, FiChevronDown, FiSlash } from 'react-icons/fi';
 import ProjectedCashBalanceChart from './ProjectedCashBalanceChart';
+import PeriodDropdown, { type PeriodOption } from './PeriodDropdown';
 import type {
   CashFlowForecastStatus,
   ForecastDecisionSignals,
@@ -98,13 +99,7 @@ function dateInMonth(month: string, desiredDay: number): string {
   return `${month}-${String(day).padStart(2, '0')}`;
 }
 
-// Forecast horizon segmented control split:
-// — primary segments rendered directly in the toggle track (compact, common ranges)
-// — overflow values rendered inside the More dropdown (longer ranges)
-const FORECAST_PRIMARY_VALUES: readonly string[] = ['30d', '60d', '90d'];
-const FORECAST_MORE_VALUES: readonly string[] = ['6m', '1y', '2y', '3y'];
-
-// Short labels for the segmented control (parent passes longer "Next ..." labels
+// Short labels for the horizon dropdown (parent passes longer "Next ..." labels
 // which are still the canonical option labels — these are display-only).
 const FORECAST_RANGE_SHORT_LABELS: Record<string, string> = {
   '30d': '30 Days',
@@ -431,11 +426,6 @@ export default function CashFlowForecastModule({
     }
   }, []);
 
-  // Forecast horizon "More" dropdown — primary range pills are 30/60/90 Days;
-  // longer ranges (6 Months / 1/2/3 Years) live behind a More popover so the
-  // segmented control stays compact while preserving every option.
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const moreMenuRef = useRef<HTMLDivElement>(null);
   const [scenarioMenuOpen, setScenarioMenuOpen] = useState(false);
   const scenarioMenuRef = useRef<HTMLDivElement>(null);
 
@@ -460,6 +450,15 @@ export default function CashFlowForecastModule({
     const maxMonths = forecastRangeOptions.reduce((acc, opt) => Math.max(acc, opt.months), 0);
     return lastDayOfHorizon(maxMonths);
   }, [forecastRangeOptions]);
+
+  const periodDropdownOptions = useMemo<PeriodOption[]>(
+    () =>
+      forecastRangeOptions.map((opt) => ({
+        value: opt.value,
+        label: FORECAST_RANGE_SHORT_LABELS[opt.value] ?? opt.label,
+      })),
+    [forecastRangeOptions],
+  );
 
   function openAddModal() {
     setEditingEventId(null);
@@ -566,18 +565,6 @@ export default function CashFlowForecastModule({
     onAddEvent?.(events);
     setShowAddModal(false);
   }
-
-  // Close the More popover on outside click.
-  useEffect(() => {
-    if (!moreMenuOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
-        setMoreMenuOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [moreMenuOpen]);
 
   useEffect(() => {
     if (!scenarioMenuOpen) return;
@@ -1057,10 +1044,6 @@ export default function CashFlowForecastModule({
           const netChange = finalBalance - startingCashBalance;
           const netSign = netChange > 0 ? '+' : netChange < 0 ? '−' : '';
           const netColor = netChange > 0 ? 'is-positive' : netChange < 0 ? 'is-negative' : '';
-          const moreSelected = FORECAST_MORE_VALUES.includes(forecastRangeValue);
-          const moreLabel = moreSelected
-            ? FORECAST_RANGE_SHORT_LABELS[forecastRangeValue] ?? forecastRangeValue
-            : 'More';
           return (
             <div className="projected-cash-header">
               <div className="projected-cash-heading">
@@ -1092,65 +1075,11 @@ export default function CashFlowForecastModule({
               </div>
               <div className="projected-cash-timeline">
                 <div className="projected-cash-timeline-row">
-                <div
-                  className="segmented-toggle"
-                  role="radiogroup"
-                  aria-label="Select forecast horizon"
-                >
-                  {FORECAST_PRIMARY_VALUES.map((val) => {
-                    const opt = forecastRangeOptions.find((o) => o.value === val);
-                    if (!opt) return null;
-                    const isActive = forecastRangeValue === val;
-                    return (
-                      <button
-                        key={val}
-                        type="button"
-                        role="radio"
-                        aria-checked={isActive}
-                        className={`segmented-toggle-btn${isActive ? ' is-active' : ''}`}
-                        onClick={() => onForecastRangeChange(val)}
-                      >
-                        {FORECAST_RANGE_SHORT_LABELS[val] ?? opt.label}
-                      </button>
-                    );
-                  })}
-                  <div className="forecast-timeline-more timeframe-menu" ref={moreMenuRef}>
-                    <button
-                      type="button"
-                      className={`segmented-toggle-btn forecast-timeline-more-trigger${moreSelected ? ' is-active' : ''}`}
-                      aria-haspopup="menu"
-                      aria-expanded={moreMenuOpen}
-                      onClick={() => setMoreMenuOpen((c) => !c)}
-                    >
-                      {moreLabel} &#9662;
-                    </button>
-                    {moreMenuOpen && (
-                      <ul className="timeframe-list" role="menu" aria-label="More forecast horizons">
-                        {FORECAST_MORE_VALUES.map((val) => {
-                          const opt = forecastRangeOptions.find((o) => o.value === val);
-                          if (!opt) return null;
-                          const isActive = forecastRangeValue === val;
-                          return (
-                            <li key={val}>
-                              <button
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={isActive}
-                                className={isActive ? 'is-active' : ''}
-                                onClick={() => {
-                                  onForecastRangeChange(val);
-                                  setMoreMenuOpen(false);
-                                }}
-                              >
-                                {FORECAST_RANGE_SHORT_LABELS[val] ?? opt.label}
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                </div>
+                <PeriodDropdown
+                  value={forecastRangeValue}
+                  options={periodDropdownOptions}
+                  onChange={onForecastRangeChange}
+                />
                 <div className="action-dropdown" ref={scenarioMenuRef}>
                   {(() => {
                     const scenarioOptions = [
