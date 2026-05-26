@@ -236,8 +236,8 @@ const BIG_PICTURE_FILTER_FRAME_OPTIONS: Array<KpiFrameOption & { value: BigPictu
   { value: 'custom', label: 'Custom' },
 ];
 const EPSILON = 0.00001;
-type TrendTimeframeOption = 6 | 12 | 24 | 36 | 'all';
-const TREND_TIMEFRAMES: TrendTimeframeOption[] = [6, 12, 24, 36, 'all'];
+type TrendTimeframeOption = 3 | 6 | 12;
+const TREND_TIMEFRAMES: TrendTimeframeOption[] = [3, 6, 12];
 
 // Illustrative fixture series for UI Lab mini-charts. Reusable by any
 // future UI Lab card that needs a sparkline. Not wired to production data.
@@ -491,10 +491,8 @@ function parseForecastRangeValue(value: string): ForecastRangeValue | null {
 }
 
 function adaptiveMaWindowByTimeframe(timeframe: TrendTimeframeOption): number {
-  if (timeframe === 'all') return 12;
   if (timeframe <= 6) return 3;
-  if (timeframe <= 24) return 6;
-  return 12;
+  return 6;
 }
 
 function formatCurrency(value: number): string {
@@ -696,7 +694,7 @@ export default function Dashboard() {
   const activeTab: TabId = pathToTab(location.pathname);
   const { setMobileOpen } = useSidebar();
   const [query, setQuery] = useState('');
-  const [netChartTimeframe, setNetChartTimeframe] = useState<TrendTimeframeOption>(12);
+  const [netChartTimeframe, setNetChartTimeframe] = useState<TrendTimeframeOption>(6);
   const bigPictureFilterMenuRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const [importedDataSet, setImportedDataSet] = useState<DataSet | null>(null);
@@ -1545,7 +1543,7 @@ export default function Dashboard() {
     const debug = buildPrePhase4DebugReport(model.monthlyRollups, filteredTxns);
 
     const trendValidationRows = TREND_TIMEFRAMES.flatMap((timeframe) => {
-      const scopedTrend = timeframe === 'all' ? model.trend : model.trend.slice(-timeframe);
+      const scopedTrend = model.trend.slice(-timeframe);
       const metrics: Array<'income' | 'expense' | 'net'> = ['income', 'expense', 'net'];
 
       return metrics.map((metric) => {
@@ -1555,7 +1553,7 @@ export default function Dashboard() {
           const slopeSign =
             linear.slopePerMonth > EPSILON ? 'up' : linear.slopePerMonth < -EPSILON ? 'down' : 'flat';
           return {
-            timeframe: timeframe === 'all' ? 'all' : `${timeframe}m`,
+            timeframe: `${timeframe}m`,
             metric,
             trendType: 'linear',
             trendWindow: 'n/a',
@@ -1571,7 +1569,7 @@ export default function Dashboard() {
         const window = adaptiveMaWindowByTimeframe(timeframe);
         const ma = computeProgressiveMovingAverage(values, window);
         return {
-          timeframe: timeframe === 'all' ? 'all' : `${timeframe}m`,
+          timeframe: `${timeframe}m`,
           metric,
           trendType: 'ma',
           trendWindow: window,
@@ -1618,7 +1616,7 @@ export default function Dashboard() {
       {
         case: 'Rapid timeframe switch simulation',
         status: 'ok',
-        simulatedTimeframes: TREND_TIMEFRAMES.map((item) => (item === 'all' ? 'all' : `${item}m`)).join(', '),
+        simulatedTimeframes: TREND_TIMEFRAMES.map((item) => `${item}m`).join(', '),
       },
       runEdgeCase('Search filter applied (live state)', filteredTxns, profitabilityCashFlowMode),
       runEdgeCase(`Chart Cash Flow toggled (${oppositeCashFlowMode})`, filteredTxns, oppositeCashFlowMode),
