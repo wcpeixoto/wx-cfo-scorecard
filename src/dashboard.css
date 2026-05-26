@@ -8418,6 +8418,8 @@ body {
   font-family: 'Outfit', sans-serif;
   display: flex;
   flex-direction: column;
+  /* Card sizes to its content; don't stretch to match the chart neighbor. */
+  align-self: start;
 }
 
 .cth-card--building  { --cth-accent: #12B76A; }
@@ -8462,9 +8464,35 @@ body {
 
 .cth-header-right {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
   flex-shrink: 0;
+}
+
+/* Compact best-fit trend line stack — eyebrow above the line, right-aligned
+   directly under the status pill. Hidden entirely when <6 months. */
+.cth-trend-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.cth-trend-eyebrow {
+  font-size: 10px;
+  font-weight: 500;
+  color: #98A2B3;
+  line-height: 1;
+}
+
+.cth-trend-line {
+  display: block;
+  stroke: var(--accent);
+}
+
+.cth-trend-line.is-worsening {
+  stroke: var(--negative);
 }
 
 /* When the ⓘ sits in the title row (left side of the card, the

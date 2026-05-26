@@ -49,7 +49,7 @@ export interface CashTrendResult {
 const INTERPRETATION_BY_STATUS: Record<CashTrendStatus, string> = {
   building: 'Strong cash generation across the last 6 months.',
   treading: 'Cash is positive, but there is little room for error.',
-  pressure: 'Cash is positive, but the margin cannot absorb a bad month.',
+  pressure: 'Cash is positive, but one bad month could erase the cushion.',
   burning:  'Cash is going out faster than it comes in.',
 };
 
