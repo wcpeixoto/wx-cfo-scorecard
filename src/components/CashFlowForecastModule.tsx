@@ -280,14 +280,22 @@ function formatSignedPercent(value: number): string {
   return `${rounded}%`;
 }
 
-// Slider impact label: signed monthly dollar delta (e.g. "+$2.3K/mo", "-$700/mo").
-// Returns "$0/mo" at the neutral position so the right-hand slot remains
-// visible before the user moves the slider.
-function formatSignedDollarPerMonth(value: number): string {
+// Revenue-slider impact label: word-polarity instead of +/- signs.
+// "$0/mo revenue" stays visible at the neutral position so the slot is
+// understood before the user moves the slider.
+function formatRevenueImpact(value: number): string {
   const rounded = Math.round(value);
-  if (rounded === 0) return '$0/mo';
-  const compact = formatCompact(rounded);
-  return rounded > 0 ? `+${compact}/mo` : `${compact}/mo`;
+  if (rounded === 0) return '$0/mo revenue';
+  const compact = formatCompact(Math.abs(rounded));
+  return rounded > 0 ? `${compact}/mo revenue` : `${compact}/mo less revenue`;
+}
+
+// Expense-slider impact label: both polarities take an explicit qualifier.
+function formatExpenseImpact(value: number): string {
+  const rounded = Math.round(value);
+  if (rounded === 0) return '$0/mo expenses';
+  const compact = formatCompact(Math.abs(rounded));
+  return rounded > 0 ? `${compact}/mo more expenses` : `${compact}/mo less expenses`;
 }
 
 function formatDays(value: number): string {
@@ -351,7 +359,7 @@ function ForecastSliderControl({
       <div className="forecast-slider-header">
         <span className="forecast-slider-label">{label}</span>
         {secondaryLabel != null && (
-          <span className="forecast-slider-impact">{secondaryLabel}</span>
+          <span className="forecast-slider-impact">: {secondaryLabel}</span>
         )}
       </div>
       <div className="forecast-slider-track-wrap">
@@ -493,8 +501,8 @@ export default function CashFlowForecastModule({
     return recent.reduce((sum, r) => sum + r.expenses, 0) / recent.length;
   }, [monthlyRollups]);
 
-  const revenueImpactLabel = `${formatSignedDollarPerMonth((revenueGrowthPct / 100) * baselineMonthlyRevenue)} revenue`;
-  const expenseImpactLabel = `${formatSignedDollarPerMonth((expenseChangePct / 100) * baselineMonthlyExpense)} expenses`;
+  const revenueImpactLabel = formatRevenueImpact((revenueGrowthPct / 100) * baselineMonthlyRevenue);
+  const expenseImpactLabel = formatExpenseImpact((expenseChangePct / 100) * baselineMonthlyExpense);
 
   function openAddModal() {
     setEditingEventId(null);

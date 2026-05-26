@@ -1674,8 +1674,7 @@ body {
 .forecast-slider-header {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 4px;
 }
 
 .forecast-slider-label {
