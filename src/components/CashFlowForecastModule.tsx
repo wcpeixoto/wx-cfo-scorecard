@@ -1315,6 +1315,9 @@ export default function CashFlowForecastModule({
               secondaryLabel={expenseImpactLabel}
             />
           </div>
+          <p className="subtle">
+            Sliders change all future months. Use Cash Event for a specific event.
+          </p>
         </div>
 
         <div className="forecast-events-section">
