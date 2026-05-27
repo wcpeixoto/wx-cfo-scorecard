@@ -30,6 +30,14 @@ const OWNER_DIST_MIN_HISTORY_MONTHS = 15;
 
 const TODAY_FORWARD_CASH_WINDOW_MONTHS = 12;
 
+// Today's longer-horizon "are you projected to run out of cash" detection
+// window. Independent of TODAY_FORWARD_CASH_WINDOW_MONTHS (above) — the
+// 12-month window drives near-term severity for the priority ranking and
+// the Cash on Hand badge; this 24-month window drives the cash run-out
+// row on the Cash on Hand card body. The asymmetry is intentional: badge
+// = near-term, body row = longer-horizon outlook.
+export const TODAY_RUN_OUT_HORIZON_MONTHS = 24;
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function average(values: number[]): number {
