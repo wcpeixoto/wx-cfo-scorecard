@@ -801,12 +801,6 @@ export default function CashFlowForecastModule({
       : seasonality.confidence === 'strong'
         ? 'Strong confidence'
         : null;
-  const scenarioOptions: Array<{ key: ForecastScenarioKey; label: string }> = [
-    { key: 'base', label: 'Base Case' },
-    { key: 'best', label: 'Best Case' },
-    { key: 'worst', label: 'Worst Case' },
-    { key: 'custom', label: 'Custom Case' },
-  ];
 
   const groupedEventRows = useMemo(() => {
     type ManualBucket = { kind: 'manual'; frequency: EventFrequency; events: ForecastEvent[] };
