@@ -1435,11 +1435,27 @@ to match the pill.
 - Neutral brand blue (`chartTokens.brand`, `#465FFF` — matches
   `var(--accent)`) otherwise — positive, flat, or insufficiently
   negative.
-- Gradient under the line uses the same hue as the stroke at reduced
-  opacity (`opacityFrom: 0.6 → opacityTo: 0`).
 - Never green; the pill carries "good" / "healthy" already.
 - ApexCharts options must read hex from `chartTokens.ts` — chart
   internals can't resolve CSS custom properties.
+
+**Area fill — Apex-native, line-anchored.** Apex draws the area below
+the line and fades it via a gradient (`opacityFrom: 0.6 → opacityTo: 0`,
+same hue as the stroke). Two settings make this work with the raw-
+anchored y-axis:
+1. **`plotOptions.area.fillTo: 'end'`** — by default Apex anchors the
+   area's lower edge to zero (`'origin'`), which with our raw-anchored
+   y-axis collapses the fill to a 1px sliver near zero. `'end'` anchors
+   the lower edge to the chart canvas bottom (= sparkline container
+   bottom = the supporting-metric baseline). The fill becomes a proper
+   trapezoid from line down to the baseline.
+2. **Apex `fill.gradient`** then fades that trapezoid from line
+   (`opacityFrom: 0.6`) to baseline (`opacityTo: 0`).
+
+No CSS background layer behind the chart. A CSS pseudo-element belongs
+to the container, not the line, so any tint set on it reads as a
+rectangle regardless of stops or opacity. Apex's line-anchored area is
+the only shape that gives the TailAdmin "soft area under a line" feel.
 
 **Three-state accessible label (semantic).** The chart container has
 an `aria-label` driven by the same slope:
@@ -1451,18 +1467,34 @@ The visual stays two-color (no green); the semantic label gets the
 extra "improving" state so screen-reader and color-blind users hear
 direction explicitly without adding a visible third color.
 
-**Y-axis scaling.** Scaled to the two best-fit endpoints with 15%
-padding above and below the higher / lower endpoint. Never forced to
-zero.
-- `chartMin = minY − 0.15 × range`, `chartMax = maxY + 0.15 × range`
-  where `range = |endY − startY| = |slope| × 5`.
+**Y-axis scaling.** Scaled to the **raw 6 monthly net-cash values**
+(not the best-fit endpoint range) with 15% padding above and below.
+Never forced to zero.
+- `rawMin = min(monthlyValues)`, `rawMax = max(monthlyValues)`,
+  `rawRange = rawMax − rawMin`.
+- `chartMin = rawMin − 0.15 × rawRange`,
+  `chartMax = rawMax + 0.15 × rawRange`.
+- The displayed line is still the best-fit endpoints `[startY, endY]`
+  — only the canvas/Y-axis scale derives from the raw monthly range.
+- **Why raw-anchored.** Anchoring to the endpoint range made any
+  non-flat slope fill ~77% of the chart by construction; magnitude
+  was set by the slope's own internal range, not by the dollars the
+  business actually moves. Raw-anchored ties visual magnitude to data
+  magnitude — a modest slope on noisy monthly cash now renders as a
+  visibly modest line within a wide window, while a strong slope still
+  reads strong because it spans more of that same window.
 - **Flat fallback:** if `|slope| × 6 < $500` — i.e. the best-fit line
   moves less than $500 across the 6-month window — render a flat line
-  at the midpoint and widen the y-axis to a fixed ±$1,000 around it.
-  This is a *rendering* concern only; the slope-based color rule still
-  runs independently. (Math: |slope|×6 < $500 implies |slope| < ~$83/mo,
-  well above the −$1,500/mo worsening threshold — flat and red can't
-  co-occur in practice.)
+  at the midpoint and widen the y-axis to a fixed ±$1,000 around it
+  instead of using the raw-anchored window. This is a *rendering*
+  concern only; the slope-based color rule still runs independently.
+  (Math: |slope|×6 < $500 implies |slope| < ~$83/mo, well above the
+  −$1,500/mo worsening threshold — flat and red can't co-occur in
+  practice.)
+- **Defensive guard:** if `rawRange === 0` (all 6 values identical),
+  fall back to the flat-rule's midpoint-centered window. The flat
+  branch above already captures this case (slope = 0 → flat); the
+  guard is defense if that invariant ever changes.
 
 **Card layout.** `.cth-card` is a 2-column CSS grid (`minmax(0, 1fr) auto`).
 Row 1: title block (col 1) + pill (col 2). Row 2: metric block (col 1,

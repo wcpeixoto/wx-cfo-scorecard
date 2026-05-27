@@ -8492,7 +8492,14 @@ body {
    container only constrains size and places the sparkline in row 2
    col 2 bottom-aligned with the supporting-metric line on the left.
    Hidden entirely when <6 months OR when the card is narrower than
-   the responsive threshold below. */
+   the responsive threshold below.
+
+   Area fill is Apex-native: `plotOptions.area.fillTo: 'end'` makes the
+   area extend to the chart canvas bottom (= container bottom = the
+   supporting-metric baseline) instead of the default origin (zero),
+   producing a proper line-anchored trapezoid that fades via Apex's
+   gradient. No CSS background layer — a pseudo-element would always
+   read as a rectangle behind the chart. */
 .cth-trend-sparkline {
   grid-column: 2;
   grid-row: 2;

@@ -158,11 +158,26 @@ function CashTrendSparkline({ bars }: { bars: CashTrendBar[] }) {
     chartMax = mid + FLAT_VISUAL_HALF_WINDOW;
   } else {
     series = [startY, endY];
-    const minY = Math.min(startY, endY);
-    const maxY = Math.max(startY, endY);
-    const range = maxY - minY;
-    chartMin = minY - 0.15 * range;
-    chartMax = maxY + 0.15 * range;
+    // Y-axis anchored to the RAW monthly values (not the best-fit
+    // endpoint range), so visual magnitude tracks the dollars the
+    // business actually moves month-to-month — not the slope's own
+    // narrow internal range. A modest slope on noisy data renders as
+    // a near-flat line within a wide window; a strong slope still
+    // looks strong because the endpoints span more of the same window.
+    const rawMin = Math.min(...values);
+    const rawMax = Math.max(...values);
+    const rawRange = rawMax - rawMin;
+    if (rawRange === 0) {
+      // Defensive: all 6 values identical → slope is 0 → the isFlat
+      // branch above already handles this. Guard left in to avoid a
+      // degenerate zero-padding y-axis if that invariant ever shifts.
+      const mid = (startY + endY) / 2;
+      chartMin = mid - FLAT_VISUAL_HALF_WINDOW;
+      chartMax = mid + FLAT_VISUAL_HALF_WINDOW;
+    } else {
+      chartMin = rawMin - 0.15 * rawRange;
+      chartMax = rawMax + 0.15 * rawRange;
+    }
   }
 
   const options: ApexOptions = {
@@ -173,6 +188,17 @@ function CashTrendSparkline({ bars }: { bars: CashTrendBar[] }) {
       sparkline: { enabled: true },
       toolbar: { show: false },
       animations: { enabled: false },
+    },
+    // Anchor the area's lower edge at the chart canvas bottom (= the
+    // sparkline container bottom = the supporting-metric baseline)
+    // instead of the Apex default of zero. With the raw-anchored y-axis
+    // (chartMin well below the line), the default-baseline fill would
+    // collapse to a sliver; `fillTo: 'end'` makes it a proper trapezoid
+    // anchored to the line, fading down via the gradient below.
+    plotOptions: {
+      area: {
+        fillTo: 'end',
+      },
     },
     // Two-point best-fit line — straight by construction; smoothing has no
     // effect on a single segment, declared `straight` for clarity.
