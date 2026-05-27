@@ -9804,3 +9804,483 @@ body {
   border-color: #344054;
   color: #98A2B3;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Business Valuation card — Big Picture, below Money Left / Dig Here row.
+   SDE method, owner-guidance only. Reuses .ta-card shell and
+   .db-tooltip-wrap pattern; only the inline-edit affordance is local.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.bv-card {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.bv-header {
+  display: flex;
+  flex-direction: column;
+}
+
+.bv-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 28px;
+  color: #1D2939;
+  margin: 0;
+}
+
+.dark .bv-title { color: rgba(255, 255, 255, 0.9); }
+
+.bv-subtitle {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: #667085;
+  margin: 4px 0 0 0;
+}
+
+.dark .bv-subtitle { color: #98A2B3; }
+
+/* Hero — three stacked label/value rows (OOV / TV / Gap) */
+.bv-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bv-hero-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bv-hero-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667085;
+}
+
+.dark .bv-hero-label { color: #98A2B3; }
+
+.bv-hero-value {
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1D2939;
+  line-height: 32px;
+}
+
+.dark .bv-hero-value { color: rgba(255, 255, 255, 0.9); }
+
+.bv-hero-value--muted {
+  color: #98A2B3;
+  font-weight: 500;
+}
+
+.dark .bv-hero-value--muted { color: #667085; }
+
+.bv-hero-note {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: #667085;
+  margin: 4px 0 0 0;
+  line-height: 1.5;
+}
+
+.dark .bv-hero-note { color: #98A2B3; }
+
+.bv-teaching-line {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  font-style: italic;
+  color: #667085;
+  margin: 4px 0 0 0;
+  line-height: 1.5;
+}
+
+.dark .bv-teaching-line { color: #98A2B3; }
+
+/* Drivers */
+.bv-drivers {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bv-drivers-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #344054;
+  margin: 0;
+}
+
+.dark .bv-drivers-title { color: rgba(255, 255, 255, 0.9); }
+
+.bv-drivers-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bv-driver-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.bv-driver-sep {
+  color: #98A2B3;
+  user-select: none;
+}
+
+.bv-driver-label {
+  color: #344054;
+  font-weight: 400;
+}
+
+.dark .bv-driver-label { color: rgba(255, 255, 255, 0.85); }
+
+/* Footer rows — TTM SDE / Multiple Range / Replacement Cost. Label left,
+   value right; supports inline editor expansion. */
+.bv-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #E4E7EC;
+}
+
+.dark .bv-footer { border-top-color: #344054; }
+
+.bv-footer-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.bv-footer-label {
+  color: #667085;
+  font-weight: 400;
+  flex-shrink: 0;
+}
+
+.dark .bv-footer-label { color: #98A2B3; }
+
+.bv-footer-value {
+  color: #1D2939;
+  font-weight: 600;
+  text-align: right;
+}
+
+.dark .bv-footer-value { color: rgba(255, 255, 255, 0.9); }
+
+.bv-footer-value--muted {
+  color: #98A2B3;
+  font-weight: 500;
+}
+
+.dark .bv-footer-value--muted { color: #667085; }
+
+.bv-footer-note {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: #667085;
+  margin: -8px 0 0 0;
+  line-height: 1.5;
+}
+
+.dark .bv-footer-note { color: #98A2B3; }
+
+/* Inline-edit affordance — mirrors .eff-row-best-val--clickable.
+   Dotted underline at rest, brand blue solid on hover/focus. */
+.bv-editable {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-color: #98A2B3;
+  text-underline-offset: 3px;
+  color: #1D2939;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+}
+
+.dark .bv-editable { color: rgba(255, 255, 255, 0.9); }
+
+.bv-editable:hover {
+  color: #465FFF;
+  text-decoration: underline solid;
+  text-decoration-color: #465FFF;
+}
+
+.bv-editable:focus-visible {
+  color: #465FFF;
+  text-decoration: underline solid;
+  text-decoration-color: #465FFF;
+  outline: 2px solid #465FFF;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.bv-editable--muted {
+  color: #98A2B3;
+  font-weight: 500;
+}
+
+.dark .bv-editable--muted { color: #667085; }
+
+/* Read-only value (Lease runway) — same visual weight as editable text but
+   no underline, no clickable cursor. Carries the tooltip wrapper. */
+.bv-readonly {
+  color: #1D2939;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  cursor: default;
+}
+
+.dark .bv-readonly { color: rgba(255, 255, 255, 0.9); }
+
+.bv-readonly:focus-visible {
+  outline: 2px solid #465FFF;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Muted variant — "Not tracked" reads as missing data, not a confident
+   system result. Mirrors .bv-editable--muted color/weight but stays
+   non-clickable + non-underlined (no system-input affordance). */
+.bv-readonly--muted {
+  color: #98A2B3;
+  font-weight: 500;
+}
+
+.dark .bv-readonly--muted { color: #667085; }
+
+/* Tooltip override: panel anchors to LEFT of the wrap (driver text is
+   left-aligned in each row, label is to the right). Compact min-width
+   for short driver definitions. */
+.bv-tooltip-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.bv-driver-tooltip-panel {
+  left: 0;
+  right: auto;
+  min-width: 240px;
+  max-width: 320px;
+  white-space: normal;
+  line-height: 1.5;
+}
+
+/* Inline editor */
+.bv-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 240px;
+}
+
+.bv-editor-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.bv-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.bv-editor-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: #667085;
+}
+
+.bv-editor-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #FFFFFF;
+  height: 36px;
+}
+
+.bv-editor-input-wrap:focus-within {
+  border-color: #465FFF;
+  box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.2);
+}
+
+.dark .bv-editor-input-wrap {
+  background: #1D2939;
+  border-color: #344054;
+}
+
+.bv-editor-prefix,
+.bv-editor-suffix {
+  color: #667085;
+  font-size: 14px;
+  font-family: 'Outfit', sans-serif;
+}
+
+.bv-editor-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  color: #1D2939;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+}
+
+.dark .bv-editor-input { color: rgba(255, 255, 255, 0.9); }
+
+.bv-editor-dash {
+  align-self: center;
+  color: #98A2B3;
+  margin-top: 18px; /* line up with the input row, not the field label */
+}
+
+.bv-editor-helper {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: #667085;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.bv-editor-error {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: #F04438;
+  margin: 0;
+}
+
+.bv-editor-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.bv-editor-save,
+.bv-editor-cancel {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  padding: 8px 14px;
+  height: 36px;
+  border: 1px solid;
+  cursor: pointer;
+}
+
+.bv-editor-save {
+  background: #465FFF;
+  border-color: #465FFF;
+  color: #FFFFFF;
+}
+
+.bv-editor-save:hover {
+  background: #3641F5;
+  border-color: #3641F5;
+}
+
+.bv-editor-cancel {
+  background: #FFFFFF;
+  border-color: #D0D5DD;
+  color: #344054;
+}
+
+.bv-editor-cancel:hover {
+  background: #F9FAFB;
+}
+
+.dark .bv-editor-cancel {
+  background: #1D2939;
+  border-color: #344054;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Grade picker — 4-option menu (Needs input / Weak / Mixed / Strong) */
+.bv-picker {
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+  border: 1px solid #E4E7EC;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(16, 24, 40, 0.08);
+  padding: 4px;
+  min-width: 140px;
+  z-index: 30;
+}
+
+.dark .bv-picker {
+  background: #1D2939;
+  border-color: #344054;
+}
+
+.bv-picker-item {
+  background: transparent;
+  border: none;
+  text-align: left;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #344054;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.dark .bv-picker-item { color: rgba(255, 255, 255, 0.85); }
+
+.bv-picker-item:hover {
+  background: #F2F4F7;
+  color: #101828;
+}
+
+.dark .bv-picker-item:hover {
+  background: #344054;
+  color: #FFFFFF;
+}
+
+.bv-picker-item--active {
+  background: #F2F4F7;
+  color: #101828;
+}
+
+.dark .bv-picker-item--active {
+  background: #344054;
+  color: #FFFFFF;
+}
+
+.bv-picker-item:focus-visible {
+  outline: 2px solid #465FFF;
+  outline-offset: -2px;
+}

@@ -146,7 +146,35 @@ type SharedWorkspaceSettingRow = {
   // Optional for the same reason as the columns above (added via later
   // migration). Pre-migration reads default to 35.
   payroll_target_percent?: number | null;
+  // Business Valuation — additive, all optional for the defensive-mapper
+  // pre-migration read pattern. SDE add-backs: NULL means blank (selector
+  // treats as $0). Multiple range: DB default 2.0/2.5, NULL only on pre-
+  // migration rows. Replacement cost: NULL = "Needs input". Lease metadata:
+  // NULL = unset → "Not tracked". Driver grades: NULL = "Needs input".
+  owner_w2_compensation?: number | null;
+  personal_expenses_through_business?: number | null;
+  one_time_expenses_to_add_back?: number | null;
+  one_time_gains_to_subtract?: number | null;
+  valuation_multiple_lower?: number | null;
+  valuation_multiple_upper?: number | null;
+  replacement_cost_lower?: number | null;
+  replacement_cost_upper?: number | null;
+  lease_start_date?: string | null;
+  lease_end_date?: string | null;
+  lease_renewal_option?: boolean | null;
+  lease_renewal_years?: number | null;
+  driver_grade_recurring_revenue?: string | null;
+  driver_grade_financial_clarity?: string | null;
+  driver_grade_churn_tracking?: string | null;
+  driver_grade_coach_depth?: string | null;
+  driver_grade_owner_independence?: string | null;
+  driver_grade_brand_strength?: string | null;
 };
+
+// Local mirror of businessValuation.ts DriverGrade. Kept here to avoid a
+// cross-module import on the persistence boundary; the test suite for the
+// selector enforces the source-of-truth shape.
+type DriverGradePersisted = 'needs_input' | 'weak' | 'mixed' | 'strong';
 
 export type WorkspaceSettings = {
   targetNetMargin: number;
@@ -163,6 +191,30 @@ export type WorkspaceSettings = {
   scenarioBaseExpenseChangePct: number;
   scenarioWorstRevenueGrowthPct: number;
   scenarioWorstExpenseChangePct: number;
+  // Business Valuation — additive. SDE add-backs are `number | null` so the
+  // card can distinguish "user hasn't entered anything" (null → blank note)
+  // from "user entered 0". Multiple range always has a value (DB defaults
+  // 2.0/2.5; pre-migration rows fall back via mapper). Replacement cost is
+  // `number | null` because null = "Needs input". Lease fields nullable.
+  // Driver grades store the typed union; null in the DB → 'needs_input'.
+  ownerW2Compensation: number | null;
+  personalExpensesThroughBusiness: number | null;
+  oneTimeExpensesToAddBack: number | null;
+  oneTimeGainsToSubtract: number | null;
+  valuationMultipleLower: number;
+  valuationMultipleUpper: number;
+  replacementCostLower: number | null;
+  replacementCostUpper: number | null;
+  leaseStartDate: string | null;
+  leaseEndDate: string | null;
+  leaseRenewalOption: boolean | null;
+  leaseRenewalYears: number | null;
+  driverGradeRecurringRevenue: DriverGradePersisted;
+  driverGradeFinancialClarity: DriverGradePersisted;
+  driverGradeChurnTracking: DriverGradePersisted;
+  driverGradeCoachDepth: DriverGradePersisted;
+  driverGradeOwnerIndependence: DriverGradePersisted;
+  driverGradeBrandStrength: DriverGradePersisted;
 };
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
@@ -179,7 +231,42 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   scenarioBaseExpenseChangePct: 0,
   scenarioWorstRevenueGrowthPct: -5,
   scenarioWorstExpenseChangePct: 4,
+  // Business Valuation additive defaults — match the DB column defaults so
+  // the in-memory default and a fresh-row read are byte-identical.
+  ownerW2Compensation: null,
+  personalExpensesThroughBusiness: null,
+  oneTimeExpensesToAddBack: null,
+  oneTimeGainsToSubtract: null,
+  valuationMultipleLower: 2.0,
+  valuationMultipleUpper: 2.5,
+  replacementCostLower: null,
+  replacementCostUpper: null,
+  leaseStartDate: null,
+  leaseEndDate: null,
+  leaseRenewalOption: null,
+  leaseRenewalYears: null,
+  driverGradeRecurringRevenue: 'needs_input',
+  driverGradeFinancialClarity: 'needs_input',
+  driverGradeChurnTracking: 'needs_input',
+  driverGradeCoachDepth: 'needs_input',
+  driverGradeOwnerIndependence: 'needs_input',
+  driverGradeBrandStrength: 'needs_input',
 };
+
+// Defensive normalizer: any non-recognized text (including null/undefined) maps
+// to 'needs_input'. Prevents a stray DB value from breaking the typed union.
+function normalizeDriverGradePersisted(value: unknown): DriverGradePersisted {
+  if (value === 'weak') return 'weak';
+  if (value === 'mixed') return 'mixed';
+  if (value === 'strong') return 'strong';
+  return 'needs_input';
+}
+
+// Numeric defensive coercion: only finite numbers survive; everything else
+// (null, undefined, NaN, strings) becomes null. Used for nullable BV columns.
+function nullableNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
 
 function isConfigured(): boolean {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
@@ -974,7 +1061,40 @@ function fromSharedWorkspaceSettingRow(row: SharedWorkspaceSettingRow): Workspac
     scenarioWorstExpenseChangePct: typeof row.scenario_worst_expense_change_pct === 'number'
       ? row.scenario_worst_expense_change_pct
       : DEFAULT_WORKSPACE_SETTINGS.scenarioWorstExpenseChangePct,
+    // Business Valuation — additive. Pre-migration rows omit these keys;
+    // the defensive coercers fall through to DEFAULT_WORKSPACE_SETTINGS
+    // values (or null where the spec uses null as the "Needs input"
+    // / blank sentinel).
+    ownerW2Compensation: nullableNumber(row.owner_w2_compensation),
+    personalExpensesThroughBusiness: nullableNumber(row.personal_expenses_through_business),
+    oneTimeExpensesToAddBack: nullableNumber(row.one_time_expenses_to_add_back),
+    oneTimeGainsToSubtract: nullableNumber(row.one_time_gains_to_subtract),
+    valuationMultipleLower: typeof row.valuation_multiple_lower === 'number'
+      ? row.valuation_multiple_lower
+      : DEFAULT_WORKSPACE_SETTINGS.valuationMultipleLower,
+    valuationMultipleUpper: typeof row.valuation_multiple_upper === 'number'
+      ? row.valuation_multiple_upper
+      : DEFAULT_WORKSPACE_SETTINGS.valuationMultipleUpper,
+    replacementCostLower: nullableNumber(row.replacement_cost_lower),
+    replacementCostUpper: nullableNumber(row.replacement_cost_upper),
+    leaseStartDate: typeof row.lease_start_date === 'string' ? row.lease_start_date : null,
+    leaseEndDate: typeof row.lease_end_date === 'string' ? row.lease_end_date : null,
+    leaseRenewalOption: typeof row.lease_renewal_option === 'boolean' ? row.lease_renewal_option : null,
+    leaseRenewalYears: nullableNumber(row.lease_renewal_years),
+    driverGradeRecurringRevenue: normalizeDriverGradePersisted(row.driver_grade_recurring_revenue),
+    driverGradeFinancialClarity: normalizeDriverGradePersisted(row.driver_grade_financial_clarity),
+    driverGradeChurnTracking: normalizeDriverGradePersisted(row.driver_grade_churn_tracking),
+    driverGradeCoachDepth: normalizeDriverGradePersisted(row.driver_grade_coach_depth),
+    driverGradeOwnerIndependence: normalizeDriverGradePersisted(row.driver_grade_owner_independence),
+    driverGradeBrandStrength: normalizeDriverGradePersisted(row.driver_grade_brand_strength),
   };
+}
+
+// 'needs_input' is the in-memory sentinel for "no grade yet"; the DB stores
+// NULL for that state (column type is nullable text). Symmetric with the
+// read-path normalizer above.
+function driverGradeToColumn(value: DriverGradePersisted): string | null {
+  return value === 'needs_input' ? null : value;
 }
 
 function toSharedWorkspaceSettingRow(settings: WorkspaceSettings): SharedWorkspaceSettingRow {
@@ -997,6 +1117,27 @@ function toSharedWorkspaceSettingRow(settings: WorkspaceSettings): SharedWorkspa
     scenario_base_expense_change_pct: settings.scenarioBaseExpenseChangePct,
     scenario_worst_revenue_growth_pct: settings.scenarioWorstRevenueGrowthPct,
     scenario_worst_expense_change_pct: settings.scenarioWorstExpenseChangePct,
+    // Business Valuation — additive. Number/null/boolean/string pass through
+    // unchanged; driver grades map 'needs_input' → NULL so the column stays
+    // a clean { weak | mixed | strong | null } distribution.
+    owner_w2_compensation: settings.ownerW2Compensation,
+    personal_expenses_through_business: settings.personalExpensesThroughBusiness,
+    one_time_expenses_to_add_back: settings.oneTimeExpensesToAddBack,
+    one_time_gains_to_subtract: settings.oneTimeGainsToSubtract,
+    valuation_multiple_lower: settings.valuationMultipleLower,
+    valuation_multiple_upper: settings.valuationMultipleUpper,
+    replacement_cost_lower: settings.replacementCostLower,
+    replacement_cost_upper: settings.replacementCostUpper,
+    lease_start_date: settings.leaseStartDate,
+    lease_end_date: settings.leaseEndDate,
+    lease_renewal_option: settings.leaseRenewalOption,
+    lease_renewal_years: settings.leaseRenewalYears,
+    driver_grade_recurring_revenue: driverGradeToColumn(settings.driverGradeRecurringRevenue),
+    driver_grade_financial_clarity: driverGradeToColumn(settings.driverGradeFinancialClarity),
+    driver_grade_churn_tracking: driverGradeToColumn(settings.driverGradeChurnTracking),
+    driver_grade_coach_depth: driverGradeToColumn(settings.driverGradeCoachDepth),
+    driver_grade_owner_independence: driverGradeToColumn(settings.driverGradeOwnerIndependence),
+    driver_grade_brand_strength: driverGradeToColumn(settings.driverGradeBrandStrength),
   };
 }
 

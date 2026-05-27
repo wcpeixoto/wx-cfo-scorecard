@@ -26,6 +26,13 @@ import { SecondaryPrioritiesLab } from '../components/SecondaryPrioritiesLab';
 import { CfoAssistantCard } from '../components/CfoAssistantCard';
 import { ProjectionCompareDrawer } from '../components/ProjectionCompareDrawer';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
+import { BusinessValuationCard } from '../components/BusinessValuationCard';
+import {
+  computeBusinessValuation,
+  computeTtmOperatingProfit,
+  type DriverGrade,
+  type Range as BVRange,
+} from '../lib/kpis/businessValuation';
 import ContractsSettingsPane from '../components/ContractsSettingsPane';
 import { computeEfficiencyOpportunities } from '../lib/kpis/efficiencyOpportunities';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
@@ -1349,6 +1356,122 @@ export default function Dashboard() {
   const efficiencyResult = useMemo(
     () => computeEfficiencyOpportunities(model, filteredTxns),
     [model, filteredTxns]
+  );
+
+  // Business Valuation — SDE-method composer. Pure selector over
+  // monthlyRollups (TTM operating profit) + businessRules (SDE add-backs,
+  // multiple range, replacement cost, driver grades, lease metadata).
+  const businessValuationResult = useMemo(() => {
+    const ttmOperatingProfit = computeTtmOperatingProfit(
+      model.monthlyRollups,
+      new Date()
+    );
+    const replacementCost: BVRange | null =
+      businessRules.replacementCostLower !== null &&
+      businessRules.replacementCostUpper !== null
+        ? {
+            lower: businessRules.replacementCostLower,
+            upper: businessRules.replacementCostUpper,
+          }
+        : null;
+    return computeBusinessValuation(
+      {
+        ttmOperatingProfit,
+        ownerW2Compensation: businessRules.ownerW2Compensation,
+        personalExpensesThroughBusiness:
+          businessRules.personalExpensesThroughBusiness,
+        oneTimeExpensesToAddBack: businessRules.oneTimeExpensesToAddBack,
+        oneTimeGainsToSubtract: businessRules.oneTimeGainsToSubtract,
+        multipleRange: {
+          lower: businessRules.valuationMultipleLower,
+          upper: businessRules.valuationMultipleUpper,
+        },
+        replacementCost,
+        driverGrades: {
+          recurringRevenue: businessRules.driverGradeRecurringRevenue,
+          financialClarity: businessRules.driverGradeFinancialClarity,
+          churnTracking: businessRules.driverGradeChurnTracking,
+          coachDepth: businessRules.driverGradeCoachDepth,
+          ownerIndependence: businessRules.driverGradeOwnerIndependence,
+          brandStrength: businessRules.driverGradeBrandStrength,
+        },
+        lease: {
+          startDate: businessRules.leaseStartDate,
+          endDate: businessRules.leaseEndDate,
+          renewalOption: businessRules.leaseRenewalOption,
+          renewalYears: businessRules.leaseRenewalYears,
+        },
+      },
+      new Date()
+    );
+  }, [
+    model.monthlyRollups,
+    businessRules.ownerW2Compensation,
+    businessRules.personalExpensesThroughBusiness,
+    businessRules.oneTimeExpensesToAddBack,
+    businessRules.oneTimeGainsToSubtract,
+    businessRules.valuationMultipleLower,
+    businessRules.valuationMultipleUpper,
+    businessRules.replacementCostLower,
+    businessRules.replacementCostUpper,
+    businessRules.driverGradeRecurringRevenue,
+    businessRules.driverGradeFinancialClarity,
+    businessRules.driverGradeChurnTracking,
+    businessRules.driverGradeCoachDepth,
+    businessRules.driverGradeOwnerIndependence,
+    businessRules.driverGradeBrandStrength,
+    businessRules.leaseStartDate,
+    businessRules.leaseEndDate,
+    businessRules.leaseRenewalOption,
+    businessRules.leaseRenewalYears,
+  ]);
+
+  const handleBusinessValuationMultipleRangeChange = useCallback(
+    (lower: number, upper: number) => {
+      updateBusinessRules({
+        valuationMultipleLower: lower,
+        valuationMultipleUpper: upper,
+      });
+    },
+    [updateBusinessRules]
+  );
+
+  const handleBusinessValuationReplacementCostChange = useCallback(
+    (range: BVRange | null) => {
+      updateBusinessRules({
+        replacementCostLower: range === null ? null : range.lower,
+        replacementCostUpper: range === null ? null : range.upper,
+      });
+    },
+    [updateBusinessRules]
+  );
+
+  const handleBusinessValuationDriverGradeChange = useCallback(
+    (
+      key:
+        | 'recurringRevenue'
+        | 'financialClarity'
+        | 'churnTracking'
+        | 'coachDepth'
+        | 'ownerIndependence'
+        | 'brandStrength',
+      grade: DriverGrade
+    ) => {
+      const patch: Partial<typeof businessRules> =
+        key === 'recurringRevenue'
+          ? { driverGradeRecurringRevenue: grade }
+          : key === 'financialClarity'
+            ? { driverGradeFinancialClarity: grade }
+            : key === 'churnTracking'
+              ? { driverGradeChurnTracking: grade }
+              : key === 'coachDepth'
+                ? { driverGradeCoachDepth: grade }
+                : key === 'ownerIndependence'
+                  ? { driverGradeOwnerIndependence: grade }
+                  : { driverGradeBrandStrength: grade };
+      updateBusinessRules(patch);
+    },
+    [updateBusinessRules]
   );
   // Operating Reserve coverage delta — computed here so the locked
   // computeReserveCoverageDelta no longer needs to walk back through
@@ -2840,6 +2963,16 @@ export default function Dashboard() {
               <DigHereHighlights result={whatNeedsAttention} />
             </div>
 
+            {/* Business Valuation (full-width) — SDE-method owner-guidance card.
+                Placed immediately below the Money Left / Dig Here row per
+                Phase 2 placement decision. */}
+            <BusinessValuationCard
+              result={businessValuationResult}
+              onMultipleRangeChange={handleBusinessValuationMultipleRangeChange}
+              onReplacementCostChange={handleBusinessValuationReplacementCostChange}
+              onDriverGradeChange={handleBusinessValuationDriverGradeChange}
+            />
+
             {/* Row 6: Payroll Efficiency (1/3) | Cash reserve calendar (2/3, provisional)
                 Cash reserve calendar is designed for the 1/3 slot — provisional
                 placement in the 2/3 slot is just for visual evaluation before
@@ -4007,6 +4140,180 @@ export default function Dashboard() {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Business Valuation settings — SDE add-backs (4 currency
+                      inputs) and Lease metadata (4 inputs powering Lease
+                      runway driver on the Business Valuation card). */}
+                  <div className="ta-card">
+                    <div className="ta-card-header">
+                      <h3 className="ta-card-title">Business Valuation — SDE add-backs</h3>
+                    </div>
+                    <div className="ta-card-body">
+                      <div className="rules-list">
+                        {([
+                          {
+                            key: 'ownerW2Compensation' as const,
+                            label: 'Owner W-2 compensation',
+                            sub: 'Annual owner salary that runs through payroll',
+                          },
+                          {
+                            key: 'personalExpensesThroughBusiness' as const,
+                            label: 'Personal expenses through business',
+                            sub: 'Owner-benefit costs the business covers',
+                          },
+                          {
+                            key: 'oneTimeExpensesToAddBack' as const,
+                            label: 'One-time expenses to add back',
+                            sub: 'Non-recurring expenses in the TTM window',
+                          },
+                          {
+                            key: 'oneTimeGainsToSubtract' as const,
+                            label: 'One-time gains to subtract',
+                            sub: 'Non-recurring gains in the TTM window',
+                          },
+                        ]).map((row) => {
+                          const current = businessRules[row.key];
+                          return (
+                            <div key={row.key} className="rules-row">
+                              <div className="rules-row-info">
+                                <span className="rules-row-label">{row.label}</span>
+                                <span className="rules-row-sub">{row.sub}</span>
+                              </div>
+                              <div className="rules-row-control">
+                                <div className="rules-currency-input-wrap">
+                                  <span className="rules-currency-prefix">$</span>
+                                  <input
+                                    className="rules-currency-input"
+                                    type="number"
+                                    min="0"
+                                    step="1000"
+                                    aria-label={`${row.label} amount`}
+                                    placeholder="Blank"
+                                    value={current === null ? '' : current}
+                                    onChange={(event) => {
+                                      const raw = event.target.value.trim();
+                                      if (raw === '') {
+                                        updateBusinessRules({ [row.key]: null } as Partial<BusinessRules>);
+                                        return;
+                                      }
+                                      const num = Number.parseFloat(raw);
+                                      if (Number.isFinite(num) && num >= 0) {
+                                        updateBusinessRules({ [row.key]: num } as Partial<BusinessRules>);
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="ta-card">
+                    <div className="ta-card-header">
+                      <h3 className="ta-card-title">Business Valuation — Lease</h3>
+                    </div>
+                    <div className="ta-card-body">
+                      <div className="rules-list">
+                        <div className="rules-row">
+                          <div className="rules-row-info">
+                            <span className="rules-row-label">Lease start date</span>
+                            <span className="rules-row-sub">When the current lease term began</span>
+                          </div>
+                          <div className="rules-row-control">
+                            <input
+                              className="rules-currency-input"
+                              type="date"
+                              aria-label="Lease start date"
+                              value={businessRules.leaseStartDate ?? ''}
+                              onChange={(event) => {
+                                const raw = event.target.value.trim();
+                                updateBusinessRules({
+                                  leaseStartDate: raw === '' ? null : raw,
+                                });
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="rules-row">
+                          <div className="rules-row-info">
+                            <span className="rules-row-label">Lease end date</span>
+                            <span className="rules-row-sub">When the current lease term ends — used to grade Lease runway</span>
+                          </div>
+                          <div className="rules-row-control">
+                            <input
+                              className="rules-currency-input"
+                              type="date"
+                              aria-label="Lease end date"
+                              value={businessRules.leaseEndDate ?? ''}
+                              onChange={(event) => {
+                                const raw = event.target.value.trim();
+                                updateBusinessRules({
+                                  leaseEndDate: raw === '' ? null : raw,
+                                });
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="rules-row">
+                          <div className="rules-row-info">
+                            <span className="rules-row-label">Renewal option</span>
+                            <span className="rules-row-sub">Whether the lease includes a renewal option</span>
+                          </div>
+                          <div className="rules-row-control">
+                            <div className="segmented-toggle">
+                              <button
+                                type="button"
+                                className={`segmented-toggle-btn${businessRules.leaseRenewalOption === true ? ' is-active' : ''}`}
+                                onClick={() => updateBusinessRules({ leaseRenewalOption: true })}
+                              >
+                                Yes
+                              </button>
+                              <button
+                                type="button"
+                                className={`segmented-toggle-btn${businessRules.leaseRenewalOption === false ? ' is-active' : ''}`}
+                                onClick={() => updateBusinessRules({ leaseRenewalOption: false })}
+                              >
+                                No
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        {businessRules.leaseRenewalOption === true && (
+                          <div className="rules-row">
+                            <div className="rules-row-info">
+                              <span className="rules-row-label">Renewal option years</span>
+                              <span className="rules-row-sub">How many additional years the renewal would add</span>
+                            </div>
+                            <div className="rules-row-control">
+                              <input
+                                className="rules-currency-input"
+                                type="number"
+                                min="0"
+                                step="1"
+                                aria-label="Renewal option years"
+                                placeholder="0"
+                                value={businessRules.leaseRenewalYears === null ? '' : businessRules.leaseRenewalYears}
+                                onChange={(event) => {
+                                  const raw = event.target.value.trim();
+                                  if (raw === '') {
+                                    updateBusinessRules({ leaseRenewalYears: null });
+                                    return;
+                                  }
+                                  const num = Number.parseFloat(raw);
+                                  if (Number.isFinite(num) && num >= 0) {
+                                    updateBusinessRules({ leaseRenewalYears: num });
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
