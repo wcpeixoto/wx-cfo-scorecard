@@ -305,5 +305,30 @@ create table if not exists public.shared_workspace_settings (
   scenario_base_expense_change_pct numeric not null default 0,
   scenario_worst_revenue_growth_pct numeric not null default -5,
   scenario_worst_expense_change_pct numeric not null default 4,
+  -- Business Valuation — SDE add-backs (NULL = blank; selector treats blank as $0).
+  -- All four NULL triggers the "Add SDE add-backs in Settings for full accuracy" note.
+  owner_w2_compensation numeric null,
+  personal_expenses_through_business numeric null,
+  one_time_expenses_to_add_back numeric null,
+  one_time_gains_to_subtract numeric null,
+  -- Business Valuation — Multiple range (always has a value; empty rejected by validator).
+  valuation_multiple_lower numeric null default 2.0,
+  valuation_multiple_upper numeric null default 2.5,
+  -- Business Valuation — Replacement cost (NULL = "Needs input"; never silently $0).
+  replacement_cost_lower numeric null,
+  replacement_cost_upper numeric null,
+  -- Business Valuation — Lease metadata (NULL = unset → Lease runway "Not tracked").
+  lease_start_date date null,
+  lease_end_date date null,
+  lease_renewal_option boolean null,
+  lease_renewal_years numeric null,
+  -- Business Valuation — Owner-set driver grades (NULL = "Needs input";
+  -- non-null values: 'weak' | 'mixed' | 'strong').
+  driver_grade_recurring_revenue text null,
+  driver_grade_financial_clarity text null,
+  driver_grade_churn_tracking text null,
+  driver_grade_coach_depth text null,
+  driver_grade_owner_independence text null,
+  driver_grade_brand_strength text null,
   primary key (workspace_id)
 );

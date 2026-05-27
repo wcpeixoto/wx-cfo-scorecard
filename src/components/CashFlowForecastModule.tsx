@@ -166,6 +166,11 @@ type CashFlowForecastModuleProps = {
   onReplaceGroup?: (groupId: string, events: ForecastEvent[]) => void;
   onDeleteEvent?: (groupId: string) => void;
   onToggleEvent?: (groupId: string, enabled: boolean) => void;
+  /** Optional sibling rendered to the right of the Projected Cash Balance
+   *  chart-shell. When provided, the chart and the slot share a 2/3 + 1/3
+   *  grid. Used by the Forecast page to pair the Business Valuation card
+   *  with the cash-balance chart. */
+  rightSlot?: ReactNode;
 };
 
 type ForecastSliderControlProps = {
@@ -451,6 +456,7 @@ export default function CashFlowForecastModule({
   onReplaceGroup,
   onDeleteEvent,
   onToggleEvent,
+  rightSlot,
 }: CashFlowForecastModuleProps) {
   const chartMountT0Ref = useRef(performance.now());
   const chartBootLoggedRef = useRef(false);
@@ -1093,6 +1099,7 @@ export default function CashFlowForecastModule({
 
       </div>
 
+      <div className={`forecast-chart-row${rightSlot ? ' has-side' : ''}`}>
       <section className="card forecast-chart-shell">
 
         {(() => {
@@ -1455,6 +1462,8 @@ export default function CashFlowForecastModule({
           )}
         </div>
       </section>
+      {rightSlot}
+      </div>
 
       {/* Add Event modal */}
       {showAddModal && (
