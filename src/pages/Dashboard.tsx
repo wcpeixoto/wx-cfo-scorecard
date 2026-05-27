@@ -15,6 +15,7 @@ import DigHereHighlights from '../components/DigHereHighlights';
 import CashTrendHero from '../components/CashTrendHero';
 import IncomeExpenseCard from '../components/IncomeExpenseCard';
 import PayrollEfficiencyCard from '../components/PayrollEfficiencyCard';
+import CashReserveCalendarCard from '../components/CashReserveCalendarCard';
 import KpiCards from '../components/KpiCards';
 import TopCategoriesCard from '../components/TopCategoriesCard';
 import PeriodDropdown from '../components/PeriodDropdown';
@@ -2839,7 +2840,10 @@ export default function Dashboard() {
               <DigHereHighlights result={whatNeedsAttention} />
             </div>
 
-            {/* Row 6: Payroll Efficiency (1/3) | placeholder (2/3) */}
+            {/* Row 6: Payroll Efficiency (1/3) | Cash reserve calendar (2/3, provisional)
+                Cash reserve calendar is designed for the 1/3 slot — provisional
+                placement in the 2/3 slot is just for visual evaluation before
+                final layout. */}
             <div className="bp-split-grid">
               <PayrollEfficiencyCard
                 txns={filteredTxns}
@@ -2847,7 +2851,7 @@ export default function Dashboard() {
                 payrollTargetPercent={businessRules.payrollTargetPercent}
                 payrollExcessPerMonth={efficiencyResult.payrollExtraPerMonth}
               />
-              <div className="bp-placeholder-card">Placeholder</div>
+              <CashReserveCalendarCard monthlyRollups={model.monthlyRollups} />
             </div>
           </>
         )}
