@@ -6,7 +6,7 @@ import { toMonthLabel } from '../lib/kpis/compute';
 import type { CashFlowMode, TrendPoint } from '../lib/data/contract';
 import { chartTokens } from '../lib/ui/chartTokens';
 
-type TimeframeOption = 3 | 6 | 12;
+type TimeframeOption = 6 | 12 | 24 | 36 | 'all';
 
 type TimeframeItem = {
   value: TimeframeOption;
@@ -23,13 +23,15 @@ type NetCashFlowChartProps = {
 };
 
 const TIMEFRAME_OPTIONS: TimeframeItem[] = [
-  { value: 3, label: 'Last 3 months' },
   { value: 6, label: 'Last 6 months' },
   { value: 12, label: 'Last 12 months' },
+  { value: 24, label: 'Last 24 months' },
+  { value: 36, label: 'Last 36 months' },
+  { value: 'all', label: 'All time' },
 ];
 
 function timeframeLabel(value: TimeframeOption): string {
-  return TIMEFRAME_OPTIONS.find((o) => o.value === value)?.label ?? 'Last 6 months';
+  return TIMEFRAME_OPTIONS.find((o) => o.value === value)?.label ?? 'Last 12 months';
 }
 
 function formatShortMonth(month: string): string {
@@ -49,6 +51,10 @@ function formatCurrency(value: number): string {
 }
 
 function xAxisLabelStep(count: number): number {
+  // ≥48 months ("All time" once history crosses ~4 years): yearly markers
+  // so the forced last-label doesn't overlap a step-aligned neighbor in
+  // the cramped right edge.
+  if (count >= 48) return 12;
   if (count >= 24) return 3;
   if (count >= 12) return 2;
   return 1;
@@ -93,7 +99,7 @@ export default function NetCashFlowChart({
   onTimeframeChange,
   onMonthPointClick,
 }: NetCashFlowChartProps) {
-  const [internalTimeframe, setInternalTimeframe] = useState<TimeframeOption>(6);
+  const [internalTimeframe, setInternalTimeframe] = useState<TimeframeOption>(12);
   const timeframe = controlledTimeframe ?? internalTimeframe;
   const setTimeframe = useCallback(
     (next: TimeframeOption) => {
@@ -116,7 +122,10 @@ export default function NetCashFlowChart({
     return () => document.removeEventListener('mousedown', handler);
   }, [menuOpen]);
 
-  const scopedData = useMemo(() => data.slice(-timeframe), [data, timeframe]);
+  const scopedData = useMemo(() => {
+    if (timeframe === 'all') return data;
+    return data.slice(-timeframe);
+  }, [data, timeframe]);
 
   const categories = useMemo(() => scopedData.map((d) => formatShortMonth(d.month)), [scopedData]);
   const values = useMemo(() => scopedData.map((d) => d.net), [scopedData]);
