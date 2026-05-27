@@ -6,28 +6,37 @@
  * property set per status modifier class.
  *
  * Body content: dominant metric line, status-driven interpretation line,
- * and a single proof line. A compact best-fit trend line sits in the right
- * column of the header; it carries one signal only — is the 6-month
- * direction worsening? — leaving the pill to carry state.
+ * and a single proof line. A compact area sparkline sits in the right
+ * column of the header rendering the actual 6 monthly net-cash values;
+ * it carries one signal only — is the 6-month direction worsening? —
+ * leaving the pill to carry state. No visible label above the sparkline;
+ * the chart container carries a three-state accessible name instead
+ * (worsening / improving / stable).
  *
- * Layout assumes the production prop wiring (negativeMonthsAsSubtitle=true,
- * the only mount today at Dashboard.tsx). In that mode the ⓘ tooltip sits
- * in the title row on the left, so the right column is pill → eyebrow →
- * trend line, stacked top-down via .cth-header-right (flex column,
- * align-items: flex-end). The negativeMonthsAsSubtitle=false branch still
- * compiles but stacks the ⓘ tooltip between the pill and the trend block;
- * not a supported production layout.
+ * Layout is a 2-column CSS grid on .cth-card. Row 1: title block (col 1)
+ * + pill (col 2). Row 2: metric block (col 1, bottom-aligned) + sparkline
+ * (col 2, bottom-aligned + right-aligned). Row 3: verdict, spans both
+ * columns. The bottom alignment in row 2 puts the sparkline's bottom on
+ * the same baseline as the "6-month cumulative profit margin" supporting
+ * line, with no overlap (separate grid cells) and no hard-coded offsets.
+ * Container query at ≤380px hides the sparkline so narrow viewports can't
+ * collide with text. The negativeMonthsAsSubtitle=false branch is still
+ * compiled but is not a supported production layout — its optional
+ * .cth-stat-block lands in row 4 spanning both columns.
  *
  * Interaction model: ⓘ tooltip only.
  */
 
 import { useId } from 'react';
+import ReactApexChart from 'react-apexcharts';
+import type { ApexOptions } from 'apexcharts';
 import type {
   CashTrendBar,
   CashTrendResult,
   CashTrendStatus,
 } from '../lib/kpis/cashTrend';
 import { formatCompact } from '../lib/utils/formatCompact';
+import { chartTokens } from '../lib/ui/chartTokens';
 
 // Slope (dollars per month) at or below which the compact trend line turns
 // red. Backtest-justified: 12 successive 6-month windows on the live
@@ -40,7 +49,27 @@ import { formatCompact } from '../lib/utils/formatCompact';
 // deferred).
 const WORSENING_SLOPE_PER_MONTH = -1500;
 
+// Mirror of the worsening threshold, used only for the three-state
+// accessible label (worsening / improving / stable). The visual stays
+// two-color (red below the worsening threshold, brand-blue otherwise);
+// the assistive label gets the extra "improving" state so screen-reader
+// and color-blind users hear direction without requiring a visible green.
+const IMPROVING_SLOPE_PER_MONTH = 1500;
+
 const TREND_MIN_MONTHS = 6;
+
+// Flat-fallback threshold (dollars). The sparkline shows the linear
+// best-fit trend over 6 months; "flat" means the trend's total movement
+// across the window — |slope| × 6 — is under $500. That's a trend so
+// shallow it isn't worth amplifying as a visible diagonal: render a
+// centered horizontal line at the trend midpoint instead. Rendering-only
+// — independent of the slope-based color rule above. (Math note:
+// |slope|×6 < $500 implies |slope| < ~$83/mo, well below the worsening
+// threshold of -$1,500/mo. Flat and red cannot co-occur on real data;
+// the independence is a property of the code paths, not an observed
+// combination.)
+const FLAT_RANGE_THRESHOLD = 500;
+const FLAT_VISUAL_HALF_WINDOW = 1000;
 
 type Props = {
   result: CashTrendResult;
@@ -70,6 +99,11 @@ function formatSignedPct(decimal: number): string {
 function leastSquaresSlope(values: number[]): { slope: number; intercept: number } {
   const n = values.length;
   if (n < 2) return { slope: 0, intercept: values[0] ?? 0 };
+  // NaN guard: if any input is non-finite, treat the trend as flat rather
+  // than poisoning slope + intercept with NaN values downstream.
+  for (let i = 0; i < n; i++) {
+    if (!Number.isFinite(values[i])) return { slope: 0, intercept: 0 };
+  }
   const xMean = (n - 1) / 2;
   const yMean = values.reduce((a, b) => a + b, 0) / n;
   let num = 0;
@@ -78,44 +112,98 @@ function leastSquaresSlope(values: number[]): { slope: number; intercept: number
     num += (i - xMean) * (values[i] - yMean);
     den += (i - xMean) ** 2;
   }
-  const slope = den === 0 ? 0 : num / den;
+  // den = sum((i - xMean)^2) over [0, n-1] with n >= 2 is always > 0, so
+  // the prior `den === 0 ? 0 : num / den` branch was unreachable.
+  const slope = num / den;
   const intercept = yMean - slope * xMean;
   return { slope, intercept };
 }
 
-function CashTrendCompactLine({ bars }: { bars: CashTrendBar[] }) {
-  const W = 132;
-  const H = 36;
-  const PAD = 4;
-  const innerW = W - 2 * PAD;
-  const innerH = H - 2 * PAD;
+function ariaLabelForSlope(slope: number): string {
+  if (slope <= WORSENING_SLOPE_PER_MONTH) {
+    return 'Cash trend over 6 months — direction worsening';
+  }
+  if (slope >= IMPROVING_SLOPE_PER_MONTH) {
+    return 'Cash trend over 6 months — direction improving';
+  }
+  return 'Cash trend over 6 months — stable';
+}
+
+function CashTrendSparkline({ bars }: { bars: CashTrendBar[] }) {
   const values = bars.map((b) => b.netCash);
   const { slope, intercept } = leastSquaresSlope(values);
-  const lastIdx = values.length - 1;
-  const y0 = intercept;
-  const yN = intercept + lastIdx * slope;
-  const lo = Math.min(...values, y0, yN);
-  const hi = Math.max(...values, y0, yN);
-  const range = hi - lo || 1;
-  const mapY = (v: number) => PAD + innerH * (1 - (v - lo) / range);
   const isWorsening = slope <= WORSENING_SLOPE_PER_MONTH;
+  const color = isWorsening ? chartTokens.error : chartTokens.brand;
+
+  // Best-fit endpoints — the entire visual is the linear trend, not the
+  // monthly noise. The neighbor "Monthly Net Cash Flow" chart already
+  // carries the month-by-month shape; this card communicates direction.
+  const n = values.length;
+  const startY = intercept;
+  const endY = intercept + (n - 1) * slope;
+
+  // Flat-rule: total movement across the 6-month window. Compared against
+  // FLAT_RANGE_THRESHOLD ($500) so a near-zero slope doesn't get amplified
+  // into a visible diagonal by the 15%-padded y-axis.
+  const visualTraversal = Math.abs(slope) * 6;
+  const isFlat = visualTraversal < FLAT_RANGE_THRESHOLD;
+
+  let series: number[];
+  let chartMin: number;
+  let chartMax: number;
+  if (isFlat) {
+    const mid = (startY + endY) / 2;
+    series = [mid, mid];
+    chartMin = mid - FLAT_VISUAL_HALF_WINDOW;
+    chartMax = mid + FLAT_VISUAL_HALF_WINDOW;
+  } else {
+    series = [startY, endY];
+    const minY = Math.min(startY, endY);
+    const maxY = Math.max(startY, endY);
+    const range = maxY - minY;
+    chartMin = minY - 0.15 * range;
+    chartMax = maxY + 0.15 * range;
+  }
+
+  const options: ApexOptions = {
+    chart: {
+      type: 'area',
+      height: 70,
+      fontFamily: 'Outfit, sans-serif',
+      sparkline: { enabled: true },
+      toolbar: { show: false },
+      animations: { enabled: false },
+    },
+    // Two-point best-fit line — straight by construction; smoothing has no
+    // effect on a single segment, declared `straight` for clarity.
+    stroke: { curve: 'straight', width: 2, colors: [color] },
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.6,
+        opacityTo: 0,
+        stops: [0, 100],
+      },
+    },
+    colors: [color],
+    dataLabels: { enabled: false },
+    markers: { size: 0 },
+    grid: { show: false },
+    xaxis: { labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
+    yaxis: { min: chartMin, max: chartMax, labels: { show: false } },
+    tooltip: { enabled: false },
+    legend: { show: false },
+  };
+
   return (
-    <svg
-      className={`cth-trend-line${isWorsening ? ' is-worsening' : ''}`}
-      width={W}
-      height={H}
-      viewBox={`0 0 ${W} ${H}`}
-      aria-hidden="true"
+    <div
+      className="cth-trend-sparkline"
+      role="img"
+      aria-label={ariaLabelForSlope(slope)}
     >
-      <line
-        x1={PAD}
-        y1={mapY(y0)}
-        x2={PAD + innerW}
-        y2={mapY(yN)}
-        strokeWidth={1.75}
-        strokeLinecap="round"
-      />
-    </svg>
+      <ReactApexChart options={options} series={[{ data: series }]} type="area" height={70} />
+    </div>
   );
 }
 
@@ -132,11 +220,9 @@ export default function CashTrendHero({ result, negativeMonthsAsSubtitle = false
   if (result.noData) {
     return (
       <div className="cth-card cth-card--treading">
-        <div className="cth-header">
-          <div className="cth-header-left">
-            <h3 className="cth-title">Cash Trend</h3>
-            <p className="cth-subtitle">Last 6 complete months</p>
-          </div>
+        <div className="cth-header-left">
+          <h3 className="cth-title">Cash Trend</h3>
+          <p className="cth-subtitle">Last 6 complete months</p>
         </div>
         <div className="cth-empty">
           Not enough complete months yet to evaluate cash trend. Need at least 3 closed months.
@@ -177,52 +263,50 @@ export default function CashTrendHero({ result, negativeMonthsAsSubtitle = false
   return (
     <div className={`cth-card cth-card--${status}${negativeMonthsAsSubtitle ? ' cth-card--inline-stat' : ''}`}>
 
-      {/* ── Header (Pattern B) ────────────────────────────────────────── */}
-      <div className="cth-header">
-        <div className="cth-header-left">
-          <div className="cth-title-row">
-            <h3 className="cth-title">Cash Trend</h3>
-            {negativeMonthsAsSubtitle && infoTooltip}
-          </div>
-          <p className="cth-subtitle">
-            {negativeMonthsAsSubtitle
-              ? `${result.negativeMonthCount} of the last ${totalMonths} months were negative`
-              : 'Last 6 complete months'}
-          </p>
+      {/* Row 1 — title block (col 1) + pill (col 2) */}
+      <div className="cth-header-left">
+        <div className="cth-title-row">
+          <h3 className="cth-title">Cash Trend</h3>
+          {negativeMonthsAsSubtitle && infoTooltip}
         </div>
-        <div className="cth-header-right">
-          <span className={`card-status-badge ${badge.cls}`}>
-            {badge.label}
-          </span>
-          {!negativeMonthsAsSubtitle && infoTooltip}
-          {showTrendLine && (
-            <div className="cth-trend-block">
-              <span className="cth-trend-eyebrow">Trend</span>
-              <CashTrendCompactLine bars={result.monthlyBars} />
-            </div>
-          )}
-        </div>
+        <p className="cth-subtitle">
+          {negativeMonthsAsSubtitle
+            ? `${result.negativeMonthCount} of the last ${totalMonths} months were negative`
+            : 'Last 6 complete months'}
+        </p>
+      </div>
+      <div className="cth-header-right">
+        <span className={`card-status-badge ${badge.cls}`}>
+          {badge.label}
+        </span>
+        {!negativeMonthsAsSubtitle && infoTooltip}
       </div>
 
-      {/* ── Body ──────────────────────────────────────────────────────── */}
-      <div className="cth-body">
-        <div className="cth-body-left">
-          <div className="cth-metric-primary">
-            <span className="cth-metric-amount">{netCashFormatted}</span>
-            <span className="cth-metric-noun">net cash</span>
-          </div>
-          <div className="cth-metric-secondary">
-            6-month cumulative profit margin: <span className="cth-metric-margin">{marginFormatted}</span>
-          </div>
-          <div className="cth-interpretation">{result.interpretation}</div>
+      {/* Row 2 — metric block (col 1, bottom-aligned) + sparkline (col 2,
+          bottom-aligned). Sparkline hides on narrow widths via @container. */}
+      <div className="cth-body-left">
+        <div className="cth-metric-primary">
+          <span className="cth-metric-amount">{netCashFormatted}</span>
+          <span className="cth-metric-noun">net cash</span>
         </div>
-        {!negativeMonthsAsSubtitle && (
-          <div className="cth-stat-block">
-            <div className="cth-stat-number">{result.negativeMonthCount} of {totalMonths}</div>
-            <div className="cth-stat-label">negative months</div>
-          </div>
-        )}
+        <div className="cth-metric-secondary">
+          6-month cumulative profit margin: <span className="cth-metric-margin">{marginFormatted}</span>
+        </div>
       </div>
+      {showTrendLine && (
+        <CashTrendSparkline bars={result.monthlyBars} />
+      )}
+
+      {/* Row 3 — verdict, spans both columns */}
+      <div className="cth-interpretation">{result.interpretation}</div>
+
+      {/* Row 4 — optional mini-stat (non-production branch only) */}
+      {!negativeMonthsAsSubtitle && (
+        <div className="cth-stat-block">
+          <div className="cth-stat-number">{result.negativeMonthCount} of {totalMonths}</div>
+          <div className="cth-stat-label">negative months</div>
+        </div>
+      )}
 
     </div>
   );
