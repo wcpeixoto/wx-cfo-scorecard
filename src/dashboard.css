@@ -880,6 +880,9 @@ body {
   color: #344054;
   font-size: 16px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .kpi-value {

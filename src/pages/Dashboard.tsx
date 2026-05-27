@@ -2343,7 +2343,7 @@ export default function Dashboard() {
     return [
       metricToCard('income', 'Revenue', selectedKpiComparison.revenue),
       metricToCard('expense', 'Expenses', selectedKpiComparison.expenses),
-      metricToCard('net', 'Net Cash Flow', selectedKpiComparison.netCashFlow),
+      metricToCard('net', 'Profit', selectedKpiComparison.netCashFlow),
       metricToCard('savingsRate', 'Profit Margin', selectedKpiComparison.savingsRate),
     ];
   }, [selectedKpiComparison, model.kpiCards]);
