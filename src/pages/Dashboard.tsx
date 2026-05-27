@@ -72,6 +72,8 @@ import { applyEventsOverlay } from '../lib/kpis/applyEventsOverlay';
 import { generateRenewalEvents } from '../lib/forecast/generateRenewalEvents';
 import { expandRecurringEvents } from '../lib/forecast/expandRecurringEvents';
 import { applyForecastFineTune } from '../lib/forecast/scenarioMath';
+import { extendComposedProjection } from '../lib/forecast/extendComposedProjection';
+import { TODAY_RUN_OUT_HORIZON_MONTHS } from '../lib/priorities/signals';
 import type {
   AccountRecord,
   AccountType,
@@ -1832,23 +1834,25 @@ export default function Dashboard() {
     [forecastEvents, forecastRangeMonths]
   );
 
-  const forecastProjection = useMemo(
+  // Composer's 12-month projection — Engine + Cadence + Reality/Recovery
+  // composition. Captured separately so both the user-selected horizon
+  // (forecastProjection below) and the fixed 24-month Today run-out signal
+  // (todayRunOutNegativeCashMonth below) can extend from the same composed
+  // output without re-running the composer. Both Engine and Cadence projections
+  // are computed as composer inputs. Known Events are intentionally excluded
+  // from composer inputs (events=[]) — see composeSplitConservative /
+  // composeConservativeFloor policy notes for the symmetric one-sided-event
+  // rationale. Cadence is hardcoded to a 12-month horizon (HORIZON_MONTHS in
+  // categoryCadence.ts); composers throw on length mismatch by design
+  // ("Caller responsibility to handle horizons beyond Cadence's reach").
+  // Compose at 12 months and extend at the caller layer (see below).
+  const forecastComposed = useMemo(
     () => {
       const fcT0 = performance.now();
       const scenarioWithMonths = {
         ...scenarioInput,
         months: Math.max(scenarioInput.months, forecastRangeMonths),
       };
-      // Both Engine and Cadence projections are computed as composer inputs.
-      // Known Events are intentionally excluded from composer inputs (events=[])
-      // — see composeSplitConservative / composeConservativeFloor policy notes
-      // for the symmetric one-sided-event rationale.
-      //
-      // Cadence is hardcoded to a 12-month horizon (HORIZON_MONTHS in
-      // categoryCadence.ts); composers throw on length mismatch by design
-      // ("Caller responsibility to handle horizons beyond Cadence's reach").
-      // Compose at 12 months and, for selectors longer than 12 months,
-      // extend at the caller layer (see below). Composer files are unchanged.
       const COMPOSER_MONTHS_CAP = 12;
       const composerInput = applyForecastFineTune(
         {
@@ -1877,67 +1881,28 @@ export default function Dashboard() {
         businessRules.forecastPosture === 'recovery'
           ? composeSplitConservative(engineProj, cadenceProj, currentCashBalance)
           : composeConservativeFloor(engineProj, cadenceProj, currentCashBalance);
-
-      // 2Y/3Y horizons extend the 12-month composed historical-pattern
-      // forecast by repeating the monthly pattern (flat, month-of-year
-      // aligned) and walking the running balance forward. Composer
-      // inputs remain capped at 12 months because Cadence does not
-      // extrapolate beyond its window. This is the caller-layer
-      // extension policy locked in 2c.1.
-      const requestedMonths = scenarioWithMonths.months;
-      let result = composed;
-      if (requestedMonths > composed.points.length && composed.points.length > 0) {
-        // Build month-of-year lookup ("01"–"12") from composed Year 1.
-        const sourceByMonthOfYear = new Map<string, ScenarioPoint>();
-        for (const p of composed.points) {
-          const moy = p.month.slice(5, 7);
-          if (!sourceByMonthOfYear.has(moy)) sourceByMonthOfYear.set(moy, p);
-        }
-        const firstMonth = composed.points[0].month;
-        const extended: ScenarioPoint[] = [];
-        let prevBalance = currentCashBalance;
-        for (let i = 0; i < requestedMonths; i += 1) {
-          if (i < composed.points.length) {
-            const p = composed.points[i];
-            extended.push(p);
-            prevBalance = p.endingCashBalance;
-            continue;
-          }
-          const monthToken = addMonthsToToken(firstMonth, i) ?? composed.points[i % composed.points.length].month;
-          const sourceMoy = monthToken.slice(5, 7);
-          const source = sourceByMonthOfYear.get(sourceMoy);
-          if (!source) {
-            // Defensive: should not happen because Year 1 always covers all 12 month-of-year keys
-            // when composed.points.length === 12. Skip extension if it does.
-            break;
-          }
-          const endingCashBalance = prevBalance + source.netCashFlow;
-          extended.push({
-            month: monthToken,
-            operatingCashIn: source.operatingCashIn,
-            operatingCashOut: source.operatingCashOut,
-            cashIn: source.cashIn,
-            cashOut: source.cashOut,
-            netCashFlow: source.netCashFlow,
-            endingCashBalance,
-          });
-          prevBalance = endingCashBalance;
-        }
-        result = { points: extended, seasonality: composed.seasonality };
-      }
-      // Post-composition Known Events overlay. Engine, Cadence, Reality
-      // composer, and Recovery composer remain event-free; the overlay
-      // sits OUTSIDE all of them and applies once to the final
-      // posture-aware horizon. When forecastEvents is empty, the helper
-      // returns its input unchanged so math is byte-for-byte identical.
-      result = { points: applyEventsOverlay(result.points, expandedForecastEvents), seasonality: result.seasonality };
       if (import.meta.env.DEV && !bootPhaseLoggedRef.current.forecast && model.monthlyRollups.length > 0) {
         bootPhaseLoggedRef.current.forecast = true;
         console.log('[BOOT] Forecast compute:', Math.round(performance.now() - fcT0), 'ms');
       }
-      return result;
+      return composed;
     },
-    [filteredTxns, currentCashBalance, businessRules.forecastPosture, businessRules.scenarioBaseRevenueGrowthPct, businessRules.scenarioBaseExpenseChangePct, expandedForecastEvents, forecastRangeMonths, model, scenarioInput]
+    [filteredTxns, currentCashBalance, businessRules.forecastPosture, businessRules.scenarioBaseRevenueGrowthPct, businessRules.scenarioBaseExpenseChangePct, forecastRangeMonths, model, scenarioInput]
+  );
+
+  // Active forecast at the user-selected horizon. 2Y/3Y horizons extend the
+  // 12-month composed historical-pattern forecast by repeating the monthly
+  // pattern (flat, month-of-year aligned) and walking the running balance
+  // forward. Composer inputs remain capped at 12 months because Cadence does
+  // not extrapolate beyond its window. This is the caller-layer extension
+  // policy locked in 2c.1. Known Events overlay applied after extension.
+  const forecastProjection = useMemo(
+    () => {
+      const requestedMonths = Math.max(scenarioInput.months, forecastRangeMonths);
+      const points = extendComposedProjection(forecastComposed, currentCashBalance, requestedMonths, expandedForecastEvents);
+      return { points, seasonality: forecastComposed.seasonality };
+    },
+    [forecastComposed, scenarioInput.months, forecastRangeMonths, currentCashBalance, expandedForecastEvents]
   );
   const scenarioProjection = useMemo(() => forecastProjection.points, [forecastProjection.points]);
   const forecastSeasonality = useMemo(() => forecastProjection.seasonality, [forecastProjection.seasonality]);
@@ -2047,6 +2012,25 @@ export default function Dashboard() {
     () => computeForecastDecisionSignals(scenarioProjection, model.runway.reserveTarget),
     [model.runway.reserveTarget, scenarioProjection]
   );
+
+  // Today's Cash on Hand "projected to run out" signal — sourced from a
+  // dedicated 24-month projection so the row can't be silenced by a shorter
+  // Forecast-page display window. The 12-month priority/badge pipeline
+  // (detectSignals → TODAY_FORWARD_CASH_WINDOW_MONTHS) is intentionally
+  // unchanged: badge = near-term severity, body row = longer-horizon outlook.
+  // When the user already has ≥24m selected on Forecast, reuse the active
+  // projection. Events re-expanded to the longer horizon so a recurring
+  // event at month 13–24 still applies.
+  const todayRunOutEvents = useMemo(
+    () => expandRecurringEvents(forecastEvents, TODAY_RUN_OUT_HORIZON_MONTHS),
+    [forecastEvents]
+  );
+  const todayRunOutNegativeCashMonth = useMemo<string | null>(() => {
+    const projection = forecastRangeMonths >= TODAY_RUN_OUT_HORIZON_MONTHS
+      ? forecastProjection.points
+      : extendComposedProjection(forecastComposed, currentCashBalance, TODAY_RUN_OUT_HORIZON_MONTHS, todayRunOutEvents);
+    return projection.find((point) => point.endingCashBalance < -EPSILON)?.month ?? null;
+  }, [forecastComposed, currentCashBalance, forecastRangeMonths, forecastProjection.points, todayRunOutEvents]);
 
   // Dedicated projection for the Next Owner Distribution card. It mirrors
   // the forecastProjection pipeline above but FORCES three params,
@@ -2769,7 +2753,7 @@ export default function Dashboard() {
             model={model}
             txns={filteredTxns}
             forecastProjection={scenarioProjection}
-            negativeCashMonth={forecastDecisionSignals.negativeCashMonth}
+            negativeCashMonth={todayRunOutNegativeCashMonth}
             ownerPayProjection={ownerPayProjection}
             ownerPayReserveFloor={ownerPayReserveFloor}
             targetNetMargin={businessRules.targetNetMargin}
