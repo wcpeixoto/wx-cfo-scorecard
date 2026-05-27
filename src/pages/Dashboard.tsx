@@ -2963,16 +2963,6 @@ export default function Dashboard() {
               <DigHereHighlights result={whatNeedsAttention} />
             </div>
 
-            {/* Business Valuation (full-width) — SDE-method owner-guidance card.
-                Placed immediately below the Money Left / Dig Here row per
-                Phase 2 placement decision. */}
-            <BusinessValuationCard
-              result={businessValuationResult}
-              onMultipleRangeChange={handleBusinessValuationMultipleRangeChange}
-              onReplacementCostChange={handleBusinessValuationReplacementCostChange}
-              onDriverGradeChange={handleBusinessValuationDriverGradeChange}
-            />
-
             {/* Row 6: Payroll Efficiency (1/3) | Cash reserve calendar (2/3, provisional)
                 Cash reserve calendar is designed for the 1/3 slot — provisional
                 placement in the 2/3 slot is just for visual evaluation before
@@ -3070,6 +3060,14 @@ export default function Dashboard() {
                 void saveSharedForecastEvents(next);
                 return next;
               })}
+              rightSlot={
+                <BusinessValuationCard
+                  result={businessValuationResult}
+                  onMultipleRangeChange={handleBusinessValuationMultipleRangeChange}
+                  onReplacementCostChange={handleBusinessValuationReplacementCostChange}
+                  onDriverGradeChange={handleBusinessValuationDriverGradeChange}
+                />
+              }
             />
 
             <article className="card table-card projection-table-card" ref={projectionTableRef}>

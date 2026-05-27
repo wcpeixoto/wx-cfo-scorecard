@@ -9805,6 +9805,36 @@ body {
   color: #98A2B3;
 }
 
+/* Forecast Projected-Cash-Balance row — when a sibling slot is provided
+   (e.g. the Business Valuation card on the Forecast page), pair the chart
+   with the slot in a 2/3 + 1/3 grid. When no slot is provided, the wrapper
+   is `display: contents` so the chart-shell lays out as a direct grid
+   child of .forecast-cockpit — preserves all existing forecast pages. */
+.forecast-chart-row {
+  display: contents;
+}
+
+.forecast-chart-row.has-side {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.forecast-chart-row.has-side > * {
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .forecast-chart-row.has-side { gap: 24px; }
+}
+
+@media (max-width: 960px) {
+  .forecast-chart-row.has-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    Business Valuation card — Big Picture, below Money Left / Dig Here row.
    SDE method, owner-guidance only. Reuses .ta-card shell and
