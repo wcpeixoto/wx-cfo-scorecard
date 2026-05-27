@@ -8942,6 +8942,104 @@ body {
 .dark .pe-footer,
 .dark .pe-kpi + .pe-kpi { border-color: #344054; }
 
+/* === Big Picture — Cash reserve calendar card =================================
+   Compact card sized for the 1/3-page-width slot, currently occupying the
+   Big Picture Row 6 right-hand slot. Flags calendar months where net
+   operating cash has historically run negative in the trailing 24 months. */
+
+.crc-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+  font-family: 'Outfit', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.crc-header {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.crc-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.crc-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.crc-subtitle {
+  margin: 4px 0 0 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+/* Tooltip panel — left-anchored so it opens to the right of the ⓘ.
+   Two paragraphs, narrow card width, so cap the panel at 300px. */
+.crc-tooltip-panel {
+  right: auto;
+  left: 0;
+  min-width: 260px;
+  max-width: 300px;
+  white-space: normal;
+}
+
+.crc-tooltip-panel .db-tooltip-list li + li {
+  margin-top: 8px;
+}
+
+.crc-chart {
+  margin-top: 12px;
+}
+
+.crc-empty {
+  margin-top: 20px;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.crc-advice {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.crc-advice-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.crc-advice-body {
+  margin: 6px 0 0 0;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.dark .crc-card {
+  background: #1D2939;
+  border-color: #344054;
+}
+.dark .crc-title { color: rgba(255, 255, 255, 0.9); }
+.dark .crc-subtitle,
+.dark .crc-empty,
+.dark .crc-advice-label { color: #98A2B3; }
+.dark .crc-advice { border-color: #344054; }
+.dark .crc-advice-body { color: rgba(255, 255, 255, 0.9); }
+
 /* === Phase 5.1 Branch 5 — Contracts & Renewals settings pane === */
 
 .contracts-card-header {
