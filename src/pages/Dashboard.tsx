@@ -2334,16 +2334,22 @@ export default function Dashboard() {
 
   // Ambient 12-month trailing series for the Revenue & Expenses mini-card
   // sparklines. Independent of the header timeframe; sourced from monthly
-  // rollups so no new computation is required.
+  // rollups so no new computation is required. Filter to calendar-complete
+  // months only (matches the NetCashFlow chart's pipeline, compute.ts:1934)
+  // so a partial current month can't produce a synchronized revenue/expense
+  // cliff at the right edge.
   const kpiSparklinesById = useMemo<Record<string, { data: number[]; color: string }>>(() => {
-    const last12 = model.monthlyRollups.slice(-12);
+    const completed = previousCalendarMonth
+      ? model.monthlyRollups.filter((rollup) => rollup.month <= previousCalendarMonth)
+      : model.monthlyRollups;
+    const last12 = completed.slice(-12);
     if (last12.length < 2) return {};
     const sparks: Record<string, { data: number[]; color: string }> = {
       income: { data: last12.map((rollup) => rollup.revenue), color: chartTokens.brand },
       expense: { data: last12.map((rollup) => rollup.expenses), color: chartTokens.costSpike },
     };
     return sparks;
-  }, [model.monthlyRollups]);
+  }, [model.monthlyRollups, previousCalendarMonth]);
 
   const topCategoriesBreakdown = useMemo(() => {
     const comparison = model.kpiYoYComparisonByTimeframe[topCategoriesTimeframe];
