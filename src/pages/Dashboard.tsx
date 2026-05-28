@@ -2147,6 +2147,10 @@ export default function Dashboard() {
     return computeValuationProjection({
       forecastPoints: scenarioProjection,
       baselineForecastPoints: baselineProjection ?? scenarioProjection,
+      // Anchor for the delta-SDE actual leg. ttmSde already includes
+      // add-backs (computeSde in businessValuation.ts), so the actual
+      // leg does NOT re-apply them — see valuationProjection.ts header.
+      currentTtmSde: businessValuationResult.ttmSde,
       addBacks: {
         ownerW2Compensation: businessRules.ownerW2Compensation,
         personalExpensesThroughBusiness:
@@ -2168,6 +2172,7 @@ export default function Dashboard() {
     businessRules.oneTimeGainsToSubtract,
     businessValuationResult.derivedMultiple,
     businessValuationResult.displayMultipleRange,
+    businessValuationResult.ttmSde,
   ]);
 
   // Today's Cash on Hand "projected to run out" signal — sourced from a

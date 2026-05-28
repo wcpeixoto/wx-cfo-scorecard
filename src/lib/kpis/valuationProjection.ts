@@ -1,31 +1,51 @@
 // Business Valuation — projection selectors.
 //
-// Sister module to businessValuation.ts. Takes the 12-month forecast (from
-// Dashboard scenarioProjection) plus a slider-neutral baseline projection
-// and produces two projection legs:
-//   actual : slider-driven projection — moves with revenue/expense sliders
-//   goal   : slider-neutral projection at the fixed target net margin —
+// Sister module to businessValuation.ts. Produces two projection legs for
+// the dominant valuation hero:
+//   actual : slider-driven delta on top of current TTM SDE — moves with
+//            revenue/expense sliders while staying anchored to today's
+//            real cash-flow base
+//   goal   : slider-neutral baseline revenue × fixed target net margin —
 //            the "stable prize" hero that must NOT move with sliders
 //
-// Both legs apply a margin-quality adjustment to the derived multiple, then
-// clamp the result inside the existing driver-based display band. The
-// adjustment is a single mechanism (NOT a stacked bonus): margin >= 25%
-// earns the top of the band, 10-24.9% sits at derived, < 10% takes a hit.
+// Delta-SDE model for the actual leg:
 //
-// Owner Independence and the other 6 driver rows remain the bigger lever —
-// this adjustment moves the point inside the band, not the band edges.
+//   scenarioSde = currentTtmSde
+//               + (activeForecastAnnualNet - baselineForecastAnnualNet)
 //
-// Negative valuation floor: a negative projected SDE produces a non-sensical
-// negative sale price. The displayed valuation is floored at 0. The actual
-// leg's isFloored flag signals "not buyer-ready" copy at the call site.
-// The underlying SDE/margin math is NOT clamped — tests assert on the raw
-// arithmetic.
+// The hero stays anchored to TTM SDE at sliders-neutral (delta = 0), and
+// moves by the same dollar amount the forecast net would move, in the
+// same direction. This eliminates the level cliff that the absolute
+// forecast-SDE path produced: the forecast composer is structurally
+// conservative and sits well below TTM even at neutral sliders, so any
+// nonzero slider flipped the hero from ~TTM to ~forecast in one step.
+// The delta model cancels model-layer conservatism between active and
+// baseline projections — only the slider's marginal effect remains.
 //
-// Same accounting layer reconciliation: ScenarioPoint.netCashFlow and
-// MonthlyRollup.netCashFlow (operating mode) both exclude owner distributions
-// and include W2/personal-expenses, so add-backs apply identically to TTM
-// SDE and projected SDE (see cashFlow.ts forecastCashOutContribution and
-// compute.ts computeMonthlyRollups).
+// Add-backs apply ONLY to the goal leg, which builds SDE from a
+// constructed goal net (baselineRevenue × targetMargin). The actual leg
+// adds the forecast delta to currentTtmSde directly — TTM SDE already
+// contains the add-backs, so re-applying them would double-count.
+//
+// Both legs apply a margin-quality adjustment to the derived multiple
+// based on their own annualNet/annualRevenue margin, then clamp inside
+// the existing driver-based display band. The adjustment is a single
+// mechanism (NOT a stacked bonus): margin >= 25% earns the top of the
+// band, 10-24.9% sits at derived, < 10% takes a hit. A small residual
+// step (~$4K at typical gym numbers) can still appear at the first
+// nonzero slider touch — the neutral TTM hero has no margin-quality
+// adjustment, the active hero uses the scenario margin. This is
+// intentional and far smaller than the previous SDE-base cliff.
+//
+// Owner Independence and the other 6 driver rows remain the bigger
+// lever — the margin-quality adjustment moves the point inside the
+// band, not the band edges.
+//
+// Negative valuation floor: a non-positive scenario SDE produces a
+// nonsensical negative sale price. The displayed valuation is floored
+// at 0. The actual leg's isFloored flag signals "not buyer-ready" copy
+// at the call site. The underlying SDE math is NOT clamped — tests
+// assert on the raw arithmetic.
 
 import type { Range } from './businessValuation';
 
@@ -74,8 +94,19 @@ export interface ValuationProjectionInputs {
   // Slider-driven projection. First 12 entries used.
   forecastPoints: ProjectionPoint[] | null;
   // Slider-neutral baseline (Dashboard `baselineProjection ?? scenarioProjection`).
-  // First 12 entries used. When null, goal leg returns null.
+  // First 12 entries used. When null, both legs return null — the actual
+  // leg needs it for the delta math, the goal leg needs it for the
+  // baseline-revenue × target-margin computation.
   baselineForecastPoints: ProjectionPoint[] | null;
+  // Current TTM SDE from BusinessValuationResult.ttmSde — the anchor for
+  // the actual leg's delta math. Already includes add-backs (computeSde
+  // in businessValuation.ts). When null (insufficient TTM data), the
+  // actual leg returns null and the card falls back to its "Needs input"
+  // TTM hero — same surface as a missing ownerOperatorValue.
+  currentTtmSde: number | null;
+  // Add-backs apply ONLY to the goal leg (which builds SDE from a
+  // constructed goal net). The actual leg uses currentTtmSde + delta and
+  // must NOT re-apply these — currentTtmSde already contains them.
   addBacks: ProjectionAddBacks;
   // From BusinessValuationResult.derivedMultiple / displayMultipleRange.
   // Same range as the on-screen "Range: lower – upper" subtitle band in
@@ -143,15 +174,18 @@ export function buildProjectedSde(
   );
 }
 
-function buildLeg(
+// Core leg assembler — takes an already-computed SDE and applies the
+// margin-quality adjustment, band clamp, and display floor. Both legs
+// converge here; only the SDE derivation differs (actual = currentTtmSde +
+// delta; goal = projected goalNet + add-backs).
+function buildLegFromSde(
+  sde: number,
   annualNet: number,
   annualRevenue: number,
   margin: number,
-  addBacks: ProjectionAddBacks,
   derivedMultiple: number,
   displayMultipleRange: Range
 ): ValuationProjectionLeg {
-  const sde = buildProjectedSde(annualNet, addBacks);
   const adjustment = marginQualityAdjustment(margin);
   const adjustedMultiple = clamp(
     derivedMultiple + adjustment,
@@ -175,6 +209,26 @@ function buildLeg(
   };
 }
 
+// Goal-leg wrapper: derives SDE from a projected annual net + add-backs.
+function buildLegFromProjectedNet(
+  annualNet: number,
+  annualRevenue: number,
+  margin: number,
+  addBacks: ProjectionAddBacks,
+  derivedMultiple: number,
+  displayMultipleRange: Range
+): ValuationProjectionLeg {
+  const sde = buildProjectedSde(annualNet, addBacks);
+  return buildLegFromSde(
+    sde,
+    annualNet,
+    annualRevenue,
+    margin,
+    derivedMultiple,
+    displayMultipleRange
+  );
+}
+
 function take12(points: ProjectionPoint[] | null): ProjectionPoint[] | null {
   if (!points) return null;
   if (points.length < PROJECTION_WINDOW_MONTHS) return null;
@@ -187,23 +241,42 @@ export function computeValuationProjection(
   const forecast12 = take12(inputs.forecastPoints);
   const baseline12 = take12(inputs.baselineForecastPoints);
 
+  // Actual (scenario) leg — delta-SDE model.
+  //
+  // Requires BOTH a 12-month active forecast and a 12-month baseline
+  // forecast, plus a current TTM SDE anchor. When any is missing the
+  // leg is null and the card falls back to its TTM-based current hero
+  // (the same surface that already covers `result.ownerOperatorValue ===
+  // null`). Margin still comes from the active scenario projection so
+  // the margin-quality adjustment reflects "this scenario's pace," not
+  // historical TTM margin.
   let actual: ValuationProjectionLeg | null = null;
-  if (forecast12 !== null) {
+  if (
+    forecast12 !== null
+    && baseline12 !== null
+    && inputs.currentTtmSde !== null
+  ) {
     const annualNet = forecast12.reduce((s, p) => s + p.netCashFlow, 0);
     const annualRevenue = forecast12.reduce((s, p) => s + p.cashIn, 0);
     if (annualRevenue > 0) {
+      const baselineAnnualNet = baseline12.reduce((s, p) => s + p.netCashFlow, 0);
+      const forecastDelta = annualNet - baselineAnnualNet;
+      const scenarioSde = inputs.currentTtmSde + forecastDelta;
       const margin = annualNet / annualRevenue;
-      actual = buildLeg(
+      actual = buildLegFromSde(
+        scenarioSde,
         annualNet,
         annualRevenue,
         margin,
-        inputs.addBacks,
         inputs.derivedMultiple,
         inputs.displayMultipleRange
       );
     }
   }
 
+  // Goal leg — slider-immune. Built from baseline revenue × target net
+  // margin, then converted to SDE via add-backs (the goal net is a pure
+  // projection that doesn't include owner add-backs yet).
   let goal: ValuationProjectionLeg | null = null;
   if (
     baseline12 !== null
@@ -214,7 +287,7 @@ export function computeValuationProjection(
     if (baselineRevenue > 0) {
       const goalMargin = inputs.effectiveTargetNetMargin;
       const goalNet = baselineRevenue * goalMargin;
-      goal = buildLeg(
+      goal = buildLegFromProjectedNet(
         goalNet,
         baselineRevenue,
         goalMargin,
