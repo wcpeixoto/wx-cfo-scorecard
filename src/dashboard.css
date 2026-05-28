@@ -1509,11 +1509,6 @@ body {
   align-items: flex-start;
   gap: 2px;
 }
-.scenario-menu-item-sub {
-  font-size: 12px;
-  font-weight: 400;
-  color: #667085;
-}
 
 @media (max-width: 767px) {
   .action-dropdown {
