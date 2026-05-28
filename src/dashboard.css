@@ -1598,6 +1598,18 @@ body {
   margin-bottom: 16px;
 }
 
+.forecast-decision-label--with-tooltip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.forecast-reserve-tooltip-panel {
+  left: 0;
+  right: auto;
+  width: 320px;
+}
+
 .forecast-decision-value {
   font-size: 30px;
   font-weight: 600;
