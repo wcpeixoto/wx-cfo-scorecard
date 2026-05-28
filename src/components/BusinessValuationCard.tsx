@@ -4,8 +4,12 @@ import type {
   DriverGrade,
   LeaseRunwayGrade,
   Range,
+  ValuationDriverImpact,
 } from '../lib/kpis/businessValuation';
 import {
+  // Still imported because RangeEditor's allowEmpty=false branch references
+  // it (dead branch now that the inline multiple editor is gone, but the
+  // editor function is still in this file for the replacement-cost path).
   validateMultipleRange,
   validateReplacementCostRange,
 } from '../lib/kpis/businessValuation';
@@ -20,73 +24,62 @@ type DriverKey =
   | 'ownerIndependence'
   | 'brandStrength';
 
-interface DriverRowConfig {
-  key: DriverKey | 'leaseRunway';
-  label: string;
-  tooltip: string;
-}
-
 interface Props {
   result: BusinessValuationResult;
-  onMultipleRangeChange: (lower: number, upper: number) => void;
   onReplacementCostChange: (range: Range | null) => void;
   onDriverGradeChange: (key: DriverKey, grade: DriverGrade) => void;
 }
 
 // ── Display copy ───────────────────────────────────────────────────────────
 
-const DRIVER_TOOLTIPS: Record<DriverKey, string> = {
+// Per-driver base description (the V1 "what this driver means" sentence).
+// Render-time appends a current-grade + contribution suffix via
+// driverTooltipText() so the tooltip always reflects the live impact.
+const DRIVER_BASE_TOOLTIPS: Record<DriverKey, string> = {
   recurringRevenue:
-    'How reliable and recurring the business income is. Click to set its grade.',
+    'How reliable and recurring the business income is.',
   financialClarity:
-    'How organized and trustworthy the business financial reporting is. Click to set its grade.',
+    'How organized and trustworthy the business financial reporting is.',
   churnTracking:
-    'How well member retention and cancellations are monitored. Click to set its grade.',
+    'How well member retention and cancellations are monitored.',
   coachDepth:
-    'How strong the coaching bench is beyond the owner. Click to set its grade.',
+    'How strong the coaching bench is beyond the owner.',
   ownerIndependence:
-    'How much the business depends on the owner operationally. Click to set its grade.',
+    'How much the business depends on the owner operationally.',
   brandStrength:
-    'How strong the academy identity/community is beyond one individual. Click to set its grade.',
+    'How strong the academy identity/community is beyond one individual.',
 };
 
-const LEASE_TOOLTIP_WITH_DATA =
-  'How secure and stable the physical location is long-term. Calculated from your lease dates in Settings.';
-const LEASE_TOOLTIP_NOT_TRACKED =
-  'How secure and stable the physical location is long-term. Enter your lease dates in Settings to track this driver.';
+const LEASE_BASE_TOOLTIP =
+  'How secure and stable the physical location is long-term. Auto-graded from your lease dates in Settings.';
+const LEASE_BASE_TOOLTIP_NOT_TRACKED =
+  'How secure and stable the physical location is long-term. Add lease dates in Settings to grade this driver.';
 
+const SDE_METHOD_TOOLTIP_PARAGRAPHS: string[] = [
+  'This estimates what your business could sell for.',
+  'It starts with owner cash flow from the last 12 months, then adjusts based on buyer risk. The starting point is 2.25× owner cash flow.',
+  'Value goes up when the business can run without you, has recurring revenue, a strong lease, good coaches, clean books, churn tracking, and a transferable brand. Value goes down when those drivers are weak or missing.',
+  'Final value stays between 1.5× and 3.0× owner cash flow.',
+  'This is not an official appraisal, just a practical benchmark to show what improves — or hurts — business value.',
+];
+
+const MULTIPLE_CLIP_TOOLTIP = 'Range narrowed by the 1.5×–3.0× cap.';
+
+interface DriverRowConfig {
+  key: DriverKey | 'leaseRunway';
+  label: string;
+}
+
+// Display order matches `DRIVER_IMPACT_ORDER` in the selector so the
+// impact-list index aligns with the rendered row order.
 const DRIVER_ROWS: DriverRowConfig[] = [
-  {
-    key: 'recurringRevenue',
-    label: 'Recurring revenue',
-    tooltip: DRIVER_TOOLTIPS.recurringRevenue,
-  },
-  {
-    key: 'financialClarity',
-    label: 'Financial clarity',
-    tooltip: DRIVER_TOOLTIPS.financialClarity,
-  },
-  {
-    key: 'churnTracking',
-    label: 'Churn tracking',
-    tooltip: DRIVER_TOOLTIPS.churnTracking,
-  },
-  { key: 'leaseRunway', label: 'Lease runway', tooltip: '' },
-  {
-    key: 'coachDepth',
-    label: 'Coach depth',
-    tooltip: DRIVER_TOOLTIPS.coachDepth,
-  },
-  {
-    key: 'ownerIndependence',
-    label: 'Owner independence',
-    tooltip: DRIVER_TOOLTIPS.ownerIndependence,
-  },
-  {
-    key: 'brandStrength',
-    label: 'Brand strength',
-    tooltip: DRIVER_TOOLTIPS.brandStrength,
-  },
+  { key: 'recurringRevenue',  label: 'Recurring revenue' },
+  { key: 'leaseRunway',       label: 'Lease runway' },
+  { key: 'coachDepth',        label: 'Coach depth' },
+  { key: 'ownerIndependence', label: 'Owner independence' },
+  { key: 'financialClarity',  label: 'Financial clarity' },
+  { key: 'churnTracking',     label: 'Churn tracking' },
+  { key: 'brandStrength',     label: 'Brand strength' },
 ];
 
 const GRADE_OPTIONS: { value: DriverGrade; label: string }[] = [
@@ -112,7 +105,8 @@ function formatMoneyRange(range: Range): string {
 }
 
 function formatMultiple(value: number): string {
-  return `${value.toFixed(1)}×`;
+  // 2-decimal precision matches the derived multiple's 0.05× granularity.
+  return `${value.toFixed(2)}×`;
 }
 
 function formatMultipleRange(range: Range): string {
@@ -144,6 +138,41 @@ function leaseGradeLabel(grade: LeaseRunwayGrade): string {
     case 'not_tracked':
       return 'Not tracked';
   }
+}
+
+// Impact column display. Returns null for needs_input / not_tracked so the
+// column slot renders blank. Uses Unicode minus (−) for visual consistency
+// with the en-dash range separator elsewhere in the card.
+function formatContribution(impact: ValuationDriverImpact): string | null {
+  if (impact.grade === 'needs_input' || impact.grade === 'not_tracked') {
+    return null;
+  }
+  if (impact.grade === 'mixed') return '0.00×';
+  const magnitude = Math.abs(impact.contribution).toFixed(2);
+  const sign = impact.contribution > 0 ? '+' : '−';
+  return `${sign}${magnitude}×`;
+}
+
+// Per-driver tooltip — base description + dynamic current-grade/contribution
+// suffix. Lease and other drivers diverge on the suffix copy.
+function driverTooltipText(
+  impact: ValuationDriverImpact,
+  rowKey: DriverKey | 'leaseRunway'
+): string {
+  if (rowKey === 'leaseRunway') {
+    if (impact.grade === 'not_tracked') return LEASE_BASE_TOOLTIP_NOT_TRACKED;
+    const contribution = formatContribution(impact) ?? '0.00×';
+    const gradeLabel = leaseGradeLabel(impact.grade as LeaseRunwayGrade);
+    return `${LEASE_BASE_TOOLTIP} Currently ${gradeLabel}, contributing ${contribution} to your multiple.`;
+  }
+
+  const baseText = DRIVER_BASE_TOOLTIPS[rowKey];
+  const gradeLabel = driverGradeLabel(impact.grade as DriverGrade);
+  if (impact.grade === 'needs_input') {
+    return `${baseText} Currently ${gradeLabel}. Click to set this driver's grade.`;
+  }
+  const contribution = formatContribution(impact) ?? '0.00×';
+  return `${baseText} Currently ${gradeLabel}, contributing ${contribution} to your multiple. Click to change.`;
 }
 
 // ── Inline editor — range (two numeric inputs) ─────────────────────────────
@@ -475,28 +504,17 @@ function ReadOnlyValue({ displayText, tooltipText, isMuted }: ReadOnlyValueProps
 
 export function BusinessValuationCard({
   result,
-  onMultipleRangeChange,
   onReplacementCostChange,
   onDriverGradeChange,
 }: Props) {
   const [editing, setEditing] = useState<
-    | { kind: 'multiple' }
     | { kind: 'replacementCost' }
     | { kind: 'driver'; driver: DriverKey }
     | null
   >(null);
+  const sdeTooltipId = useId();
 
   const closeEditor = useCallback(() => setEditing(null), []);
-
-  const handleMultipleSave = useCallback(
-    (range: Range | null) => {
-      // Multiple range never accepts empty.
-      if (range === null) return;
-      onMultipleRangeChange(range.lower, range.upper);
-      closeEditor();
-    },
-    [onMultipleRangeChange, closeEditor]
-  );
 
   const handleReplacementCostSave = useCallback(
     (range: Range | null) => {
@@ -530,19 +548,65 @@ export function BusinessValuationCard({
   const ttmSdeDisplay =
     result.ttmSde === null ? 'Needs input' : formatK(result.ttmSde);
 
-  const multipleDisplay = formatMultipleRange(result.multipleRange);
+  const multipleDisplay = formatMultipleRange(result.displayMultipleRange);
 
-  const replacementDisplay =
-    result.replacementCost === null
+  // Owner Independence resolves which note / value the Replacement Cost row
+  // shows. Strong forces effective $0 (no editor change; persisted value
+  // preserved). Needs input shows "Needs input" REGARDLESS of persisted value
+  // — TV and Gap are blocked until OI is graded, so the cost row reflects
+  // the same "ungraded" state. Mixed/Weak with blank → default $60K applied;
+  // with a persisted nonzero, the persisted value renders.
+  const ownerIndependenceGrade = result.driverGrades.ownerIndependence;
+  const isOwnerIndependenceStrong = ownerIndependenceGrade === 'strong';
+  const isOwnerIndependenceNeedsInput = ownerIndependenceGrade === 'needs_input';
+  const replacementDisplay = isOwnerIndependenceStrong
+    ? formatK(0)
+    : isOwnerIndependenceNeedsInput
       ? 'Needs input'
-      : formatMoneyRange(result.replacementCost);
+      : result.replacementCostDefaultApplied && result.effectiveReplacementCost
+        ? formatMoneyRange(result.effectiveReplacementCost)
+        : result.replacementCost === null
+          ? 'Needs input'
+          : formatMoneyRange(result.replacementCost);
+  // Muted when the row displays "Needs input" — covers (a) Needs input OI
+  // (regardless of persisted) and (b) blank persisted under Mixed/Weak with
+  // no default applied (which shouldn't happen since default kicks in, but
+  // defensive).
+  const isReplacementMuted =
+    isOwnerIndependenceNeedsInput ||
+    (result.replacementCost === null && !result.replacementCostDefaultApplied);
 
   return (
     <div className="ta-card bv-card">
-      {/* Header — Pattern B (title + subtitle) */}
+      {/* Header — Pattern B (title + subtitle).
+          The "SDE method" subtitle is the anchor for the card-level
+          explainer tooltip. Hover/focus reveals the wide panel. No info
+          icon, no new button — the subtitle text itself is interactive. */}
       <div className="bv-header">
         <h3 className="bv-title">Business Valuation</h3>
-        <p className="bv-subtitle">SDE method</p>
+        <span className="db-tooltip-wrap bv-card-tooltip-wrap">
+          <p
+            className="bv-subtitle bv-subtitle--tooltip"
+            tabIndex={0}
+            aria-describedby={sdeTooltipId}
+          >
+            SDE method
+          </p>
+          <span
+            id={sdeTooltipId}
+            role="tooltip"
+            className="db-tooltip-panel is-wide bv-card-tooltip-panel"
+          >
+            {SDE_METHOD_TOOLTIP_PARAGRAPHS.map((para, idx) => (
+              <p
+                key={idx}
+                className="bv-card-tooltip-paragraph"
+              >
+                {para}
+              </p>
+            ))}
+          </span>
+        </span>
       </div>
 
       {/* Hero rows: Owner-Operator Value / Transferable Value / Gap */}
@@ -572,14 +636,16 @@ export function BusinessValuationCard({
             {tvDisplay}
           </span>
         </div>
-        {result.replacementCost === null && (
+        {result.transferableValue === null && (
           <p className="bv-hero-note">
-            Set Replacement Cost to see Transferable Value.
+            {ownerIndependenceGrade === 'needs_input'
+              ? 'Set Owner Independence to see Transferable Value.'
+              : 'Set Replacement Cost to see Transferable Value.'}
           </p>
         )}
 
         <div className="bv-hero-row">
-          <span className="bv-hero-label">Gap</span>
+          <span className="bv-hero-label">Transferability Gap</span>
           <span
             className={
               result.gap === null
@@ -590,31 +656,46 @@ export function BusinessValuationCard({
             {gapDisplay}
           </span>
         </div>
-        <p className="bv-teaching-line">
-          The smaller this gap gets, the more the business can run without you.
-        </p>
+        {isOwnerIndependenceStrong && result.gap !== null ? (
+          <p className="bv-teaching-line bv-teaching-line--strong">
+            Your business already operates independently of you. Strong work.
+          </p>
+        ) : (
+          <p className="bv-teaching-line">
+            The smaller this gap, the more the business can run without you.
+          </p>
+        )}
       </div>
 
-      {/* Drivers */}
+      {/* Drivers — impacts list in canonical render order. Each row shows
+          grade (left), label (middle), contribution (right). Lease is
+          auto-graded and read-only with an "(auto)" suffix. Other drivers
+          are owner-set, click-to-edit. */}
       <div className="bv-drivers">
         <h4 className="bv-drivers-title">Drivers</h4>
         <ul className="bv-drivers-list">
-          {DRIVER_ROWS.map((row) => {
+          {DRIVER_ROWS.map((row, idx) => {
+            const impact = result.driverImpacts[idx];
+            const contribution = formatContribution(impact);
+            const tooltipText = driverTooltipText(impact, row.key);
+
             if (row.key === 'leaseRunway') {
-              const grade = result.leaseRunway;
-              const tooltip =
-                grade === 'not_tracked'
-                  ? LEASE_TOOLTIP_NOT_TRACKED
-                  : LEASE_TOOLTIP_WITH_DATA;
+              const leaseGrade = result.leaseRunway;
               return (
                 <li key={row.key} className="bv-driver-row">
                   <ReadOnlyValue
-                    displayText={leaseGradeLabel(grade)}
-                    tooltipText={tooltip}
-                    isMuted={grade === 'not_tracked'}
+                    displayText={leaseGradeLabel(leaseGrade)}
+                    tooltipText={tooltipText}
+                    isMuted={leaseGrade === 'not_tracked'}
                   />
                   <span className="bv-driver-sep">·</span>
-                  <span className="bv-driver-label">{row.label}</span>
+                  <span className="bv-driver-label">
+                    {row.label}
+                    <span className="bv-driver-auto"> (auto)</span>
+                  </span>
+                  {contribution !== null && (
+                    <span className="bv-impact-cell">{contribution}</span>
+                  )}
                 </li>
               );
             }
@@ -638,7 +719,7 @@ export function BusinessValuationCard({
                   <EditableValue
                     displayText={driverGradeLabel(grade)}
                     ariaLabel={`${row.label} grade — currently ${driverGradeLabel(grade)}`}
-                    tooltipText={row.tooltip}
+                    tooltipText={tooltipText}
                     isMuted={grade === 'needs_input'}
                     onActivate={() =>
                       setEditing({ kind: 'driver', driver: driverKey })
@@ -647,6 +728,9 @@ export function BusinessValuationCard({
                 )}
                 <span className="bv-driver-sep">·</span>
                 <span className="bv-driver-label">{row.label}</span>
+                {contribution !== null && (
+                  <span className="bv-impact-cell">{contribution}</span>
+                )}
               </li>
             );
           })}
@@ -673,28 +757,32 @@ export function BusinessValuationCard({
           </p>
         )}
 
+        {/* Derived Multiple — static (PR-A removed the inline editor).
+            Subtitle "Derived from drivers" is the only affordance. When the
+            display range was clipped against the 1.5×–3.0× cap, a tooltip
+            on the value explains the asymmetric narrowing. */}
         <div className="bv-footer-row">
-          <span className="bv-footer-label">Multiple Range</span>
-          {editing !== null && editing.kind === 'multiple' ? (
-            <RangeEditor
-              initialLower={result.multipleRange.lower}
-              initialUpper={result.multipleRange.upper}
-              helperText="Use a range when you're unsure."
-              unit="multiple"
-              allowEmpty={false}
-              inputStep="0.1"
-              onSave={handleMultipleSave}
-              onCancel={closeEditor}
-            />
-          ) : (
-            <EditableValue
-              displayText={multipleDisplay}
-              ariaLabel={`Multiple range — currently ${multipleDisplay}`}
-              onActivate={() => setEditing({ kind: 'multiple' })}
-            />
-          )}
+          <span className="bv-footer-label">Derived Multiple</span>
+          <div className="bv-multiple-wrap">
+            {result.wasClipped ? (
+              <ReadOnlyValue
+                displayText={multipleDisplay}
+                tooltipText={MULTIPLE_CLIP_TOOLTIP}
+              />
+            ) : (
+              <span className="bv-multiple-display">{multipleDisplay}</span>
+            )}
+            <span className="bv-multiple-derived-label">
+              Derived from drivers
+            </span>
+          </div>
         </div>
 
+        {/* Replacement Cost — editor unchanged from V1 for Mixed/Weak/Needs
+            input. When Owner Independence is Strong, the field still shows
+            but reflects effective $0 in math (persisted value preserved on
+            the result for switch-back). When the $60K default applies
+            (Mixed/Weak + blank), a note explains the source. */}
         <div className="bv-footer-row">
           <span className="bv-footer-label">Replacement Cost</span>
           {editing !== null && editing.kind === 'replacementCost' ? (
@@ -711,13 +799,18 @@ export function BusinessValuationCard({
             <EditableValue
               displayText={replacementDisplay}
               ariaLabel={`Replacement cost — ${
-                result.replacementCost === null ? 'needs input' : replacementDisplay
+                replacementDisplay === 'Needs input' ? 'needs input' : replacementDisplay
               }`}
-              isMuted={result.replacementCost === null}
+              isMuted={isReplacementMuted}
               onActivate={() => setEditing({ kind: 'replacementCost' })}
             />
           )}
         </div>
+        {result.replacementCostDefaultApplied && (
+          <p className="bv-footer-note">
+            Defaulted to $60K estimated GM/lead coach replacement. Adjust to your local market.
+          </p>
+        )}
       </div>
     </div>
   );

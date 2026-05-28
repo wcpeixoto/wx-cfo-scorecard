@@ -9964,10 +9964,15 @@ body {
   gap: 8px;
 }
 
+/* PR-A — grid layout adds a right-aligned impact column. Columns:
+   [grade] [·] [label] [contribution].
+   Needs input / not_tracked rows omit the contribution span; the trailing
+   `auto` column simply collapses to 0px in those rows. */
 .bv-driver-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
   align-items: center;
-  gap: 8px;
+  column-gap: 8px;
   font-family: 'Outfit', sans-serif;
   font-size: 14px;
   line-height: 20px;
@@ -10317,3 +10322,120 @@ body {
   outline: 2px solid #465FFF;
   outline-offset: -2px;
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   PR-A additions — derived multiple, impact column, card-level tooltip
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Per-driver contribution cell (right-aligned in the grid row). Same visual
+   weight as the label but tabular-nums so "+0.15×" / "−0.20×" / "0.00×"
+   align vertically when stacked. */
+.bv-impact-cell {
+  color: #667085;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 56px;
+}
+
+.dark .bv-impact-cell { color: #98A2B3; }
+
+/* "(auto)" suffix on the Lease runway label — distinguishes auto-graded
+   from owner-set drivers without changing the row layout. */
+.bv-driver-auto {
+  color: #98A2B3;
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.dark .bv-driver-auto { color: #667085; }
+
+/* Static derived-multiple display + "Derived from drivers" subtitle.
+   Wraps in a column so the label sits directly under the value. */
+.bv-multiple-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.bv-multiple-display {
+  color: #1D2939;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.dark .bv-multiple-display { color: rgba(255, 255, 255, 0.9); }
+
+.bv-multiple-derived-label {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 400;
+  font-family: 'Outfit', sans-serif;
+}
+
+.dark .bv-multiple-derived-label { color: #98A2B3; }
+
+/* Card-level "SDE method" tooltip anchor. Dotted underline at rest signals
+   the subtitle is hoverable; cursor:help reinforces. No new button, no
+   info icon — the subtitle text itself is the affordance. */
+.bv-card-tooltip-wrap {
+  display: inline-block;
+  position: relative;
+}
+
+.bv-subtitle--tooltip {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-decoration-color: #98A2B3;
+  text-underline-offset: 3px;
+}
+
+.bv-subtitle--tooltip:focus-visible {
+  outline: 2px solid #465FFF;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* BV-scoped tooltip panel override. The base .db-tooltip-panel anchors
+   `right: 0`, which on a narrow rightSlot pushes a 380–420px wide panel
+   past the card's left edge. PR-A anchors left instead and tightens
+   max-width to fit inside the rightSlot card on the Forecast page (which
+   measures ~340–380px wide at 1440 viewport). 320px also gives a
+   comfortable 50–60 char measure for the 5-paragraph tooltip copy.
+   The viewport-based clamp keeps it from overflowing on mobile, where
+   the card spans the full viewport minus page padding. */
+.db-tooltip-panel.bv-card-tooltip-panel {
+  right: auto;
+  left: 0;
+  min-width: 0;
+  /* 300px fits the narrowest observed rightSlot card (343px on mobile)
+     with room for the wrap's left inset. Viewport clamp guards against
+     even narrower devices. 50–60 char measure stays readable. */
+  max-width: min(300px, calc(100vw - 48px));
+  width: max-content;
+}
+
+.bv-card-tooltip-paragraph {
+  margin: 0;
+  color: var(--tooltip-text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.bv-card-tooltip-paragraph + .bv-card-tooltip-paragraph {
+  margin-top: 8px;
+}
+
+/* OI=Strong helper line replaces the standard teaching line under the
+   Transferability Gap when the gap is $0. Slightly darker green-text +
+   non-italic to read as a confirmation, not a teaching prompt. */
+.bv-teaching-line--strong {
+  color: #039855;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.dark .bv-teaching-line--strong { color: #12B76A; }
