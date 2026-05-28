@@ -63,7 +63,22 @@ const SDE_METHOD_TOOLTIP_PARAGRAPHS: string[] = [
   'This is not an official appraisal, just a practical benchmark to show what improves — or hurts — business value.',
 ];
 
-const MULTIPLE_CLIP_TOOLTIP = 'Range narrowed by the 1.5×–3.0× cap.';
+// Tooltips for the single-hero layout (Phase 2 redesign). Six rows carry
+// tooltips: BV hero, range subtitle, Buyer-Ready Value, Owner Dependence Gap,
+// TTM SDE, Derived Multiple. Replacement Cost retains its existing inline
+// helper text (PR-B owns the rename + new tooltip copy).
+const BV_HERO_TOOLTIP =
+  'What the business is worth today with you running it. Based on the last 12 months of cash flow (TTM SDE) times the valuation multiple.';
+const BV_RANGE_TOOLTIP =
+  'The low and high estimate. The headline number is the midpoint of this range.';
+const BUYER_READY_TOOLTIP =
+  "What the business is worth to a buyer after paying someone to do your day-to-day job. If this is low, the business still leans heavily on you.";
+const OWNER_DEPENDENCE_GAP_TOOLTIP =
+  "Value that exists only because you're running things. The smaller this gap, the more the business can run without you — and the easier it is to sell.";
+const TTM_SDE_TOOLTIP =
+  "Trailing twelve-month Seller's Discretionary Earnings — the business's annual cash flow before accounting for the cost of replacing you.";
+const DERIVED_MULTIPLE_TOOLTIP =
+  'The valuation multiple built from seven business-quality drivers: recurring revenue, lease runway, coach depth, owner independence, financial clarity, churn tracking, and brand strength.';
 
 interface DriverRowConfig {
   key: DriverKey | 'leaseRunway';
@@ -513,6 +528,12 @@ export function BusinessValuationCard({
     | null
   >(null);
   const sdeTooltipId = useId();
+  const bvHeroTooltipId = useId();
+  const bvRangeTooltipId = useId();
+  const buyerReadyTooltipId = useId();
+  const ownerDepGapTooltipId = useId();
+  const ttmSdeTooltipId = useId();
+  const derivedMultipleTooltipId = useId();
 
   const closeEditor = useCallback(() => setEditing(null), []);
 
@@ -532,15 +553,29 @@ export function BusinessValuationCard({
     [onDriverGradeChange, closeEditor]
   );
 
-  const oovDisplay =
+  // Hero = midpoint of the OOV range. Uses the same formatter as the range
+  // endpoints (formatK) so rounding stays consistent on screen — a viewer
+  // mentally computing midpoint of the visible range will land on the same
+  // value as the hero (within K-rounding).
+  const heroMidpoint =
     result.ownerOperatorValue === null
-      ? 'Needs input'
+      ? null
+      : (result.ownerOperatorValue.lower + result.ownerOperatorValue.upper) / 2;
+  const heroDisplay = heroMidpoint === null ? 'Needs input' : formatK(heroMidpoint);
+
+  const rangeSubtitleDisplay =
+    result.ownerOperatorValue === null
+      ? null
       : formatMoneyRange(result.ownerOperatorValue);
 
-  const tvDisplay =
+  // Buyer-Ready Value: midpoint of the TV range (single value per the
+  // range-display rule — only the hero shows a range).
+  const buyerReadyMidpoint =
     result.transferableValue === null
-      ? 'Needs input'
-      : formatMoneyRange(result.transferableValue);
+      ? null
+      : (result.transferableValue.lower + result.transferableValue.upper) / 2;
+  const buyerReadyDisplay =
+    buyerReadyMidpoint === null ? 'Needs input' : formatK(buyerReadyMidpoint);
 
   const gapDisplay =
     result.gap === null ? 'Needs input' : formatK(Math.abs(result.gap));
@@ -576,6 +611,17 @@ export function BusinessValuationCard({
     isOwnerIndependenceNeedsInput ||
     (result.replacementCost === null && !result.replacementCostDefaultApplied);
 
+  // OI=Strong override note: show "(set to $0 — Owner Independence is
+  // Strong)" only when persisted is a real non-zero value. Persisted null or
+  // zero range needs no explanation — $0 is just $0. The Strong override note
+  // is MUTUALLY EXCLUSIVE with replacementCostDefaultApplied (Strong never
+  // triggers the default), so the two notes never co-render.
+  const persistedReplacementIsNonZero =
+    result.replacementCost !== null &&
+    !(result.replacementCost.lower === 0 && result.replacementCost.upper === 0);
+  const showStrongOverrideNote =
+    isOwnerIndependenceStrong && persistedReplacementIsNonZero;
+
   return (
     <div className="ta-card bv-card">
       {/* Header — Pattern B (title + subtitle).
@@ -609,68 +655,61 @@ export function BusinessValuationCard({
         </span>
       </div>
 
-      {/* Hero rows: Owner-Operator Value / Transferable Value / Gap */}
+      {/* Single dominant hero — midpoint of the Business Valuation range
+          (= SDE × derivedMultiple, by midpoint-preservation invariant) with
+          a "Range: low – high" subtitle. Per the range-display rule, the
+          hero is the ONLY metric that surfaces a range; the supporting rows
+          below render single values even though the same uncertainty
+          applies. */}
       <div className="bv-hero">
-        <div className="bv-hero-row">
-          <span className="bv-hero-label">Owner-Operator Value</span>
-          <span
-            className={
-              result.ownerOperatorValue === null
-                ? 'bv-hero-value bv-hero-value--muted'
-                : 'bv-hero-value'
-            }
-          >
-            {oovDisplay}
+        {result.ownerOperatorValue === null ? (
+          <span className="bv-hero-dominant bv-hero-dominant--muted">
+            {heroDisplay}
           </span>
-        </div>
-
-        <div className="bv-hero-row">
-          <span className="bv-hero-label">Transferable Value</span>
-          <span
-            className={
-              result.transferableValue === null
-                ? 'bv-hero-value bv-hero-value--muted'
-                : 'bv-hero-value'
-            }
-          >
-            {tvDisplay}
-          </span>
-        </div>
-        {result.transferableValue === null && (
-          <p className="bv-hero-note">
-            {ownerIndependenceGrade === 'needs_input'
-              ? 'Set Owner Independence to see Transferable Value.'
-              : 'Set Replacement Cost to see Transferable Value.'}
-          </p>
-        )}
-
-        <div className="bv-hero-row">
-          <span className="bv-hero-label">Transferability Gap</span>
-          <span
-            className={
-              result.gap === null
-                ? 'bv-hero-value bv-hero-value--muted'
-                : 'bv-hero-value'
-            }
-          >
-            {gapDisplay}
-          </span>
-        </div>
-        {isOwnerIndependenceStrong && result.gap !== null ? (
-          <p className="bv-teaching-line bv-teaching-line--strong">
-            Your business already operates independently of you. Strong work.
-          </p>
         ) : (
-          <p className="bv-teaching-line">
-            The smaller this gap, the more the business can run without you.
-          </p>
+          <>
+            <span className="db-tooltip-wrap bv-hero-tooltip-wrap">
+              <span
+                tabIndex={0}
+                className="bv-hero-dominant"
+                aria-describedby={bvHeroTooltipId}
+              >
+                {heroDisplay}
+              </span>
+              <span
+                id={bvHeroTooltipId}
+                role="tooltip"
+                className="db-tooltip-panel bv-driver-tooltip-panel"
+              >
+                {BV_HERO_TOOLTIP}
+              </span>
+            </span>
+            <span className="db-tooltip-wrap bv-hero-tooltip-wrap">
+              <span
+                tabIndex={0}
+                className="bv-hero-range"
+                aria-describedby={bvRangeTooltipId}
+              >
+                Range: {rangeSubtitleDisplay}
+              </span>
+              <span
+                id={bvRangeTooltipId}
+                role="tooltip"
+                className="db-tooltip-panel bv-driver-tooltip-panel"
+              >
+                {BV_RANGE_TOOLTIP}
+              </span>
+            </span>
+          </>
         )}
       </div>
 
       {/* Drivers — impacts list in canonical render order. Each row shows
           grade (left), label (middle), contribution (right). Lease is
-          auto-graded and read-only with an "(auto)" suffix. Other drivers
-          are owner-set, click-to-edit. */}
+          auto-graded and rendered as a read-only value (no dotted-underline
+          editable affordance); the "Auto-graded from your lease dates in
+          Settings" detail lives in the lease tooltip. Other drivers are
+          owner-set, click-to-edit. */}
       <div className="bv-drivers">
         <h4 className="bv-drivers-title">Drivers</h4>
         <ul className="bv-drivers-list">
@@ -689,10 +728,7 @@ export function BusinessValuationCard({
                     isMuted={leaseGrade === 'not_tracked'}
                   />
                   <span className="bv-driver-sep">·</span>
-                  <span className="bv-driver-label">
-                    {row.label}
-                    <span className="bv-driver-auto"> (auto)</span>
-                  </span>
+                  <span className="bv-driver-label">{row.label}</span>
                   {contribution !== null && (
                     <span className="bv-impact-cell">{contribution}</span>
                   )}
@@ -737,10 +773,31 @@ export function BusinessValuationCard({
         </ul>
       </div>
 
-      {/* Bottom rows: TTM SDE / Multiple Range / Replacement Cost */}
+      {/* Bottom rows: TTM SDE / Derived Multiple / Buyer-Ready Value /
+          Owner Dependence Gap / Replacement Cost. The compressed layout
+          demotes OOV/TV/Gap (formerly hero-weight) to label-left/value-right
+          rows; tooltips on the labels explain the metric. Replacement Cost
+          label is preserved this round — PR-B owns the rename to "Cost to
+          Replace You" alongside the data-column rename and migration. */}
       <div className="bv-footer">
+        {/* TTM SDE */}
         <div className="bv-footer-row">
-          <span className="bv-footer-label">TTM SDE</span>
+          <span className="db-tooltip-wrap bv-footer-tooltip-wrap">
+            <span
+              className="bv-footer-label bv-footer-label--tooltip"
+              tabIndex={0}
+              aria-describedby={ttmSdeTooltipId}
+            >
+              TTM SDE
+            </span>
+            <span
+              id={ttmSdeTooltipId}
+              role="tooltip"
+              className="db-tooltip-panel bv-driver-tooltip-panel"
+            >
+              {TTM_SDE_TOOLTIP}
+            </span>
+          </span>
           <span
             className={
               result.ttmSde === null
@@ -758,31 +815,103 @@ export function BusinessValuationCard({
         )}
 
         {/* Derived Multiple — static (PR-A removed the inline editor).
-            Subtitle "Derived from drivers" is the only affordance. When the
-            display range was clipped against the 1.5×–3.0× cap, a tooltip
-            on the value explains the asymmetric narrowing. */}
+            Phase 2 dropped the display clip; math and display now share the
+            unclipped derived ± buffer range, so the row is a plain span. */}
         <div className="bv-footer-row">
-          <span className="bv-footer-label">Derived Multiple</span>
-          <div className="bv-multiple-wrap">
-            {result.wasClipped ? (
-              <ReadOnlyValue
-                displayText={multipleDisplay}
-                tooltipText={MULTIPLE_CLIP_TOOLTIP}
-              />
-            ) : (
-              <span className="bv-multiple-display">{multipleDisplay}</span>
-            )}
-            <span className="bv-multiple-derived-label">
-              Derived from drivers
+          <span className="db-tooltip-wrap bv-footer-tooltip-wrap">
+            <span
+              className="bv-footer-label bv-footer-label--tooltip"
+              tabIndex={0}
+              aria-describedby={derivedMultipleTooltipId}
+            >
+              Derived Multiple
             </span>
-          </div>
+            <span
+              id={derivedMultipleTooltipId}
+              role="tooltip"
+              className="db-tooltip-panel bv-driver-tooltip-panel"
+            >
+              {DERIVED_MULTIPLE_TOOLTIP}
+            </span>
+          </span>
+          <span className="bv-multiple-display">{multipleDisplay}</span>
+        </div>
+
+        {/* Buyer-Ready Value — relabeled from "Transferable Value". Single
+            value (midpoint of TV range) per the range-display rule. */}
+        <div className="bv-footer-row">
+          <span className="db-tooltip-wrap bv-footer-tooltip-wrap">
+            <span
+              className="bv-footer-label bv-footer-label--tooltip"
+              tabIndex={0}
+              aria-describedby={buyerReadyTooltipId}
+            >
+              Buyer-Ready Value
+            </span>
+            <span
+              id={buyerReadyTooltipId}
+              role="tooltip"
+              className="db-tooltip-panel bv-driver-tooltip-panel"
+            >
+              {BUYER_READY_TOOLTIP}
+            </span>
+          </span>
+          <span
+            className={
+              result.transferableValue === null
+                ? 'bv-footer-value bv-footer-value--muted'
+                : 'bv-footer-value'
+            }
+          >
+            {buyerReadyDisplay}
+          </span>
+        </div>
+        {result.transferableValue === null && (
+          <p className="bv-footer-note">
+            {ownerIndependenceGrade === 'needs_input'
+              ? 'Set Owner Independence to see Buyer-Ready Value.'
+              : 'Set Replacement Cost to see Buyer-Ready Value.'}
+          </p>
+        )}
+
+        {/* Owner Dependence Gap — relabeled from "Transferability Gap". The
+            italic "smaller this gap…" teaching line moved into the tooltip. */}
+        <div className="bv-footer-row">
+          <span className="db-tooltip-wrap bv-footer-tooltip-wrap">
+            <span
+              className="bv-footer-label bv-footer-label--tooltip"
+              tabIndex={0}
+              aria-describedby={ownerDepGapTooltipId}
+            >
+              Owner Dependence Gap
+            </span>
+            <span
+              id={ownerDepGapTooltipId}
+              role="tooltip"
+              className="db-tooltip-panel bv-driver-tooltip-panel"
+            >
+              {OWNER_DEPENDENCE_GAP_TOOLTIP}
+            </span>
+          </span>
+          <span
+            className={
+              result.gap === null
+                ? 'bv-footer-value bv-footer-value--muted'
+                : 'bv-footer-value'
+            }
+          >
+            {gapDisplay}
+          </span>
         </div>
 
         {/* Replacement Cost — editor unchanged from V1 for Mixed/Weak/Needs
-            input. When Owner Independence is Strong, the field still shows
-            but reflects effective $0 in math (persisted value preserved on
-            the result for switch-back). When the $60K default applies
-            (Mixed/Weak + blank), a note explains the source. */}
+            input. When Owner Independence is Strong, the field shows $0
+            (effective replacement cost; persisted preserved on the result
+            for switch-back). The override note explains the $0 only when
+            persisted differs (i.e. would have shown a non-zero value).
+            When the $60K default applies (Mixed/Weak + blank), a different
+            note fires — the two are mutually exclusive (Strong never sets
+            defaultApplied=true). */}
         <div className="bv-footer-row">
           <span className="bv-footer-label">Replacement Cost</span>
           {editing !== null && editing.kind === 'replacementCost' ? (
@@ -806,11 +935,15 @@ export function BusinessValuationCard({
             />
           )}
         </div>
-        {result.replacementCostDefaultApplied && (
+        {result.replacementCostDefaultApplied ? (
           <p className="bv-footer-note">
             Defaulted to $60K estimated GM/lead coach replacement. Adjust to your local market.
           </p>
-        )}
+        ) : showStrongOverrideNote ? (
+          <p className="bv-footer-note">
+            Set to $0 — Owner Independence is Strong.
+          </p>
+        ) : null}
       </div>
     </div>
   );

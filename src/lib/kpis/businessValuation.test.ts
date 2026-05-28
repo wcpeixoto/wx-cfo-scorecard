@@ -16,7 +16,7 @@ import {
   monthsBetween,
   buildDriverImpacts,
   deriveMultiple,
-  clipDisplayRange,
+  bufferDisplayRange,
   resolveEffectiveReplacementCost,
   BASE_MULTIPLE,
   MULTIPLE_FLOOR,
@@ -282,7 +282,6 @@ describe('computeBusinessValuation — missing Replacement Cost', () => {
     expect(result.ttmSde).toBe(160_000);
     expect(result.derivedMultiple).toBeCloseTo(BASE_MULTIPLE);
     expect(result.displayMultipleRange).toEqual({ lower: 2.0, upper: 2.5 });
-    expect(result.wasClipped).toBe(false);
     expect(result.ownerOperatorValue).toEqual({ lower: 320_000, upper: 400_000 });
     expect(result.transferableValue).toBeNull();
     expect(result.gap).toBeNull();
@@ -569,39 +568,47 @@ describe('deriveMultiple', () => {
   });
 });
 
-describe('clipDisplayRange', () => {
-  it('no clip when derived ± 0.25 stays inside [1.5, 3.0]', () => {
-    const result = clipDisplayRange(2.55);
-    expect(result.range).toEqual({ lower: 2.30, upper: 2.80 });
-    expect(result.wasClipped).toBe(false);
+describe('bufferDisplayRange', () => {
+  // Phase 2 dropped the display clip. Math and display share the same
+  // derived ± DISPLAY_BUFFER range so midpoint(display) = derived and the
+  // hero number reconciles with the displayed multiple on screen
+  // (SDE × midpoint(display) = hero). The industry-range guarantee on
+  // derivedMultiple itself still lives in deriveMultiple's
+  // [MULTIPLE_FLOOR, MULTIPLE_CEILING] clamp — only the displayed buffer
+  // is unclipped.
+  it('returns derived ± 0.25 (interior case unchanged)', () => {
+    expect(bufferDisplayRange(2.55)).toEqual({ lower: 2.30, upper: 2.80 });
   });
 
-  it('clips the upper end when derived + 0.25 exceeds the ceiling', () => {
-    const result = clipDisplayRange(2.90);
-    expect(result.range.lower).toBeCloseTo(2.65);
-    expect(result.range.upper).toBe(MULTIPLE_CEILING);
-    expect(result.wasClipped).toBe(true);
+  it('extends past the ceiling when derived + 0.25 > MULTIPLE_CEILING (no clip)', () => {
+    const result = bufferDisplayRange(2.90);
+    expect(result.lower).toBeCloseTo(2.65);
+    expect(result.upper).toBeCloseTo(3.15);
   });
 
-  it('clips the lower end when derived − 0.25 falls below the floor', () => {
-    const result = clipDisplayRange(1.60);
-    expect(result.range.lower).toBe(MULTIPLE_FLOOR);
-    expect(result.range.upper).toBeCloseTo(1.85);
-    expect(result.wasClipped).toBe(true);
+  it('extends below the floor when derived − 0.25 < MULTIPLE_FLOOR (no clip)', () => {
+    const result = bufferDisplayRange(1.60);
+    expect(result.lower).toBeCloseTo(1.35);
+    expect(result.upper).toBeCloseTo(1.85);
   });
 
-  it('clips at the ceiling itself (derived = 3.00)', () => {
-    const result = clipDisplayRange(MULTIPLE_CEILING);
-    expect(result.range.lower).toBeCloseTo(2.75);
-    expect(result.range.upper).toBe(MULTIPLE_CEILING);
-    expect(result.wasClipped).toBe(true);
+  it('at MULTIPLE_CEILING (3.00) → symmetric buffer 2.75–3.25', () => {
+    const result = bufferDisplayRange(MULTIPLE_CEILING);
+    expect(result.lower).toBeCloseTo(2.75);
+    expect(result.upper).toBeCloseTo(3.25);
   });
 
-  it('clips at the floor itself (derived = 1.50)', () => {
-    const result = clipDisplayRange(MULTIPLE_FLOOR);
-    expect(result.range.lower).toBe(MULTIPLE_FLOOR);
-    expect(result.range.upper).toBeCloseTo(1.75);
-    expect(result.wasClipped).toBe(true);
+  it('at MULTIPLE_FLOOR (1.50) → symmetric buffer 1.25–1.75', () => {
+    const result = bufferDisplayRange(MULTIPLE_FLOOR);
+    expect(result.lower).toBeCloseTo(1.25);
+    expect(result.upper).toBeCloseTo(1.75);
+  });
+
+  it('midpoint of display always equals derived (midpoint-preservation, on-screen reconciliation)', () => {
+    for (const derived of [1.50, 1.85, 2.25, 2.90, 3.00]) {
+      const { lower, upper } = bufferDisplayRange(derived);
+      expect((lower + upper) / 2).toBeCloseTo(derived);
+    }
   });
 });
 
@@ -688,7 +695,7 @@ describe('computeBusinessValuation — PR-A derived multiple end-to-end', () => 
     lease,
   });
 
-  it('all-Strong + Strong lease + null replacement cost → derived clipped to 3.00, transferable = OOV (Strong OI forces effective $0)', () => {
+  it('all-Strong + Strong lease + null replacement cost → derived clamped to 3.00, transferable = OOV (Strong OI forces effective $0)', () => {
     const inputs = baseInputs(
       ALL_STRONG_DRIVERS,
       null,
@@ -697,16 +704,19 @@ describe('computeBusinessValuation — PR-A derived multiple end-to-end', () => 
     const result = computeBusinessValuation(inputs, REF_DATE);
     expect(result.ttmSde).toBe(160_000);
     expect(result.derivedMultiple).toBe(MULTIPLE_CEILING);
-    expect(result.wasClipped).toBe(true);
+    // Phase 2: display range is UNCLIPPED. At derived=3.00, display extends
+    // to 2.75–3.25 (past the ceiling) as honest uncertainty around the
+    // midpoint. The MULTIPLE_CEILING clamp lives upstream in deriveMultiple
+    // (on the derived value itself), not on the display buffer.
     expect(result.displayMultipleRange.lower).toBeCloseTo(2.75);
-    expect(result.displayMultipleRange.upper).toBe(MULTIPLE_CEILING);
+    expect(result.displayMultipleRange.upper).toBeCloseTo(3.25);
     // OI = strong → effective cost = $0 → transferable = OOV → gap = 0
     expect(result.effectiveReplacementCost).toEqual({ lower: 0, upper: 0 });
     expect(result.transferableValue).toEqual(result.ownerOperatorValue);
     expect(result.gap).toBe(0);
   });
 
-  it('all-Weak + Weak lease + null replacement cost → derived clipped to 1.50, $60K default applied, math uses derived (not clipped midpoint)', () => {
+  it('all-Weak + Weak lease + null replacement cost → derived clamped to 1.50, $60K default applied, midpoint-preservation holds', () => {
     const inputs = baseInputs(
       ALL_WEAK_DRIVERS,
       null,
@@ -714,46 +724,38 @@ describe('computeBusinessValuation — PR-A derived multiple end-to-end', () => 
     );
     const result = computeBusinessValuation(inputs, REF_DATE);
     expect(result.derivedMultiple).toBe(MULTIPLE_FLOOR);
-    expect(result.wasClipped).toBe(true);
     expect(result.effectiveReplacementCost).toEqual({
       lower: DEFAULT_REPLACEMENT_COST,
       upper: DEFAULT_REPLACEMENT_COST,
     });
     expect(result.replacementCostDefaultApplied).toBe(true);
-    // Multiple DISPLAY range is clipped: 1.50–1.75 (floor cap).
-    expect(result.displayMultipleRange).toEqual({ lower: 1.50, upper: 1.75 });
-    // OOV / TV MATH uses the unclipped buffer (derived ± 0.25 = 1.25–1.75).
-    // SDE = 160K. OOV = 160K × {1.25, 1.75} = {200K, 280K} → midpoint 240K.
+    // Phase 2: display range = derived ± 0.25, unclipped. At derived=1.50,
+    // display = 1.25–1.75 (extends below the floor). Math and display use
+    // the SAME range now, so midpoint(display) = derived = 1.50.
+    expect(result.displayMultipleRange).toEqual({ lower: 1.25, upper: 1.75 });
+    // SDE = 160K. OOV = 160K × {1.25, 1.75} = {200K, 280K} → midpoint 240K
+    // = SDE × derived (160K × 1.50). Midpoint-preservation invariant.
     expect(result.ownerOperatorValue).toEqual({ lower: 200_000, upper: 280_000 });
     // Transferable SDE = 160K − 60K = 100K (point). TV = 100K × {1.25, 1.75}
     // = {125K, 175K} → midpoint 150K.
     expect(result.transferableValue).toEqual({ lower: 125_000, upper: 175_000 });
-    // Gap = midpoint(OOV) − midpoint(TV) = 240K − 150K = 90K.
-    // This equals derived × effectiveCost.midpoint = 1.50 × 60K = 90K — the
-    // spec-correct value. Using displayMultipleRange would have given 97.5K
-    // (biased by the floor clip).
+    // Gap = midpoint(OOV) − midpoint(TV) = 240K − 150K = 90K
+    //     = derived × effectiveCost.midpoint = 1.50 × 60K = 90K.
     expect(result.gap).toBeCloseTo(90_000);
   });
 
-  it('Gap math anchors on derived, not on the clipped display midpoint (lower-cap edge)', () => {
-    // Reproduces the cap-edge math bias diagnosed in code review: at the
-    // floor (derived = 1.50), the displayed multiple range is asymmetric
-    // (1.50–1.75) so its midpoint = 1.625, not 1.50. The Gap math MUST use
-    // 1.50 (the derived value) — otherwise the gap inflates by ~8% at the
-    // floor and ~8% at the ceiling.
-    //
-    // We use a point cost range here so the Range × Range arithmetic
-    // collapses to Gap = derived × cost (closed form). With derived = 1.50
-    // and cost = $50K, expected Gap = 1.50 × $50K = $75K. The pre-fix
-    // (display-range math) value would have been ~$81K (biased by the
-    // floor's asymmetric clip).
+  it('Gap math anchors on derived (midpoint-preservation invariant) at the floor edge', () => {
+    // Midpoint-preservation: Gap = derived × cost.midpoint when cost is a
+    // point range. Phase 2 made this true on screen as well (midpoint of
+    // displayed multiple = derived), not just internally. With derived = 1.50
+    // and cost = $50K, Gap = 1.50 × $50K = $75K.
     const inputs = baseInputs(
       ALL_WEAK_DRIVERS,
       { lower: 50_000, upper: 50_000 },
       { startDate: null, endDate: null, renewalOption: null, renewalYears: null }
     );
     const result = computeBusinessValuation(inputs, REF_DATE);
-    expect(result.derivedMultiple).toBe(MULTIPLE_FLOOR); // clipped to 1.50
+    expect(result.derivedMultiple).toBe(MULTIPLE_FLOOR); // clamped to 1.50
     expect(result.effectiveReplacementCost).toEqual({ lower: 50_000, upper: 50_000 });
     expect(result.gap).toBeCloseTo(75_000);
   });

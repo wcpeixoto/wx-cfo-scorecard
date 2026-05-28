@@ -9876,67 +9876,56 @@ body {
 
 .dark .bv-subtitle { color: #98A2B3; }
 
-/* Hero — three stacked label/value rows (OOV / TV / Gap) */
+/* Hero — Phase 2 single-dominant layout. One large number (midpoint of the
+   Business Valuation range) with a small "Range: low – high" subtitle. The
+   pre-Phase-2 three-row hero (OOV / TV / Gap with teaching line) was
+   collapsed into this single-hero + supporting-rows layout; OOV / TV / Gap
+   are now footer rows. */
 .bv-hero {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.bv-hero-row {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.bv-hero-label {
+.bv-hero-dominant {
   font-family: 'Outfit', sans-serif;
-  font-size: 14px;
-  font-weight: 500;
-  color: #667085;
-}
-
-.dark .bv-hero-label { color: #98A2B3; }
-
-.bv-hero-value {
-  font-family: 'Outfit', sans-serif;
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 40px;
   color: #1D2939;
-  line-height: 32px;
+  cursor: help;
 }
 
-.dark .bv-hero-value { color: rgba(255, 255, 255, 0.9); }
+.dark .bv-hero-dominant { color: rgba(255, 255, 255, 0.95); }
 
-.bv-hero-value--muted {
+.bv-hero-dominant--muted {
   color: #98A2B3;
   font-weight: 500;
 }
 
-.dark .bv-hero-value--muted { color: #667085; }
+.dark .bv-hero-dominant--muted { color: #667085; }
 
-.bv-hero-note {
-  font-family: 'Outfit', sans-serif;
-  font-size: 12px;
-  font-weight: 400;
-  color: #667085;
-  margin: 4px 0 0 0;
-  line-height: 1.5;
+.bv-hero-dominant:focus-visible {
+  outline: 2px solid #465FFF;
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
-.dark .bv-hero-note { color: #98A2B3; }
-
-.bv-teaching-line {
+.bv-hero-range {
   font-family: 'Outfit', sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 400;
-  font-style: italic;
   color: #667085;
-  margin: 4px 0 0 0;
-  line-height: 1.5;
+  cursor: help;
 }
 
-.dark .bv-teaching-line { color: #98A2B3; }
+.dark .bv-hero-range { color: #98A2B3; }
+
+.bv-hero-range:focus-visible {
+  outline: 2px solid #465FFF;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 
 /* Drivers */
 .bv-drivers {
@@ -10019,6 +10008,23 @@ body {
 }
 
 .dark .bv-footer-label { color: #98A2B3; }
+
+/* Tooltip affordance on footer labels (TTM SDE, Derived Multiple,
+   Buyer-Ready Value, Owner Dependence Gap). Dotted underline + cursor:help
+   matches the SDE method subtitle pattern; focus ring matches inline
+   editables. Reuses the base color/weight from .bv-footer-label. */
+.bv-footer-label--tooltip {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-decoration-color: #98A2B3;
+  text-underline-offset: 3px;
+}
+
+.bv-footer-label--tooltip:focus-visible {
+  outline: 2px solid #465FFF;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 
 .bv-footer-value {
   color: #1D2939;
@@ -10340,26 +10346,11 @@ body {
 
 .dark .bv-impact-cell { color: #98A2B3; }
 
-/* "(auto)" suffix on the Lease runway label — distinguishes auto-graded
-   from owner-set drivers without changing the row layout. */
-.bv-driver-auto {
-  color: #98A2B3;
-  font-size: 12px;
-  font-weight: 400;
-  margin-left: 4px;
-}
-
-.dark .bv-driver-auto { color: #667085; }
-
-/* Static derived-multiple display + "Derived from drivers" subtitle.
-   Wraps in a column so the label sits directly under the value. */
-.bv-multiple-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
-
+/* Static derived-multiple display. Phase 2.1: pruned the "(auto)" suffix
+   on Lease runway (visual affordance already carried by .bv-readonly's
+   no-underline / cursor:default, and the tooltip already says "Auto-graded
+   from your lease dates in Settings") and the "Derived from drivers"
+   subtitle (duplicates the Derived Multiple label's tooltip copy). */
 .bv-multiple-display {
   color: #1D2939;
   font-weight: 600;
@@ -10368,15 +10359,6 @@ body {
 }
 
 .dark .bv-multiple-display { color: rgba(255, 255, 255, 0.9); }
-
-.bv-multiple-derived-label {
-  color: #667085;
-  font-size: 12px;
-  font-weight: 400;
-  font-family: 'Outfit', sans-serif;
-}
-
-.dark .bv-multiple-derived-label { color: #98A2B3; }
 
 /* Card-level "SDE method" tooltip anchor. Dotted underline at rest signals
    the subtitle is hoverable; cursor:help reinforces. No new button, no
