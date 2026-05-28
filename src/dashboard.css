@@ -9910,6 +9910,74 @@ body {
 
 .dark .bv-hero-dominant--muted { color: #667085; }
 
+/* Honest-floor copy variant — projected SDE <= 0 case. Calmer than the
+   dominant numeric hero so a multi-word sentence ("Not buyer-ready at
+   this pace.") doesn't overrun the right-slot card width. Reuses the
+   muted color tokens above (no alarm styling). */
+.bv-hero-dominant--floor-copy {
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+/* Goal hero ribbon — slider-neutral "Projected at goal $X" pair sitting
+   above the dominant hero inside .bv-hero. Smaller than the dominant
+   hero so the two don't compete for attention; reads as a stable target
+   above the live projected number. Tooltip wrap inherits inline-grid
+   from .db-tooltip-wrap; placing it as the first child of the .bv-hero
+   column-flex (align-items: flex-start) keeps it left-anchored. */
+.bv-goal-hero-tooltip-wrap {
+  cursor: help;
+}
+
+.bv-goal-hero-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.bv-goal-hero-row:focus-visible {
+  outline: 2px solid #465FFF;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.bv-goal-hero-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  color: #667085;
+}
+
+.dark .bv-goal-hero-label { color: #98A2B3; }
+
+.bv-goal-hero-value {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 26px;
+  color: #1D2939;
+}
+
+.dark .bv-goal-hero-value { color: rgba(255, 255, 255, 0.95); }
+
+/* Scenario state label — small qualifier above the dominant hero that
+   tells the owner the headline number is a what-if, not the saved
+   current valuation. Hidden in the neutral (TTM) hero state. Calm
+   muted token; intentionally subordinate to the headline number so
+   the dollar amount stays the primary read. */
+.bv-hero-scenario-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  text-transform: uppercase;
+  color: #667085;
+}
+
+.dark .bv-hero-scenario-label { color: #98A2B3; }
+
 .bv-hero-dominant:focus-visible {
   outline: 2px solid #465FFF;
   outline-offset: 2px;

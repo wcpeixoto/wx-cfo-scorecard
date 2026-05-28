@@ -33,6 +33,10 @@ import {
   type DriverGrade,
   type Range as BVRange,
 } from '../lib/kpis/businessValuation';
+import {
+  computeValuationProjection,
+  isValuationScenarioActive,
+} from '../lib/kpis/valuationProjection';
 import ContractsSettingsPane from '../components/ContractsSettingsPane';
 import { computeEfficiencyOpportunities } from '../lib/kpis/efficiencyOpportunities';
 import { computeLinearTrendLine, computeProgressiveMovingAverage } from '../lib/charts/movingAverage';
@@ -2123,6 +2127,49 @@ export default function Dashboard() {
     [model.runway.reserveTarget, scenarioProjection]
   );
 
+  // Valuation projection — slider-driven "actual" leg + slider-neutral
+  // "goal" leg fed into BusinessValuationCard. Shares the same first-12
+  // basis as the decision-card averages above (DECISION_WINDOW_MONTHS).
+  // Goal leg pulls from baselineProjection (base preset, slider-neutral);
+  // when the active scenario IS the base, baselineProjection is null and
+  // scenarioProjection IS the slider-neutral basis.
+  //
+  // Hero state gate: card uses the TTM-based current valuation by default
+  // and only renders the scenario projection when revenue/expense sliders
+  // are active. AR/AP day controls deliberately excluded — see
+  // isValuationScenarioActive comments.
+  const isValuationScenarioActiveNow = isValuationScenarioActive(scenarioInput);
+  const valuationProjectionResult = useMemo(() => {
+    const goalTargetMargin =
+      businessRules.targetNetMargin != null && businessRules.targetNetMargin > 0
+        ? businessRules.targetNetMargin
+        : 0.25;
+    return computeValuationProjection({
+      forecastPoints: scenarioProjection,
+      baselineForecastPoints: baselineProjection ?? scenarioProjection,
+      addBacks: {
+        ownerW2Compensation: businessRules.ownerW2Compensation,
+        personalExpensesThroughBusiness:
+          businessRules.personalExpensesThroughBusiness,
+        oneTimeExpensesToAddBack: businessRules.oneTimeExpensesToAddBack,
+        oneTimeGainsToSubtract: businessRules.oneTimeGainsToSubtract,
+      },
+      derivedMultiple: businessValuationResult.derivedMultiple,
+      displayMultipleRange: businessValuationResult.displayMultipleRange,
+      effectiveTargetNetMargin: goalTargetMargin,
+    });
+  }, [
+    scenarioProjection,
+    baselineProjection,
+    businessRules.targetNetMargin,
+    businessRules.ownerW2Compensation,
+    businessRules.personalExpensesThroughBusiness,
+    businessRules.oneTimeExpensesToAddBack,
+    businessRules.oneTimeGainsToSubtract,
+    businessValuationResult.derivedMultiple,
+    businessValuationResult.displayMultipleRange,
+  ]);
+
   // Today's Cash on Hand "projected to run out" signal — sourced from a
   // dedicated 24-month projection so the row can't be silenced by a shorter
   // Forecast-page display window. The 12-month priority/badge pipeline
@@ -3049,6 +3096,8 @@ export default function Dashboard() {
               rightSlot={
                 <BusinessValuationCard
                   result={businessValuationResult}
+                  projection={valuationProjectionResult}
+                  isScenarioActive={isValuationScenarioActiveNow}
                   onReplacementCostChange={handleBusinessValuationReplacementCostChange}
                   onDriverGradeChange={handleBusinessValuationDriverGradeChange}
                 />
