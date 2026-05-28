@@ -1168,7 +1168,7 @@ export default function CashFlowForecastModule({
                         </button>
                         {scenarioMenuOpen && (
                           <ul className="action-dropdown-menu" role="menu" aria-label="Forecast scenario">
-                            {scenarioOptions.map((option) => (
+                            {scenarioOptions.filter((option) => option.key !== scenarioKey).map((option) => (
                               <li key={option.key}>
                                 <button
                                   type="button"
