@@ -933,8 +933,8 @@ body {
 
 
 .forecast-decision-value--md {
-  font-size: 20px;
-  line-height: 1.25;
+  font-size: 30px;
+  line-height: 36px;
 }
 
 .forecast-mo {
@@ -1581,9 +1581,9 @@ body {
 }
 
 .forecast-decision-card {
-  display: grid;
-  gap: 3px;
-  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
   border: 1px solid #E4E7EC;
   border-radius: 16px;
   background: #FFFFFF;
@@ -1598,20 +1598,24 @@ body {
 .forecast-decision-label {
   font-size: 14px;
   font-weight: 500;
-  color: #344054;
+  line-height: 20px;
+  color: #667085;
+  margin-bottom: 16px;
 }
 
 .forecast-decision-meta {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 400;
   color: #667085;
-  line-height: 1.25;
+  line-height: 20px;
 }
 
 .forecast-decision-value {
   font-size: 30px;
   font-weight: 600;
-  color: #101828;
+  line-height: 36px;
+  color: #1D2939;
+  margin-bottom: 8px;
 }
 
 .forecast-decision-value--safe {
@@ -1642,7 +1646,7 @@ body {
   font-size: 14px;
   font-weight: 400;
   color: #667085;
-  line-height: 1.4;
+  line-height: 20px;
 }
 
 .forecast-control-stack {
