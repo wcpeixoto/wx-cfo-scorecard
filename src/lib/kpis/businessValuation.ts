@@ -151,13 +151,13 @@ export interface BusinessValuationResult {
   // owner-set grades together via the impacts list).
   leaseRunway: LeaseRunwayGrade;
   driverGrades: DriverGrades;
-  // Derived multiple model. derivedMultiple is the math midpoint (capped to
-  // [1.5, 3.0]); displayMultipleRange is derived ± DISPLAY_BUFFER, clipped to
-  // the cap; wasClipped is true when either end of the display range was
-  // clipped by the cap (drives the explainer tooltip on the multiple display).
+  // Derived multiple model. derivedMultiple is the math midpoint (clamped to
+  // [MULTIPLE_FLOOR, MULTIPLE_CEILING] by deriveMultiple — that's the
+  // industry-range guarantee). displayMultipleRange is derived ± DISPLAY_BUFFER,
+  // UNCLIPPED. Math and display use the same range so midpoint(display) =
+  // derived = on-screen reconciliation: SDE × midpoint(display) = hero.
   derivedMultiple: number;
   displayMultipleRange: Range;
-  wasClipped: boolean;
   // Per-driver impacts in render order. 7 entries.
   driverImpacts: ValuationDriverImpact[];
   // Replacement cost — persisted value (unchanged from V1) and the effective
@@ -456,21 +456,17 @@ export function deriveMultiple(impacts: ValuationDriverImpact[]): number {
   return raw;
 }
 
-export interface ClippedRange {
-  range: Range;
-  wasClipped: boolean;
-}
-
-// Display range = derived ± DISPLAY_BUFFER, then clipped against the cap.
-// wasClipped is true when EITHER end was clipped (drives the cap-neutral
-// explainer tooltip on the multiple display).
-export function clipDisplayRange(derived: number): ClippedRange {
-  const rawLower = derived - DISPLAY_BUFFER;
-  const rawUpper = derived + DISPLAY_BUFFER;
-  const lower = Math.max(MULTIPLE_FLOOR, rawLower);
-  const upper = Math.min(MULTIPLE_CEILING, rawUpper);
-  const wasClipped = rawLower < MULTIPLE_FLOOR || rawUpper > MULTIPLE_CEILING;
-  return { range: { lower, upper }, wasClipped };
+// Display range = derived ± DISPLAY_BUFFER. NO clipping — math and display
+// share this range so midpoint(display) = derived. The derivedMultiple is
+// already clamped to [MULTIPLE_FLOOR, MULTIPLE_CEILING] upstream by
+// deriveMultiple; the displayed buffer can extend slightly past the cap
+// (e.g. derived=3.00 → display=[2.75, 3.25]) as honest uncertainty around
+// the midpoint, not an off-market claim.
+export function bufferDisplayRange(derived: number): Range {
+  return {
+    lower: derived - DISPLAY_BUFFER,
+    upper: derived + DISPLAY_BUFFER,
+  };
 }
 
 export interface EffectiveReplacementCost {
@@ -528,8 +524,7 @@ export function computeBusinessValuation(
   const leaseRunway = gradeLeaseRunway(referenceDate, inputs.lease);
   const driverImpacts = buildDriverImpacts(inputs.driverGrades, leaseRunway);
   const derivedMultiple = deriveMultiple(driverImpacts);
-  const { range: displayMultipleRange, wasClipped } =
-    clipDisplayRange(derivedMultiple);
+  const displayMultipleRange = bufferDisplayRange(derivedMultiple);
 
   const { effective: effectiveReplacementCost, defaultApplied } =
     resolveEffectiveReplacementCost(
@@ -537,28 +532,21 @@ export function computeBusinessValuation(
       inputs.driverGrades.ownerIndependence
     );
 
-  // OOV / TV math uses the UNCLIPPED derived ± buffer range, not the display
-  // multiple range. The cap applies to the MULTIPLE DISPLAY (1.5×–3.0×
-  // ceiling/floor on the displayed multiple buffer), not to dollar values.
-  // Using the unclipped buffer here keeps midpoint(OOV) = SDE × derived and
-  // midpoint(TV) = transferableSde.midpoint × derived, which matches the
-  // spec's "use the midpoint for math" — midpoint of the buffer = derived.
-  //
-  // If we instead used displayMultipleRange, midpoint(OOV) at the floor
-  // (derived = 1.50, displayed 1.50–1.75) would drift to 1.625 × SDE, and
-  // Gap would be biased away from derived × effectiveCost.midpoint.
-  const mathMultipleRange: Range = {
-    lower: derivedMultiple - DISPLAY_BUFFER,
-    upper: derivedMultiple + DISPLAY_BUFFER,
-  };
+  // OOV / TV math and the displayed multiple range share the SAME
+  // derived ± DISPLAY_BUFFER range. The midpoint of that range = derived,
+  // which keeps midpoint(OOV) = SDE × derived and midpoint(TV) =
+  // transferableSde.midpoint × derived — the midpoint-preservation invariant
+  // also reconciles on screen now (SDE × midpoint(displayed multiple) = hero).
+  // The industry-range guarantee on the underlying value lives upstream in
+  // deriveMultiple's [MULTIPLE_FLOOR, MULTIPLE_CEILING] clamp.
   const ownerOperatorValue = computeOwnerOperatorValue(
     ttmSde,
-    mathMultipleRange
+    displayMultipleRange
   );
   const transferableSde = computeTransferableSde(ttmSde, effectiveReplacementCost);
   const transferableValue = computeTransferableValue(
     transferableSde,
-    mathMultipleRange
+    displayMultipleRange
   );
   const gap = computeGap(ownerOperatorValue, transferableValue);
 
@@ -578,7 +566,6 @@ export function computeBusinessValuation(
     driverGrades: inputs.driverGrades,
     derivedMultiple,
     displayMultipleRange,
-    wasClipped,
     driverImpacts,
     replacementCost: inputs.replacementCost,
     effectiveReplacementCost,
