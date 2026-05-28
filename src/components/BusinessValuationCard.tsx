@@ -94,10 +94,6 @@ const BV_HERO_TOOLTIP_SCENARIO =
 // displayMultipleRange). In scenario state the margin-quality adjustment
 // can move the point off-midpoint inside the band, so the midpoint claim
 // no longer holds.
-const BV_RANGE_TOOLTIP_CURRENT =
-  'The low and high estimate. The headline number is the midpoint of this range.';
-const BV_RANGE_TOOLTIP_SCENARIO =
-  'The low and high estimate. Margin quality can move the scenario number inside this range.';
 const GOAL_HERO_TOOLTIP =
   'What the business would be worth at your target net margin. This number is stable — sliders do not move it.';
 const NOT_BUYER_READY_COPY = 'Not buyer-ready at this pace.';
@@ -563,7 +559,6 @@ export function BusinessValuationCard({
   >(null);
   const sdeTooltipId = useId();
   const bvHeroTooltipId = useId();
-  const bvRangeTooltipId = useId();
   const buyerReadyTooltipId = useId();
   const ownerDepGapTooltipId = useId();
   const ttmSdeTooltipId = useId();
@@ -632,9 +627,6 @@ export function BusinessValuationCard({
   const heroTooltipText = useScenarioHero
     ? BV_HERO_TOOLTIP_SCENARIO
     : BV_HERO_TOOLTIP_CURRENT;
-  const rangeTooltipText = useScenarioHero
-    ? BV_RANGE_TOOLTIP_SCENARIO
-    : BV_RANGE_TOOLTIP_CURRENT;
 
   const goalHeroValueDisplay =
     projectionGoal !== null && !projectionGoal.isFloored
@@ -697,41 +689,44 @@ export function BusinessValuationCard({
 
   return (
     <div className="ta-card bv-card">
-      {/* Header — Pattern B (title + subtitle).
-          The "SDE method" subtitle is the anchor for the card-level
-          explainer tooltip. Hover/focus reveals the wide panel. No info
-          icon, no new button — the subtitle text itself is interactive. */}
+      {/* Header — Pattern B (title + subtitle). The card-level explainer
+          tooltip is triggered by a small info icon next to the "SDE method"
+          subtitle text; the text itself is plain and non-interactive. */}
       <div className="bv-header">
         <h3 className="bv-title">Business Valuation</h3>
-        <span className="db-tooltip-wrap bv-card-tooltip-wrap">
-          <p
-            className="bv-subtitle bv-subtitle--tooltip"
-            tabIndex={0}
-            aria-describedby={sdeTooltipId}
-          >
-            SDE method
-          </p>
-          <span
-            id={sdeTooltipId}
-            role="tooltip"
-            className="db-tooltip-panel is-wide bv-card-tooltip-panel"
-          >
-            {SDE_METHOD_TOOLTIP_PARAGRAPHS.map((para, idx) => (
-              <p
-                key={idx}
-                className="bv-card-tooltip-paragraph"
-              >
-                {para}
-              </p>
-            ))}
+        <div className="bv-subtitle-row">
+          <p className="bv-subtitle">SDE method</p>
+          <span className="db-tooltip-wrap bv-card-tooltip-wrap">
+            <button
+              type="button"
+              className="db-tooltip-btn"
+              aria-label="SDE method explanation"
+              aria-describedby={sdeTooltipId}
+            >
+              &#9432;
+            </button>
+            <span
+              id={sdeTooltipId}
+              role="tooltip"
+              className="db-tooltip-panel is-wide bv-card-tooltip-panel"
+            >
+              {SDE_METHOD_TOOLTIP_PARAGRAPHS.map((para, idx) => (
+                <p
+                  key={idx}
+                  className="bv-card-tooltip-paragraph"
+                >
+                  {para}
+                </p>
+              ))}
+            </span>
           </span>
-        </span>
+        </div>
       </div>
 
-      {/* Hero block — goal ribbon (slider-neutral, fixed-margin "stable
-          prize") above the dominant hero. Both live inside .bv-hero so
-          the gap between them is the hero stack's 4px, not the card's
-          24px section gap.
+      {/* Hero block — read order is: current value → current range →
+          projected-at-goal value/label. The goal block sits below the range
+          as a secondary metric (value above, label below, tight stack) so
+          it reads as a helpful target, not a competing headline.
 
           Dominant hero defaults to the TTM-based current valuation;
           switches to the slider-driven scenario projection only when
@@ -739,27 +734,9 @@ export function BusinessValuationCard({
           scenario state surfaces a small "At this scenario" label above
           the headline number so the owner reads it as a what-if, not a
           revised current value. The "Not buyer-ready" floor copy only
-          fires inside the scenario branch. */}
+          fires inside the scenario branch. The range subtitle is plain
+          text — no tooltip, no underline, no hover. */}
       <div className="bv-hero">
-        {goalHeroValueDisplay !== null && (
-          <span className="db-tooltip-wrap bv-goal-hero-tooltip-wrap">
-            <span
-              tabIndex={0}
-              className="bv-goal-hero-row"
-              aria-describedby={goalHeroTooltipId}
-            >
-              <span className="bv-goal-hero-label">{GOAL_HERO_LABEL}</span>
-              <span className="bv-goal-hero-value">{goalHeroValueDisplay}</span>
-            </span>
-            <span
-              id={goalHeroTooltipId}
-              role="tooltip"
-              className="db-tooltip-panel bv-driver-tooltip-panel"
-            >
-              {GOAL_HERO_TOOLTIP}
-            </span>
-          </span>
-        )}
         {useScenarioHero && (
           <span className="bv-hero-scenario-label">{SCENARIO_HERO_LABEL}</span>
         )}
@@ -791,23 +768,27 @@ export function BusinessValuationCard({
                 {heroTooltipText}
               </span>
             </span>
-            <span className="db-tooltip-wrap bv-hero-tooltip-wrap">
-              <span
-                tabIndex={0}
-                className="bv-hero-range"
-                aria-describedby={bvRangeTooltipId}
-              >
-                Range: {rangeSubtitleDisplay}
-              </span>
-              <span
-                id={bvRangeTooltipId}
-                role="tooltip"
-                className="db-tooltip-panel bv-driver-tooltip-panel"
-              >
-                {rangeTooltipText}
-              </span>
-            </span>
+            <span className="bv-hero-range">Range: {rangeSubtitleDisplay}</span>
           </>
+        )}
+        {goalHeroValueDisplay !== null && (
+          <span className="db-tooltip-wrap bv-goal-hero-tooltip-wrap">
+            <span
+              tabIndex={0}
+              className="bv-goal-hero-stack"
+              aria-describedby={goalHeroTooltipId}
+            >
+              <span className="bv-goal-hero-value">{goalHeroValueDisplay}</span>
+              <span className="bv-goal-hero-label">{GOAL_HERO_LABEL}</span>
+            </span>
+            <span
+              id={goalHeroTooltipId}
+              role="tooltip"
+              className="db-tooltip-panel bv-driver-tooltip-panel"
+            >
+              {GOAL_HERO_TOOLTIP}
+            </span>
+          </span>
         )}
       </div>
 

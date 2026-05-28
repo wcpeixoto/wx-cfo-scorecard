@@ -9886,6 +9886,20 @@ body {
 
 .dark .bv-subtitle { color: #98A2B3; }
 
+/* Subtitle row — keeps the "SDE method" text plain and pairs it with a
+   small info-icon tooltip trigger. The 4px top spacing on the inner
+   .bv-subtitle is zeroed here because the row owns the top spacing. */
+.bv-subtitle-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.bv-subtitle-row .bv-subtitle {
+  margin: 0;
+}
+
 /* Hero — Phase 2 single-dominant layout. One large number (midpoint of the
    Business Valuation range) with a small "Range: low – high" subtitle. The
    pre-Phase-2 three-row hero (OOV / TV / Gap with teaching line) was
@@ -9926,23 +9940,27 @@ body {
   line-height: 24px;
 }
 
-/* Goal hero ribbon — slider-neutral "Projected at goal $X" pair sitting
-   above the dominant hero inside .bv-hero. Smaller than the dominant
-   hero so the two don't compete for attention; reads as a stable target
-   above the live projected number. Tooltip wrap inherits inline-grid
-   from .db-tooltip-wrap; placing it as the first child of the .bv-hero
-   column-flex (align-items: flex-start) keeps it left-anchored. */
+/* Goal hero — slider-neutral "$X / Projected at goal" pair sitting BELOW
+   the current value + range, as a secondary metric. The value sits above
+   its label in a tight vertical stack (label-to-value relationship).
+   Smaller than the dominant hero so the two don't compete for attention;
+   reads as a helpful target, not a competing headline.
+
+   margin-top adds to .bv-hero's 4px parent gap, giving 28px of breathing
+   room between "Range: …" and the secondary $-value below. */
 .bv-goal-hero-tooltip-wrap {
   cursor: help;
+  margin-top: 24px;
 }
 
-.bv-goal-hero-row {
+.bv-goal-hero-stack {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
 }
 
-.bv-goal-hero-row:focus-visible {
+.bv-goal-hero-stack:focus-visible {
   outline: 2px solid #465FFF;
   outline-offset: 2px;
   border-radius: 2px;
@@ -9995,16 +10013,9 @@ body {
   font-size: 13px;
   font-weight: 400;
   color: #667085;
-  cursor: help;
 }
 
 .dark .bv-hero-range { color: #98A2B3; }
-
-.bv-hero-range:focus-visible {
-  outline: 2px solid #465FFF;
-  outline-offset: 2px;
-  border-radius: 2px;
-}
 
 /* Drivers */
 .bv-drivers {
@@ -10445,19 +10456,6 @@ body {
 .bv-card-tooltip-wrap {
   display: inline-block;
   position: relative;
-}
-
-.bv-subtitle--tooltip {
-  cursor: help;
-  text-decoration: underline dotted;
-  text-decoration-color: #98A2B3;
-  text-underline-offset: 3px;
-}
-
-.bv-subtitle--tooltip:focus-visible {
-  outline: 2px solid #465FFF;
-  outline-offset: 2px;
-  border-radius: 2px;
 }
 
 /* BV-scoped tooltip panel override. The base .db-tooltip-panel anchors
