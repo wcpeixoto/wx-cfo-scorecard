@@ -3024,7 +3024,6 @@ export default function Dashboard() {
               baselineData={cashFlowForecastBaselineTrend}
               monthlyRollups={model.monthlyRollups}
               fullForecast={scenarioProjection}
-              reserveTarget={model.runway.reserveTarget}
               fixedReserveAmount={
                 businessRules.safetyReserveMethod === 'fixed' &&
                 businessRules.safetyReserveAmount > 0

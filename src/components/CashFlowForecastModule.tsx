@@ -132,8 +132,7 @@ type CashFlowForecastModuleProps = {
   /** Historical monthly actuals — drives the optional prior-period overlay. */
   monthlyRollups: MonthlyRollup[];
   fullForecast: ScenarioPoint[];
-  reserveTarget: number;
-  /** Optional: override the computed reserve target with a fixed amount from settings. */
+  /** Optional: fixed reserve target from Settings (used when method = 'fixed'). */
   fixedReserveAmount?: number | null;
   /** Optional: override TARGET_NET_MARGIN from settings (0–1). Falls back to 0.25. */
   targetNetMargin?: number | null;
@@ -431,7 +430,6 @@ export default function CashFlowForecastModule({
   baselineData = null,
   monthlyRollups,
   fullForecast,
-  reserveTarget,
   fixedReserveAmount,
   targetNetMargin,
   decisionSignals,
@@ -998,13 +996,17 @@ export default function CashFlowForecastModule({
         {/* Card 1 — Operating Reserve Target */}
         <article className="forecast-decision-card">
           <span className="forecast-decision-label">Operating Reserve Target</span>
-          {scenarioReserveTarget > 0 && reserveGap !== null ? (
+          {scenarioReserveTarget > 0 ? (
             <>
               <strong className="forecast-decision-value forecast-decision-value--md">{formatCurrencyCompactNode(scenarioReserveTarget)}</strong>
-              {reserveGap > RESERVE_GAP_FLOOR ? (
-                <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, reserveGap))} short of your reserve target at the projected low</span>
+              {reserveGap !== null ? (
+                reserveGap > RESERVE_GAP_FLOOR ? (
+                  <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, reserveGap))} short of your reserve target at the projected low</span>
+                ) : (
+                  <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, -reserveGap))} above your reserve target at the projected low</span>
+                )
               ) : (
-                <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, -reserveGap))} above your reserve target at the projected low</span>
+                <span className="forecast-decision-detail">No projection data yet</span>
               )}
             </>
           ) : (
@@ -1034,7 +1036,9 @@ export default function CashFlowForecastModule({
           {isAtGoal && avgNet !== null ? (
             <>
               <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">{fmtMonthlyValue(avgNet)}</strong>
-              <span className="forecast-decision-detail">Your current profit — this is solid</span>
+              {netMarginPct !== null && (
+                <span className="forecast-decision-detail">{netMarginPct}% net profit — this is solid</span>
+              )}
             </>
           ) : profitGap !== null && targetProfit !== null ? (
             <>
