@@ -938,7 +938,7 @@ body {
 }
 
 .forecast-mo {
-  font-size: 0.75em;
+  font-size: 1em;
 }
 
 .forecast-decision-card--warning {
@@ -1596,13 +1596,6 @@ body {
   line-height: 20px;
   color: #667085;
   margin-bottom: 16px;
-}
-
-.forecast-decision-meta {
-  font-size: 14px;
-  font-weight: 400;
-  color: #667085;
-  line-height: 20px;
 }
 
 .forecast-decision-value {

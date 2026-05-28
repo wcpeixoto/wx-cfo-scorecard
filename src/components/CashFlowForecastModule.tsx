@@ -132,8 +132,7 @@ type CashFlowForecastModuleProps = {
   /** Historical monthly actuals — drives the optional prior-period overlay. */
   monthlyRollups: MonthlyRollup[];
   fullForecast: ScenarioPoint[];
-  reserveTarget: number;
-  /** Optional: override the computed reserve target with a fixed amount from settings. */
+  /** Optional: fixed reserve target from Settings (used when method = 'fixed'). */
   fixedReserveAmount?: number | null;
   /** Optional: override TARGET_NET_MARGIN from settings (0–1). Falls back to 0.25. */
   targetNetMargin?: number | null;
@@ -431,7 +430,6 @@ export default function CashFlowForecastModule({
   baselineData = null,
   monthlyRollups,
   fullForecast,
-  reserveTarget,
   fixedReserveAmount,
   targetNetMargin,
   decisionSignals,
@@ -918,54 +916,32 @@ export default function CashFlowForecastModule({
     ? Math.round((avgNet / avgCashIn) * 100)
     : null;
 
-  // Card 1 — Safety line coverage (full forecast horizon).
+  // Card 1 — Operating Reserve Target (scenario-reactive, Option A).
   //
-  // SAFETY_LINE: When a fixedReserveAmount is provided from settings (fixed method),
-  // use that value. Otherwise fall back to reserveTarget (1 month of trailing expenses).
-  // Intentionally scenario-independent: the definition of "safe" must not move when
-  // scenario inputs change. Goalposts stay fixed.
-  const effectiveReserveTarget =
+  // Target: fixed-method Settings amount when configured (intentionally
+  // slider-immune — matches the Settings semantic). Otherwise one month of
+  // scenario-projected expenses (avg cashOut over decisionWindow). The
+  // expense slider therefore moves the target; the revenue slider does not.
+  //
+  // Gap: target − lowestProjectedBalance over the FULL forecast horizon,
+  // so BOTH sliders move the gap — expense via target AND lowestBalance,
+  // revenue via lowestBalance only. Signed (positive = short, negative =
+  // above). ±$100 floor suppresses flicker around the threshold.
+  const avgCashOut = decisionWindow.length > 0
+    ? decisionWindow.reduce((s, p) => s + p.cashOut, 0) / decisionWindow.length
+    : null;
+  const scenarioReserveTarget =
     fixedReserveAmount != null && fixedReserveAmount > 0
       ? fixedReserveAmount
-      : reserveTarget;
-  const fixedSafetyLine = effectiveReserveTarget;
-
-  // SAFETY_GAP_FLOOR: gaps within ±$100 are treated as zero to suppress rounding noise.
-  const SAFETY_GAP_FLOOR = 100;
-
-  // Scan the FULL forecast array (not the visible chart window) for the lowest balance.
-  // The horizon selector controls chart display only — this card always uses all months.
+      : avgCashOut !== null ? avgCashOut : 0;
+  const RESERVE_GAP_FLOOR = 100;
   const lowestBalanceIdx = fullForecast.length > 0
     ? fullForecast.reduce((minIdx, p, i) =>
         p.endingCashBalance < fullForecast[minIdx].endingCashBalance ? i : minIdx, 0)
     : -1;
   const lowestBalance = lowestBalanceIdx >= 0 ? fullForecast[lowestBalanceIdx].endingCashBalance : null;
-
-  // gap = fixedSafetyLine − lowestProjectedBalance (positive = shortfall, negative = buffer)
-  const safetyGap = lowestBalance !== null && fixedSafetyLine > 0
-    ? fixedSafetyLine - lowestBalance
-    : null;
-  const isSafe = safetyGap === null || safetyGap <= SAFETY_GAP_FLOOR;
-
-  // bufferState drives the two card states:
-  //   'safe'    — lowest balance stays at or above the safety line
-  //   'at-risk' — lowest balance dips below the safety line
-  //   null      — no forecast data or no safety line configured
-  const bufferState: 'safe' | 'at-risk' | null =
-    fullForecast.length === 0 || fixedSafetyLine <= 0
-      ? null
-      : !isSafe
-        ? 'at-risk'
-        : 'safe';
-
-  // Shortfall: total lump-sum reserve gap (used in at-risk state; no /mo suffix).
-  const shortfall = safetyGap !== null && safetyGap > SAFETY_GAP_FLOOR ? safetyGap : null;
-
-  // Buffer: how far above the safety line the lowest balance sits (used in safe state).
-  // Clamped to zero: when the buffer is technically negative but within the ±$100 safe band,
-  // we are still in the safe state — display "$0 above reserve", never a negative value.
-  const safeBuffer = bufferState === 'safe' && lowestBalance !== null
-    ? Math.max(0, lowestBalance - fixedSafetyLine)
+  const reserveGap = scenarioReserveTarget > 0 && lowestBalance !== null
+    ? scenarioReserveTarget - lowestBalance
     : null;
 
   // Card 3: profit target gap
@@ -1017,50 +993,33 @@ export default function CashFlowForecastModule({
 
       <div className="forecast-decision-grid" aria-label="Forecast decision signals">
 
-        {/* Card 1 — Safety line coverage (full forecast horizon) */}
-        {bufferState !== null && (
-          <article className={`forecast-decision-card${bufferState === 'at-risk' ? ' forecast-decision-card--warning' : ''}`}>
-            {bufferState === 'safe' && safeBuffer !== null && (
-              <>
-                <span className="forecast-decision-label">You&rsquo;re above your Operating Reserve</span>
-                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">{formatCurrencyCompactNode(safeBuffer)}</strong>
-                <span className="forecast-decision-detail">Across your full forecast</span>
-              </>
-            )}
-            {bufferState === 'safe' && safeBuffer === null && (
-              <>
-                <span className="forecast-decision-label">To stay above your Operating Reserve</span>
-                <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">—</strong>
-                <span className="forecast-decision-detail">Across your full forecast</span>
-              </>
-            )}
-            {bufferState === 'at-risk' && shortfall !== null && (
-              <>
-                <span className="forecast-decision-label">To stay above your Operating Reserve</span>
-                <strong className="forecast-decision-value forecast-decision-value--md">{formatCurrencyCompactNode(shortfall)}</strong>
-                <span className="forecast-decision-detail">To reach your Operating Reserve</span>
-              </>
-            )}
-            {bufferState === 'at-risk' && shortfall === null && (
-              <>
-                <span className="forecast-decision-label">Below your Operating Reserve</span>
-                <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
-                <span className="forecast-decision-detail">Across your full forecast</span>
-              </>
-            )}
-          </article>
-        )}
-        {bufferState === null && (
-          <article className="forecast-decision-card">
-            <span className="forecast-decision-label">Operating Reserve</span>
-            <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
-            <span className="forecast-decision-detail">No Operating Reserve set</span>
-          </article>
-        )}
-
-        {/* Card 2 — At this pace */}
+        {/* Card 1 — Operating Reserve Target */}
         <article className="forecast-decision-card">
-          <span className="forecast-decision-label">At this pace, monthly result is</span>
+          <span className="forecast-decision-label">Operating Reserve Target</span>
+          {scenarioReserveTarget > 0 ? (
+            <>
+              <strong className="forecast-decision-value forecast-decision-value--md">{formatCurrencyCompactNode(scenarioReserveTarget)}</strong>
+              {reserveGap !== null ? (
+                reserveGap > RESERVE_GAP_FLOOR ? (
+                  <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, reserveGap))} short of your reserve target at the projected low</span>
+                ) : (
+                  <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, -reserveGap))} above your reserve target at the projected low</span>
+                )
+              ) : (
+                <span className="forecast-decision-detail">No projection data yet</span>
+              )}
+            </>
+          ) : (
+            <>
+              <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
+              <span className="forecast-decision-detail">No Operating Reserve set</span>
+            </>
+          )}
+        </article>
+
+        {/* Card 2 — Current Monthly Result */}
+        <article className="forecast-decision-card">
+          <span className="forecast-decision-label">Current Monthly Result</span>
           {avgNet !== null ? (
             <strong className={`forecast-decision-value forecast-decision-value--md${avgNet < 0 ? ' forecast-decision-value--negative' : ''}`}>{fmtMonthlyValueSigned(avgNet)}</strong>
           ) : (
@@ -1071,20 +1030,20 @@ export default function CashFlowForecastModule({
           )}
         </article>
 
-        {/* Card 3 — Profit goal */}
+        {/* Card 3 — Net Profit Target */}
         <article className="forecast-decision-card">
-          <span className="forecast-decision-label">{isAtGoal ? 'Your current profit' : 'To hit your profit goal you need'}</span>
+          <span className="forecast-decision-label">Net Profit Target: {Math.round(effectiveTargetNetMargin * 100)}%</span>
           {isAtGoal && avgNet !== null ? (
             <>
               <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">{fmtMonthlyValue(avgNet)}</strong>
               {netMarginPct !== null && (
-                <span className="forecast-decision-meta">{netMarginPct}% net profit — this is solid</span>
+                <span className="forecast-decision-detail">{netMarginPct}% net profit — this is solid</span>
               )}
             </>
           ) : profitGap !== null && targetProfit !== null ? (
             <>
               <strong className="forecast-decision-value forecast-decision-value--md">{fmtMonthlyValuePerMonth(profitGap)}</strong>
-              <span className="forecast-decision-meta">Estimated additional revenue at your current margin to reach {Math.round(effectiveTargetNetMargin * 100)}% net profit.</span>
+              <span className="forecast-decision-detail">Additional revenue needed at your current margin</span>
             </>
           ) : (
             <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
