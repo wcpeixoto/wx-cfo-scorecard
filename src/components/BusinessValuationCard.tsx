@@ -13,6 +13,7 @@ import {
   validateMultipleRange,
   validateReplacementCostRange,
 } from '../lib/kpis/businessValuation';
+import type { ValuationProjectionResult } from '../lib/kpis/valuationProjection';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,19 @@ type DriverKey =
 
 interface Props {
   result: BusinessValuationResult;
+  // Slider-driven actual leg + slider-neutral goal leg. Optional so the
+  // card still renders when the projection helper hasn't run (e.g. < 12
+  // months of forecast). The goal-hero ribbon appears above the dominant
+  // hero whenever projection.goal is present. The dominant hero only
+  // switches to projection.actual when isScenarioActive is true (see
+  // below); otherwise it stays on the TTM-based current valuation.
+  projection?: ValuationProjectionResult | null;
+  // True when the forecast revenue/expense sliders are active (nonzero
+  // delta). The dominant hero swaps from current TTM-based valuation to
+  // the scenario projection only in this state; the "Not buyer-ready at
+  // this pace" floor copy is gated on it too. Default false keeps the
+  // current valuation as the headline.
+  isScenarioActive?: boolean;
   onReplacementCostChange: (range: Range | null) => void;
   onDriverGradeChange: (key: DriverKey, grade: DriverGrade) => void;
 }
@@ -67,10 +81,28 @@ const SDE_METHOD_TOOLTIP_PARAGRAPHS: string[] = [
 // tooltips: BV hero, range subtitle, Buyer-Ready Value, Owner Dependence Gap,
 // TTM SDE, Derived Multiple. Replacement Cost retains its existing inline
 // helper text (PR-B owns the rename + new tooltip copy).
-const BV_HERO_TOOLTIP =
+// Dominant-hero tooltip switches with state:
+//   - neutral: TTM-based current value; same explanation as pre-#289
+//   - active scenario: what-if at the slider pace; margin quality nudges
+//     the point inside the existing driver-based band
+const BV_HERO_TOOLTIP_CURRENT =
   'What the business is worth today with you running it. Based on the last 12 months of cash flow (TTM SDE) times the valuation multiple.';
-const BV_RANGE_TOOLTIP =
+const BV_HERO_TOOLTIP_SCENARIO =
+  "What the business would be worth at this scenario's pace. Margin quality nudges the point inside your driver-based range.";
+// Range tooltip is state-aware. In neutral TTM state the headline IS the
+// midpoint of the displayed band (SDE × derivedMultiple = midpoint of SDE ×
+// displayMultipleRange). In scenario state the margin-quality adjustment
+// can move the point off-midpoint inside the band, so the midpoint claim
+// no longer holds.
+const BV_RANGE_TOOLTIP_CURRENT =
   'The low and high estimate. The headline number is the midpoint of this range.';
+const BV_RANGE_TOOLTIP_SCENARIO =
+  'The low and high estimate. Margin quality can move the scenario number inside this range.';
+const GOAL_HERO_TOOLTIP =
+  'What the business would be worth at your target net margin. This number is stable — sliders do not move it.';
+const NOT_BUYER_READY_COPY = 'Not buyer-ready at this pace.';
+const GOAL_HERO_LABEL = 'Projected at goal';
+const SCENARIO_HERO_LABEL = 'At this scenario';
 const BUYER_READY_TOOLTIP =
   "What the business is worth to a buyer after paying someone to do your day-to-day job. If this is low, the business still leans heavily on you.";
 const OWNER_DEPENDENCE_GAP_TOOLTIP =
@@ -519,6 +551,8 @@ function ReadOnlyValue({ displayText, tooltipText, isMuted }: ReadOnlyValueProps
 
 export function BusinessValuationCard({
   result,
+  projection,
+  isScenarioActive = false,
   onReplacementCostChange,
   onDriverGradeChange,
 }: Props) {
@@ -534,6 +568,7 @@ export function BusinessValuationCard({
   const ownerDepGapTooltipId = useId();
   const ttmSdeTooltipId = useId();
   const derivedMultipleTooltipId = useId();
+  const goalHeroTooltipId = useId();
 
   const closeEditor = useCallback(() => setEditing(null), []);
 
@@ -553,20 +588,58 @@ export function BusinessValuationCard({
     [onDriverGradeChange, closeEditor]
   );
 
-  // Hero = midpoint of the OOV range. Uses the same formatter as the range
-  // endpoints (formatK) so rounding stays consistent on screen — a viewer
-  // mentally computing midpoint of the visible range will land on the same
-  // value as the hero (within K-rounding).
-  const heroMidpoint =
+  // Dominant hero — TWO STATES:
+  //   - Neutral (default): TTM-based current valuation. The pre-#289
+  //     behavior. Honest "today's reality" number. Never shows the
+  //     "Not buyer-ready" floor copy — that's a forward-looking signal.
+  //   - Active scenario (revenue/expense slider nonzero): slider-driven
+  //     projection from the valuationProjection helper. When projected
+  //     SDE <= 0, the "Not buyer-ready at this pace" floor copy fires.
+  //
+  // Per the corrected product model: card defaults to "today's reality"
+  // and the scenario projection is a temporary, unsaved what-if that
+  // resets on neutralized sliders or page refresh.
+  const projectionActual = projection?.actual ?? null;
+  const projectionGoal = projection?.goal ?? null;
+
+  const ttmHeroMidpoint =
     result.ownerOperatorValue === null
       ? null
       : (result.ownerOperatorValue.lower + result.ownerOperatorValue.upper) / 2;
-  const heroDisplay = heroMidpoint === null ? 'Needs input' : formatK(heroMidpoint);
-
-  const rangeSubtitleDisplay =
+  const ttmHeroDisplay =
+    ttmHeroMidpoint === null ? 'Needs input' : formatK(ttmHeroMidpoint);
+  const ttmRangeDisplay =
     result.ownerOperatorValue === null
       ? null
       : formatMoneyRange(result.ownerOperatorValue);
+
+  // Hero state selection. Scenario branch only activates when both the
+  // active flag is true AND a projection is available; otherwise we fall
+  // back to the TTM-based current valuation (handles the <12mo forecast
+  // edge case the same way as neutral).
+  const useScenarioHero = isScenarioActive && projectionActual !== null;
+  const heroIsFloored = useScenarioHero && projectionActual!.isFloored;
+  const heroDisplay = useScenarioHero
+    ? (heroIsFloored
+        ? NOT_BUYER_READY_COPY
+        : formatK(projectionActual!.displayedValuation))
+    : ttmHeroDisplay;
+
+  const rangeSubtitleDisplay = useScenarioHero
+    ? (heroIsFloored ? null : formatMoneyRange(projectionActual!.displayedRange))
+    : ttmRangeDisplay;
+
+  const heroTooltipText = useScenarioHero
+    ? BV_HERO_TOOLTIP_SCENARIO
+    : BV_HERO_TOOLTIP_CURRENT;
+  const rangeTooltipText = useScenarioHero
+    ? BV_RANGE_TOOLTIP_SCENARIO
+    : BV_RANGE_TOOLTIP_CURRENT;
+
+  const goalHeroValueDisplay =
+    projectionGoal !== null && !projectionGoal.isFloored
+      ? formatK(projectionGoal.displayedValuation)
+      : null;
 
   // Buyer-Ready Value: midpoint of the TV range (single value per the
   // range-display rule — only the hero shows a range).
@@ -655,15 +728,49 @@ export function BusinessValuationCard({
         </span>
       </div>
 
-      {/* Single dominant hero — midpoint of the Business Valuation range
-          (= SDE × derivedMultiple, by midpoint-preservation invariant) with
-          a "Range: low – high" subtitle. Per the range-display rule, the
-          hero is the ONLY metric that surfaces a range; the supporting rows
-          below render single values even though the same uncertainty
-          applies. */}
+      {/* Hero block — goal ribbon (slider-neutral, fixed-margin "stable
+          prize") above the dominant hero. Both live inside .bv-hero so
+          the gap between them is the hero stack's 4px, not the card's
+          24px section gap.
+
+          Dominant hero defaults to the TTM-based current valuation;
+          switches to the slider-driven scenario projection only when
+          isScenarioActive is true AND a projection is available. The
+          scenario state surfaces a small "At this scenario" label above
+          the headline number so the owner reads it as a what-if, not a
+          revised current value. The "Not buyer-ready" floor copy only
+          fires inside the scenario branch. */}
       <div className="bv-hero">
-        {result.ownerOperatorValue === null ? (
-          <span className="bv-hero-dominant bv-hero-dominant--muted">
+        {goalHeroValueDisplay !== null && (
+          <span className="db-tooltip-wrap bv-goal-hero-tooltip-wrap">
+            <span
+              tabIndex={0}
+              className="bv-goal-hero-row"
+              aria-describedby={goalHeroTooltipId}
+            >
+              <span className="bv-goal-hero-label">{GOAL_HERO_LABEL}</span>
+              <span className="bv-goal-hero-value">{goalHeroValueDisplay}</span>
+            </span>
+            <span
+              id={goalHeroTooltipId}
+              role="tooltip"
+              className="db-tooltip-panel bv-driver-tooltip-panel"
+            >
+              {GOAL_HERO_TOOLTIP}
+            </span>
+          </span>
+        )}
+        {useScenarioHero && (
+          <span className="bv-hero-scenario-label">{SCENARIO_HERO_LABEL}</span>
+        )}
+        {rangeSubtitleDisplay === null ? (
+          <span
+            className={
+              heroIsFloored
+                ? 'bv-hero-dominant bv-hero-dominant--muted bv-hero-dominant--floor-copy'
+                : 'bv-hero-dominant bv-hero-dominant--muted'
+            }
+          >
             {heroDisplay}
           </span>
         ) : (
@@ -681,7 +788,7 @@ export function BusinessValuationCard({
                 role="tooltip"
                 className="db-tooltip-panel bv-driver-tooltip-panel"
               >
-                {BV_HERO_TOOLTIP}
+                {heroTooltipText}
               </span>
             </span>
             <span className="db-tooltip-wrap bv-hero-tooltip-wrap">
@@ -697,7 +804,7 @@ export function BusinessValuationCard({
                 role="tooltip"
                 className="db-tooltip-panel bv-driver-tooltip-panel"
               >
-                {BV_RANGE_TOOLTIP}
+                {rangeTooltipText}
               </span>
             </span>
           </>
