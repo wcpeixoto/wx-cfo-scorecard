@@ -1013,9 +1013,9 @@ export default function CashFlowForecastModule({
               <strong className="forecast-decision-value forecast-decision-value--md">{formatCurrencyCompactNode(scenarioReserveTarget)}</strong>
               {reserveGap !== null ? (
                 reserveGap > RESERVE_GAP_FLOOR ? (
-                  <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, reserveGap))} short of your projected reserve need at the projected low</span>
+                  <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, reserveGap))} short of your projected reserve need</span>
                 ) : (
-                  <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, -reserveGap))} above your projected reserve need at the projected low</span>
+                  <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, -reserveGap))} above your projected reserve need</span>
                 )
               ) : (
                 <span className="forecast-decision-detail">No projection data yet</span>
