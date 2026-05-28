@@ -1029,9 +1029,20 @@ export default function CashFlowForecastModule({
           )}
         </article>
 
-        {/* Card 2 — Current Monthly Result */}
+        {/* Card 2 — Projected Monthly Result */}
         <article className="forecast-decision-card">
-          <span className="forecast-decision-label">Current Monthly Result</span>
+          <span className="forecast-decision-label forecast-decision-label--with-tooltip">
+            Projected Monthly Result
+            <span className="cashflow-help">
+              <button type="button" className="cashflow-tooltip" aria-label="Projected Monthly Result explanation">&#9432;</button>
+              <div role="tooltip" className="cashflow-tooltip-panel forecast-result-tooltip-panel">
+                <ul className="cashflow-tooltip-list">
+                  <li className="cashflow-tooltip-body">This shows the average monthly result based on the active forecast scenario.</li>
+                  <li className="cashflow-tooltip-body">Revenue and expense changes affect this number because they change projected cash in, cash out, and net profit.</li>
+                </ul>
+              </div>
+            </span>
+          </span>
           {avgNet !== null ? (
             <strong className={`forecast-decision-value forecast-decision-value--md${avgNet < 0 ? ' forecast-decision-value--negative' : ''}`}>{fmtMonthlyValueSigned(avgNet)}</strong>
           ) : (
