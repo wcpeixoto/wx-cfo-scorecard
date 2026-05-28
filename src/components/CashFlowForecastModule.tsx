@@ -1066,7 +1066,7 @@ export default function CashFlowForecastModule({
           ) : profitGap !== null && targetProfit !== null ? (
             <>
               <strong className="forecast-decision-value forecast-decision-value--md">{fmtMonthlyValuePerMonth(profitGap)}</strong>
-              <span className="forecast-decision-detail">Additional revenue needed at your current margin</span>
+              <span className="forecast-decision-detail">Additional revenue needed to hit your goal</span>
             </>
           ) : (
             <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
