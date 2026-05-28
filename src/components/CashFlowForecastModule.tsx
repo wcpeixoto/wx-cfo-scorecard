@@ -993,17 +993,29 @@ export default function CashFlowForecastModule({
 
       <div className="forecast-decision-grid" aria-label="Forecast decision signals">
 
-        {/* Card 1 — Operating Reserve Target */}
+        {/* Card 1 — Projected Reserve Need */}
         <article className="forecast-decision-card">
-          <span className="forecast-decision-label">Operating Reserve Target</span>
+          <span className="forecast-decision-label forecast-decision-label--with-tooltip">
+            Projected Reserve Need
+            <span className="cashflow-help">
+              <button type="button" className="cashflow-tooltip" aria-label="Projected Reserve Need explanation">&#9432;</button>
+              <div role="tooltip" className="cashflow-tooltip-panel forecast-reserve-tooltip-panel">
+                <ul className="cashflow-tooltip-list">
+                  <li className="cashflow-tooltip-body">This shows how much cash reserve the business may need based on projected monthly expenses.</li>
+                  <li className="cashflow-tooltip-body">Revenue changes affect your future cash balance, but they do not change the reserve need.</li>
+                  <li className="cashflow-tooltip-body">Expense changes affect both the reserve need and your future cash balance.</li>
+                </ul>
+              </div>
+            </span>
+          </span>
           {scenarioReserveTarget > 0 ? (
             <>
               <strong className="forecast-decision-value forecast-decision-value--md">{formatCurrencyCompactNode(scenarioReserveTarget)}</strong>
               {reserveGap !== null ? (
                 reserveGap > RESERVE_GAP_FLOOR ? (
-                  <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, reserveGap))} short of your reserve target at the projected low</span>
+                  <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, reserveGap))} short of your projected reserve need at the projected low</span>
                 ) : (
-                  <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, -reserveGap))} above your reserve target at the projected low</span>
+                  <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, -reserveGap))} above your projected reserve need at the projected low</span>
                 )
               ) : (
                 <span className="forecast-decision-detail">No projection data yet</span>
