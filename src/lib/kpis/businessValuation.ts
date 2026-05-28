@@ -537,18 +537,28 @@ export function computeBusinessValuation(
       inputs.driverGrades.ownerIndependence
     );
 
-  // OOV / TV math uses the display range as the multiple range — this is the
-  // V1 helpers' contract (Range in, Range out). Math is consistent with what
-  // the card displays. Gap = midpoint(OOV) − midpoint(TV) collapses both to
-  // a single value for the teaching line.
+  // OOV / TV math uses the UNCLIPPED derived ± buffer range, not the display
+  // multiple range. The cap applies to the MULTIPLE DISPLAY (1.5×–3.0×
+  // ceiling/floor on the displayed multiple buffer), not to dollar values.
+  // Using the unclipped buffer here keeps midpoint(OOV) = SDE × derived and
+  // midpoint(TV) = transferableSde.midpoint × derived, which matches the
+  // spec's "use the midpoint for math" — midpoint of the buffer = derived.
+  //
+  // If we instead used displayMultipleRange, midpoint(OOV) at the floor
+  // (derived = 1.50, displayed 1.50–1.75) would drift to 1.625 × SDE, and
+  // Gap would be biased away from derived × effectiveCost.midpoint.
+  const mathMultipleRange: Range = {
+    lower: derivedMultiple - DISPLAY_BUFFER,
+    upper: derivedMultiple + DISPLAY_BUFFER,
+  };
   const ownerOperatorValue = computeOwnerOperatorValue(
     ttmSde,
-    displayMultipleRange
+    mathMultipleRange
   );
   const transferableSde = computeTransferableSde(ttmSde, effectiveReplacementCost);
   const transferableValue = computeTransferableValue(
     transferableSde,
-    displayMultipleRange
+    mathMultipleRange
   );
   const gap = computeGap(ownerOperatorValue, transferableValue);
 

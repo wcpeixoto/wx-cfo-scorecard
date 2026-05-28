@@ -706,7 +706,7 @@ describe('computeBusinessValuation — PR-A derived multiple end-to-end', () => 
     expect(result.gap).toBe(0);
   });
 
-  it('all-Weak + Weak lease + null replacement cost → derived clipped to 1.50, $60K default applied', () => {
+  it('all-Weak + Weak lease + null replacement cost → derived clipped to 1.50, $60K default applied, math uses derived (not clipped midpoint)', () => {
     const inputs = baseInputs(
       ALL_WEAK_DRIVERS,
       null,
@@ -720,13 +720,63 @@ describe('computeBusinessValuation — PR-A derived multiple end-to-end', () => 
       upper: DEFAULT_REPLACEMENT_COST,
     });
     expect(result.replacementCostDefaultApplied).toBe(true);
-    // SDE = 160K. Display range 1.50–1.75. OOV = 160K × {1.50, 1.75} = {240K, 280K}.
-    expect(result.ownerOperatorValue).toEqual({ lower: 240_000, upper: 280_000 });
-    // Transferable SDE = 160K − 60K = 100K (range collapsed since cost is point).
-    // TV = 100K × {1.50, 1.75} = {150K, 175K}.
-    expect(result.transferableValue).toEqual({ lower: 150_000, upper: 175_000 });
-    // Gap = midpoint(OOV) − midpoint(TV) = 260K − 162.5K = 97.5K.
-    expect(result.gap).toBeCloseTo(97_500);
+    // Multiple DISPLAY range is clipped: 1.50–1.75 (floor cap).
+    expect(result.displayMultipleRange).toEqual({ lower: 1.50, upper: 1.75 });
+    // OOV / TV MATH uses the unclipped buffer (derived ± 0.25 = 1.25–1.75).
+    // SDE = 160K. OOV = 160K × {1.25, 1.75} = {200K, 280K} → midpoint 240K.
+    expect(result.ownerOperatorValue).toEqual({ lower: 200_000, upper: 280_000 });
+    // Transferable SDE = 160K − 60K = 100K (point). TV = 100K × {1.25, 1.75}
+    // = {125K, 175K} → midpoint 150K.
+    expect(result.transferableValue).toEqual({ lower: 125_000, upper: 175_000 });
+    // Gap = midpoint(OOV) − midpoint(TV) = 240K − 150K = 90K.
+    // This equals derived × effectiveCost.midpoint = 1.50 × 60K = 90K — the
+    // spec-correct value. Using displayMultipleRange would have given 97.5K
+    // (biased by the floor clip).
+    expect(result.gap).toBeCloseTo(90_000);
+  });
+
+  it('Gap math anchors on derived, not on the clipped display midpoint (lower-cap edge)', () => {
+    // Reproduces the cap-edge math bias diagnosed in code review: at the
+    // floor (derived = 1.50), the displayed multiple range is asymmetric
+    // (1.50–1.75) so its midpoint = 1.625, not 1.50. The Gap math MUST use
+    // 1.50 (the derived value) — otherwise the gap inflates by ~8% at the
+    // floor and ~8% at the ceiling.
+    //
+    // We use a point cost range here so the Range × Range arithmetic
+    // collapses to Gap = derived × cost (closed form). With derived = 1.50
+    // and cost = $50K, expected Gap = 1.50 × $50K = $75K. The pre-fix
+    // (display-range math) value would have been ~$81K (biased by the
+    // floor's asymmetric clip).
+    const inputs = baseInputs(
+      ALL_WEAK_DRIVERS,
+      { lower: 50_000, upper: 50_000 },
+      { startDate: null, endDate: null, renewalOption: null, renewalYears: null }
+    );
+    const result = computeBusinessValuation(inputs, REF_DATE);
+    expect(result.derivedMultiple).toBe(MULTIPLE_FLOOR); // clipped to 1.50
+    expect(result.effectiveReplacementCost).toEqual({ lower: 50_000, upper: 50_000 });
+    expect(result.gap).toBeCloseTo(75_000);
+  });
+
+  it('Needs input Owner Independence + persisted $50K → effective stays null; persisted preserved (card layer hides display)', () => {
+    // The selector's contract: OI=needs_input always yields effective null,
+    // regardless of persisted value. The persisted value rides through on
+    // result.replacementCost so the card layer can preserve the value for
+    // switch-back without surfacing it as the cost the math is using. (The
+    // card display logic suppresses the persisted value to "Needs input"
+    // when OI = needs_input.)
+    const persisted = { lower: 50_000, upper: 50_000 };
+    const inputs = baseInputs(
+      DEFAULT_DRIVER_GRADES, // all needs_input
+      persisted,
+      { startDate: null, endDate: null, renewalOption: null, renewalYears: null }
+    );
+    const result = computeBusinessValuation(inputs, REF_DATE);
+    expect(result.replacementCost).toEqual(persisted);
+    expect(result.effectiveReplacementCost).toBeNull();
+    expect(result.replacementCostDefaultApplied).toBe(false);
+    expect(result.transferableValue).toBeNull();
+    expect(result.gap).toBeNull();
   });
 
   it('Mixed Owner Independence + persisted $30K → math uses $30K, no default', () => {

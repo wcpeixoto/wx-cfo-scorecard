@@ -552,17 +552,29 @@ export function BusinessValuationCard({
 
   // Owner Independence resolves which note / value the Replacement Cost row
   // shows. Strong forces effective $0 (no editor change; persisted value
-  // preserved). Mixed/Weak with blank → default $60K applied. Needs input →
-  // value shown as "Needs input".
+  // preserved). Needs input shows "Needs input" REGARDLESS of persisted value
+  // — TV and Gap are blocked until OI is graded, so the cost row reflects
+  // the same "ungraded" state. Mixed/Weak with blank → default $60K applied;
+  // with a persisted nonzero, the persisted value renders.
   const ownerIndependenceGrade = result.driverGrades.ownerIndependence;
   const isOwnerIndependenceStrong = ownerIndependenceGrade === 'strong';
+  const isOwnerIndependenceNeedsInput = ownerIndependenceGrade === 'needs_input';
   const replacementDisplay = isOwnerIndependenceStrong
     ? formatK(0)
-    : result.replacementCostDefaultApplied && result.effectiveReplacementCost
-      ? formatMoneyRange(result.effectiveReplacementCost)
-      : result.replacementCost === null
-        ? 'Needs input'
-        : formatMoneyRange(result.replacementCost);
+    : isOwnerIndependenceNeedsInput
+      ? 'Needs input'
+      : result.replacementCostDefaultApplied && result.effectiveReplacementCost
+        ? formatMoneyRange(result.effectiveReplacementCost)
+        : result.replacementCost === null
+          ? 'Needs input'
+          : formatMoneyRange(result.replacementCost);
+  // Muted when the row displays "Needs input" — covers (a) Needs input OI
+  // (regardless of persisted) and (b) blank persisted under Mixed/Weak with
+  // no default applied (which shouldn't happen since default kicks in, but
+  // defensive).
+  const isReplacementMuted =
+    isOwnerIndependenceNeedsInput ||
+    (result.replacementCost === null && !result.replacementCostDefaultApplied);
 
   return (
     <div className="ta-card bv-card">
@@ -787,9 +799,9 @@ export function BusinessValuationCard({
             <EditableValue
               displayText={replacementDisplay}
               ariaLabel={`Replacement cost — ${
-                result.replacementCost === null ? 'needs input' : replacementDisplay
+                replacementDisplay === 'Needs input' ? 'needs input' : replacementDisplay
               }`}
-              isMuted={result.replacementCost === null && !result.replacementCostDefaultApplied}
+              isMuted={isReplacementMuted}
               onActivate={() => setEditing({ kind: 'replacementCost' })}
             />
           )}
