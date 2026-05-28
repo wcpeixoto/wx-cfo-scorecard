@@ -1610,6 +1610,12 @@ body {
   width: 320px;
 }
 
+.forecast-result-tooltip-panel {
+  left: 0;
+  right: auto;
+  width: 320px;
+}
+
 .forecast-decision-value {
   font-size: 30px;
   font-weight: 600;
