@@ -1604,7 +1604,8 @@ body {
   gap: 6px;
 }
 
-.forecast-reserve-tooltip-panel {
+.forecast-reserve-tooltip-panel,
+.forecast-result-tooltip-panel {
   left: 0;
   right: auto;
   width: 320px;
