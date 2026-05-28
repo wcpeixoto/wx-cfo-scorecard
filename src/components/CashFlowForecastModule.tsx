@@ -1143,10 +1143,10 @@ export default function CashFlowForecastModule({
                 <div className="action-dropdown" ref={scenarioMenuRef}>
                   {(() => {
                     const scenarioOptions = [
-                      { key: 'base' as ForecastScenarioKey, label: 'Base Case', sub: 'From your Settings' },
-                      { key: 'best' as ForecastScenarioKey, label: 'Best Case', sub: 'From your Settings' },
-                      { key: 'worst' as ForecastScenarioKey, label: 'Worst Case', sub: 'From your Settings' },
-                      { key: 'custom' as ForecastScenarioKey, label: 'Custom Case', sub: null },
+                      { key: 'base' as ForecastScenarioKey, label: 'Base Case' },
+                      { key: 'best' as ForecastScenarioKey, label: 'Best Case' },
+                      { key: 'worst' as ForecastScenarioKey, label: 'Worst Case' },
+                      { key: 'custom' as ForecastScenarioKey, label: 'Custom Case' },
                     ] as const;
                     const selectedLabel =
                       scenarioOptions.find((o) => o.key === scenarioKey)?.label ?? 'Base Case';
@@ -1188,9 +1188,6 @@ export default function CashFlowForecastModule({
                                   }}
                                 >
                                   <span className="scenario-menu-item-label">{option.label}</span>
-                                  {option.sub && (
-                                    <span className="scenario-menu-item-sub">{option.sub}</span>
-                                  )}
                                 </button>
                               </li>
                             ))}
