@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { KpiCard } from '../lib/data/contract';
@@ -87,6 +88,7 @@ function formatPercentDelta(value: number | null): string {
 }
 
 export default function KpiCards({ cards, vsLabel = 'vs prior period', sparklinesById }: KpiCardsProps) {
+  const netTooltipId = useId();
   return (
     <section className="kpi-grid" aria-label="Key metrics">
       {cards.map((card) => {
@@ -115,7 +117,24 @@ export default function KpiCards({ cards, vsLabel = 'vs prior period', sparkline
         return (
           <article className="kpi-card" key={card.id}>
             <div className="kpi-card-main">
-              <p className="kpi-label">{card.label}</p>
+              <div className="kpi-label">
+                {card.label}
+                {card.id === 'net' && (
+                  <span className="db-tooltip-wrap">
+                    <button
+                      type="button"
+                      className="db-tooltip-btn"
+                      aria-label="Profit explanation"
+                      aria-describedby={netTooltipId}
+                    >
+                      &#9432;
+                    </button>
+                    <div id={netTooltipId} role="tooltip" className="db-tooltip-panel is-wide">
+                      We call this Profit to keep things simple. Technically, it&rsquo;s net cash flow: revenue minus expenses for this period, excluding transfers and financing.
+                    </div>
+                  </span>
+                )}
+              </div>
               <p className={`kpi-value${valueColorClass}`}>{formatValue(card.value, card.format)}</p>
               <div className="kpi-footer">
                 <span className={`kpi-badge ${trendClass}`}>
