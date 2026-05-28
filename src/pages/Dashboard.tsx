@@ -1384,10 +1384,6 @@ export default function Dashboard() {
           businessRules.personalExpensesThroughBusiness,
         oneTimeExpensesToAddBack: businessRules.oneTimeExpensesToAddBack,
         oneTimeGainsToSubtract: businessRules.oneTimeGainsToSubtract,
-        multipleRange: {
-          lower: businessRules.valuationMultipleLower,
-          upper: businessRules.valuationMultipleUpper,
-        },
         replacementCost,
         driverGrades: {
           recurringRevenue: businessRules.driverGradeRecurringRevenue,
@@ -1412,8 +1408,6 @@ export default function Dashboard() {
     businessRules.personalExpensesThroughBusiness,
     businessRules.oneTimeExpensesToAddBack,
     businessRules.oneTimeGainsToSubtract,
-    businessRules.valuationMultipleLower,
-    businessRules.valuationMultipleUpper,
     businessRules.replacementCostLower,
     businessRules.replacementCostUpper,
     businessRules.driverGradeRecurringRevenue,
@@ -1427,16 +1421,6 @@ export default function Dashboard() {
     businessRules.leaseRenewalOption,
     businessRules.leaseRenewalYears,
   ]);
-
-  const handleBusinessValuationMultipleRangeChange = useCallback(
-    (lower: number, upper: number) => {
-      updateBusinessRules({
-        valuationMultipleLower: lower,
-        valuationMultipleUpper: upper,
-      });
-    },
-    [updateBusinessRules]
-  );
 
   const handleBusinessValuationReplacementCostChange = useCallback(
     (range: BVRange | null) => {
@@ -3065,7 +3049,6 @@ export default function Dashboard() {
               rightSlot={
                 <BusinessValuationCard
                   result={businessValuationResult}
-                  onMultipleRangeChange={handleBusinessValuationMultipleRangeChange}
                   onReplacementCostChange={handleBusinessValuationReplacementCostChange}
                   onDriverGradeChange={handleBusinessValuationDriverGradeChange}
                 />

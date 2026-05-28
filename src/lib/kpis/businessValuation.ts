@@ -1,9 +1,13 @@
 // Business Valuation — SDE-based owner-guidance selectors.
 //
 // Architecture: pure selectors. The deterministic layer; no AI, no hidden
-// scoring. Drivers EXPLAIN the valuation (qualitative grades the owner sets),
-// they do NOT calculate it. Multiple Range is owner-controlled; we never
-// auto-derive it from driver grades.
+// scoring. The multiple is DERIVED from driver grades using an additive
+// weights model (see DRIVER_WEIGHTS). The displayed multiple range is a
+// ±DISPLAY_BUFFER buffer around the derived value, clipped to the
+// [MULTIPLE_FLOOR, MULTIPLE_CEILING] cap. Owner Independence grade also
+// gates Replacement Cost resolution — Strong forces effective cost to $0
+// (transferable = owner-operator), Mixed/Weak defaults a blank field to
+// DEFAULT_REPLACEMENT_COST, Needs input leaves it null.
 //
 // TTM convention reuses the pattern from src/lib/commitments/targetGrounding.ts
 // `weeklyCapacity()`: complete-month filter (current incomplete month excluded
@@ -19,6 +23,55 @@ import type { MonthlyRollup } from '../data/contract';
 
 export const TTM_MONTHS = 12;
 const MS_PER_MONTH = 30 * 24 * 60 * 60 * 1000; // unused; documented intent only
+
+// Derived-multiple model. Asymmetric weights — weak hurts more than strong
+// helps. Sum of all-Strong = +0.80, sum of all-Weak = −1.15, both fall outside
+// the cap and clip to the floor/ceiling. Direction is market-supported; the
+// specific per-driver weights are this product's scoring model, not a
+// market-derived coefficient. (Tooltip copy reflects that.)
+export const BASE_MULTIPLE = 2.25;
+export const MULTIPLE_FLOOR = 1.5;
+export const MULTIPLE_CEILING = 3.0;
+export const DISPLAY_BUFFER = 0.25;
+export const DEFAULT_REPLACEMENT_COST = 60_000;
+
+export type ValuationDriverKey =
+  | 'recurringRevenue'
+  | 'leaseRunway'
+  | 'coachDepth'
+  | 'ownerIndependence'
+  | 'financialClarity'
+  | 'churnTracking'
+  | 'brandStrength';
+
+interface DriverWeightRow {
+  strong: number;
+  mixed: number;
+  weak: number;
+}
+
+// Order of entries here is the render order in the card's Drivers list and the
+// order returned by buildDriverImpacts(). Don't reorder without updating the
+// card's layout expectations.
+const DRIVER_WEIGHTS: Record<ValuationDriverKey, DriverWeightRow> = {
+  recurringRevenue:    { strong: +0.15, mixed: 0, weak: -0.20 },
+  leaseRunway:         { strong: +0.15, mixed: 0, weak: -0.20 },
+  coachDepth:          { strong: +0.15, mixed: 0, weak: -0.20 },
+  ownerIndependence:   { strong: +0.15, mixed: 0, weak: -0.20 },
+  financialClarity:    { strong: +0.05, mixed: 0, weak: -0.10 },
+  churnTracking:       { strong: +0.10, mixed: 0, weak: -0.15 },
+  brandStrength:       { strong: +0.05, mixed: 0, weak: -0.10 },
+};
+
+const DRIVER_IMPACT_ORDER: { key: ValuationDriverKey; label: string }[] = [
+  { key: 'recurringRevenue',  label: 'Recurring revenue' },
+  { key: 'leaseRunway',       label: 'Lease runway' },
+  { key: 'coachDepth',        label: 'Coach depth' },
+  { key: 'ownerIndependence', label: 'Owner independence' },
+  { key: 'financialClarity',  label: 'Financial clarity' },
+  { key: 'churnTracking',     label: 'Churn tracking' },
+  { key: 'brandStrength',     label: 'Brand strength' },
+];
 
 // ── Domain types ────────────────────────────────────────────────────────────
 
@@ -53,13 +106,33 @@ export interface LeaseInputs {
   renewalYears: number | null;
 }
 
+// Unified grade for the impacts list. Includes lease's 'not_tracked' (math
+// treats it as 0; the renderer displays "Not tracked", not "Needs input").
+export type ValuationGrade = DriverGrade | 'not_tracked';
+
+export interface ValuationDriverImpact {
+  key: ValuationDriverKey;
+  label: string;
+  grade: ValuationGrade;
+  // Weight from DRIVER_WEIGHTS for the current grade. Same as `contribution`
+  // for strong/weak; 0 for mixed/needs_input/not_tracked.
+  weight: number;
+  // Effective contribution to the derived multiple (= weight; kept separate
+  // for renderer ergonomics — the impact column shows this).
+  contribution: number;
+  // Lease runway is auto-graded from Settings lease dates; recurring revenue
+  // becomes auto in PR-B. Owner-set drivers carry isAuto=false in PR-A.
+  isAuto: boolean;
+}
+
 export interface BusinessValuationInputs {
   ttmOperatingProfit: number | null;
   ownerW2Compensation: number | null;
   personalExpensesThroughBusiness: number | null;
   oneTimeExpensesToAddBack: number | null;
   oneTimeGainsToSubtract: number | null;
-  multipleRange: Range;
+  // Persisted replacement cost. Effective cost is derived from this + the
+  // Owner Independence grade by resolveEffectiveReplacementCost().
   replacementCost: Range | null;
   driverGrades: DriverGrades;
   lease: LeaseInputs;
@@ -69,13 +142,31 @@ export interface BusinessValuationResult {
   ttmOperatingProfit: number | null;
   ttmSde: number | null;
   allAddBacksBlank: boolean;
+  // Math results — driven by the DERIVED multiple's display range and the
+  // EFFECTIVE replacement cost. Renderer surfaces these directly.
   ownerOperatorValue: Range | null;
   transferableValue: Range | null;
   gap: number | null;
+  // Driver grades pass-through for the renderer (it shows the lease and
+  // owner-set grades together via the impacts list).
   leaseRunway: LeaseRunwayGrade;
   driverGrades: DriverGrades;
-  multipleRange: Range;
+  // Derived multiple model. derivedMultiple is the math midpoint (capped to
+  // [1.5, 3.0]); displayMultipleRange is derived ± DISPLAY_BUFFER, clipped to
+  // the cap; wasClipped is true when either end of the display range was
+  // clipped by the cap (drives the explainer tooltip on the multiple display).
+  derivedMultiple: number;
+  displayMultipleRange: Range;
+  wasClipped: boolean;
+  // Per-driver impacts in render order. 7 entries.
+  driverImpacts: ValuationDriverImpact[];
+  // Replacement cost — persisted value (unchanged from V1) and the effective
+  // value used in math. defaultApplied = true when Owner Independence is
+  // Mixed/Weak AND the persisted value was null/zero → effective falls back
+  // to DEFAULT_REPLACEMENT_COST.
   replacementCost: Range | null;
+  effectiveReplacementCost: Range | null;
+  replacementCostDefaultApplied: boolean;
 }
 
 export interface RangeValidationOk {
@@ -276,7 +367,12 @@ export function gradeLeaseRunway(
 
 // ── Validators (inline editors) ─────────────────────────────────────────────
 
-// Multiple Range: empty REJECTED (always has a default value).
+/**
+ * @deprecated PR-A: the multiple is now derived from driver grades; no inline
+ * editor remains. Kept for backward compatibility while the persistence
+ * columns still exist. Slated for removal in PR-B alongside the
+ * valuation_multiple_lower/upper column disposition.
+ */
 export function validateMultipleRange(
   lower: number | null,
   upper: number | null
@@ -321,6 +417,100 @@ function validateRangeStrict(
   return { ok: true, range: { lower: l, upper: u } };
 }
 
+// ── Derived multiple model ─────────────────────────────────────────────────
+
+// Build the 7-entry impacts list in render order. Lease's 'not_tracked' is
+// preserved on the grade field but contributes 0 (same math as Needs input).
+export function buildDriverImpacts(
+  driverGrades: DriverGrades,
+  leaseGrade: LeaseRunwayGrade
+): ValuationDriverImpact[] {
+  return DRIVER_IMPACT_ORDER.map(({ key, label }) => {
+    const grade: ValuationGrade =
+      key === 'leaseRunway' ? leaseGrade : driverGrades[key];
+    const weights = DRIVER_WEIGHTS[key];
+    let contribution = 0;
+    if (grade === 'strong') contribution = weights.strong;
+    else if (grade === 'weak') contribution = weights.weak;
+    // 'mixed' | 'needs_input' | 'not_tracked' → 0
+    return {
+      key,
+      label,
+      grade,
+      // weight surfaces the magnitude associated with the current grade —
+      // 0 when the grade is non-active. (Renderer reads `contribution`.)
+      weight: contribution,
+      contribution,
+      isAuto: key === 'leaseRunway',
+    };
+  });
+}
+
+// Sum impact contributions on top of BASE_MULTIPLE, then clamp to the
+// [MULTIPLE_FLOOR, MULTIPLE_CEILING] cap.
+export function deriveMultiple(impacts: ValuationDriverImpact[]): number {
+  const sum = impacts.reduce((acc, i) => acc + i.contribution, 0);
+  const raw = BASE_MULTIPLE + sum;
+  if (raw < MULTIPLE_FLOOR) return MULTIPLE_FLOOR;
+  if (raw > MULTIPLE_CEILING) return MULTIPLE_CEILING;
+  return raw;
+}
+
+export interface ClippedRange {
+  range: Range;
+  wasClipped: boolean;
+}
+
+// Display range = derived ± DISPLAY_BUFFER, then clipped against the cap.
+// wasClipped is true when EITHER end was clipped (drives the cap-neutral
+// explainer tooltip on the multiple display).
+export function clipDisplayRange(derived: number): ClippedRange {
+  const rawLower = derived - DISPLAY_BUFFER;
+  const rawUpper = derived + DISPLAY_BUFFER;
+  const lower = Math.max(MULTIPLE_FLOOR, rawLower);
+  const upper = Math.min(MULTIPLE_CEILING, rawUpper);
+  const wasClipped = rawLower < MULTIPLE_FLOOR || rawUpper > MULTIPLE_CEILING;
+  return { range: { lower, upper }, wasClipped };
+}
+
+export interface EffectiveReplacementCost {
+  effective: Range | null;
+  defaultApplied: boolean;
+}
+
+// Owner Independence gates effective replacement cost:
+//   strong       → effective = $0 (transferable = owner-operator, gap = $0).
+//                  Persisted value is preserved untouched so the owner can
+//                  switch back to mixed/weak later without re-entering it.
+//   mixed | weak → effective = persisted, OR DEFAULT_REPLACEMENT_COST when
+//                  persisted is null / a zero range (defaultApplied = true).
+//   needs_input  → effective = null ("Needs input" downstream).
+export function resolveEffectiveReplacementCost(
+  persisted: Range | null,
+  ownerIndependence: DriverGrade
+): EffectiveReplacementCost {
+  if (ownerIndependence === 'strong') {
+    return { effective: { lower: 0, upper: 0 }, defaultApplied: false };
+  }
+  if (ownerIndependence === 'needs_input') {
+    return { effective: null, defaultApplied: false };
+  }
+  // mixed | weak
+  const isBlankOrZero =
+    persisted === null ||
+    (persisted.lower === 0 && persisted.upper === 0);
+  if (isBlankOrZero) {
+    return {
+      effective: {
+        lower: DEFAULT_REPLACEMENT_COST,
+        upper: DEFAULT_REPLACEMENT_COST,
+      },
+      defaultApplied: true,
+    };
+  }
+  return { effective: persisted, defaultApplied: false };
+}
+
 // ── Main composer ──────────────────────────────────────────────────────────
 
 export function computeBusinessValuation(
@@ -335,14 +525,30 @@ export function computeBusinessValuation(
     oneTimeGainsToSubtract: inputs.oneTimeGainsToSubtract,
   });
 
+  const leaseRunway = gradeLeaseRunway(referenceDate, inputs.lease);
+  const driverImpacts = buildDriverImpacts(inputs.driverGrades, leaseRunway);
+  const derivedMultiple = deriveMultiple(driverImpacts);
+  const { range: displayMultipleRange, wasClipped } =
+    clipDisplayRange(derivedMultiple);
+
+  const { effective: effectiveReplacementCost, defaultApplied } =
+    resolveEffectiveReplacementCost(
+      inputs.replacementCost,
+      inputs.driverGrades.ownerIndependence
+    );
+
+  // OOV / TV math uses the display range as the multiple range — this is the
+  // V1 helpers' contract (Range in, Range out). Math is consistent with what
+  // the card displays. Gap = midpoint(OOV) − midpoint(TV) collapses both to
+  // a single value for the teaching line.
   const ownerOperatorValue = computeOwnerOperatorValue(
     ttmSde,
-    inputs.multipleRange
+    displayMultipleRange
   );
-  const transferableSde = computeTransferableSde(ttmSde, inputs.replacementCost);
+  const transferableSde = computeTransferableSde(ttmSde, effectiveReplacementCost);
   const transferableValue = computeTransferableValue(
     transferableSde,
-    inputs.multipleRange
+    displayMultipleRange
   );
   const gap = computeGap(ownerOperatorValue, transferableValue);
 
@@ -358,10 +564,15 @@ export function computeBusinessValuation(
     ownerOperatorValue,
     transferableValue,
     gap,
-    leaseRunway: gradeLeaseRunway(referenceDate, inputs.lease),
+    leaseRunway,
     driverGrades: inputs.driverGrades,
-    multipleRange: inputs.multipleRange,
+    derivedMultiple,
+    displayMultipleRange,
+    wasClipped,
+    driverImpacts,
     replacementCost: inputs.replacementCost,
+    effectiveReplacementCost,
+    replacementCostDefaultApplied: defaultApplied,
   };
 }
 

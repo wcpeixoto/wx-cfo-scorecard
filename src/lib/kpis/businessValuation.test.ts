@@ -14,6 +14,14 @@ import {
   validateReplacementCostRange,
   parseLocalDate,
   monthsBetween,
+  buildDriverImpacts,
+  deriveMultiple,
+  clipDisplayRange,
+  resolveEffectiveReplacementCost,
+  BASE_MULTIPLE,
+  MULTIPLE_FLOOR,
+  MULTIPLE_CEILING,
+  DEFAULT_REPLACEMENT_COST,
   type BusinessValuationInputs,
   type DriverGrades,
 } from './businessValuation';
@@ -256,23 +264,30 @@ describe('computeGap', () => {
 // ── Missing-replacement-cost end-to-end behavior ────────────────────────────
 
 describe('computeBusinessValuation — missing Replacement Cost', () => {
-  it('renders Owner-Operator Value; TV and Gap stay null', () => {
+  it('renders Owner-Operator Value; TV and Gap stay null (Owner Independence = Needs input)', () => {
+    // All drivers Needs input → derived = 2.25 → display range 2.00–2.50.
+    // Owner Independence = needs_input → effective replacement cost = null,
+    // so transferable value and gap stay null.
     const inputs: BusinessValuationInputs = {
       ttmOperatingProfit: 100_000,
       ownerW2Compensation: 60_000,
       personalExpensesThroughBusiness: 5_000,
       oneTimeExpensesToAddBack: 3_000,
       oneTimeGainsToSubtract: 8_000,
-      multipleRange: { lower: 2.0, upper: 2.5 },
       replacementCost: null,
       driverGrades: DEFAULT_DRIVER_GRADES,
       lease: { startDate: null, endDate: null, renewalOption: null, renewalYears: null },
     };
     const result = computeBusinessValuation(inputs, REF_DATE);
     expect(result.ttmSde).toBe(160_000);
+    expect(result.derivedMultiple).toBeCloseTo(BASE_MULTIPLE);
+    expect(result.displayMultipleRange).toEqual({ lower: 2.0, upper: 2.5 });
+    expect(result.wasClipped).toBe(false);
     expect(result.ownerOperatorValue).toEqual({ lower: 320_000, upper: 400_000 });
     expect(result.transferableValue).toBeNull();
     expect(result.gap).toBeNull();
+    expect(result.effectiveReplacementCost).toBeNull();
+    expect(result.replacementCostDefaultApplied).toBe(false);
   });
 });
 
@@ -437,5 +452,333 @@ describe('validateReplacementCostRange', () => {
       ok: false,
       reason: 'min_gt_max',
     });
+  });
+});
+
+// ── Derived multiple model (PR-A) ───────────────────────────────────────────
+
+const ALL_STRONG_DRIVERS: DriverGrades = {
+  recurringRevenue: 'strong',
+  financialClarity: 'strong',
+  churnTracking: 'strong',
+  coachDepth: 'strong',
+  ownerIndependence: 'strong',
+  brandStrength: 'strong',
+};
+
+const ALL_WEAK_DRIVERS: DriverGrades = {
+  recurringRevenue: 'weak',
+  financialClarity: 'weak',
+  churnTracking: 'weak',
+  coachDepth: 'weak',
+  ownerIndependence: 'weak',
+  brandStrength: 'weak',
+};
+
+const ALL_MIXED_DRIVERS: DriverGrades = {
+  recurringRevenue: 'mixed',
+  financialClarity: 'mixed',
+  churnTracking: 'mixed',
+  coachDepth: 'mixed',
+  ownerIndependence: 'mixed',
+  brandStrength: 'mixed',
+};
+
+describe('buildDriverImpacts', () => {
+  it('returns 7 entries in canonical render order', () => {
+    const impacts = buildDriverImpacts(DEFAULT_DRIVER_GRADES, 'not_tracked');
+    expect(impacts).toHaveLength(7);
+    expect(impacts.map((i) => i.key)).toEqual([
+      'recurringRevenue',
+      'leaseRunway',
+      'coachDepth',
+      'ownerIndependence',
+      'financialClarity',
+      'churnTracking',
+      'brandStrength',
+    ]);
+  });
+
+  it('marks leaseRunway as isAuto and other drivers as not auto', () => {
+    const impacts = buildDriverImpacts(ALL_STRONG_DRIVERS, 'strong');
+    const autoEntries = impacts.filter((i) => i.isAuto);
+    expect(autoEntries.map((i) => i.key)).toEqual(['leaseRunway']);
+  });
+
+  it('contributes 0 for needs_input and not_tracked', () => {
+    const impacts = buildDriverImpacts(DEFAULT_DRIVER_GRADES, 'not_tracked');
+    for (const impact of impacts) {
+      expect(impact.contribution).toBe(0);
+    }
+  });
+
+  it('contributes 0 for mixed (math-equivalent to needs_input)', () => {
+    const impacts = buildDriverImpacts(ALL_MIXED_DRIVERS, 'mixed');
+    for (const impact of impacts) {
+      expect(impact.contribution).toBe(0);
+    }
+  });
+
+  it('preserves the lease not_tracked grade on the impact entry (renderer dispatches on key)', () => {
+    const impacts = buildDriverImpacts(DEFAULT_DRIVER_GRADES, 'not_tracked');
+    const lease = impacts.find((i) => i.key === 'leaseRunway');
+    expect(lease?.grade).toBe('not_tracked');
+    expect(lease?.contribution).toBe(0);
+  });
+});
+
+describe('deriveMultiple', () => {
+  it('returns BASE_MULTIPLE (2.25) when all drivers contribute 0', () => {
+    const impacts = buildDriverImpacts(DEFAULT_DRIVER_GRADES, 'not_tracked');
+    expect(deriveMultiple(impacts)).toBeCloseTo(BASE_MULTIPLE);
+  });
+
+  it('returns BASE_MULTIPLE when all drivers are Mixed', () => {
+    const impacts = buildDriverImpacts(ALL_MIXED_DRIVERS, 'mixed');
+    expect(deriveMultiple(impacts)).toBeCloseTo(BASE_MULTIPLE);
+  });
+
+  it('caps at MULTIPLE_CEILING (3.0) when all drivers are Strong', () => {
+    // raw sum = 4 × 0.15 + 2 × 0.05 + 1 × 0.10 = 0.80 → 2.25 + 0.80 = 3.05 → clip to 3.00
+    const impacts = buildDriverImpacts(ALL_STRONG_DRIVERS, 'strong');
+    expect(deriveMultiple(impacts)).toBe(MULTIPLE_CEILING);
+  });
+
+  it('caps at MULTIPLE_FLOOR (1.5) when all drivers are Weak', () => {
+    // raw sum = 4 × (−0.20) + 2 × (−0.10) + 1 × (−0.15) = −1.15 → 2.25 − 1.15 = 1.10 → clip to 1.50
+    const impacts = buildDriverImpacts(ALL_WEAK_DRIVERS, 'weak');
+    expect(deriveMultiple(impacts)).toBe(MULTIPLE_FLOOR);
+  });
+
+  it('combines mixed grades correctly (representative real-world case)', () => {
+    // Recurring strong (+0.15) + Lease strong (+0.15) + Coach mixed (0) +
+    // Owner needs_input (0) + Financial strong (+0.05) + Churn strong (+0.10)
+    // + Brand mixed (0) = +0.45 → 2.25 + 0.45 = 2.70 (in cap range)
+    const impacts = buildDriverImpacts(
+      {
+        recurringRevenue: 'strong',
+        financialClarity: 'strong',
+        churnTracking: 'strong',
+        coachDepth: 'mixed',
+        ownerIndependence: 'needs_input',
+        brandStrength: 'mixed',
+      },
+      'strong'
+    );
+    expect(deriveMultiple(impacts)).toBeCloseTo(2.70);
+  });
+});
+
+describe('clipDisplayRange', () => {
+  it('no clip when derived ± 0.25 stays inside [1.5, 3.0]', () => {
+    const result = clipDisplayRange(2.55);
+    expect(result.range).toEqual({ lower: 2.30, upper: 2.80 });
+    expect(result.wasClipped).toBe(false);
+  });
+
+  it('clips the upper end when derived + 0.25 exceeds the ceiling', () => {
+    const result = clipDisplayRange(2.90);
+    expect(result.range.lower).toBeCloseTo(2.65);
+    expect(result.range.upper).toBe(MULTIPLE_CEILING);
+    expect(result.wasClipped).toBe(true);
+  });
+
+  it('clips the lower end when derived − 0.25 falls below the floor', () => {
+    const result = clipDisplayRange(1.60);
+    expect(result.range.lower).toBe(MULTIPLE_FLOOR);
+    expect(result.range.upper).toBeCloseTo(1.85);
+    expect(result.wasClipped).toBe(true);
+  });
+
+  it('clips at the ceiling itself (derived = 3.00)', () => {
+    const result = clipDisplayRange(MULTIPLE_CEILING);
+    expect(result.range.lower).toBeCloseTo(2.75);
+    expect(result.range.upper).toBe(MULTIPLE_CEILING);
+    expect(result.wasClipped).toBe(true);
+  });
+
+  it('clips at the floor itself (derived = 1.50)', () => {
+    const result = clipDisplayRange(MULTIPLE_FLOOR);
+    expect(result.range.lower).toBe(MULTIPLE_FLOOR);
+    expect(result.range.upper).toBeCloseTo(1.75);
+    expect(result.wasClipped).toBe(true);
+  });
+});
+
+// ── Owner Independence → effective replacement cost (PR-A) ─────────────────
+
+describe('resolveEffectiveReplacementCost', () => {
+  it('Strong → effective = $0 regardless of persisted value, defaultApplied = false', () => {
+    const stronge = resolveEffectiveReplacementCost(null, 'strong');
+    expect(stronge.effective).toEqual({ lower: 0, upper: 0 });
+    expect(stronge.defaultApplied).toBe(false);
+
+    // Persisted nonzero value should be IGNORED while Strong is active
+    // (the persisted value is preserved on the result for switch-back).
+    const strongWithPersisted = resolveEffectiveReplacementCost(
+      { lower: 50_000, upper: 50_000 },
+      'strong'
+    );
+    expect(strongWithPersisted.effective).toEqual({ lower: 0, upper: 0 });
+    expect(strongWithPersisted.defaultApplied).toBe(false);
+  });
+
+  it('Mixed + null → effective = $60K default, defaultApplied = true', () => {
+    const r = resolveEffectiveReplacementCost(null, 'mixed');
+    expect(r.effective).toEqual({
+      lower: DEFAULT_REPLACEMENT_COST,
+      upper: DEFAULT_REPLACEMENT_COST,
+    });
+    expect(r.defaultApplied).toBe(true);
+  });
+
+  it('Weak + null → effective = $60K default, defaultApplied = true', () => {
+    const r = resolveEffectiveReplacementCost(null, 'weak');
+    expect(r.effective).toEqual({
+      lower: DEFAULT_REPLACEMENT_COST,
+      upper: DEFAULT_REPLACEMENT_COST,
+    });
+    expect(r.defaultApplied).toBe(true);
+  });
+
+  it('Mixed + zero range → effective = $60K default, defaultApplied = true', () => {
+    const r = resolveEffectiveReplacementCost(
+      { lower: 0, upper: 0 },
+      'mixed'
+    );
+    expect(r.effective).toEqual({
+      lower: DEFAULT_REPLACEMENT_COST,
+      upper: DEFAULT_REPLACEMENT_COST,
+    });
+    expect(r.defaultApplied).toBe(true);
+  });
+
+  it('Mixed + nonzero persisted → effective = persisted, defaultApplied = false', () => {
+    const persisted = { lower: 30_000, upper: 30_000 };
+    const r = resolveEffectiveReplacementCost(persisted, 'mixed');
+    expect(r.effective).toEqual(persisted);
+    expect(r.defaultApplied).toBe(false);
+  });
+
+  it('Needs input → effective = null, defaultApplied = false', () => {
+    const r = resolveEffectiveReplacementCost(
+      { lower: 50_000, upper: 50_000 },
+      'needs_input'
+    );
+    expect(r.effective).toBeNull();
+    expect(r.defaultApplied).toBe(false);
+  });
+});
+
+// ── Composer end-to-end with PR-A semantics ────────────────────────────────
+
+describe('computeBusinessValuation — PR-A derived multiple end-to-end', () => {
+  const baseInputs = (
+    driverGrades: DriverGrades,
+    replacementCost: BusinessValuationInputs['replacementCost'],
+    lease: BusinessValuationInputs['lease']
+  ): BusinessValuationInputs => ({
+    ttmOperatingProfit: 100_000,
+    ownerW2Compensation: 60_000,
+    personalExpensesThroughBusiness: null,
+    oneTimeExpensesToAddBack: null,
+    oneTimeGainsToSubtract: null,
+    replacementCost,
+    driverGrades,
+    lease,
+  });
+
+  it('all-Strong + Strong lease + null replacement cost → derived clipped to 3.00, transferable = OOV (Strong OI forces effective $0)', () => {
+    const inputs = baseInputs(
+      ALL_STRONG_DRIVERS,
+      null,
+      { startDate: null, endDate: '2031-05-27', renewalOption: null, renewalYears: null }
+    );
+    const result = computeBusinessValuation(inputs, REF_DATE);
+    expect(result.ttmSde).toBe(160_000);
+    expect(result.derivedMultiple).toBe(MULTIPLE_CEILING);
+    expect(result.wasClipped).toBe(true);
+    expect(result.displayMultipleRange.lower).toBeCloseTo(2.75);
+    expect(result.displayMultipleRange.upper).toBe(MULTIPLE_CEILING);
+    // OI = strong → effective cost = $0 → transferable = OOV → gap = 0
+    expect(result.effectiveReplacementCost).toEqual({ lower: 0, upper: 0 });
+    expect(result.transferableValue).toEqual(result.ownerOperatorValue);
+    expect(result.gap).toBe(0);
+  });
+
+  it('all-Weak + Weak lease + null replacement cost → derived clipped to 1.50, $60K default applied', () => {
+    const inputs = baseInputs(
+      ALL_WEAK_DRIVERS,
+      null,
+      { startDate: null, endDate: '2027-05-27', renewalOption: null, renewalYears: null }
+    );
+    const result = computeBusinessValuation(inputs, REF_DATE);
+    expect(result.derivedMultiple).toBe(MULTIPLE_FLOOR);
+    expect(result.wasClipped).toBe(true);
+    expect(result.effectiveReplacementCost).toEqual({
+      lower: DEFAULT_REPLACEMENT_COST,
+      upper: DEFAULT_REPLACEMENT_COST,
+    });
+    expect(result.replacementCostDefaultApplied).toBe(true);
+    // SDE = 160K. Display range 1.50–1.75. OOV = 160K × {1.50, 1.75} = {240K, 280K}.
+    expect(result.ownerOperatorValue).toEqual({ lower: 240_000, upper: 280_000 });
+    // Transferable SDE = 160K − 60K = 100K (range collapsed since cost is point).
+    // TV = 100K × {1.50, 1.75} = {150K, 175K}.
+    expect(result.transferableValue).toEqual({ lower: 150_000, upper: 175_000 });
+    // Gap = midpoint(OOV) − midpoint(TV) = 260K − 162.5K = 97.5K.
+    expect(result.gap).toBeCloseTo(97_500);
+  });
+
+  it('Mixed Owner Independence + persisted $30K → math uses $30K, no default', () => {
+    const grades: DriverGrades = {
+      ...DEFAULT_DRIVER_GRADES,
+      ownerIndependence: 'mixed',
+    };
+    const inputs = baseInputs(
+      grades,
+      { lower: 30_000, upper: 30_000 },
+      { startDate: null, endDate: null, renewalOption: null, renewalYears: null }
+    );
+    const result = computeBusinessValuation(inputs, REF_DATE);
+    expect(result.effectiveReplacementCost).toEqual({ lower: 30_000, upper: 30_000 });
+    expect(result.replacementCostDefaultApplied).toBe(false);
+    expect(result.transferableValue).not.toBeNull();
+  });
+
+  it('Strong Owner Independence + persisted $50K → effective $0, persisted preserved on result', () => {
+    const grades: DriverGrades = {
+      ...DEFAULT_DRIVER_GRADES,
+      ownerIndependence: 'strong',
+    };
+    const persisted = { lower: 50_000, upper: 50_000 };
+    const inputs = baseInputs(grades, persisted, {
+      startDate: null, endDate: null, renewalOption: null, renewalYears: null,
+    });
+    const result = computeBusinessValuation(inputs, REF_DATE);
+    // Persisted value preserved untouched on the result so the renderer
+    // can switch back without re-entering it.
+    expect(result.replacementCost).toEqual(persisted);
+    expect(result.effectiveReplacementCost).toEqual({ lower: 0, upper: 0 });
+    expect(result.transferableValue).toEqual(result.ownerOperatorValue);
+    expect(result.gap).toBe(0);
+  });
+
+  it('returns 7 driver impacts on the result in canonical order', () => {
+    const inputs = baseInputs(
+      DEFAULT_DRIVER_GRADES,
+      null,
+      { startDate: null, endDate: null, renewalOption: null, renewalYears: null }
+    );
+    const result = computeBusinessValuation(inputs, REF_DATE);
+    expect(result.driverImpacts).toHaveLength(7);
+    expect(result.driverImpacts.map((i) => i.key)).toEqual([
+      'recurringRevenue',
+      'leaseRunway',
+      'coachDepth',
+      'ownerIndependence',
+      'financialClarity',
+      'churnTracking',
+      'brandStrength',
+    ]);
   });
 });
