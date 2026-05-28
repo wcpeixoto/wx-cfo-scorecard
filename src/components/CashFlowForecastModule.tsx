@@ -918,13 +918,17 @@ export default function CashFlowForecastModule({
     ? Math.round((avgNet / avgCashIn) * 100)
     : null;
 
-  // Card 1 — Operating Reserve Target (scenario-reactive).
+  // Card 1 — Operating Reserve Target (scenario-reactive, Option A).
   //
   // Target: fixed-method Settings amount when configured (intentionally
   // slider-immune — matches the Settings semantic). Otherwise one month of
-  // scenario-projected expenses, computed from the same DECISION_WINDOW that
-  // feeds avgNet/avgCashIn. Gap: target − today's cash, floored to suppress
-  // rounding noise.
+  // scenario-projected expenses (avg cashOut over decisionWindow). The
+  // expense slider therefore moves the target; the revenue slider does not.
+  //
+  // Gap: target − lowestProjectedBalance over the FULL forecast horizon,
+  // so BOTH sliders move the gap — expense via target AND lowestBalance,
+  // revenue via lowestBalance only. Signed (positive = short, negative =
+  // above). ±$100 floor suppresses flicker around the threshold.
   const avgCashOut = decisionWindow.length > 0
     ? decisionWindow.reduce((s, p) => s + p.cashOut, 0) / decisionWindow.length
     : null;
@@ -933,8 +937,14 @@ export default function CashFlowForecastModule({
       ? fixedReserveAmount
       : avgCashOut !== null ? avgCashOut : 0;
   const RESERVE_GAP_FLOOR = 100;
-  const rawReserveGap = scenarioReserveTarget - currentCashBalance;
-  const reserveGap = rawReserveGap > RESERVE_GAP_FLOOR ? rawReserveGap : null;
+  const lowestBalanceIdx = fullForecast.length > 0
+    ? fullForecast.reduce((minIdx, p, i) =>
+        p.endingCashBalance < fullForecast[minIdx].endingCashBalance ? i : minIdx, 0)
+    : -1;
+  const lowestBalance = lowestBalanceIdx >= 0 ? fullForecast[lowestBalanceIdx].endingCashBalance : null;
+  const reserveGap = scenarioReserveTarget > 0 && lowestBalance !== null
+    ? scenarioReserveTarget - lowestBalance
+    : null;
 
   // Card 3: profit target gap
   // Use targetNetMargin from settings if valid (>0), fall back to DEFAULT_TARGET_NET_MARGIN.
@@ -988,16 +998,20 @@ export default function CashFlowForecastModule({
         {/* Card 1 — Operating Reserve Target */}
         <article className="forecast-decision-card">
           <span className="forecast-decision-label">Operating Reserve Target</span>
-          {scenarioReserveTarget > 0 ? (
-            <strong className="forecast-decision-value forecast-decision-value--md">{formatCurrencyCompactNode(scenarioReserveTarget)}</strong>
+          {scenarioReserveTarget > 0 && reserveGap !== null ? (
+            <>
+              <strong className="forecast-decision-value forecast-decision-value--md">{formatCurrencyCompactNode(scenarioReserveTarget)}</strong>
+              {reserveGap > RESERVE_GAP_FLOOR ? (
+                <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, reserveGap))} short of your reserve target at the projected low</span>
+              ) : (
+                <span className="forecast-decision-detail">{formatCurrencyCompact(Math.max(0, -reserveGap))} above your reserve target at the projected low</span>
+              )}
+            </>
           ) : (
-            <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
-          )}
-          {scenarioReserveTarget > 0 && reserveGap !== null && (
-            <span className="forecast-decision-detail">{formatCurrencyCompact(reserveGap)} to reach your goal</span>
-          )}
-          {scenarioReserveTarget <= 0 && (
-            <span className="forecast-decision-detail">No Operating Reserve set</span>
+            <>
+              <strong className="forecast-decision-value forecast-decision-value--md">—</strong>
+              <span className="forecast-decision-detail">No Operating Reserve set</span>
+            </>
           )}
         </article>
 
