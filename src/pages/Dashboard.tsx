@@ -2816,7 +2816,7 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Row 3: Cash Trend (1/3) | Monthly Profit (2/3) — reuses the .cash-trend-row 1fr/2fr grid */}
+            {/* Row 3: Cash Trend (1/3) | Monthly Net Cash Flow (2/3) — reuses the .cash-trend-row 1fr/2fr grid */}
             <div className="cash-trend-row">
               <CashTrendHero result={cashTrendResult} negativeMonthsAsSubtitle />
               <NetCashFlowChart

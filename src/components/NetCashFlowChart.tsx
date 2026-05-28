@@ -290,7 +290,7 @@ export default function NetCashFlowChart({
     <article className="card chart-card">
       <div className="card-head chart-head chart-head-has-center">
         <div className="chart-head-left">
-          <h3 className="chart-head-title">Monthly Profit</h3>
+          <h3 className="chart-head-title">Monthly Net Cash Flow</h3>
           <p className="subtle chart-head-subtitle">{subtitle}</p>
         </div>
         <div className="chart-head-middle" role="group" aria-label="Cash Flow mode selector">

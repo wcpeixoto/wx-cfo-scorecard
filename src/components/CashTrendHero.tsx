@@ -136,7 +136,7 @@ function CashTrendSparkline({ bars }: { bars: CashTrendBar[] }) {
   const color = isWorsening ? chartTokens.error : chartTokens.brand;
 
   // Best-fit endpoints — the entire visual is the linear trend, not the
-  // monthly noise. The neighbor "Monthly Profit" chart already
+  // monthly noise. The neighbor "Monthly Net Cash Flow" chart already
   // carries the month-by-month shape; this card communicates direction.
   const n = values.length;
   const startY = intercept;
