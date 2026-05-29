@@ -19,6 +19,7 @@ const SPARKLINE_OPTIONS: ApexOptions = {
     fontFamily: 'Outfit, sans-serif',
     sparkline: { enabled: true },
     toolbar: { show: false },
+    accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
     animations: { enabled: false },
   },
   stroke: {

@@ -227,6 +227,7 @@ export default function ProjectedCashBalanceChart({
         height,
         fontFamily: 'Outfit, sans-serif',
         toolbar: { show: false },
+        accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
         zoom: { enabled: false },
         sparkline: { enabled: false },
         animations: { enabled: true },

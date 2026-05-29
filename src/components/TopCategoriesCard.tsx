@@ -42,6 +42,11 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
       type: 'donut',
       fontFamily: 'Outfit, sans-serif',
       toolbar: { show: false },
+      // Apex 5.x paints a #008FFB stroke on click via its keyboard-nav focus
+      // class. We don't use Apex's chart-internal keyboard navigation, so
+      // disable it explicitly (double-disable documents intent + guards
+      // against a future library nuance flipping one but not the other).
+      accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
       animations: { enabled: false },
       background: 'transparent',
       sparkline: { enabled: false },

@@ -54,6 +54,7 @@ export default function PayrollEfficiencyCard({
       chart: {
         type: 'area',
         sparkline: { enabled: true },
+        accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
         fontFamily: 'Outfit, sans-serif',
         background: 'transparent',
       },

@@ -266,6 +266,7 @@ const UI_LAB_SPARKLINE_OPTIONS: ApexOptions = {
     fontFamily: 'Outfit, sans-serif',
     sparkline: { enabled: true },
     toolbar: { show: false },
+    accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
     animations: { enabled: false },
   },
   stroke: {
@@ -307,6 +308,7 @@ const TOTAL_BALANCE_SPARKLINE_OPTIONS: ApexOptions = {
     fontFamily: 'Outfit, sans-serif',
     sparkline: { enabled: true },
     toolbar: { show: false },
+    accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
     animations: { enabled: false },
   },
   stroke: {
@@ -351,6 +353,7 @@ const STATISTICS_CARD_OPTIONS: ApexOptions = {
     height: 250,
     fontFamily: 'Outfit, sans-serif',
     toolbar: { show: false },
+    accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
     background: 'transparent',
   },
   colors: [chartTokens.brand, chartTokens.brandSecondary],

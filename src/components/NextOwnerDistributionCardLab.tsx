@@ -165,6 +165,7 @@ export function NextOwnerDistributionCardLab({
       type: 'bar',
       stacked: true,
       toolbar: { show: false },
+      accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
       fontFamily: 'Outfit, sans-serif',
       background: 'transparent',
       animations: { enabled: false },

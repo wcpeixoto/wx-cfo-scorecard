@@ -65,6 +65,7 @@ export default function IncomeExpenseCard({ monthlyRollups }: Props) {
         type: 'bar',
         stacked: false,
         toolbar: { show: false },
+        accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
         fontFamily: 'Outfit, sans-serif',
         background: 'transparent',
       },
