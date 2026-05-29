@@ -2553,6 +2553,25 @@ export default function Dashboard() {
       const delta = metric.current - metric.previous;
       return Math.abs(delta) <= EPSILON ? 'flat' : delta > 0 ? 'up' : 'down';
     };
+    // Revenue Momentum / Cost Discipline evidence shares the badge's exact basis:
+    // last-complete-month YoY (healthBasis), via the same trendOf used for the
+    // badge — so the evidence direction can never contradict the verdict, and it
+    // never reads the in-progress month. No MoM, no streak (a single YoY
+    // {current, previous} carries no streak history).
+    const formatYoYEvidence = (
+      metric: { current: number; previous: number } | undefined,
+    ): string | undefined => {
+      if (!metric) return undefined;
+      const direction = trendOf(metric);
+      if (direction === 'flat') return 'Flat YoY';
+      const pct =
+        Math.abs(metric.previous) <= EPSILON
+          ? null
+          : Math.round((Math.abs(metric.current - metric.previous) / Math.abs(metric.previous)) * 100);
+      const directionLabel = direction === 'up' ? 'Up' : 'Down';
+      const pctText = pct === null ? '' : ` ${pct}%`;
+      return `${directionLabel}${pctText} YoY`;
+    };
 
     // Monthly Cash Result evidence: verb carries direction (figure is always
     // unsigned), plus a same-sign streak walked backward from the latest
@@ -2571,15 +2590,23 @@ export default function Dashboard() {
       const streakClause = streak > 1 ? ` · ${streak} months in a row` : '';
       monthlyCashEvidence = `${verb} ${amount} this month${streakClause}`;
     }
+    const consistencyWindow = model.monthlyRollups.slice(-6);
+    const positiveMonths = consistencyWindow.filter((rollup) => rollup.netCashFlow >= 0).length;
+    const consistencyEvidence =
+      consistencyWindow.length >= 6
+        ? `${positiveMonths} of last 6 months positive`
+        : `${model.monthlyRollups.length} months imported`;
 
     return [
       {
         label: 'Revenue Momentum',
         value: trendOf(healthBasis?.revenue) === 'up' ? 'Getting Better' : 'Getting Worse',
+        evidence: formatYoYEvidence(healthBasis?.revenue),
       },
       {
         label: 'Cost Discipline',
         value: trendOf(healthBasis?.expenses) === 'down' ? 'Getting Better' : 'Needs Attention',
+        evidence: formatYoYEvidence(healthBasis?.expenses),
       },
       {
         label: 'Monthly Cash Result',
@@ -2589,6 +2616,7 @@ export default function Dashboard() {
       {
         label: 'Consistency',
         value: model.monthlyRollups.length >= 6 ? 'Long-term Visible' : 'Need More History',
+        evidence: consistencyEvidence,
       },
     ];
   }, [latestRollup, model.kpiYoYComparisonByTimeframe.lastMonth, model.monthlyRollups]);
