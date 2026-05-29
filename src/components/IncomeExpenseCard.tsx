@@ -94,7 +94,7 @@ export default function IncomeExpenseCard({ monthlyRollups }: Props) {
         axisBorder: { show: false },
         axisTicks: { show: false },
         labels: { style: { fontSize: '12px', colors: chartTokens.axisText } },
-        crosshairs: { width: 'barWidth' },
+        crosshairs: { show: false },
       },
       yaxis: {
         tickAmount: 4,
