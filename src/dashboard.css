@@ -2649,6 +2649,20 @@ body {
   }
 }
 
+/* Big Picture — Efficiency opportunity row: Money Left 60% | Payroll Efficiency 40% (desktop only; inherits .two-col-grid gaps + ≤960px stacking) */
+@media (min-width: 961px) {
+  .two-col-grid--efficiency {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
+/* Big Picture — Expense risk row: Cost Spikes 40% | Cash Reserve Calendar 60% (desktop only; inherits .two-col-grid gaps + ≤960px stacking) */
+@media (min-width: 961px) {
+  .two-col-grid--expense-risk {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  }
+}
+
 /* Row 2 — Cash Trend 40% | Monthly Net Cash Flow 60%. Grid stretches by default so
    the chart neighbor fills the row height; the .cth-card deliberately opts out via
    align-self: start (see line 8422) so it stays compact and top-aligned. */
@@ -9771,51 +9785,6 @@ body {
 .bp-overview-tray .kpi-card-spark {
   flex: 0 0 72px;
   min-width: 0;
-}
-
-/* === Big Picture Row 6 — Payroll Health (1/3) + placeholder (2/3) split ===
-   Mirrors .cash-trend-row (16px gap, 24px ≥768px, stretch); collapses to one
-   column at the Big Picture breakpoint (max-width 960px). */
-.bp-split-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-  gap: 16px;
-  align-items: stretch;
-}
-
-.bp-split-grid > * {
-  min-width: 0;
-}
-
-@media (min-width: 768px) {
-  .bp-split-grid {
-    gap: 24px;
-  }
-}
-
-@media (max-width: 960px) {
-  .bp-split-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.bp-placeholder-card {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-panel);
-  border: 1px dashed var(--line);
-  border-radius: 16px;
-  padding: 24px;
-  font-family: 'Outfit', sans-serif;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.dark .bp-placeholder-card {
-  background: #1D2939;
-  border-color: #344054;
-  color: #98A2B3;
 }
 
 /* Forecast Projected-Cash-Balance row — when a sibling slot is provided
