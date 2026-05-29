@@ -45,6 +45,7 @@ import { computeWhatNeedsAttention } from '../lib/kpis/digHere';
 import { computeCashTrend } from '../lib/kpis/cashTrend';
 import { computeCashTrendDelta } from '../lib/data/cashTrendDelta';
 import { buildCashBalanceSeries } from '../lib/data/balanceSeries';
+import { formatCompact } from '../lib/utils/formatCompact';
 import { computePriorYearActuals } from '../lib/kpis/priorYearActuals';
 import { runDataSanityChecks } from '../lib/dataSanity';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
@@ -2590,11 +2591,20 @@ export default function Dashboard() {
       const streakClause = streak > 1 ? ` · ${streak} months in a row` : '';
       monthlyCashEvidence = `${verb} ${amount} this month${streakClause}`;
     }
+    // Consistency evidence = the SPREAD of monthly cash results across the
+    // trailing 6, not a positivity count. Positivity ("4 of 6 positive")
+    // duplicated Monthly Cash Result's metric AND understated the real story —
+    // it reads "mostly fine" over a business that can swing -$12K to +$17K. The
+    // range is purely descriptive (no steady/choppy verdict ⇒ no threshold to
+    // calibrate); a steadiness *verdict* badge is a deferred, larger decision.
+    // <6 months ⇒ no honest 6-mo window, so keep the depth read (matches the
+    // "Need More History" badge).
     const consistencyWindow = model.monthlyRollups.slice(-6);
-    const positiveMonths = consistencyWindow.filter((rollup) => rollup.netCashFlow >= 0).length;
     const consistencyEvidence =
       consistencyWindow.length >= 6
-        ? `${positiveMonths} of last 6 months positive`
+        ? `${formatCompact(Math.min(...consistencyWindow.map((r) => r.netCashFlow)))} to ${formatCompact(
+            Math.max(...consistencyWindow.map((r) => r.netCashFlow)),
+          )} · 6 mo`
         : `${model.monthlyRollups.length} months imported`;
 
     return [
