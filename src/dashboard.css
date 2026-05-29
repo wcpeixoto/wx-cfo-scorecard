@@ -9857,7 +9857,7 @@ body {
 .bv-card {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .bv-header {
@@ -9969,8 +9969,7 @@ body {
 .bv-goal-hero-label {
   font-family: 'Outfit', sans-serif;
   font-size: 13px;
-  font-weight: 500;
-  line-height: 18px;
+  font-weight: 400;
   color: #667085;
 }
 
@@ -10109,6 +10108,7 @@ body {
   cursor: pointer;
   text-decoration: underline dotted;
   text-decoration-color: #98A2B3;
+  text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
 
@@ -10120,7 +10120,7 @@ body {
 
 .bv-footer-value {
   color: #1D2939;
-  font-weight: 600;
+  font-weight: 500;
   text-align: right;
 }
 
@@ -10150,9 +10150,10 @@ body {
   cursor: pointer;
   text-decoration: underline dotted;
   text-decoration-color: #98A2B3;
+  text-decoration-thickness: 1px;
   text-underline-offset: 3px;
   color: #1D2939;
-  font-weight: 600;
+  font-weight: 500;
   font-family: 'Outfit', sans-serif;
 }
 
@@ -10184,7 +10185,7 @@ body {
    no underline, no clickable cursor. Carries the tooltip wrapper. */
 .bv-readonly {
   color: #1D2939;
-  font-weight: 600;
+  font-weight: 500;
   font-family: 'Outfit', sans-serif;
   cursor: default;
 }
@@ -10445,7 +10446,7 @@ body {
    subtitle (duplicates the Derived Multiple label's tooltip copy). */
 .bv-multiple-display {
   color: #1D2939;
-  font-weight: 600;
+  font-weight: 500;
   font-family: 'Outfit', sans-serif;
   font-variant-numeric: tabular-nums;
 }
