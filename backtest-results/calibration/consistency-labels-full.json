@@ -1,0 +1,466 @@
+{
+  "criteria": {
+    "shockLossThreshold": -5000,
+    "maxNegativeMonths": 2,
+    "clusterGapMonths": 6,
+    "passBarMinSteady": 4,
+    "passBarMinClusters": 4
+  },
+  "tally": {
+    "total": 47,
+    "Steady": 16,
+    "Choppy": 31,
+    "Insufficient": 0
+  },
+  "prodAnchorIsChoppy": true,
+  "steadyClusters": [
+    [
+      "2022-06-01",
+      "2022-07-01",
+      "2022-08-01",
+      "2022-09-01",
+      "2022-10-01",
+      "2022-11-01",
+      "2023-01-01",
+      "2023-02-01",
+      "2023-03-01",
+      "2023-04-01"
+    ],
+    [
+      "2023-11-01",
+      "2023-12-01",
+      "2024-01-01",
+      "2024-02-01",
+      "2024-03-01"
+    ],
+    [
+      "2025-04-01"
+    ]
+  ],
+  "passBar": false,
+  "windows": [
+    {
+      "asOf": "2022-06-01",
+      "isProdAnchor": false,
+      "windowLabel": "Dec 2021 – May 2022",
+      "label": "Steady",
+      "negativeCount": 0,
+      "worstLoss": 0,
+      "reason": "no shock (worst 0), 0 neg"
+    },
+    {
+      "asOf": "2022-07-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jan 2022 – Jun 2022",
+      "label": "Steady",
+      "negativeCount": 1,
+      "worstLoss": -3785.62,
+      "reason": "no shock (worst -3786), 1 neg"
+    },
+    {
+      "asOf": "2022-08-01",
+      "isProdAnchor": false,
+      "windowLabel": "Feb 2022 – Jul 2022",
+      "label": "Steady",
+      "negativeCount": 1,
+      "worstLoss": -3785.62,
+      "reason": "no shock (worst -3786), 1 neg"
+    },
+    {
+      "asOf": "2022-09-01",
+      "isProdAnchor": false,
+      "windowLabel": "Mar 2022 – Aug 2022",
+      "label": "Steady",
+      "negativeCount": 2,
+      "worstLoss": -3785.62,
+      "reason": "no shock (worst -3786), 2 neg"
+    },
+    {
+      "asOf": "2022-10-01",
+      "isProdAnchor": false,
+      "windowLabel": "Apr 2022 – Sep 2022",
+      "label": "Steady",
+      "negativeCount": 2,
+      "worstLoss": -3785.62,
+      "reason": "no shock (worst -3786), 2 neg"
+    },
+    {
+      "asOf": "2022-11-01",
+      "isProdAnchor": false,
+      "windowLabel": "May 2022 – Oct 2022",
+      "label": "Steady",
+      "negativeCount": 2,
+      "worstLoss": -3785.62,
+      "reason": "no shock (worst -3786), 2 neg"
+    },
+    {
+      "asOf": "2022-12-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jun 2022 – Nov 2022",
+      "label": "Choppy",
+      "negativeCount": 3,
+      "worstLoss": -3785.62,
+      "reason": "3 neg (worst -3786)"
+    },
+    {
+      "asOf": "2023-01-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jul 2022 – Dec 2022",
+      "label": "Steady",
+      "negativeCount": 2,
+      "worstLoss": -2740.81,
+      "reason": "no shock (worst -2741), 2 neg"
+    },
+    {
+      "asOf": "2023-02-01",
+      "isProdAnchor": false,
+      "windowLabel": "Aug 2022 – Jan 2023",
+      "label": "Steady",
+      "negativeCount": 2,
+      "worstLoss": -2740.81,
+      "reason": "no shock (worst -2741), 2 neg"
+    },
+    {
+      "asOf": "2023-03-01",
+      "isProdAnchor": false,
+      "windowLabel": "Sep 2022 – Feb 2023",
+      "label": "Steady",
+      "negativeCount": 1,
+      "worstLoss": -1792.77,
+      "reason": "no shock (worst -1793), 1 neg"
+    },
+    {
+      "asOf": "2023-04-01",
+      "isProdAnchor": false,
+      "windowLabel": "Oct 2022 – Mar 2023",
+      "label": "Steady",
+      "negativeCount": 1,
+      "worstLoss": -1792.77,
+      "reason": "no shock (worst -1793), 1 neg"
+    },
+    {
+      "asOf": "2023-05-01",
+      "isProdAnchor": false,
+      "windowLabel": "Nov 2022 – Apr 2023",
+      "label": "Choppy",
+      "negativeCount": 2,
+      "worstLoss": -20164.21,
+      "reason": "shock loss -20164 (2 neg only)"
+    },
+    {
+      "asOf": "2023-06-01",
+      "isProdAnchor": false,
+      "windowLabel": "Dec 2022 – May 2023",
+      "label": "Choppy",
+      "negativeCount": 1,
+      "worstLoss": -20164.21,
+      "reason": "shock loss -20164 (1 neg only)"
+    },
+    {
+      "asOf": "2023-07-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jan 2023 – Jun 2023",
+      "label": "Choppy",
+      "negativeCount": 1,
+      "worstLoss": -20164.21,
+      "reason": "shock loss -20164 (1 neg only)"
+    },
+    {
+      "asOf": "2023-08-01",
+      "isProdAnchor": false,
+      "windowLabel": "Feb 2023 – Jul 2023",
+      "label": "Choppy",
+      "negativeCount": 1,
+      "worstLoss": -20164.21,
+      "reason": "shock loss -20164 (1 neg only)"
+    },
+    {
+      "asOf": "2023-09-01",
+      "isProdAnchor": false,
+      "windowLabel": "Mar 2023 – Aug 2023",
+      "label": "Choppy",
+      "negativeCount": 2,
+      "worstLoss": -20164.21,
+      "reason": "shock loss -20164 (2 neg only)"
+    },
+    {
+      "asOf": "2023-10-01",
+      "isProdAnchor": false,
+      "windowLabel": "Apr 2023 – Sep 2023",
+      "label": "Choppy",
+      "negativeCount": 2,
+      "worstLoss": -20164.21,
+      "reason": "shock loss -20164 (2 neg only)"
+    },
+    {
+      "asOf": "2023-11-01",
+      "isProdAnchor": false,
+      "windowLabel": "May 2023 – Oct 2023",
+      "label": "Steady",
+      "negativeCount": 1,
+      "worstLoss": -3140.87,
+      "reason": "no shock (worst -3141), 1 neg"
+    },
+    {
+      "asOf": "2023-12-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jun 2023 – Nov 2023",
+      "label": "Steady",
+      "negativeCount": 1,
+      "worstLoss": -3140.87,
+      "reason": "no shock (worst -3141), 1 neg"
+    },
+    {
+      "asOf": "2024-01-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jul 2023 – Dec 2023",
+      "label": "Steady",
+      "negativeCount": 1,
+      "worstLoss": -3140.87,
+      "reason": "no shock (worst -3141), 1 neg"
+    },
+    {
+      "asOf": "2024-02-01",
+      "isProdAnchor": false,
+      "windowLabel": "Aug 2023 – Jan 2024",
+      "label": "Steady",
+      "negativeCount": 1,
+      "worstLoss": -3140.87,
+      "reason": "no shock (worst -3141), 1 neg"
+    },
+    {
+      "asOf": "2024-03-01",
+      "isProdAnchor": false,
+      "windowLabel": "Sep 2023 – Feb 2024",
+      "label": "Steady",
+      "negativeCount": 0,
+      "worstLoss": 0,
+      "reason": "no shock (worst 0), 0 neg"
+    },
+    {
+      "asOf": "2024-04-01",
+      "isProdAnchor": false,
+      "windowLabel": "Oct 2023 – Mar 2024",
+      "label": "Choppy",
+      "negativeCount": 1,
+      "worstLoss": -8054.03,
+      "reason": "shock loss -8054 (1 neg only)"
+    },
+    {
+      "asOf": "2024-05-01",
+      "isProdAnchor": false,
+      "windowLabel": "Nov 2023 – Apr 2024",
+      "label": "Choppy",
+      "negativeCount": 1,
+      "worstLoss": -8054.03,
+      "reason": "shock loss -8054 (1 neg only)"
+    },
+    {
+      "asOf": "2024-06-01",
+      "isProdAnchor": false,
+      "windowLabel": "Dec 2023 – May 2024",
+      "label": "Choppy",
+      "negativeCount": 1,
+      "worstLoss": -8054.03,
+      "reason": "shock loss -8054 (1 neg only)"
+    },
+    {
+      "asOf": "2024-07-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jan 2024 – Jun 2024",
+      "label": "Choppy",
+      "negativeCount": 1,
+      "worstLoss": -8054.03,
+      "reason": "shock loss -8054 (1 neg only)"
+    },
+    {
+      "asOf": "2024-08-01",
+      "isProdAnchor": false,
+      "windowLabel": "Feb 2024 – Jul 2024",
+      "label": "Choppy",
+      "negativeCount": 1,
+      "worstLoss": -8054.03,
+      "reason": "shock loss -8054 (1 neg only)"
+    },
+    {
+      "asOf": "2024-09-01",
+      "isProdAnchor": false,
+      "windowLabel": "Mar 2024 – Aug 2024",
+      "label": "Choppy",
+      "negativeCount": 2,
+      "worstLoss": -8054.03,
+      "reason": "shock loss -8054 (2 neg only)"
+    },
+    {
+      "asOf": "2024-10-01",
+      "isProdAnchor": false,
+      "windowLabel": "Apr 2024 – Sep 2024",
+      "label": "Choppy",
+      "negativeCount": 2,
+      "worstLoss": -7889.72,
+      "reason": "shock loss -7890 (2 neg only)"
+    },
+    {
+      "asOf": "2024-11-01",
+      "isProdAnchor": false,
+      "windowLabel": "May 2024 – Oct 2024",
+      "label": "Choppy",
+      "negativeCount": 2,
+      "worstLoss": -7889.72,
+      "reason": "shock loss -7890 (2 neg only)"
+    },
+    {
+      "asOf": "2024-12-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jun 2024 – Nov 2024",
+      "label": "Choppy",
+      "negativeCount": 2,
+      "worstLoss": -7889.72,
+      "reason": "shock loss -7890 (2 neg only)"
+    },
+    {
+      "asOf": "2025-01-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jul 2024 – Dec 2024",
+      "label": "Choppy",
+      "negativeCount": 3,
+      "worstLoss": -7889.72,
+      "reason": "shock loss -7890 + 3 neg"
+    },
+    {
+      "asOf": "2025-02-01",
+      "isProdAnchor": false,
+      "windowLabel": "Aug 2024 – Jan 2025",
+      "label": "Choppy",
+      "negativeCount": 4,
+      "worstLoss": -7889.72,
+      "reason": "shock loss -7890 + 4 neg"
+    },
+    {
+      "asOf": "2025-03-01",
+      "isProdAnchor": false,
+      "windowLabel": "Sep 2024 – Feb 2025",
+      "label": "Choppy",
+      "negativeCount": 3,
+      "worstLoss": -3195.4,
+      "reason": "3 neg (worst -3195)"
+    },
+    {
+      "asOf": "2025-04-01",
+      "isProdAnchor": false,
+      "windowLabel": "Oct 2024 – Mar 2025",
+      "label": "Steady",
+      "negativeCount": 2,
+      "worstLoss": -3195.4,
+      "reason": "no shock (worst -3195), 2 neg"
+    },
+    {
+      "asOf": "2025-05-01",
+      "isProdAnchor": false,
+      "windowLabel": "Nov 2024 – Apr 2025",
+      "label": "Choppy",
+      "negativeCount": 3,
+      "worstLoss": -6518.94,
+      "reason": "shock loss -6519 + 3 neg"
+    },
+    {
+      "asOf": "2025-06-01",
+      "isProdAnchor": false,
+      "windowLabel": "Dec 2024 – May 2025",
+      "label": "Choppy",
+      "negativeCount": 3,
+      "worstLoss": -6518.94,
+      "reason": "shock loss -6519 + 3 neg"
+    },
+    {
+      "asOf": "2025-07-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jan 2025 – Jun 2025",
+      "label": "Choppy",
+      "negativeCount": 3,
+      "worstLoss": -6518.94,
+      "reason": "shock loss -6519 + 3 neg"
+    },
+    {
+      "asOf": "2025-08-01",
+      "isProdAnchor": false,
+      "windowLabel": "Feb 2025 – Jul 2025",
+      "label": "Choppy",
+      "negativeCount": 2,
+      "worstLoss": -6518.94,
+      "reason": "shock loss -6519 (2 neg only)"
+    },
+    {
+      "asOf": "2025-09-01",
+      "isProdAnchor": false,
+      "windowLabel": "Mar 2025 – Aug 2025",
+      "label": "Choppy",
+      "negativeCount": 3,
+      "worstLoss": -6518.94,
+      "reason": "shock loss -6519 + 3 neg"
+    },
+    {
+      "asOf": "2025-10-01",
+      "isProdAnchor": false,
+      "windowLabel": "Apr 2025 – Sep 2025",
+      "label": "Choppy",
+      "negativeCount": 3,
+      "worstLoss": -6518.94,
+      "reason": "shock loss -6519 + 3 neg"
+    },
+    {
+      "asOf": "2025-11-01",
+      "isProdAnchor": false,
+      "windowLabel": "May 2025 – Oct 2025",
+      "label": "Choppy",
+      "negativeCount": 3,
+      "worstLoss": -5488.62,
+      "reason": "shock loss -5489 + 3 neg"
+    },
+    {
+      "asOf": "2025-12-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jun 2025 – Nov 2025",
+      "label": "Choppy",
+      "negativeCount": 4,
+      "worstLoss": -6855.85,
+      "reason": "shock loss -6856 + 4 neg"
+    },
+    {
+      "asOf": "2026-01-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jul 2025 – Dec 2025",
+      "label": "Choppy",
+      "negativeCount": 3,
+      "worstLoss": -6855.85,
+      "reason": "shock loss -6856 + 3 neg"
+    },
+    {
+      "asOf": "2026-02-01",
+      "isProdAnchor": false,
+      "windowLabel": "Aug 2025 – Jan 2026",
+      "label": "Choppy",
+      "negativeCount": 3,
+      "worstLoss": -6855.85,
+      "reason": "shock loss -6856 + 3 neg"
+    },
+    {
+      "asOf": "2026-03-01",
+      "isProdAnchor": false,
+      "windowLabel": "Sep 2025 – Feb 2026",
+      "label": "Choppy",
+      "negativeCount": 3,
+      "worstLoss": -12220.28,
+      "reason": "shock loss -12220 + 3 neg"
+    },
+    {
+      "asOf": "2026-05-01",
+      "isProdAnchor": true,
+      "windowLabel": "Nov 2025 – Apr 2026",
+      "label": "Choppy",
+      "negativeCount": 3,
+      "worstLoss": -12220.28,
+      "reason": "shock loss -12220 + 3 neg"
+    }
+  ]
+}

@@ -1,0 +1,1796 @@
+{
+  "generatedFromFixture": true,
+  "windowMonths": 6,
+  "asOfDateCount": 47,
+  "boundaryStart": "2022-06-01",
+  "boundaryEndRegular": "2026-03-01",
+  "prodAnchor": "2026-05-01",
+  "windows": [
+    {
+      "asOf": "2022-06-01",
+      "isProdAnchor": false,
+      "windowLabel": "Dec 2021 – May 2022",
+      "months": [
+        {
+          "month": "2021-12",
+          "netCashFlow": 6285.82,
+          "revenue": 19610.37
+        },
+        {
+          "month": "2022-01",
+          "netCashFlow": 14427.81,
+          "revenue": 35573
+        },
+        {
+          "month": "2022-02",
+          "netCashFlow": 10385.66,
+          "revenue": 29335.45
+        },
+        {
+          "month": "2022-03",
+          "netCashFlow": 3959.45,
+          "revenue": 38296.05
+        },
+        {
+          "month": "2022-04",
+          "netCashFlow": 8386.38,
+          "revenue": 28798.33
+        },
+        {
+          "month": "2022-05",
+          "netCashFlow": 5920.66,
+          "revenue": 25755.11
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2022-07-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jan 2022 – Jun 2022",
+      "months": [
+        {
+          "month": "2022-01",
+          "netCashFlow": 14427.81,
+          "revenue": 35573
+        },
+        {
+          "month": "2022-02",
+          "netCashFlow": 10385.66,
+          "revenue": 29335.45
+        },
+        {
+          "month": "2022-03",
+          "netCashFlow": 3959.45,
+          "revenue": 38296.05
+        },
+        {
+          "month": "2022-04",
+          "netCashFlow": 8386.38,
+          "revenue": 28798.33
+        },
+        {
+          "month": "2022-05",
+          "netCashFlow": 5920.66,
+          "revenue": 25755.11
+        },
+        {
+          "month": "2022-06",
+          "netCashFlow": -3785.62,
+          "revenue": 27155.42
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2022-08-01",
+      "isProdAnchor": false,
+      "windowLabel": "Feb 2022 – Jul 2022",
+      "months": [
+        {
+          "month": "2022-02",
+          "netCashFlow": 10385.66,
+          "revenue": 29335.45
+        },
+        {
+          "month": "2022-03",
+          "netCashFlow": 3959.45,
+          "revenue": 38296.05
+        },
+        {
+          "month": "2022-04",
+          "netCashFlow": 8386.38,
+          "revenue": 28798.33
+        },
+        {
+          "month": "2022-05",
+          "netCashFlow": 5920.66,
+          "revenue": 25755.11
+        },
+        {
+          "month": "2022-06",
+          "netCashFlow": -3785.62,
+          "revenue": 27155.42
+        },
+        {
+          "month": "2022-07",
+          "netCashFlow": 22304.27,
+          "revenue": 44282.77
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2022-09-01",
+      "isProdAnchor": false,
+      "windowLabel": "Mar 2022 – Aug 2022",
+      "months": [
+        {
+          "month": "2022-03",
+          "netCashFlow": 3959.45,
+          "revenue": 38296.05
+        },
+        {
+          "month": "2022-04",
+          "netCashFlow": 8386.38,
+          "revenue": 28798.33
+        },
+        {
+          "month": "2022-05",
+          "netCashFlow": 5920.66,
+          "revenue": 25755.11
+        },
+        {
+          "month": "2022-06",
+          "netCashFlow": -3785.62,
+          "revenue": 27155.42
+        },
+        {
+          "month": "2022-07",
+          "netCashFlow": 22304.27,
+          "revenue": 44282.77
+        },
+        {
+          "month": "2022-08",
+          "netCashFlow": -2740.81,
+          "revenue": 28503
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2022-10-01",
+      "isProdAnchor": false,
+      "windowLabel": "Apr 2022 – Sep 2022",
+      "months": [
+        {
+          "month": "2022-04",
+          "netCashFlow": 8386.38,
+          "revenue": 28798.33
+        },
+        {
+          "month": "2022-05",
+          "netCashFlow": 5920.66,
+          "revenue": 25755.11
+        },
+        {
+          "month": "2022-06",
+          "netCashFlow": -3785.62,
+          "revenue": 27155.42
+        },
+        {
+          "month": "2022-07",
+          "netCashFlow": 22304.27,
+          "revenue": 44282.77
+        },
+        {
+          "month": "2022-08",
+          "netCashFlow": -2740.81,
+          "revenue": 28503
+        },
+        {
+          "month": "2022-09",
+          "netCashFlow": 3539.9,
+          "revenue": 33202.1
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2022-11-01",
+      "isProdAnchor": false,
+      "windowLabel": "May 2022 – Oct 2022",
+      "months": [
+        {
+          "month": "2022-05",
+          "netCashFlow": 5920.66,
+          "revenue": 25755.11
+        },
+        {
+          "month": "2022-06",
+          "netCashFlow": -3785.62,
+          "revenue": 27155.42
+        },
+        {
+          "month": "2022-07",
+          "netCashFlow": 22304.27,
+          "revenue": 44282.77
+        },
+        {
+          "month": "2022-08",
+          "netCashFlow": -2740.81,
+          "revenue": 28503
+        },
+        {
+          "month": "2022-09",
+          "netCashFlow": 3539.9,
+          "revenue": 33202.1
+        },
+        {
+          "month": "2022-10",
+          "netCashFlow": 4364.78,
+          "revenue": 36967.88
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2022-12-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jun 2022 – Nov 2022",
+      "months": [
+        {
+          "month": "2022-06",
+          "netCashFlow": -3785.62,
+          "revenue": 27155.42
+        },
+        {
+          "month": "2022-07",
+          "netCashFlow": 22304.27,
+          "revenue": 44282.77
+        },
+        {
+          "month": "2022-08",
+          "netCashFlow": -2740.81,
+          "revenue": 28503
+        },
+        {
+          "month": "2022-09",
+          "netCashFlow": 3539.9,
+          "revenue": 33202.1
+        },
+        {
+          "month": "2022-10",
+          "netCashFlow": 4364.78,
+          "revenue": 36967.88
+        },
+        {
+          "month": "2022-11",
+          "netCashFlow": -1792.77,
+          "revenue": 24125.55
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2023-01-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jul 2022 – Dec 2022",
+      "months": [
+        {
+          "month": "2022-07",
+          "netCashFlow": 22304.27,
+          "revenue": 44282.77
+        },
+        {
+          "month": "2022-08",
+          "netCashFlow": -2740.81,
+          "revenue": 28503
+        },
+        {
+          "month": "2022-09",
+          "netCashFlow": 3539.9,
+          "revenue": 33202.1
+        },
+        {
+          "month": "2022-10",
+          "netCashFlow": 4364.78,
+          "revenue": 36967.88
+        },
+        {
+          "month": "2022-11",
+          "netCashFlow": -1792.77,
+          "revenue": 24125.55
+        },
+        {
+          "month": "2022-12",
+          "netCashFlow": 2685.68,
+          "revenue": 33110.36
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2023-02-01",
+      "isProdAnchor": false,
+      "windowLabel": "Aug 2022 – Jan 2023",
+      "months": [
+        {
+          "month": "2022-08",
+          "netCashFlow": -2740.81,
+          "revenue": 28503
+        },
+        {
+          "month": "2022-09",
+          "netCashFlow": 3539.9,
+          "revenue": 33202.1
+        },
+        {
+          "month": "2022-10",
+          "netCashFlow": 4364.78,
+          "revenue": 36967.88
+        },
+        {
+          "month": "2022-11",
+          "netCashFlow": -1792.77,
+          "revenue": 24125.55
+        },
+        {
+          "month": "2022-12",
+          "netCashFlow": 2685.68,
+          "revenue": 33110.36
+        },
+        {
+          "month": "2023-01",
+          "netCashFlow": 24534.37,
+          "revenue": 49414.42
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2023-03-01",
+      "isProdAnchor": false,
+      "windowLabel": "Sep 2022 – Feb 2023",
+      "months": [
+        {
+          "month": "2022-09",
+          "netCashFlow": 3539.9,
+          "revenue": 33202.1
+        },
+        {
+          "month": "2022-10",
+          "netCashFlow": 4364.78,
+          "revenue": 36967.88
+        },
+        {
+          "month": "2022-11",
+          "netCashFlow": -1792.77,
+          "revenue": 24125.55
+        },
+        {
+          "month": "2022-12",
+          "netCashFlow": 2685.68,
+          "revenue": 33110.36
+        },
+        {
+          "month": "2023-01",
+          "netCashFlow": 24534.37,
+          "revenue": 49414.42
+        },
+        {
+          "month": "2023-02",
+          "netCashFlow": 12500.9,
+          "revenue": 44166.84
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2023-04-01",
+      "isProdAnchor": false,
+      "windowLabel": "Oct 2022 – Mar 2023",
+      "months": [
+        {
+          "month": "2022-10",
+          "netCashFlow": 4364.78,
+          "revenue": 36967.88
+        },
+        {
+          "month": "2022-11",
+          "netCashFlow": -1792.77,
+          "revenue": 24125.55
+        },
+        {
+          "month": "2022-12",
+          "netCashFlow": 2685.68,
+          "revenue": 33110.36
+        },
+        {
+          "month": "2023-01",
+          "netCashFlow": 24534.37,
+          "revenue": 49414.42
+        },
+        {
+          "month": "2023-02",
+          "netCashFlow": 12500.9,
+          "revenue": 44166.84
+        },
+        {
+          "month": "2023-03",
+          "netCashFlow": 18356.95,
+          "revenue": 48653.97
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2023-05-01",
+      "isProdAnchor": false,
+      "windowLabel": "Nov 2022 – Apr 2023",
+      "months": [
+        {
+          "month": "2022-11",
+          "netCashFlow": -1792.77,
+          "revenue": 24125.55
+        },
+        {
+          "month": "2022-12",
+          "netCashFlow": 2685.68,
+          "revenue": 33110.36
+        },
+        {
+          "month": "2023-01",
+          "netCashFlow": 24534.37,
+          "revenue": 49414.42
+        },
+        {
+          "month": "2023-02",
+          "netCashFlow": 12500.9,
+          "revenue": 44166.84
+        },
+        {
+          "month": "2023-03",
+          "netCashFlow": 18356.95,
+          "revenue": 48653.97
+        },
+        {
+          "month": "2023-04",
+          "netCashFlow": -20164.21,
+          "revenue": 34108.67
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2023-06-01",
+      "isProdAnchor": false,
+      "windowLabel": "Dec 2022 – May 2023",
+      "months": [
+        {
+          "month": "2022-12",
+          "netCashFlow": 2685.68,
+          "revenue": 33110.36
+        },
+        {
+          "month": "2023-01",
+          "netCashFlow": 24534.37,
+          "revenue": 49414.42
+        },
+        {
+          "month": "2023-02",
+          "netCashFlow": 12500.9,
+          "revenue": 44166.84
+        },
+        {
+          "month": "2023-03",
+          "netCashFlow": 18356.95,
+          "revenue": 48653.97
+        },
+        {
+          "month": "2023-04",
+          "netCashFlow": -20164.21,
+          "revenue": 34108.67
+        },
+        {
+          "month": "2023-05",
+          "netCashFlow": 14861.2,
+          "revenue": 42806.47
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2023-07-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jan 2023 – Jun 2023",
+      "months": [
+        {
+          "month": "2023-01",
+          "netCashFlow": 24534.37,
+          "revenue": 49414.42
+        },
+        {
+          "month": "2023-02",
+          "netCashFlow": 12500.9,
+          "revenue": 44166.84
+        },
+        {
+          "month": "2023-03",
+          "netCashFlow": 18356.95,
+          "revenue": 48653.97
+        },
+        {
+          "month": "2023-04",
+          "netCashFlow": -20164.21,
+          "revenue": 34108.67
+        },
+        {
+          "month": "2023-05",
+          "netCashFlow": 14861.2,
+          "revenue": 42806.47
+        },
+        {
+          "month": "2023-06",
+          "netCashFlow": 6081.23,
+          "revenue": 38905.34
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2023-08-01",
+      "isProdAnchor": false,
+      "windowLabel": "Feb 2023 – Jul 2023",
+      "months": [
+        {
+          "month": "2023-02",
+          "netCashFlow": 12500.9,
+          "revenue": 44166.84
+        },
+        {
+          "month": "2023-03",
+          "netCashFlow": 18356.95,
+          "revenue": 48653.97
+        },
+        {
+          "month": "2023-04",
+          "netCashFlow": -20164.21,
+          "revenue": 34108.67
+        },
+        {
+          "month": "2023-05",
+          "netCashFlow": 14861.2,
+          "revenue": 42806.47
+        },
+        {
+          "month": "2023-06",
+          "netCashFlow": 6081.23,
+          "revenue": 38905.34
+        },
+        {
+          "month": "2023-07",
+          "netCashFlow": 21409.33,
+          "revenue": 54735.67
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2023-09-01",
+      "isProdAnchor": false,
+      "windowLabel": "Mar 2023 – Aug 2023",
+      "months": [
+        {
+          "month": "2023-03",
+          "netCashFlow": 18356.95,
+          "revenue": 48653.97
+        },
+        {
+          "month": "2023-04",
+          "netCashFlow": -20164.21,
+          "revenue": 34108.67
+        },
+        {
+          "month": "2023-05",
+          "netCashFlow": 14861.2,
+          "revenue": 42806.47
+        },
+        {
+          "month": "2023-06",
+          "netCashFlow": 6081.23,
+          "revenue": 38905.34
+        },
+        {
+          "month": "2023-07",
+          "netCashFlow": 21409.33,
+          "revenue": 54735.67
+        },
+        {
+          "month": "2023-08",
+          "netCashFlow": -3140.87,
+          "revenue": 30319.94
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2023-10-01",
+      "isProdAnchor": false,
+      "windowLabel": "Apr 2023 – Sep 2023",
+      "months": [
+        {
+          "month": "2023-04",
+          "netCashFlow": -20164.21,
+          "revenue": 34108.67
+        },
+        {
+          "month": "2023-05",
+          "netCashFlow": 14861.2,
+          "revenue": 42806.47
+        },
+        {
+          "month": "2023-06",
+          "netCashFlow": 6081.23,
+          "revenue": 38905.34
+        },
+        {
+          "month": "2023-07",
+          "netCashFlow": 21409.33,
+          "revenue": 54735.67
+        },
+        {
+          "month": "2023-08",
+          "netCashFlow": -3140.87,
+          "revenue": 30319.94
+        },
+        {
+          "month": "2023-09",
+          "netCashFlow": 18233.88,
+          "revenue": 44242.82
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2023-11-01",
+      "isProdAnchor": false,
+      "windowLabel": "May 2023 – Oct 2023",
+      "months": [
+        {
+          "month": "2023-05",
+          "netCashFlow": 14861.2,
+          "revenue": 42806.47
+        },
+        {
+          "month": "2023-06",
+          "netCashFlow": 6081.23,
+          "revenue": 38905.34
+        },
+        {
+          "month": "2023-07",
+          "netCashFlow": 21409.33,
+          "revenue": 54735.67
+        },
+        {
+          "month": "2023-08",
+          "netCashFlow": -3140.87,
+          "revenue": 30319.94
+        },
+        {
+          "month": "2023-09",
+          "netCashFlow": 18233.88,
+          "revenue": 44242.82
+        },
+        {
+          "month": "2023-10",
+          "netCashFlow": 3188.62,
+          "revenue": 29719
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2023-12-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jun 2023 – Nov 2023",
+      "months": [
+        {
+          "month": "2023-06",
+          "netCashFlow": 6081.23,
+          "revenue": 38905.34
+        },
+        {
+          "month": "2023-07",
+          "netCashFlow": 21409.33,
+          "revenue": 54735.67
+        },
+        {
+          "month": "2023-08",
+          "netCashFlow": -3140.87,
+          "revenue": 30319.94
+        },
+        {
+          "month": "2023-09",
+          "netCashFlow": 18233.88,
+          "revenue": 44242.82
+        },
+        {
+          "month": "2023-10",
+          "netCashFlow": 3188.62,
+          "revenue": 29719
+        },
+        {
+          "month": "2023-11",
+          "netCashFlow": 28663.28,
+          "revenue": 56784.55
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2024-01-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jul 2023 – Dec 2023",
+      "months": [
+        {
+          "month": "2023-07",
+          "netCashFlow": 21409.33,
+          "revenue": 54735.67
+        },
+        {
+          "month": "2023-08",
+          "netCashFlow": -3140.87,
+          "revenue": 30319.94
+        },
+        {
+          "month": "2023-09",
+          "netCashFlow": 18233.88,
+          "revenue": 44242.82
+        },
+        {
+          "month": "2023-10",
+          "netCashFlow": 3188.62,
+          "revenue": 29719
+        },
+        {
+          "month": "2023-11",
+          "netCashFlow": 28663.28,
+          "revenue": 56784.55
+        },
+        {
+          "month": "2023-12",
+          "netCashFlow": 3106.83,
+          "revenue": 32025.26
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2024-02-01",
+      "isProdAnchor": false,
+      "windowLabel": "Aug 2023 – Jan 2024",
+      "months": [
+        {
+          "month": "2023-08",
+          "netCashFlow": -3140.87,
+          "revenue": 30319.94
+        },
+        {
+          "month": "2023-09",
+          "netCashFlow": 18233.88,
+          "revenue": 44242.82
+        },
+        {
+          "month": "2023-10",
+          "netCashFlow": 3188.62,
+          "revenue": 29719
+        },
+        {
+          "month": "2023-11",
+          "netCashFlow": 28663.28,
+          "revenue": 56784.55
+        },
+        {
+          "month": "2023-12",
+          "netCashFlow": 3106.83,
+          "revenue": 32025.26
+        },
+        {
+          "month": "2024-01",
+          "netCashFlow": 9584.7,
+          "revenue": 40137.9
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2024-03-01",
+      "isProdAnchor": false,
+      "windowLabel": "Sep 2023 – Feb 2024",
+      "months": [
+        {
+          "month": "2023-09",
+          "netCashFlow": 18233.88,
+          "revenue": 44242.82
+        },
+        {
+          "month": "2023-10",
+          "netCashFlow": 3188.62,
+          "revenue": 29719
+        },
+        {
+          "month": "2023-11",
+          "netCashFlow": 28663.28,
+          "revenue": 56784.55
+        },
+        {
+          "month": "2023-12",
+          "netCashFlow": 3106.83,
+          "revenue": 32025.26
+        },
+        {
+          "month": "2024-01",
+          "netCashFlow": 9584.7,
+          "revenue": 40137.9
+        },
+        {
+          "month": "2024-02",
+          "netCashFlow": 14737.71,
+          "revenue": 36367.08
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2024-04-01",
+      "isProdAnchor": false,
+      "windowLabel": "Oct 2023 – Mar 2024",
+      "months": [
+        {
+          "month": "2023-10",
+          "netCashFlow": 3188.62,
+          "revenue": 29719
+        },
+        {
+          "month": "2023-11",
+          "netCashFlow": 28663.28,
+          "revenue": 56784.55
+        },
+        {
+          "month": "2023-12",
+          "netCashFlow": 3106.83,
+          "revenue": 32025.26
+        },
+        {
+          "month": "2024-01",
+          "netCashFlow": 9584.7,
+          "revenue": 40137.9
+        },
+        {
+          "month": "2024-02",
+          "netCashFlow": 14737.71,
+          "revenue": 36367.08
+        },
+        {
+          "month": "2024-03",
+          "netCashFlow": -8054.03,
+          "revenue": 36766.09
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2024-05-01",
+      "isProdAnchor": false,
+      "windowLabel": "Nov 2023 – Apr 2024",
+      "months": [
+        {
+          "month": "2023-11",
+          "netCashFlow": 28663.28,
+          "revenue": 56784.55
+        },
+        {
+          "month": "2023-12",
+          "netCashFlow": 3106.83,
+          "revenue": 32025.26
+        },
+        {
+          "month": "2024-01",
+          "netCashFlow": 9584.7,
+          "revenue": 40137.9
+        },
+        {
+          "month": "2024-02",
+          "netCashFlow": 14737.71,
+          "revenue": 36367.08
+        },
+        {
+          "month": "2024-03",
+          "netCashFlow": -8054.03,
+          "revenue": 36766.09
+        },
+        {
+          "month": "2024-04",
+          "netCashFlow": 66.55,
+          "revenue": 38880.18
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2024-06-01",
+      "isProdAnchor": false,
+      "windowLabel": "Dec 2023 – May 2024",
+      "months": [
+        {
+          "month": "2023-12",
+          "netCashFlow": 3106.83,
+          "revenue": 32025.26
+        },
+        {
+          "month": "2024-01",
+          "netCashFlow": 9584.7,
+          "revenue": 40137.9
+        },
+        {
+          "month": "2024-02",
+          "netCashFlow": 14737.71,
+          "revenue": 36367.08
+        },
+        {
+          "month": "2024-03",
+          "netCashFlow": -8054.03,
+          "revenue": 36766.09
+        },
+        {
+          "month": "2024-04",
+          "netCashFlow": 66.55,
+          "revenue": 38880.18
+        },
+        {
+          "month": "2024-05",
+          "netCashFlow": 6381.6,
+          "revenue": 36912.86
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2024-07-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jan 2024 – Jun 2024",
+      "months": [
+        {
+          "month": "2024-01",
+          "netCashFlow": 9584.7,
+          "revenue": 40137.9
+        },
+        {
+          "month": "2024-02",
+          "netCashFlow": 14737.71,
+          "revenue": 36367.08
+        },
+        {
+          "month": "2024-03",
+          "netCashFlow": -8054.03,
+          "revenue": 36766.09
+        },
+        {
+          "month": "2024-04",
+          "netCashFlow": 66.55,
+          "revenue": 38880.18
+        },
+        {
+          "month": "2024-05",
+          "netCashFlow": 6381.6,
+          "revenue": 36912.86
+        },
+        {
+          "month": "2024-06",
+          "netCashFlow": 575.44,
+          "revenue": 28374.87
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2024-08-01",
+      "isProdAnchor": false,
+      "windowLabel": "Feb 2024 – Jul 2024",
+      "months": [
+        {
+          "month": "2024-02",
+          "netCashFlow": 14737.71,
+          "revenue": 36367.08
+        },
+        {
+          "month": "2024-03",
+          "netCashFlow": -8054.03,
+          "revenue": 36766.09
+        },
+        {
+          "month": "2024-04",
+          "netCashFlow": 66.55,
+          "revenue": 38880.18
+        },
+        {
+          "month": "2024-05",
+          "netCashFlow": 6381.6,
+          "revenue": 36912.86
+        },
+        {
+          "month": "2024-06",
+          "netCashFlow": 575.44,
+          "revenue": 28374.87
+        },
+        {
+          "month": "2024-07",
+          "netCashFlow": 9532.86,
+          "revenue": 52943.87
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2024-09-01",
+      "isProdAnchor": false,
+      "windowLabel": "Mar 2024 – Aug 2024",
+      "months": [
+        {
+          "month": "2024-03",
+          "netCashFlow": -8054.03,
+          "revenue": 36766.09
+        },
+        {
+          "month": "2024-04",
+          "netCashFlow": 66.55,
+          "revenue": 38880.18
+        },
+        {
+          "month": "2024-05",
+          "netCashFlow": 6381.6,
+          "revenue": 36912.86
+        },
+        {
+          "month": "2024-06",
+          "netCashFlow": 575.44,
+          "revenue": 28374.87
+        },
+        {
+          "month": "2024-07",
+          "netCashFlow": 9532.86,
+          "revenue": 52943.87
+        },
+        {
+          "month": "2024-08",
+          "netCashFlow": -7889.72,
+          "revenue": 33984.15
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2024-10-01",
+      "isProdAnchor": false,
+      "windowLabel": "Apr 2024 – Sep 2024",
+      "months": [
+        {
+          "month": "2024-04",
+          "netCashFlow": 66.55,
+          "revenue": 38880.18
+        },
+        {
+          "month": "2024-05",
+          "netCashFlow": 6381.6,
+          "revenue": 36912.86
+        },
+        {
+          "month": "2024-06",
+          "netCashFlow": 575.44,
+          "revenue": 28374.87
+        },
+        {
+          "month": "2024-07",
+          "netCashFlow": 9532.86,
+          "revenue": 52943.87
+        },
+        {
+          "month": "2024-08",
+          "netCashFlow": -7889.72,
+          "revenue": 33984.15
+        },
+        {
+          "month": "2024-09",
+          "netCashFlow": -2077.2,
+          "revenue": 40628.55
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2024-11-01",
+      "isProdAnchor": false,
+      "windowLabel": "May 2024 – Oct 2024",
+      "months": [
+        {
+          "month": "2024-05",
+          "netCashFlow": 6381.6,
+          "revenue": 36912.86
+        },
+        {
+          "month": "2024-06",
+          "netCashFlow": 575.44,
+          "revenue": 28374.87
+        },
+        {
+          "month": "2024-07",
+          "netCashFlow": 9532.86,
+          "revenue": 52943.87
+        },
+        {
+          "month": "2024-08",
+          "netCashFlow": -7889.72,
+          "revenue": 33984.15
+        },
+        {
+          "month": "2024-09",
+          "netCashFlow": -2077.2,
+          "revenue": 40628.55
+        },
+        {
+          "month": "2024-10",
+          "netCashFlow": 2575.26,
+          "revenue": 38923.46
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2024-12-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jun 2024 – Nov 2024",
+      "months": [
+        {
+          "month": "2024-06",
+          "netCashFlow": 575.44,
+          "revenue": 28374.87
+        },
+        {
+          "month": "2024-07",
+          "netCashFlow": 9532.86,
+          "revenue": 52943.87
+        },
+        {
+          "month": "2024-08",
+          "netCashFlow": -7889.72,
+          "revenue": 33984.15
+        },
+        {
+          "month": "2024-09",
+          "netCashFlow": -2077.2,
+          "revenue": 40628.55
+        },
+        {
+          "month": "2024-10",
+          "netCashFlow": 2575.26,
+          "revenue": 38923.46
+        },
+        {
+          "month": "2024-11",
+          "netCashFlow": 11387.62,
+          "revenue": 54703.55
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2025-01-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jul 2024 – Dec 2024",
+      "months": [
+        {
+          "month": "2024-07",
+          "netCashFlow": 9532.86,
+          "revenue": 52943.87
+        },
+        {
+          "month": "2024-08",
+          "netCashFlow": -7889.72,
+          "revenue": 33984.15
+        },
+        {
+          "month": "2024-09",
+          "netCashFlow": -2077.2,
+          "revenue": 40628.55
+        },
+        {
+          "month": "2024-10",
+          "netCashFlow": 2575.26,
+          "revenue": 38923.46
+        },
+        {
+          "month": "2024-11",
+          "netCashFlow": 11387.62,
+          "revenue": 54703.55
+        },
+        {
+          "month": "2024-12",
+          "netCashFlow": -3195.4,
+          "revenue": 39059.22
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2025-02-01",
+      "isProdAnchor": false,
+      "windowLabel": "Aug 2024 – Jan 2025",
+      "months": [
+        {
+          "month": "2024-08",
+          "netCashFlow": -7889.72,
+          "revenue": 33984.15
+        },
+        {
+          "month": "2024-09",
+          "netCashFlow": -2077.2,
+          "revenue": 40628.55
+        },
+        {
+          "month": "2024-10",
+          "netCashFlow": 2575.26,
+          "revenue": 38923.46
+        },
+        {
+          "month": "2024-11",
+          "netCashFlow": 11387.62,
+          "revenue": 54703.55
+        },
+        {
+          "month": "2024-12",
+          "netCashFlow": -3195.4,
+          "revenue": 39059.22
+        },
+        {
+          "month": "2025-01",
+          "netCashFlow": -685.65,
+          "revenue": 30782.18
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2025-03-01",
+      "isProdAnchor": false,
+      "windowLabel": "Sep 2024 – Feb 2025",
+      "months": [
+        {
+          "month": "2024-09",
+          "netCashFlow": -2077.2,
+          "revenue": 40628.55
+        },
+        {
+          "month": "2024-10",
+          "netCashFlow": 2575.26,
+          "revenue": 38923.46
+        },
+        {
+          "month": "2024-11",
+          "netCashFlow": 11387.62,
+          "revenue": 54703.55
+        },
+        {
+          "month": "2024-12",
+          "netCashFlow": -3195.4,
+          "revenue": 39059.22
+        },
+        {
+          "month": "2025-01",
+          "netCashFlow": -685.65,
+          "revenue": 30782.18
+        },
+        {
+          "month": "2025-02",
+          "netCashFlow": 7708.28,
+          "revenue": 45146.71
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2025-04-01",
+      "isProdAnchor": false,
+      "windowLabel": "Oct 2024 – Mar 2025",
+      "months": [
+        {
+          "month": "2024-10",
+          "netCashFlow": 2575.26,
+          "revenue": 38923.46
+        },
+        {
+          "month": "2024-11",
+          "netCashFlow": 11387.62,
+          "revenue": 54703.55
+        },
+        {
+          "month": "2024-12",
+          "netCashFlow": -3195.4,
+          "revenue": 39059.22
+        },
+        {
+          "month": "2025-01",
+          "netCashFlow": -685.65,
+          "revenue": 30782.18
+        },
+        {
+          "month": "2025-02",
+          "netCashFlow": 7708.28,
+          "revenue": 45146.71
+        },
+        {
+          "month": "2025-03",
+          "netCashFlow": 11174.16,
+          "revenue": 41937.88
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2025-05-01",
+      "isProdAnchor": false,
+      "windowLabel": "Nov 2024 – Apr 2025",
+      "months": [
+        {
+          "month": "2024-11",
+          "netCashFlow": 11387.62,
+          "revenue": 54703.55
+        },
+        {
+          "month": "2024-12",
+          "netCashFlow": -3195.4,
+          "revenue": 39059.22
+        },
+        {
+          "month": "2025-01",
+          "netCashFlow": -685.65,
+          "revenue": 30782.18
+        },
+        {
+          "month": "2025-02",
+          "netCashFlow": 7708.28,
+          "revenue": 45146.71
+        },
+        {
+          "month": "2025-03",
+          "netCashFlow": 11174.16,
+          "revenue": 41937.88
+        },
+        {
+          "month": "2025-04",
+          "netCashFlow": -6518.94,
+          "revenue": 46233.06
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2025-06-01",
+      "isProdAnchor": false,
+      "windowLabel": "Dec 2024 – May 2025",
+      "months": [
+        {
+          "month": "2024-12",
+          "netCashFlow": -3195.4,
+          "revenue": 39059.22
+        },
+        {
+          "month": "2025-01",
+          "netCashFlow": -685.65,
+          "revenue": 30782.18
+        },
+        {
+          "month": "2025-02",
+          "netCashFlow": 7708.28,
+          "revenue": 45146.71
+        },
+        {
+          "month": "2025-03",
+          "netCashFlow": 11174.16,
+          "revenue": 41937.88
+        },
+        {
+          "month": "2025-04",
+          "netCashFlow": -6518.94,
+          "revenue": 46233.06
+        },
+        {
+          "month": "2025-05",
+          "netCashFlow": 146.63,
+          "revenue": 37228.54
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2025-07-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jan 2025 – Jun 2025",
+      "months": [
+        {
+          "month": "2025-01",
+          "netCashFlow": -685.65,
+          "revenue": 30782.18
+        },
+        {
+          "month": "2025-02",
+          "netCashFlow": 7708.28,
+          "revenue": 45146.71
+        },
+        {
+          "month": "2025-03",
+          "netCashFlow": 11174.16,
+          "revenue": 41937.88
+        },
+        {
+          "month": "2025-04",
+          "netCashFlow": -6518.94,
+          "revenue": 46233.06
+        },
+        {
+          "month": "2025-05",
+          "netCashFlow": 146.63,
+          "revenue": 37228.54
+        },
+        {
+          "month": "2025-06",
+          "netCashFlow": -4928.52,
+          "revenue": 33695.73
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2025-08-01",
+      "isProdAnchor": false,
+      "windowLabel": "Feb 2025 – Jul 2025",
+      "months": [
+        {
+          "month": "2025-02",
+          "netCashFlow": 7708.28,
+          "revenue": 45146.71
+        },
+        {
+          "month": "2025-03",
+          "netCashFlow": 11174.16,
+          "revenue": 41937.88
+        },
+        {
+          "month": "2025-04",
+          "netCashFlow": -6518.94,
+          "revenue": 46233.06
+        },
+        {
+          "month": "2025-05",
+          "netCashFlow": 146.63,
+          "revenue": 37228.54
+        },
+        {
+          "month": "2025-06",
+          "netCashFlow": -4928.52,
+          "revenue": 33695.73
+        },
+        {
+          "month": "2025-07",
+          "netCashFlow": 13588.33,
+          "revenue": 50981.08
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2025-09-01",
+      "isProdAnchor": false,
+      "windowLabel": "Mar 2025 – Aug 2025",
+      "months": [
+        {
+          "month": "2025-03",
+          "netCashFlow": 11174.16,
+          "revenue": 41937.88
+        },
+        {
+          "month": "2025-04",
+          "netCashFlow": -6518.94,
+          "revenue": 46233.06
+        },
+        {
+          "month": "2025-05",
+          "netCashFlow": 146.63,
+          "revenue": 37228.54
+        },
+        {
+          "month": "2025-06",
+          "netCashFlow": -4928.52,
+          "revenue": 33695.73
+        },
+        {
+          "month": "2025-07",
+          "netCashFlow": 13588.33,
+          "revenue": 50981.08
+        },
+        {
+          "month": "2025-08",
+          "netCashFlow": -4429.8,
+          "revenue": 32248.25
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2025-10-01",
+      "isProdAnchor": false,
+      "windowLabel": "Apr 2025 – Sep 2025",
+      "months": [
+        {
+          "month": "2025-04",
+          "netCashFlow": -6518.94,
+          "revenue": 46233.06
+        },
+        {
+          "month": "2025-05",
+          "netCashFlow": 146.63,
+          "revenue": 37228.54
+        },
+        {
+          "month": "2025-06",
+          "netCashFlow": -4928.52,
+          "revenue": 33695.73
+        },
+        {
+          "month": "2025-07",
+          "netCashFlow": 13588.33,
+          "revenue": 50981.08
+        },
+        {
+          "month": "2025-08",
+          "netCashFlow": -4429.8,
+          "revenue": 32248.25
+        },
+        {
+          "month": "2025-09",
+          "netCashFlow": 9203.48,
+          "revenue": 49319.23
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2025-11-01",
+      "isProdAnchor": false,
+      "windowLabel": "May 2025 – Oct 2025",
+      "months": [
+        {
+          "month": "2025-05",
+          "netCashFlow": 146.63,
+          "revenue": 37228.54
+        },
+        {
+          "month": "2025-06",
+          "netCashFlow": -4928.52,
+          "revenue": 33695.73
+        },
+        {
+          "month": "2025-07",
+          "netCashFlow": 13588.33,
+          "revenue": 50981.08
+        },
+        {
+          "month": "2025-08",
+          "netCashFlow": -4429.8,
+          "revenue": 32248.25
+        },
+        {
+          "month": "2025-09",
+          "netCashFlow": 9203.48,
+          "revenue": 49319.23
+        },
+        {
+          "month": "2025-10",
+          "netCashFlow": -5488.62,
+          "revenue": 33052.79
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2025-12-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jun 2025 – Nov 2025",
+      "months": [
+        {
+          "month": "2025-06",
+          "netCashFlow": -4928.52,
+          "revenue": 33695.73
+        },
+        {
+          "month": "2025-07",
+          "netCashFlow": 13588.33,
+          "revenue": 50981.08
+        },
+        {
+          "month": "2025-08",
+          "netCashFlow": -4429.8,
+          "revenue": 32248.25
+        },
+        {
+          "month": "2025-09",
+          "netCashFlow": 9203.48,
+          "revenue": 49319.23
+        },
+        {
+          "month": "2025-10",
+          "netCashFlow": -5488.62,
+          "revenue": 33052.79
+        },
+        {
+          "month": "2025-11",
+          "netCashFlow": -6855.85,
+          "revenue": 32075.67
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2026-01-01",
+      "isProdAnchor": false,
+      "windowLabel": "Jul 2025 – Dec 2025",
+      "months": [
+        {
+          "month": "2025-07",
+          "netCashFlow": 13588.33,
+          "revenue": 50981.08
+        },
+        {
+          "month": "2025-08",
+          "netCashFlow": -4429.8,
+          "revenue": 32248.25
+        },
+        {
+          "month": "2025-09",
+          "netCashFlow": 9203.48,
+          "revenue": 49319.23
+        },
+        {
+          "month": "2025-10",
+          "netCashFlow": -5488.62,
+          "revenue": 33052.79
+        },
+        {
+          "month": "2025-11",
+          "netCashFlow": -6855.85,
+          "revenue": 32075.67
+        },
+        {
+          "month": "2025-12",
+          "netCashFlow": 9565.38,
+          "revenue": 63797.35
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2026-02-01",
+      "isProdAnchor": false,
+      "windowLabel": "Aug 2025 – Jan 2026",
+      "months": [
+        {
+          "month": "2025-08",
+          "netCashFlow": -4429.8,
+          "revenue": 32248.25
+        },
+        {
+          "month": "2025-09",
+          "netCashFlow": 9203.48,
+          "revenue": 49319.23
+        },
+        {
+          "month": "2025-10",
+          "netCashFlow": -5488.62,
+          "revenue": 33052.79
+        },
+        {
+          "month": "2025-11",
+          "netCashFlow": -6855.85,
+          "revenue": 32075.67
+        },
+        {
+          "month": "2025-12",
+          "netCashFlow": 9565.38,
+          "revenue": 63797.35
+        },
+        {
+          "month": "2026-01",
+          "netCashFlow": 4227.94,
+          "revenue": 37005.11
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2026-03-01",
+      "isProdAnchor": false,
+      "windowLabel": "Sep 2025 – Feb 2026",
+      "months": [
+        {
+          "month": "2025-09",
+          "netCashFlow": 9203.48,
+          "revenue": 49319.23
+        },
+        {
+          "month": "2025-10",
+          "netCashFlow": -5488.62,
+          "revenue": 33052.79
+        },
+        {
+          "month": "2025-11",
+          "netCashFlow": -6855.85,
+          "revenue": 32075.67
+        },
+        {
+          "month": "2025-12",
+          "netCashFlow": 9565.38,
+          "revenue": 63797.35
+        },
+        {
+          "month": "2026-01",
+          "netCashFlow": 4227.94,
+          "revenue": 37005.11
+        },
+        {
+          "month": "2026-02",
+          "netCashFlow": -12220.28,
+          "revenue": 27007.94
+        }
+      ],
+      "monthCount": 6
+    },
+    {
+      "asOf": "2026-05-01",
+      "isProdAnchor": true,
+      "windowLabel": "Nov 2025 – Apr 2026",
+      "months": [
+        {
+          "month": "2025-11",
+          "netCashFlow": -6855.85,
+          "revenue": 32075.67
+        },
+        {
+          "month": "2025-12",
+          "netCashFlow": 9565.38,
+          "revenue": 63797.35
+        },
+        {
+          "month": "2026-01",
+          "netCashFlow": 4227.94,
+          "revenue": 37005.11
+        },
+        {
+          "month": "2026-02",
+          "netCashFlow": -12220.28,
+          "revenue": 27007.94
+        },
+        {
+          "month": "2026-03",
+          "netCashFlow": 16982.36,
+          "revenue": 54065.91
+        },
+        {
+          "month": "2026-04",
+          "netCashFlow": -3802.06,
+          "revenue": 22990.68
+        }
+      ],
+      "monthCount": 6
+    }
+  ]
+}
