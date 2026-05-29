@@ -110,7 +110,7 @@ const TTM_SDE_TOOLTIP =
 const DERIVED_MULTIPLE_TOOLTIP =
   'The valuation multiple built from seven business-quality drivers: recurring revenue, lease runway, coach depth, owner independence, financial clarity, churn tracking, and brand strength.';
 const REPLACEMENT_COST_TOOLTIP =
-  "Estimated annual cost to replace the owner's role with paid staff or management. This is used to calculate Buyer-Ready Value and Owner Dependence Gap.";
+  "Estimated annual cost to replace the owner's role with paid staff or management. This is used to calculate Buyer-Ready Value and Owner Dependence Gap. Defaulted to $60K estimated GM/lead coach replacement. Adjust to your local market.";
 
 interface DriverRowConfig {
   key: DriverKey | 'leaseRunway';
@@ -999,11 +999,9 @@ export function BusinessValuationCard({
         {/* Replacement Cost — editor unchanged from V1 for Mixed/Weak/Needs
             input. When Owner Independence is Strong, the field shows $0
             (effective replacement cost; persisted preserved on the result
-            for switch-back). The override note explains the $0 only when
-            persisted differs (i.e. would have shown a non-zero value).
-            When the $60K default applies (Mixed/Weak + blank), a different
-            note fires — the two are mutually exclusive (Strong never sets
-            defaultApplied=true). */}
+            for switch-back). The override note below explains the $0 only
+            when persisted differs (i.e. would have shown a non-zero value).
+            The $60K-default helper now lives in the row's tooltip. */}
         <div className="bv-footer-row">
           <span className="db-tooltip-wrap bv-footer-tooltip-wrap">
             <span
@@ -1042,11 +1040,7 @@ export function BusinessValuationCard({
             />
           )}
         </div>
-        {result.replacementCostDefaultApplied ? (
-          <p className="bv-footer-note">
-            Defaulted to $60K estimated GM/lead coach replacement. Adjust to your local market.
-          </p>
-        ) : showStrongOverrideNote ? (
+        {showStrongOverrideNote ? (
           <p className="bv-footer-note">
             Set to $0 — Owner Independence is Strong.
           </p>
