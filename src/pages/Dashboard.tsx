@@ -2998,23 +2998,20 @@ export default function Dashboard() {
               </ul>
             </article>
 
-            {/* Money Left on the Table (1/2) | Cost Spikes to Investigate (1/2) */}
-            <div className="two-col-grid">
+            {/* Row 5 — Efficiency opportunity: Money Left (60%) | Payroll Efficiency (40%) */}
+            <div className="two-col-grid two-col-grid--efficiency">
               <EfficiencyOpportunitiesCard result={efficiencyResult} />
-              <DigHereHighlights result={whatNeedsAttention} />
-            </div>
-
-            {/* Row 6: Payroll Efficiency (1/3) | Cash reserve calendar (2/3, provisional)
-                Cash reserve calendar is designed for the 1/3 slot — provisional
-                placement in the 2/3 slot is just for visual evaluation before
-                final layout. */}
-            <div className="bp-split-grid">
               <PayrollEfficiencyCard
                 txns={filteredTxns}
                 monthlyRollups={model.monthlyRollups}
                 payrollTargetPercent={businessRules.payrollTargetPercent}
                 payrollExcessPerMonth={efficiencyResult.payrollExtraPerMonth}
               />
+            </div>
+
+            {/* Row 6 — Expense risk / timing: Cost Spikes (40%) | Cash Reserve Calendar (60%) */}
+            <div className="two-col-grid two-col-grid--expense-risk">
+              <DigHereHighlights result={whatNeedsAttention} />
               <CashReserveCalendarCard monthlyRollups={model.monthlyRollups} />
             </div>
           </>
