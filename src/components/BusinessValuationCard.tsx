@@ -97,7 +97,6 @@ const BV_HERO_TOOLTIP_SCENARIO =
 const GOAL_HERO_TOOLTIP =
   'What the business would be worth at your target net margin. This number is stable — sliders do not move it.';
 const NOT_BUYER_READY_COPY = 'Not buyer-ready at this pace.';
-const GOAL_HERO_LABEL = 'Projected at goal';
 const SCENARIO_HERO_LABEL = 'At this scenario';
 const BUYER_READY_TOOLTIP =
   "What the business is worth to a buyer after paying someone to do your day-to-day job. If this is low, the business still leans heavily on you.";
@@ -628,9 +627,19 @@ export function BusinessValuationCard({
     ? BV_HERO_TOOLTIP_SCENARIO
     : BV_HERO_TOOLTIP_CURRENT;
 
+  // Both the goal $-value and its label are derived from the SAME
+  // projectionGoal that valuationProjection.computeValuationProjection
+  // built from inputs.effectiveTargetNetMargin. Reading
+  // projectionGoal.margin here (rather than the raw input) means the
+  // displayed % can never drift from the % used to compute the $-value:
+  // the leg builder stores the exact margin it used.
   const goalHeroValueDisplay =
     projectionGoal !== null && !projectionGoal.isFloored
       ? formatK(projectionGoal.displayedValuation)
+      : null;
+  const goalHeroLabelDisplay =
+    projectionGoal !== null && !projectionGoal.isFloored
+      ? `Projected when hit ${Math.round(projectionGoal.margin * 100)}% margin`
       : null;
 
   // Buyer-Ready Value: midpoint of the TV range (single value per the
@@ -779,7 +788,7 @@ export function BusinessValuationCard({
               aria-describedby={goalHeroTooltipId}
             >
               <span className="bv-goal-hero-value">{goalHeroValueDisplay}</span>
-              <span className="bv-goal-hero-label">{GOAL_HERO_LABEL}</span>
+              <span className="bv-goal-hero-label">{goalHeroLabelDisplay}</span>
             </span>
             <span
               id={goalHeroTooltipId}
