@@ -77,10 +77,13 @@ const SDE_METHOD_TOOLTIP_PARAGRAPHS: string[] = [
   'This is not an official appraisal, just a practical benchmark to show what improves — or hurts — business value.',
 ];
 
-// Tooltips for the single-hero layout (Phase 2 redesign). Six rows carry
-// tooltips: BV hero, range subtitle, Buyer-Ready Value, Owner Dependence Gap,
-// TTM SDE, Derived Multiple. Replacement Cost retains its existing inline
-// helper text (PR-B owns the rename + new tooltip copy).
+// Tooltips for the single-hero layout (Phase 2 redesign). Tooltips cover
+// the dominant hero, the projected-at-goal block, and all five footer rows:
+// TTM SDE, Derived Multiple, Buyer-Ready Value, Owner Dependence Gap, and
+// Replacement Cost. The two former inline helper notes (SDE add-backs and
+// "Set Owner Independence…") were folded into the TTM SDE and Buyer-Ready
+// tooltips. PR-B still owns the row rename to "Cost to Replace You" — the
+// label text stays "Replacement Cost" for now.
 // Dominant-hero tooltip switches with state:
 //   - neutral: TTM-based current value; same explanation as pre-#289
 //   - active scenario: what-if at the slider pace; margin quality nudges
@@ -99,13 +102,15 @@ const GOAL_HERO_TOOLTIP =
 const NOT_BUYER_READY_COPY = 'Not buyer-ready at this pace.';
 const SCENARIO_HERO_LABEL = 'At this scenario';
 const BUYER_READY_TOOLTIP =
-  "What the business is worth to a buyer after paying someone to do your day-to-day job. If this is low, the business still leans heavily on you.";
+  'What the business may be worth after subtracting the cost of replacing the owner. Set Owner Independence in Settings to calculate this.';
 const OWNER_DEPENDENCE_GAP_TOOLTIP =
   "Value that exists only because you're running things. The smaller this gap, the more the business can run without you — and the easier it is to sell.";
 const TTM_SDE_TOOLTIP =
-  "Trailing twelve-month Seller's Discretionary Earnings — the business's annual cash flow before accounting for the cost of replacing you.";
+  "Trailing twelve-month Seller's Discretionary Earnings — the business's annual owner cash flow before accounting for the cost of replacing you. Add SDE add-backs in Settings for full accuracy.";
 const DERIVED_MULTIPLE_TOOLTIP =
   'The valuation multiple built from seven business-quality drivers: recurring revenue, lease runway, coach depth, owner independence, financial clarity, churn tracking, and brand strength.';
+const REPLACEMENT_COST_TOOLTIP =
+  "Estimated annual cost to replace the owner's role with paid staff or management. This is used to calculate Buyer-Ready Value and Owner Dependence Gap.";
 
 interface DriverRowConfig {
   key: DriverKey | 'leaseRunway';
@@ -563,6 +568,7 @@ export function BusinessValuationCard({
   const ttmSdeTooltipId = useId();
   const derivedMultipleTooltipId = useId();
   const goalHeroTooltipId = useId();
+  const replacementCostTooltipId = useId();
 
   const closeEditor = useCallback(() => setEditing(null), []);
 
@@ -873,9 +879,10 @@ export function BusinessValuationCard({
       {/* Bottom rows: TTM SDE / Derived Multiple / Buyer-Ready Value /
           Owner Dependence Gap / Replacement Cost. The compressed layout
           demotes OOV/TV/Gap (formerly hero-weight) to label-left/value-right
-          rows; tooltips on the labels explain the metric. Replacement Cost
-          label is preserved this round — PR-B owns the rename to "Cost to
-          Replace You" alongside the data-column rename and migration. */}
+          rows; a tooltip on every label (now including Replacement Cost)
+          explains the metric. The Replacement Cost label text is preserved
+          this round — PR-B owns the rename to "Cost to Replace You" alongside
+          the data-column rename and migration. */}
       <div className="bv-footer">
         {/* TTM SDE */}
         <div className="bv-footer-row">
@@ -905,11 +912,6 @@ export function BusinessValuationCard({
             {ttmSdeDisplay}
           </span>
         </div>
-        {result.allAddBacksBlank && result.ttmSde !== null && (
-          <p className="bv-footer-note">
-            Add SDE add-backs in Settings for full accuracy.
-          </p>
-        )}
 
         {/* Derived Multiple — static (PR-A removed the inline editor).
             Phase 2 dropped the display clip; math and display now share the
@@ -963,13 +965,6 @@ export function BusinessValuationCard({
             {buyerReadyDisplay}
           </span>
         </div>
-        {result.transferableValue === null && (
-          <p className="bv-footer-note">
-            {ownerIndependenceGrade === 'needs_input'
-              ? 'Set Owner Independence to see Buyer-Ready Value.'
-              : 'Set Replacement Cost to see Buyer-Ready Value.'}
-          </p>
-        )}
 
         {/* Owner Dependence Gap — relabeled from "Transferability Gap". The
             italic "smaller this gap…" teaching line moved into the tooltip. */}
@@ -1010,7 +1005,22 @@ export function BusinessValuationCard({
             note fires — the two are mutually exclusive (Strong never sets
             defaultApplied=true). */}
         <div className="bv-footer-row">
-          <span className="bv-footer-label">Replacement Cost</span>
+          <span className="db-tooltip-wrap bv-footer-tooltip-wrap">
+            <span
+              className="bv-footer-label bv-footer-label--tooltip"
+              tabIndex={0}
+              aria-describedby={replacementCostTooltipId}
+            >
+              Replacement Cost
+            </span>
+            <span
+              id={replacementCostTooltipId}
+              role="tooltip"
+              className="db-tooltip-panel bv-driver-tooltip-panel"
+            >
+              {REPLACEMENT_COST_TOOLTIP}
+            </span>
+          </span>
           {editing !== null && editing.kind === 'replacementCost' ? (
             <RangeEditor
               initialLower={result.replacementCost?.lower ?? null}
