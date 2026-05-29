@@ -1,0 +1,409 @@
+{
+  "discipline": "Informational footnote, OUTSIDE pre-committed calibration flow. Cluster gate failed (3 vs 4 required); no cutoff proposed or validated.",
+  "metric": "Range / trailing-6 Business Income (same 6-month window for numerator and denominator)",
+  "counts": {
+    "Steady": 16,
+    "Choppy": 31
+  },
+  "distributions": {
+    "Steady": {
+      "count": 16,
+      "min": 0.05820333422469497,
+      "max": 0.13900023724441016,
+      "median": 0.12498549221706336
+    },
+    "Choppy": {
+      "count": 31,
+      "min": 0.05850908871627513,
+      "max": 0.19136320044099703,
+      "median": 0.08297661474978967
+    }
+  },
+  "separation": {
+    "cleanlySeparated": false,
+    "gapBetweenMaxSteadyAndMinChoppy": null,
+    "overlapCount": 38,
+    "choppyBelowOrAtMaxSteady": 23,
+    "steadyAboveOrAtMinChoppy": 15
+  },
+  "rowsBySteadyAsc": [
+    {
+      "asOf": "2025-04-01",
+      "label": "Steady",
+      "windowLabel": "Oct 2024 – Mar 2025",
+      "range": 14583.02,
+      "sumBI": 250553,
+      "ratio": 0.05820333422469497
+    },
+    {
+      "asOf": "2022-06-01",
+      "label": "Steady",
+      "windowLabel": "Dec 2021 – May 2022",
+      "range": 10468.36,
+      "sumBI": 177368.31,
+      "ratio": 0.059020464253169015
+    },
+    {
+      "asOf": "2022-07-01",
+      "label": "Steady",
+      "windowLabel": "Jan 2022 – Jun 2022",
+      "range": 18213.43,
+      "sumBI": 184913.36,
+      "ratio": 0.09849710156150968
+    },
+    {
+      "asOf": "2023-11-01",
+      "label": "Steady",
+      "windowLabel": "May 2023 – Oct 2023",
+      "range": 24550.2,
+      "sumBI": 240729.24,
+      "ratio": 0.10198262579153243
+    },
+    {
+      "asOf": "2024-03-01",
+      "label": "Steady",
+      "windowLabel": "Sep 2023 – Feb 2024",
+      "range": 25556.449999999997,
+      "sumBI": 239276.61,
+      "ratio": 0.1068071383993613
+    },
+    {
+      "asOf": "2023-04-01",
+      "label": "Steady",
+      "windowLabel": "Oct 2022 – Mar 2023",
+      "range": 26327.14,
+      "sumBI": 236439.02,
+      "ratio": 0.11134854137020192
+    },
+    {
+      "asOf": "2023-03-01",
+      "label": "Steady",
+      "windowLabel": "Sep 2022 – Feb 2023",
+      "range": 26327.14,
+      "sumBI": 220987.15,
+      "ratio": 0.11913425735387782
+    },
+    {
+      "asOf": "2023-12-01",
+      "label": "Steady",
+      "windowLabel": "Jun 2023 – Nov 2023",
+      "range": 31804.149999999998,
+      "sumBI": 254707.32,
+      "ratio": 0.12486547304569023
+    },
+    {
+      "asOf": "2023-01-01",
+      "label": "Steady",
+      "windowLabel": "Jul 2022 – Dec 2022",
+      "range": 25045.08,
+      "sumBI": 200191.65999999997,
+      "ratio": 0.12510551138843648
+    },
+    {
+      "asOf": "2024-01-01",
+      "label": "Steady",
+      "windowLabel": "Jul 2023 – Dec 2023",
+      "range": 31804.149999999998,
+      "sumBI": 247827.24,
+      "ratio": 0.12833193800649192
+    },
+    {
+      "asOf": "2023-02-01",
+      "label": "Steady",
+      "windowLabel": "Aug 2022 – Jan 2023",
+      "range": 27275.18,
+      "sumBI": 205323.31,
+      "ratio": 0.1328401534146318
+    },
+    {
+      "asOf": "2022-11-01",
+      "label": "Steady",
+      "windowLabel": "May 2022 – Oct 2022",
+      "range": 26089.89,
+      "sumBI": 195866.28,
+      "ratio": 0.13320256044072518
+    },
+    {
+      "asOf": "2022-08-01",
+      "label": "Steady",
+      "windowLabel": "Feb 2022 – Jul 2022",
+      "range": 26089.89,
+      "sumBI": 193623.12999999998,
+      "ratio": 0.13474573001686319
+    },
+    {
+      "asOf": "2022-09-01",
+      "label": "Steady",
+      "windowLabel": "Mar 2022 – Aug 2022",
+      "range": 26089.89,
+      "sumBI": 192790.68,
+      "ratio": 0.1353275479914278
+    },
+    {
+      "asOf": "2024-02-01",
+      "label": "Steady",
+      "windowLabel": "Aug 2023 – Jan 2024",
+      "range": 31804.149999999998,
+      "sumBI": 233229.47,
+      "ratio": 0.13636419960136253
+    },
+    {
+      "asOf": "2022-10-01",
+      "label": "Steady",
+      "windowLabel": "Apr 2022 – Sep 2022",
+      "range": 26089.89,
+      "sumBI": 187696.73,
+      "ratio": 0.13900023724441016
+    }
+  ],
+  "rowsByChoppyAsc": [
+    {
+      "asOf": "2025-03-01",
+      "label": "Choppy",
+      "windowLabel": "Sep 2024 – Feb 2025",
+      "range": 14583.02,
+      "sumBI": 249243.66999999998,
+      "ratio": 0.05850908871627513
+    },
+    {
+      "asOf": "2026-02-01",
+      "label": "Choppy",
+      "windowLabel": "Aug 2025 – Jan 2026",
+      "range": 16421.23,
+      "sumBI": 247498.40000000002,
+      "ratio": 0.06634883296215248
+    },
+    {
+      "asOf": "2025-05-01",
+      "label": "Choppy",
+      "windowLabel": "Nov 2024 – Apr 2025",
+      "range": 17906.56,
+      "sumBI": 257862.6,
+      "ratio": 0.06944225335508135
+    },
+    {
+      "asOf": "2025-06-01",
+      "label": "Choppy",
+      "windowLabel": "Dec 2024 – May 2025",
+      "range": 17693.1,
+      "sumBI": 240387.59,
+      "ratio": 0.07360238521464439
+    },
+    {
+      "asOf": "2025-01-01",
+      "label": "Choppy",
+      "windowLabel": "Jul 2024 – Dec 2024",
+      "range": 19277.34,
+      "sumBI": 260242.80000000002,
+      "ratio": 0.07407444125255339
+    },
+    {
+      "asOf": "2024-11-01",
+      "label": "Choppy",
+      "windowLabel": "May 2024 – Oct 2024",
+      "range": 17422.58,
+      "sumBI": 231767.75999999998,
+      "ratio": 0.07517257792887157
+    },
+    {
+      "asOf": "2024-10-01",
+      "label": "Choppy",
+      "windowLabel": "Apr 2024 – Sep 2024",
+      "range": 17422.58,
+      "sumBI": 231724.47999999998,
+      "ratio": 0.075186618176897
+    },
+    {
+      "asOf": "2025-07-01",
+      "label": "Choppy",
+      "windowLabel": "Jan 2025 – Jun 2025",
+      "range": 17693.1,
+      "sumBI": 235024.1,
+      "ratio": 0.07528206681782847
+    },
+    {
+      "asOf": "2024-09-01",
+      "label": "Choppy",
+      "windowLabel": "Mar 2024 – Aug 2024",
+      "range": 17586.89,
+      "sumBI": 227862.02,
+      "ratio": 0.07718219122256531
+    },
+    {
+      "asOf": "2024-12-01",
+      "label": "Choppy",
+      "windowLabel": "Jun 2024 – Nov 2024",
+      "range": 19277.34,
+      "sumBI": 249558.45,
+      "ratio": 0.07724579151697729
+    },
+    {
+      "asOf": "2026-01-01",
+      "label": "Choppy",
+      "windowLabel": "Jul 2025 – Dec 2025",
+      "range": 20444.18,
+      "sumBI": 261474.37000000002,
+      "ratio": 0.0781880839793208
+    },
+    {
+      "asOf": "2025-08-01",
+      "label": "Choppy",
+      "windowLabel": "Feb 2025 – Jul 2025",
+      "range": 20107.27,
+      "sumBI": 255223,
+      "ratio": 0.07878314258511185
+    },
+    {
+      "asOf": "2025-10-01",
+      "label": "Choppy",
+      "windowLabel": "Apr 2025 – Sep 2025",
+      "range": 20107.27,
+      "sumBI": 249705.89000000004,
+      "ratio": 0.0805238114327219
+    },
+    {
+      "asOf": "2025-11-01",
+      "label": "Choppy",
+      "windowLabel": "May 2025 – Oct 2025",
+      "range": 19076.95,
+      "sumBI": 236525.62000000002,
+      "ratio": 0.08065489903377063
+    },
+    {
+      "asOf": "2025-02-01",
+      "label": "Choppy",
+      "windowLabel": "Aug 2024 – Jan 2025",
+      "range": 19277.34,
+      "sumBI": 238081.11000000002,
+      "ratio": 0.0809696325760578
+    },
+    {
+      "asOf": "2025-09-01",
+      "label": "Choppy",
+      "windowLabel": "Mar 2025 – Aug 2025",
+      "range": 20107.27,
+      "sumBI": 242324.54000000004,
+      "ratio": 0.08297661474978967
+    },
+    {
+      "asOf": "2025-12-01",
+      "label": "Choppy",
+      "windowLabel": "Jun 2025 – Nov 2025",
+      "range": 20444.18,
+      "sumBI": 231372.75,
+      "ratio": 0.08836036222934637
+    },
+    {
+      "asOf": "2026-03-01",
+      "label": "Choppy",
+      "windowLabel": "Sep 2025 – Feb 2026",
+      "range": 21785.66,
+      "sumBI": 242258.09000000003,
+      "ratio": 0.08992748188512506
+    },
+    {
+      "asOf": "2024-08-01",
+      "label": "Choppy",
+      "windowLabel": "Feb 2024 – Jul 2024",
+      "range": 22791.739999999998,
+      "sumBI": 230244.95,
+      "ratio": 0.09898909834938832
+    },
+    {
+      "asOf": "2024-06-01",
+      "label": "Choppy",
+      "windowLabel": "Dec 2023 – May 2024",
+      "range": 22791.739999999998,
+      "sumBI": 221089.37,
+      "ratio": 0.10308835743663297
+    },
+    {
+      "asOf": "2024-07-01",
+      "label": "Choppy",
+      "windowLabel": "Jan 2024 – Jun 2024",
+      "range": 22791.739999999998,
+      "sumBI": 217438.97999999998,
+      "ratio": 0.10481901635116206
+    },
+    {
+      "asOf": "2026-05-01",
+      "label": "Choppy",
+      "windowLabel": "Nov 2025 – Apr 2026",
+      "range": 29202.64,
+      "sumBI": 236942.66,
+      "ratio": 0.1232477089604717
+    },
+    {
+      "asOf": "2022-12-01",
+      "label": "Choppy",
+      "windowLabel": "Jun 2022 – Nov 2022",
+      "range": 26089.89,
+      "sumBI": 194236.72,
+      "ratio": 0.13432007089081818
+    },
+    {
+      "asOf": "2024-05-01",
+      "label": "Choppy",
+      "windowLabel": "Nov 2023 – Apr 2024",
+      "range": 36717.31,
+      "sumBI": 240961.05999999997,
+      "ratio": 0.15237860424418784
+    },
+    {
+      "asOf": "2023-08-01",
+      "label": "Choppy",
+      "windowLabel": "Feb 2023 – Jul 2023",
+      "range": 41573.54,
+      "sumBI": 263376.96,
+      "ratio": 0.15784805170505423
+    },
+    {
+      "asOf": "2024-04-01",
+      "label": "Choppy",
+      "windowLabel": "Oct 2023 – Mar 2024",
+      "range": 36717.31,
+      "sumBI": 231799.87999999998,
+      "ratio": 0.15840090167432355
+    },
+    {
+      "asOf": "2023-09-01",
+      "label": "Choppy",
+      "windowLabel": "Mar 2023 – Aug 2023",
+      "range": 41573.54,
+      "sumBI": 249530.06,
+      "ratio": 0.16660734181685366
+    },
+    {
+      "asOf": "2023-10-01",
+      "label": "Choppy",
+      "windowLabel": "Apr 2023 – Sep 2023",
+      "range": 41573.54,
+      "sumBI": 245118.91,
+      "ratio": 0.1696056008081955
+    },
+    {
+      "asOf": "2023-07-01",
+      "label": "Choppy",
+      "windowLabel": "Jan 2023 – Jun 2023",
+      "range": 44698.58,
+      "sumBI": 258055.70999999996,
+      "ratio": 0.17321290817397533
+    },
+    {
+      "asOf": "2023-06-01",
+      "label": "Choppy",
+      "windowLabel": "Dec 2022 – May 2023",
+      "range": 44698.58,
+      "sumBI": 252260.73,
+      "ratio": 0.17719198703658712
+    },
+    {
+      "asOf": "2023-05-01",
+      "label": "Choppy",
+      "windowLabel": "Nov 2022 – Apr 2023",
+      "range": 44698.58,
+      "sumBI": 233579.81,
+      "ratio": 0.19136320044099703
+    }
+  ]
+}

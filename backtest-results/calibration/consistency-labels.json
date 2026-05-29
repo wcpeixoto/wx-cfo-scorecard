@@ -1,0 +1,25 @@
+{
+  "labelingDiscipline": "Labels assigned by eye from consistency-windows-raw.json before computing any ratios. Criteria: Steady iff no month worse than -$5K AND at most 2 negative months out of 6. See consistency-labels.md for rationale.",
+  "anchors": {
+    "prodWindowMustBeChoppy": "2026-05-01"
+  },
+  "labels": [
+    { "asOf": "2025-01-01", "window": "Jul-Dec 2024", "label": "Choppy" },
+    { "asOf": "2025-02-01", "window": "Aug 2024-Jan 2025", "label": "Choppy" },
+    { "asOf": "2025-03-01", "window": "Sep 2024-Feb 2025", "label": "Choppy" },
+    { "asOf": "2025-04-01", "window": "Oct 2024-Mar 2025", "label": "Steady" },
+    { "asOf": "2025-05-01", "window": "Nov 2024-Apr 2025", "label": "Choppy" },
+    { "asOf": "2025-06-01", "window": "Dec 2024-May 2025", "label": "Choppy" },
+    { "asOf": "2025-07-01", "window": "Jan-Jun 2025", "label": "Choppy" },
+    { "asOf": "2025-08-01", "window": "Feb-Jul 2025", "label": "Choppy" },
+    { "asOf": "2025-09-01", "window": "Mar-Aug 2025", "label": "Choppy" },
+    { "asOf": "2025-10-01", "window": "Apr-Sep 2025", "label": "Choppy" },
+    { "asOf": "2025-11-01", "window": "May-Oct 2025", "label": "Choppy" },
+    { "asOf": "2025-12-01", "window": "Jun-Nov 2025", "label": "Choppy" },
+    { "asOf": "2026-01-01", "window": "Jul-Dec 2025", "label": "Choppy" },
+    { "asOf": "2026-02-01", "window": "Aug 2025-Jan 2026", "label": "Choppy" },
+    { "asOf": "2026-03-01", "window": "Sep 2025-Feb 2026", "label": "Choppy" },
+    { "asOf": "2026-05-01", "window": "Nov 2025-Apr 2026 [PROD]", "label": "Choppy" }
+  ],
+  "tally": { "Steady": 1, "Choppy": 15 }
+}
