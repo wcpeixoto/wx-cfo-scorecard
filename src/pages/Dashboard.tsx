@@ -2543,15 +2543,25 @@ export default function Dashboard() {
   }, [kpiTimeframe]);
 
 
-  const sustainability = useMemo(
-    () => [
+  const sustainability = useMemo(() => {
+    // Sustainability is a FIXED Big Picture health basis: last complete month vs
+    // the same month last year (YoY). It deliberately does NOT read the KPI
+    // timeframe — those controls now live on Today, and Big Picture health must
+    // not react to a Today-only control. Same trend rule as metricToCard.
+    const healthBasis = model.kpiYoYComparisonByTimeframe.lastMonth;
+    const trendOf = (metric: { current: number; previous: number } | undefined) => {
+      if (!metric) return 'flat';
+      const delta = metric.current - metric.previous;
+      return Math.abs(delta) <= EPSILON ? 'flat' : delta > 0 ? 'up' : 'down';
+    };
+    return [
       {
         label: 'Revenue Momentum',
-        value: selectedKpiCards.find((card) => card.id === 'income')?.trend === 'up' ? 'Getting Better' : 'Getting Worse',
+        value: trendOf(healthBasis?.revenue) === 'up' ? 'Getting Better' : 'Getting Worse',
       },
       {
         label: 'Cost Discipline',
-        value: selectedKpiCards.find((card) => card.id === 'expense')?.trend === 'down' ? 'Getting Better' : 'Needs Attention',
+        value: trendOf(healthBasis?.expenses) === 'down' ? 'Getting Better' : 'Needs Attention',
       },
       {
         label: 'Net Cash Position',
@@ -2561,9 +2571,8 @@ export default function Dashboard() {
         label: 'Consistency',
         value: model.monthlyRollups.length >= 6 ? 'Long-term Visible' : 'Need More History',
       },
-    ],
-    [latestRollup?.netCashFlow, selectedKpiCards, model.monthlyRollups.length]
-  );
+    ];
+  }, [latestRollup?.netCashFlow, model.kpiYoYComparisonByTimeframe.lastMonth, model.monthlyRollups.length]);
 
 
   useEffect(() => {
@@ -2761,12 +2770,8 @@ export default function Dashboard() {
         {activeTab === 'big-picture' && <header className="top-bar glass-panel top-bar--big-picture">
           <div className="top-bar-main">
             <div className="top-bar-copy">
-              <h2>
-                {selectedBigPictureTitle}
-              </h2>
-              <p className="top-bar-context">
-                {selectedHeaderComparisonLabel}
-              </p>
+              <h2>Big Picture</h2>
+              <p className="top-bar-context">Long-term health and strategic interpretation</p>
               <button
                 type="button"
                 className="top-bar-freshness subtle clickable top-bar-freshness-mobile"
@@ -2777,104 +2782,7 @@ export default function Dashboard() {
                 <span>{lastUpdatedLabel}</span>
               </button>
             </div>
-
-            <div className="top-controls top-controls-timeframe">
-              <div className="kpi-timeframe-control">
-                <div className="segmented-toggle" role="group" aria-label="KPI timeframe selector">
-                  {BIG_PICTURE_VISIBLE_FRAME_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`segmented-toggle-btn${kpiTimeframe === option.value ? ' is-active' : ''}`}
-                      onClick={() => {
-                        setKpiTimeframe(option.value);
-                        setIsBigPictureFilterOpen(false);
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                  <div className="timeframe-menu" ref={bigPictureFilterMenuRef}>
-                    <button
-                      type="button"
-                      className="segmented-toggle-btn timeframe-trigger"
-                      onClick={() => setIsBigPictureFilterOpen((current) => !current)}
-                      aria-haspopup="menu"
-                      aria-expanded={isBigPictureFilterOpen}
-                    >
-                      More ▾
-                    </button>
-                    {isBigPictureFilterOpen && (
-                      <ul className="timeframe-list" role="menu" aria-label="Select Big Picture filter timeframe">
-                        {BIG_PICTURE_FILTER_FRAME_OPTIONS.map((option) => (
-                          <li key={option.value}>
-                            <button
-                              type="button"
-                              role="menuitemradio"
-                              aria-checked={kpiTimeframe === option.value}
-                              className={kpiTimeframe === option.value ? 'is-active' : ''}
-                              onClick={() => {
-                                setKpiTimeframe(option.value);
-                                setIsBigPictureFilterOpen(false);
-                              }}
-                            >
-                              {option.label}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-                {kpiTimeframe === 'custom' && (
-                  <div className="kpi-custom-range" aria-label="Custom Big Picture date range">
-                    <label>
-                      <span>Start</span>
-                      <input
-                        type="date"
-                        onClick={openNativeDatePicker}
-                        value={customStartDate}
-                        min={earliestAvailableDate || undefined}
-                        max={latestAvailableDate || undefined}
-                        onChange={(event) => {
-                          const nextStart = event.target.value;
-                          setCustomStartDate(nextStart);
-                          if (customEndDate && nextStart > customEndDate) {
-                            setCustomEndDate(nextStart);
-                          }
-                        }}
-                      />
-                    </label>
-                    <label>
-                      <span>End</span>
-                      <input
-                        type="date"
-                        onClick={openNativeDatePicker}
-                        value={customEndDate}
-                        min={customStartDate || earliestAvailableDate || undefined}
-                        max={latestAvailableDate || undefined}
-                        onChange={(event) => {
-                          const nextEnd = event.target.value;
-                          setCustomEndDate(nextEnd);
-                          if (customStartDate && nextEnd < customStartDate) {
-                            setCustomStartDate(nextEnd);
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
-          {hasImportedData && (
-            <>
-              <div className="bp-overview-tray">
-                <KpiCards cards={selectedKpiCards} vsLabel={kpiVsLabel} sparklinesById={kpiSparklinesById} />
-              </div>
-              <p className="data-trust-note">Excludes transfers &amp; financing · operating cash flow only</p>
-            </>
-          )}
         </header>}
 
         {bootLoadError && (
@@ -2919,6 +2827,114 @@ export default function Dashboard() {
           </article>
         )}
 
+        {/* KPI snapshot — moved here from the Big Picture header. KPI state is still
+            owned by Dashboard.tsx (rendered above TodayPage, which is untouched). The
+            top-bar--big-picture / bp-overview-tray class names are legacy from the
+            block's previous home on Big Picture. */}
+        {hasImportedData && activeTab === 'today' && (
+          <header className="top-bar glass-panel top-bar--big-picture">
+            <div className="top-bar-main">
+              <div className="top-bar-copy">
+                <h2>{selectedBigPictureTitle}</h2>
+                <p className="top-bar-context">{selectedHeaderComparisonLabel}</p>
+              </div>
+
+              <div className="top-controls top-controls-timeframe">
+                <div className="kpi-timeframe-control">
+                  <div className="segmented-toggle" role="group" aria-label="KPI timeframe selector">
+                    {BIG_PICTURE_VISIBLE_FRAME_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`segmented-toggle-btn${kpiTimeframe === option.value ? ' is-active' : ''}`}
+                        onClick={() => {
+                          setKpiTimeframe(option.value);
+                          setIsBigPictureFilterOpen(false);
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                    <div className="timeframe-menu" ref={bigPictureFilterMenuRef}>
+                      <button
+                        type="button"
+                        className="segmented-toggle-btn timeframe-trigger"
+                        onClick={() => setIsBigPictureFilterOpen((current) => !current)}
+                        aria-haspopup="menu"
+                        aria-expanded={isBigPictureFilterOpen}
+                      >
+                        More ▾
+                      </button>
+                      {isBigPictureFilterOpen && (
+                        <ul className="timeframe-list" role="menu" aria-label="Select Big Picture filter timeframe">
+                          {BIG_PICTURE_FILTER_FRAME_OPTIONS.map((option) => (
+                            <li key={option.value}>
+                              <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={kpiTimeframe === option.value}
+                                className={kpiTimeframe === option.value ? 'is-active' : ''}
+                                onClick={() => {
+                                  setKpiTimeframe(option.value);
+                                  setIsBigPictureFilterOpen(false);
+                                }}
+                              >
+                                {option.label}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                  {kpiTimeframe === 'custom' && (
+                    <div className="kpi-custom-range" aria-label="Custom Big Picture date range">
+                      <label>
+                        <span>Start</span>
+                        <input
+                          type="date"
+                          onClick={openNativeDatePicker}
+                          value={customStartDate}
+                          min={earliestAvailableDate || undefined}
+                          max={latestAvailableDate || undefined}
+                          onChange={(event) => {
+                            const nextStart = event.target.value;
+                            setCustomStartDate(nextStart);
+                            if (customEndDate && nextStart > customEndDate) {
+                              setCustomEndDate(nextStart);
+                            }
+                          }}
+                        />
+                      </label>
+                      <label>
+                        <span>End</span>
+                        <input
+                          type="date"
+                          onClick={openNativeDatePicker}
+                          value={customEndDate}
+                          min={customStartDate || earliestAvailableDate || undefined}
+                          max={latestAvailableDate || undefined}
+                          onChange={(event) => {
+                            const nextEnd = event.target.value;
+                            setCustomEndDate(nextEnd);
+                            if (customStartDate && nextEnd < customStartDate) {
+                              setCustomStartDate(nextEnd);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="bp-overview-tray">
+              <KpiCards cards={selectedKpiCards} vsLabel={kpiVsLabel} sparklinesById={kpiSparklinesById} />
+            </div>
+            <p className="data-trust-note">Excludes transfers &amp; financing · operating cash flow only</p>
+          </header>
+        )}
+
         {hasImportedData && activeTab === 'today' && (
           <TodayPage
             model={model}
@@ -2955,6 +2971,22 @@ export default function Dashboard() {
 
         {hasImportedData && activeTab === 'big-picture' && (
           <>
+            {/* Sustainability — health at a glance, pinned to last-month YoY; top of Big Picture */}
+            <article className="card summary-card">
+              <div className="card-head">
+                <h3>Sustainability</h3>
+                <p className="subtle">Health checks in one glance</p>
+              </div>
+              <ul className="status-list">
+                {sustainability.map((item) => (
+                  <li key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </li>
+                ))}
+              </ul>
+            </article>
+
             {/* Row 2: Income & Expense (60%) | Top Expense Categories (40%) */}
             <div className="two-col-grid two-col-grid--income-expense">
               <IncomeExpenseCard monthlyRollups={model.monthlyRollups} />
@@ -2982,21 +3014,6 @@ export default function Dashboard() {
                 onTimeframeChange={setNetChartTimeframe}
               />
             </div>
-
-            <article className="card summary-card">
-              <div className="card-head">
-                <h3>Sustainability</h3>
-                <p className="subtle">Health checks in one glance</p>
-              </div>
-              <ul className="status-list">
-                {sustainability.map((item) => (
-                  <li key={item.label}>
-                    <span>{item.label}</span>
-                    <strong>{item.value}</strong>
-                  </li>
-                ))}
-              </ul>
-            </article>
 
             {/* Row 5 — Efficiency opportunity: Money Left (60%) | Payroll Efficiency (40%) */}
             <div className="two-col-grid two-col-grid--efficiency">
