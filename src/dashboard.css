@@ -9918,7 +9918,7 @@ body {
   font-weight: 700;
   line-height: 40px;
   color: #1D2939;
-  cursor: help;
+  cursor: pointer;
 }
 
 .dark .bv-hero-dominant { color: rgba(255, 255, 255, 0.95); }
@@ -9949,7 +9949,7 @@ body {
    margin-top adds to .bv-hero's 4px parent gap, giving 28px of breathing
    room between "Range: …" and the secondary $-value below. */
 .bv-goal-hero-tooltip-wrap {
-  cursor: help;
+  cursor: pointer;
   margin-top: 24px;
 }
 
@@ -10100,11 +10100,13 @@ body {
 .dark .bv-footer-label { color: #98A2B3; }
 
 /* Tooltip affordance on footer labels (TTM SDE, Derived Multiple,
-   Buyer-Ready Value, Owner Dependence Gap). Dotted underline + cursor:help
-   matches the SDE method subtitle pattern; focus ring matches inline
-   editables. Reuses the base color/weight from .bv-footer-label. */
+   Buyer-Ready Value, Owner Dependence Gap). Dotted underline signals
+   the label is hoverable; cursor:pointer matches the card's other
+   tooltip anchors (info-icon button, hero, goal block). Focus ring
+   matches inline editables. Reuses base color/weight from
+   .bv-footer-label. */
 .bv-footer-label--tooltip {
-  cursor: help;
+  cursor: pointer;
   text-decoration: underline dotted;
   text-decoration-color: #98A2B3;
   text-underline-offset: 3px;
@@ -10450,9 +10452,9 @@ body {
 
 .dark .bv-multiple-display { color: rgba(255, 255, 255, 0.9); }
 
-/* Card-level "SDE method" tooltip anchor. Dotted underline at rest signals
-   the subtitle is hoverable; cursor:help reinforces. No new button, no
-   info icon — the subtitle text itself is the affordance. */
+/* Card-level "SDE method" tooltip wrap. Anchors the info-icon button
+   that triggers the wide explainer panel; the subtitle text itself is
+   plain (no underline, no hover affordance). */
 .bv-card-tooltip-wrap {
   display: inline-block;
   position: relative;
