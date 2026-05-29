@@ -257,6 +257,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       type: 'bar',
       stacked: true,
       toolbar: { show: false },
+      accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
       fontFamily: 'Outfit, sans-serif',
       background: 'transparent',
     },

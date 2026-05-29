@@ -21,6 +21,7 @@ function buildSparkOptions(color: string): ApexOptions {
       type: 'area',
       sparkline: { enabled: true },
       toolbar: { show: false },
+      accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
       animations: { enabled: false },
       fontFamily: 'Outfit, sans-serif',
     },

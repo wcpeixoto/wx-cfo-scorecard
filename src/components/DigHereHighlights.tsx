@@ -32,6 +32,7 @@ const SPARK_OPTIONS: ApexOptions = {
     type: 'area',
     sparkline: { enabled: true },
     toolbar: { show: false },
+    accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
     fontFamily: 'Outfit, sans-serif',
     background: 'transparent',
   },
