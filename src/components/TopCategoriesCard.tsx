@@ -32,6 +32,11 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
     );
   }
 
+  // Share denominator between tooltip and legend so percentages reconcile to
+  // the card total (which is ALL parent categories, not just the visible top 6).
+  const getPct = (slice: ExpenseSlice): number =>
+    total > 0 ? Math.round((slice.value / total) * 100) : 0;
+
   const chartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'donut',
@@ -57,17 +62,15 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
       },
     },
     tooltip: {
-      custom: ({ seriesIndex, w }: { seriesIndex: number; w: { globals: { labels: string[]; series: number[] } } }) => {
-        const name = w.globals.labels[seriesIndex];
-        const series = w.globals.series;
-        const value = series[seriesIndex];
-        const tooltipTotal = series.reduce((a: number, b: number) => a + b, 0);
-        const pct = Math.round((value / tooltipTotal) * 100);
-        const formatted = formatCompact(value);
+      custom: ({ seriesIndex }: { seriesIndex: number }) => {
+        const slice = top[seriesIndex];
+        if (!slice) return '';
+        const pct = getPct(slice);
+        const formatted = formatCompact(slice.value);
 
         return `
           <div class="ec-donut-tooltip">
-            <div class="ec-donut-tooltip__title">${name} · ${pct}%</div>
+            <div class="ec-donut-tooltip__title">${slice.name} · ${pct}%</div>
             <div class="ec-donut-tooltip__value">${formatted}</div>
           </div>
         `;
@@ -100,16 +103,13 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
         </div>
 
         <ul className="top-categories-legend">
-          {top.map((slice) => {
-            const pct = total > 0 ? Math.round((slice.value / total) * 100) : 0;
-            return (
-              <li key={slice.name} className="top-categories-legend-item">
-                <span className="top-categories-legend-dot" style={{ background: slice.color }} aria-hidden="true" />
-                <span className="top-categories-legend-name">{slice.name}</span>
-                <span className="top-categories-legend-pct">{pct}%</span>
-              </li>
-            );
-          })}
+          {top.map((slice) => (
+            <li key={slice.name} className="top-categories-legend-item">
+              <span className="top-categories-legend-dot" style={{ background: slice.color }} aria-hidden="true" />
+              <span className="top-categories-legend-name">{slice.name}</span>
+              <span className="top-categories-legend-pct">{getPct(slice)}%</span>
+            </li>
+          ))}
         </ul>
       </div>
     </article>
