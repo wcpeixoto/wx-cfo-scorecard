@@ -2542,7 +2542,7 @@ export default function Dashboard() {
   }, [kpiTimeframe]);
 
 
-  const sustainability = useMemo(() => {
+  const sustainability = useMemo<Array<{ label: string; value: string; evidence?: string }>>(() => {
     // Sustainability is a FIXED Big Picture health basis: last complete month vs
     // the same month last year (YoY). It deliberately does NOT read the KPI
     // timeframe — those controls now live on Today, and Big Picture health must
@@ -2553,6 +2553,25 @@ export default function Dashboard() {
       const delta = metric.current - metric.previous;
       return Math.abs(delta) <= EPSILON ? 'flat' : delta > 0 ? 'up' : 'down';
     };
+
+    // Monthly Cash Result evidence: verb carries direction (figure is always
+    // unsigned), plus a same-sign streak walked backward from the latest
+    // rollup. $0 counts as non-negative — matches the badge's `>= 0 ? Healthy`
+    // rule, so a $0 month is "Added" and breaks a negative streak.
+    let monthlyCashEvidence: string | undefined;
+    if (latestRollup) {
+      const isNegative = latestRollup.netCashFlow < 0;
+      const verb = isNegative ? 'Burned' : 'Added';
+      const amount = formatCurrency(Math.abs(latestRollup.netCashFlow));
+      let streak = 0;
+      for (let i = model.monthlyRollups.length - 1; i >= 0; i--) {
+        if ((model.monthlyRollups[i].netCashFlow < 0) !== isNegative) break;
+        streak++;
+      }
+      const streakClause = streak > 1 ? ` · ${streak} months in a row` : '';
+      monthlyCashEvidence = `${verb} ${amount} this month${streakClause}`;
+    }
+
     return [
       {
         label: 'Revenue Momentum',
@@ -2563,15 +2582,16 @@ export default function Dashboard() {
         value: trendOf(healthBasis?.expenses) === 'down' ? 'Getting Better' : 'Needs Attention',
       },
       {
-        label: 'Net Cash Position',
+        label: 'Monthly Cash Result',
         value: (latestRollup?.netCashFlow ?? 0) >= 0 ? 'Healthy' : 'Negative',
+        evidence: monthlyCashEvidence,
       },
       {
         label: 'Consistency',
         value: model.monthlyRollups.length >= 6 ? 'Long-term Visible' : 'Need More History',
       },
     ];
-  }, [latestRollup?.netCashFlow, model.kpiYoYComparisonByTimeframe.lastMonth, model.monthlyRollups.length]);
+  }, [latestRollup, model.kpiYoYComparisonByTimeframe.lastMonth, model.monthlyRollups]);
 
 
   useEffect(() => {
@@ -2961,7 +2981,10 @@ export default function Dashboard() {
               <ul className="status-list">
                 {sustainability.map((item) => (
                   <li key={item.label}>
-                    <span>{item.label}</span>
+                    <span className="status-row-text">
+                      {item.label}
+                      {item.evidence ? <small className="status-evidence">{item.evidence}</small> : null}
+                    </span>
                     <strong>{item.value}</strong>
                   </li>
                 ))}
