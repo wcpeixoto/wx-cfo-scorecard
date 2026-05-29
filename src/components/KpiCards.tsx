@@ -117,47 +117,47 @@ export default function KpiCards({ cards, vsLabel = 'vs prior period', sparkline
 
         return (
           <article className="kpi-card" key={card.id}>
-            <div className="kpi-card-main">
-              <div className="kpi-label">
-                {card.label}
-                {card.id === 'net' && (
-                  <span className="db-tooltip-wrap">
-                    <button
-                      type="button"
-                      className="db-tooltip-btn"
-                      aria-label="Profit explanation"
-                      aria-describedby={netTooltipId}
-                    >
-                      &#9432;
-                    </button>
-                    <div id={netTooltipId} role="tooltip" className="db-tooltip-panel is-wide">
-                      We call this Profit to keep things simple. Technically, it&rsquo;s net cash flow: revenue minus expenses for this period, excluding transfers and financing.
-                    </div>
-                  </span>
-                )}
-              </div>
-              <p className={`kpi-value${valueColorClass}`}>{formatValue(card.value, card.format)}</p>
-              <div className="kpi-footer">
-                <span className={`kpi-badge ${trendClass}`}>
-                  <span aria-hidden="true" className="kpi-change-arrow">
-                    {trendClass === 'is-up' ? '▲' : trendClass === 'is-down' ? '▼' : '●'}
-                  </span>
-                  <span className="kpi-change-percent">{percentDelta}</span>
+            <div className="kpi-label">
+              {card.label}
+              {card.id === 'net' && (
+                <span className="db-tooltip-wrap">
+                  <button
+                    type="button"
+                    className="db-tooltip-btn"
+                    aria-label="Profit explanation"
+                    aria-describedby={netTooltipId}
+                  >
+                    &#9432;
+                  </button>
+                  <div id={netTooltipId} role="tooltip" className="db-tooltip-panel is-wide">
+                    We call this Profit to keep things simple. Technically, it&rsquo;s net cash flow: revenue minus expenses for this period, excluding transfers and financing.
+                  </div>
                 </span>
-                <span className="kpi-vs-label">{vsLabel}</span>
-              </div>
+              )}
             </div>
-            {spark && spark.data.length > 1 && (
-              <div className="kpi-card-spark" aria-hidden="true">
-                <ReactApexChart
-                  type="area"
-                  series={[{ data: spark.data }]}
-                  options={buildSparkOptions(spark.color)}
-                  width="100%"
-                  height={40}
-                />
-              </div>
-            )}
+            <div className="kpi-value-row">
+              <p className={`kpi-value${valueColorClass}`}>{formatValue(card.value, card.format)}</p>
+              {spark && spark.data.length > 1 && (
+                <div className="kpi-card-spark" aria-hidden="true">
+                  <ReactApexChart
+                    type="area"
+                    series={[{ data: spark.data }]}
+                    options={buildSparkOptions(spark.color)}
+                    width="100%"
+                    height={40}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="kpi-footer">
+              <span className={`kpi-badge ${trendClass}`}>
+                <span aria-hidden="true" className="kpi-change-arrow">
+                  {trendClass === 'is-up' ? '▲' : trendClass === 'is-down' ? '▼' : '●'}
+                </span>
+                <span className="kpi-change-percent">{percentDelta}</span>
+              </span>
+              <span className="kpi-vs-label">{vsLabel}</span>
+            </div>
           </article>
         );
       })}
