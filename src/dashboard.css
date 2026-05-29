@@ -2709,6 +2709,7 @@ body {
 .status-list li {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 10px;
   font-size: 0.92rem;
   border-bottom: 1px solid #e8eef9;
@@ -2718,6 +2719,18 @@ body {
 .status-list li:last-child {
   border-bottom: none;
   padding-bottom: 0;
+}
+
+.status-list .status-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.status-list .status-evidence {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 400;
 }
 
 .tab-grid,
