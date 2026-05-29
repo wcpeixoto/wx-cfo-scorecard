@@ -1570,7 +1570,7 @@ export function computeExpenseSlices(txns: Txn[], cashFlowMode: CashFlowMode): {
   // Compute share relative to ALL categories so percentages are accurate even when truncated to top N
   const totalExpense = [...parentTotals.values()].reduce((sum, v) => sum + v, 0);
   const entries = [...parentTotals.entries()].sort((a, b) => b[1] - a[1]);
-  const top = entries.slice(0, 7);
+  const top = entries.slice(0, 6);
 
   return {
     slices: top.map(([name, value], index) => ({
