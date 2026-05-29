@@ -2596,9 +2596,11 @@ export default function Dashboard() {
     // duplicated Monthly Cash Result's metric AND understated the real story —
     // it reads "mostly fine" over a business that can swing -$12K to +$17K. The
     // range is purely descriptive (no steady/choppy verdict ⇒ no threshold to
-    // calibrate); a steadiness *verdict* badge is a deferred, larger decision.
-    // <6 months ⇒ no honest 6-mo window, so keep the depth read (matches the
-    // "Need More History" badge).
+    // calibrate); a steadiness *verdict* badge is a deferred, larger decision
+    // gated on threshold calibration (dollar floor vs ratio vs CoV).
+    // <6 months ⇒ no honest 6-mo window, so keep the "Need More History" depth
+    // read. At ≥6mo, Consistency is deliberately verdict-exempt — the row
+    // ships with an empty verdict cell, and the evidence range IS the answer.
     const consistencyWindow = model.monthlyRollups.slice(-6);
     const consistencyEvidence =
       consistencyWindow.length >= 6
@@ -2615,7 +2617,7 @@ export default function Dashboard() {
       },
       {
         label: 'Cost Discipline',
-        value: trendOf(healthBasis?.expenses) === 'down' ? 'Getting Better' : 'Needs Attention',
+        value: trendOf(healthBasis?.expenses) === 'down' ? 'Getting Better' : 'Getting Worse',
         evidence: formatYoYEvidence(healthBasis?.expenses),
       },
       {
@@ -2625,7 +2627,7 @@ export default function Dashboard() {
       },
       {
         label: 'Consistency',
-        value: model.monthlyRollups.length >= 6 ? 'Long-term Visible' : 'Need More History',
+        value: model.monthlyRollups.length >= 6 ? '' : 'Need More History',
         evidence: consistencyEvidence,
       },
     ];
@@ -3023,7 +3025,7 @@ export default function Dashboard() {
                       {item.label}
                       {item.evidence ? <small className="status-evidence">{item.evidence}</small> : null}
                     </span>
-                    <strong>{item.value}</strong>
+                    {item.value ? <strong>{item.value}</strong> : null}
                   </li>
                 ))}
               </ul>
