@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react';
 import { STORAGE_KEYS } from '../config';
 import { useLocation, useNavigate } from 'react-router';
-import { FiRefreshCw } from 'react-icons/fi';
 import { AppSidebar } from '../components/AppSidebar';
 import { AppHeader } from '../components/AppHeader';
 import { useSidebar } from '../context/SidebarContext';
@@ -2767,24 +2766,6 @@ export default function Dashboard() {
           onUpdatedClick={() => navigateToTab('settings')}
         />
       <section className="main-zone">
-        {activeTab === 'big-picture' && <header className="top-bar glass-panel top-bar--big-picture">
-          <div className="top-bar-main">
-            <div className="top-bar-copy">
-              <h2>Big Picture</h2>
-              <p className="top-bar-context">Long-term health and strategic interpretation</p>
-              <button
-                type="button"
-                className="top-bar-freshness subtle clickable top-bar-freshness-mobile"
-                onClick={() => navigateToTab('settings')}
-                aria-label={`${lastUpdatedLabel}. Open Settings.`}
-              >
-                <FiRefreshCw className="top-bar-freshness-icon" aria-hidden="true" />
-                <span>{lastUpdatedLabel}</span>
-              </button>
-            </div>
-          </div>
-        </header>}
-
         {bootLoadError && (
           <div className="dashboard-load-error" role="alert">
             <div className="dashboard-load-error-body">
@@ -2866,7 +2847,7 @@ export default function Dashboard() {
                         More ▾
                       </button>
                       {isBigPictureFilterOpen && (
-                        <ul className="timeframe-list" role="menu" aria-label="Select Big Picture filter timeframe">
+                        <ul className="timeframe-list" role="menu" aria-label="Select KPI timeframe">
                           {BIG_PICTURE_FILTER_FRAME_OPTIONS.map((option) => (
                             <li key={option.value}>
                               <button
@@ -2888,7 +2869,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   {kpiTimeframe === 'custom' && (
-                    <div className="kpi-custom-range" aria-label="Custom Big Picture date range">
+                    <div className="kpi-custom-range" aria-label="Custom KPI date range">
                       <label>
                         <span>Start</span>
                         <input
