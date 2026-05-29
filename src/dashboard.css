@@ -9769,13 +9769,16 @@ body {
   }
 }
 
-.bp-overview-tray .kpi-card {
+.bp-overview-tray .kpi-value-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
+  margin-top: 6px;
+  min-height: 40px;
 }
 
-.bp-overview-tray .kpi-card-main {
+.bp-overview-tray .kpi-value-row .kpi-value {
+  margin: 0;
   flex: 1 1 auto;
   min-width: 0;
 }
