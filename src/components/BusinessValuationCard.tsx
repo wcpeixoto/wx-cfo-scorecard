@@ -95,7 +95,7 @@ const BV_HERO_TOOLTIP_SCENARIO =
 // can move the point off-midpoint inside the band, so the midpoint claim
 // no longer holds.
 const GOAL_HERO_TOOLTIP =
-  'What the business would be worth if you hit your target net margin on your baseline revenue. This number is stable — Forecast sliders do not move it.';
+  'What the business would be worth if you hit your target net margin using your Base Case forecasted revenue. This number is stable — Forecast sliders do not move it.';
 const NOT_BUYER_READY_COPY = 'Not buyer-ready at this pace.';
 const SCENARIO_HERO_LABEL = 'At this scenario';
 const BUYER_READY_TOOLTIP =
