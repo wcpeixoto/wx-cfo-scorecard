@@ -30,6 +30,18 @@
                     rgba(16, 24, 40, 0.06) 0px 1px 2px;
   --tooltip-text: #475467;
   --tooltip-title: #101828;
+
+  /* Design-system tokens used by the Sustainability card restyle. Named to
+     match the Claude Design handoff bundle (colors_and_type.css) so token
+     references in the .sustain-* rules read 1:1 with the spec. Hex values
+     unchanged from the design sheet. */
+  --fg-disabled:       #98A2B3; /* N/A text */
+  --border-strong:     #D0D5DD; /* dotted underline color */
+  --success-50:        #ECFDF3; /* "Getting Better" pill bg */
+  --success-600:       #039855; /* "Getting Better" pill fg */
+  --error-50:          #FEF3F2; /* "Getting Worse" pill bg */
+  --brand-300:         #9CB9FF; /* hover underline color */
+  --brand-600:         #3641F5; /* hover label color */
 }
 
 * {
@@ -2740,70 +2752,198 @@ body {
   text-align: right;
 }
 
-/* Sustainability health card — two YoY columns (long-term thumb + this-month
-   verdict) per signal. Colors reuse the canonical --positive / --negative
-   tokens so 'up' = good and 'down' = bad read consistently with the rest of
-   the page; flat / no-data fall back to muted secondary text. */
+/* Sustainability health card — three columns (label : message, long-term
+   thumb, this-month pill). Layout + tokens lifted from the Claude Design
+   handoff bundle (Sustainability — Three Column). All visual rules are
+   scoped to `.sustain-health*` so this card cannot leak typography or color
+   onto neighboring summary cards.
+
+   Verdict-to-glyph mapping (preserved from data layer):
+     'up'   → green thumbs-up    .thumb.up
+     'down' → red thumbs-down    .thumb.down
+     'flat' → muted rounded dash .thumb.flat
+     'none' → "N/A" muted text   .na
+
+   Pill tone classes (driven by row.thisMonthTone, not row.thisMonth):
+     'up'/is-up   → green pill   .sustain-pill.is-up
+     'down'/is-down → red pill   .sustain-pill.is-down
+     'flat'/'none' → gray pill   .sustain-pill.is-flat / .is-none */
+
+/* `.sustain-health` stacks the header + 4 data rows vertically. Each child
+   row is its own 3-col grid so the column tracks line up identically. */
 .sustain-health {
   display: flex;
   flex-direction: column;
 }
+/* Shared 3-col grid: header row + data rows share the same tracks so the
+   column headers sit exactly over the thumb/pill columns beneath them. */
 .sustain-health-head,
 .sustain-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 56px 124px;
+  grid-template-columns: minmax(0, 1fr) 104px 138px;
+  column-gap: 30px;
   align-items: center;
-  gap: 12px;
 }
+
+/* Header row — title + ⓘ tooltip in col 1, column headers in cols 2/3. */
 .sustain-health-head {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-  padding-bottom: 7px;
-  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border-default, var(--line));
 }
-.sustain-health-head span {
-  text-align: right;
+.sustain-health-head .sustain-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
 }
+.sustain-health-head .sustain-title-wrap h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 28px;
+  color: var(--fg-primary, var(--text-primary));
+}
+.sustain-health-head .sustain-h {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-muted, var(--text-secondary));
+  text-align: center;
+}
+
+/* Data rows. */
 .sustain-row {
-  font-size: 0.92rem;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-divider, var(--bg-muted));
 }
 .sustain-row:last-child {
   border-bottom: none;
-  padding-bottom: 0;
+  padding-bottom: 2px;
 }
-.sustain-row-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+
+/* Col 1: label : message inline, label is the per-row tooltip trigger. */
+.sustain-metric {
   min-width: 0;
+  padding-right: 2px;
+  text-wrap: pretty;
+}
+.sustain-metric .m-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg-primary, var(--text-primary));
+}
+.sustain-metric .m-msg {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--fg-muted, var(--text-secondary));
+}
+
+/* Col 2: long-term thumb / dash / N/A — centered. */
+.sustain-thumb-cell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 .sustain-thumb {
-  text-align: right;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--text-secondary);
+  width: 18px;
+  height: 18px;
+  display: block;
 }
-.sustain-thumb.is-up {
-  color: var(--positive);
+.sustain-thumb.up {
+  color: var(--success-500, var(--positive));
 }
-.sustain-thumb.is-down {
-  color: var(--negative);
+.sustain-thumb.down {
+  color: var(--error-500, var(--negative));
 }
-.sustain-verdict {
-  text-align: right;
-  font-weight: 600;
+.sustain-thumb.flat {
+  color: var(--fg-muted, var(--text-secondary));
+}
+.sustain-na {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-disabled);
+}
+
+/* Col 3: this-month pill — centered. */
+.sustain-pill-cell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.sustain-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
   white-space: nowrap;
-  color: var(--text-secondary);
 }
-.sustain-verdict.is-up {
-  color: var(--positive);
+.sustain-pill.is-up {
+  background: var(--success-50);
+  color: var(--success-600);
 }
-.sustain-verdict.is-down {
-  color: var(--negative);
+.sustain-pill.is-down {
+  background: var(--error-50);
+  color: var(--error-500, var(--negative));
+}
+.sustain-pill.is-flat,
+.sustain-pill.is-none {
+  background: var(--bg-muted);
+  color: var(--fg-muted, var(--text-secondary));
+}
+
+/* ── Per-row label tooltip — uses canonical .db-tooltip-* convention ───
+   The label IS the trigger (no separate ⓘ icon next to each label). A
+   dotted underline on the inner `.m-label` is the visual cue; hover/
+   focus-within behavior comes from `.db-tooltip-wrap` for free.
+   `.sustain-label-tip` is a thin scoping class on the wrapper, and
+   `.sustain-label-trigger` overrides the circular-icon defaults of
+   `.db-tooltip-btn` so the button sizes to its inner text. */
+.sustain-label-trigger {
+  /* Override .db-tooltip-btn's icon-button sizing — size to text content. */
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  display: inline;
+  place-items: initial;
+  /* Strip native button chrome. */
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sustain-label-trigger:hover,
+.sustain-label-trigger:focus-visible {
+  /* Cancel the canonical .db-tooltip-btn:hover/focus chrome (pill bg, border). */
+  background: transparent;
+  border-color: transparent;
+  color: inherit;
+  outline: none;
+}
+.sustain-label-trigger .m-label {
+  text-decoration: underline dotted;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+  transition: color 120ms, text-decoration-color 120ms;
+}
+.sustain-label-tip:hover .m-label,
+.sustain-label-tip:focus-within .m-label {
+  color: var(--brand-600);
+  text-decoration-color: var(--brand-300);
+}
+/* Per-row tooltip panel sits in column 1 — anchor LEFT (canonical .db-tooltip-panel
+   is right-aligned, designed for end-of-row info icons). */
+.sustain-label-tip .db-tooltip-panel {
+  right: auto;
+  left: 0;
 }
 
 .tab-grid,
