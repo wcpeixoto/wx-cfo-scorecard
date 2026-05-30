@@ -2936,7 +2936,7 @@ export default function Dashboard() {
                 <div className="sustain-health-head" aria-hidden="true">
                   <span />
                   <span>Long term</span>
-                  <span>This month</span>
+                  <span>Latest month</span>
                 </div>
                 {sustainability.map((row) => (
                   <div className="sustain-row" key={row.label}>
