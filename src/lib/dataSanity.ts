@@ -92,6 +92,146 @@ function checkClassificationConsistency(txns: Txn[], cashFlowMode: CashFlowMode)
   };
 }
 
+// ─── Wodify (Stripe gross-up) reconciliation ────────────────────────────────
+
+const WODIFY_TOLERANCE = 0.01;
+
+function normalizeAccountName(value: string | undefined): string {
+  return (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// Lower-case + replace Unicode dash variants (en-dash U+2013, em-dash U+2014,
+// minus sign U+2212) with ASCII hyphen so the canonical Wodify payees
+// "Processor Gross-Up – Fees" / "Processor Gross-Up – Refunds" (which use
+// U+2013) match the classifier substrings.
+function normalizeWodifyText(value: string | undefined): string {
+  return (value ?? '').toLowerCase().replace(/[–—−]/g, '-');
+}
+
+function isoMonthEnd(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  // Day 0 of next month = last day of this month (UTC-stable).
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+}
+
+/** Verify Wodify (Stripe gross-up) revenue and outflow sides reconcile per
+ *  closed month. Two-sided check — abs'ing each outflow component separately
+ *  exposes a sign error inside one category that |sum| would mask. */
+function checkWodifyGrossUpReconciliation(txns: Txn[]): SanityCheck {
+  const wodifyTxns = txns.filter((t) => normalizeAccountName(t.account) === 'wodify');
+
+  // Closed-month detection is Wodify-independent: derived from the latest
+  // date across all accounts. A month is closed iff maxDate > monthEnd(M).
+  let maxDate = '';
+  for (const t of txns) {
+    if (t.date && t.date > maxDate) maxDate = t.date;
+  }
+
+  // First Wodify activity month gates the "missing gross-up" warning so
+  // historical pre-Wodify months never warn.
+  let firstWodifyMonth = '';
+  for (const t of wodifyTxns) {
+    if (t.month && (firstWodifyMonth === '' || t.month < firstWodifyMonth)) {
+      firstWodifyMonth = t.month;
+    }
+  }
+
+  type Bucket = {
+    grossUpFees: number;
+    grossUpRefunds: number;
+    merchantFees: number;
+    customerRefunds: number;
+    grossUpFeesCount: number;
+    grossUpRefundsCount: number;
+  };
+  const buckets = new Map<string, Bucket>();
+  for (const t of wodifyTxns) {
+    if (!t.month) continue;
+    let b = buckets.get(t.month);
+    if (!b) {
+      b = {
+        grossUpFees: 0,
+        grossUpRefunds: 0,
+        merchantFees: 0,
+        customerRefunds: 0,
+        grossUpFeesCount: 0,
+        grossUpRefundsCount: 0,
+      };
+      buckets.set(t.month, b);
+    }
+    if (t.category === 'Business Income:Sales') {
+      const blob = `${normalizeWodifyText(t.payee)} ${normalizeWodifyText(t.memo)}`;
+      const hasGU = blob.includes('gross-up');
+      if (hasGU && blob.includes('fee')) {
+        b.grossUpFees += t.rawAmount;
+        b.grossUpFeesCount += 1;
+      } else if (hasGU && blob.includes('refund')) {
+        b.grossUpRefunds += t.rawAmount;
+        b.grossUpRefundsCount += 1;
+      }
+    } else if (t.category === 'Merchant Fees') {
+      b.merchantFees += t.rawAmount;
+    } else if (t.category === 'Customer Refunds') {
+      b.customerRefunds += t.rawAmount;
+    }
+  }
+
+  const monthSet = new Set<string>();
+  for (const t of txns) if (t.month) monthSet.add(t.month);
+  const months = [...monthSet].sort();
+
+  const warnings: string[] = [];
+  for (const month of months) {
+    const isClosed = maxDate > isoMonthEnd(month);
+    if (!isClosed) continue; // Open month never warns solely for missing rows.
+
+    const b = buckets.get(month);
+    const hasGrossUpRows = !!b && (b.grossUpFeesCount > 0 || b.grossUpRefundsCount > 0);
+
+    if (hasGrossUpRows && b) {
+      const revenueSide = b.grossUpFees + b.grossUpRefunds;
+      // Abs each outflow component separately — combining first would hide a
+      // sign error inside one category by letting it cancel against the other.
+      const outflowSide = Math.abs(b.merchantFees) + Math.abs(b.customerRefunds);
+      const diff = revenueSide - outflowSide;
+      const balanced = Math.abs(diff) <= WODIFY_TOLERANCE;
+      const revPositive = revenueSide > WODIFY_TOLERANCE;
+      const outPositive = outflowSide > WODIFY_TOLERANCE;
+      if (!balanced || !revPositive || !outPositive) {
+        warnings.push(
+          `${month}: Wodify sides do not reconcile. ` +
+          `grossUpFees=${b.grossUpFees.toFixed(2)}, ` +
+          `grossUpRefunds=${b.grossUpRefunds.toFixed(2)}, ` +
+          `merchantFees=${b.merchantFees.toFixed(2)}, ` +
+          `customerRefunds=${b.customerRefunds.toFixed(2)}, ` +
+          `revenueSide=${revenueSide.toFixed(2)}, ` +
+          `outflowSide=${outflowSide.toFixed(2)}, ` +
+          `diff=${diff.toFixed(2)}`
+        );
+      }
+    } else if (firstWodifyMonth !== '' && month >= firstWodifyMonth) {
+      warnings.push(`${month}: closed month missing month-end Wodify gross-up.`);
+    }
+    // else: closed month strictly before first Wodify activity → silent.
+  }
+
+  // TODO(double-counting): no concrete invariant has been defined for
+  // comparing direct Stripe/Wodify bank-deposit rows against gross-up
+  // revenue, so leave this off. Parked until the relationship is specified;
+  // a vague heuristic does not belong in a precision guardrail.
+
+  return {
+    id: 'wodify-gross-up-reconciliation',
+    label: 'Wodify Stripe gross-up reconciles per closed month',
+    severity: 'warning',
+    passed: warnings.length === 0,
+    message: warnings.length === 0
+      ? 'All closed months with Wodify activity reconcile within $0.01.'
+      : `${warnings.length} Wodify gross-up issue(s) in closed months.`,
+    detail: warnings.length > 0 ? warnings.slice(0, 10).join('\n') : undefined,
+  };
+}
+
 /** Verify revenue − expenses ≈ netCashFlow for each monthly rollup. */
 function checkAccountingIdentity(rollups: MonthlyRollup[]): SanityCheck {
   const violations: string[] = [];
@@ -125,6 +265,7 @@ export function runDataSanityChecks(
     checkTransferLeakage(txns, cashFlowMode),
     checkClassificationConsistency(txns, cashFlowMode),
     checkAccountingIdentity(rollups),
+    checkWodifyGrossUpReconciliation(txns),
   ];
 
   const passCount = checks.filter((c) => c.passed).length;
