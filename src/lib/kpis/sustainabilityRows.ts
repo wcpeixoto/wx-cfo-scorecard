@@ -4,8 +4,9 @@
 // rest of the page:
 //
 //   - Revenue Momentum / Cost Discipline / Monthly Cash Result read
-//     model.kpiYoYComparisonByTimeframe (lastMonth = this-month YoY,
-//     ttm = long term). No new windows, no re-summing.
+//     model.kpiYoYComparisonByTimeframe.thisMonth (month-to-date YoY,
+//     day-truncated by thisMonthPriorYearRollup so the prior-year window
+//     covers the same number of days) and .ttm for long term.
 //   - Cash Reserve reads the existing cashBalanceSeries (total bank cash,
 //     built by buildCashBalanceSeries) and the exported computeRunwayMetric
 //     for the canonical funded ratio. It does NOT re-import the raw
@@ -13,8 +14,12 @@
 //     account balances — a second source of truth would be a drift risk.
 //
 // Each row carries two year-over-year beats:
-//   longTerm  — glyph, 12-month-vs-prior basis (ttm / funded-ratio YoY)
-//   thisMonth — last completed month vs the same month one year ago
+//   longTerm  — glyph, 12-month-vs-prior basis (ttm / funded-ratio YoY at
+//               last completed month-end)
+//   thisMonth — current month-to-date vs the same calendar window prior
+//               year. Flow rows reuse the day-truncated thisMonth YoY from
+//               compute; Cash Reserve reads as-of-latest-update balance vs
+//               balance on the same calendar date a year ago.
 //
 // ONE calibrated state per beat drives the glyph, the verdict word, the color,
 // AND the two-beat evidence sentence — there is no separate path, so the four
@@ -144,7 +149,13 @@ function revenueEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): string
     lt === 'up' ? 'Growing over the year.' : lt === 'flat' ? 'Flat over the year.' : lt === 'down' ? 'Down over the year.' : NOT_ENOUGH;
   const x = absYoyPctText(moMetric);
   const month =
-    mo === 'up' ? `Last month up ${x}%.` : mo === 'flat' ? 'Last month about even.' : mo === 'down' ? `Last month down ${x}%.` : NOT_ENOUGH;
+    mo === 'up'
+      ? `Month to date up ${x}%.`
+      : mo === 'flat'
+        ? 'Month to date about even.'
+        : mo === 'down'
+          ? `Month to date down ${x}%.`
+          : NOT_ENOUGH;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
 
@@ -160,11 +171,11 @@ function costEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): string {
   const x = absYoyPctText(moMetric);
   const month =
     mo === 'up'
-      ? `Last month spending improved ${x}%.`
+      ? `Month to date spending improved ${x}%.`
       : mo === 'flat'
-        ? 'Last month spending about even.'
+        ? 'Month to date spending about even.'
         : mo === 'down'
-          ? `Last month spending rose ${x}%.`
+          ? `Month to date spending rose ${x}%.`
           : NOT_ENOUGH;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
@@ -179,15 +190,15 @@ function cashResultEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): str
           ? 'Cash flow getting tighter.'
           : NOT_ENOUGH;
   const pair = moMetric
-    ? `${formatCompactUsd(moMetric.current)} vs ${formatCompactUsd(moMetric.previous)} a year ago`
+    ? `${formatCompactUsd(moMetric.current)} vs ${formatCompactUsd(moMetric.previous)} same period last year`
     : '';
   const month =
     mo === 'up'
-      ? `Last month improved — ${pair}.`
+      ? `Month to date improved — ${pair}.`
       : mo === 'flat'
-        ? 'Last month about the same.'
+        ? 'Month to date about the same.'
         : mo === 'down'
-          ? `Last month weaker — ${pair}.`
+          ? `Month to date weaker — ${pair}.`
           : NOT_ENOUGH;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
@@ -204,11 +215,11 @@ function reserveEvidence(lt: Verdict, mo: Verdict, moPair: MetricPair): string {
   const pair = moPair ? `${formatCompactUsd(moPair.current)} vs ${formatCompactUsd(moPair.previous)}` : '';
   const month =
     mo === 'up'
-      ? `Cash cushion stronger than last year — ${pair}.`
+      ? `As of latest update: cash cushion stronger than same point last year — ${pair}.`
       : mo === 'flat'
-        ? `Cash cushion about the same as last year — ${pair}.`
+        ? `As of latest update: cash cushion about the same as same point last year — ${pair}.`
         : mo === 'down'
-          ? `Cash cushion lower than last year — ${pair}.`
+          ? `As of latest update: cash cushion lower than same point last year — ${pair}.`
           : NOT_ENOUGH;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
@@ -226,6 +237,49 @@ export function monthEndBalance(series: BalancePoint[], month: string | null): n
     else if (pointMonth > month) break;
   }
   return found;
+}
+
+// Latest balance point that falls in the given 'YYYY-MM' month. For the
+// CURRENT month (partial), that's the as-of-latest-update balance anchored
+// to the latest imported transaction date. Returns null when the month has
+// no points. Caller uses .dateISO to derive the prior-year comparison date,
+// so the basis is transaction-date anchored, not wall-clock.
+export function lastBalancePointInMonth(series: BalancePoint[], month: string | null): BalancePoint | null {
+  if (!month) return null;
+  let found: BalancePoint | null = null;
+  for (const point of series) {
+    const pointMonth = point.dateISO.slice(0, 7);
+    if (pointMonth === month) found = point;
+    else if (pointMonth > month) break;
+  }
+  return found;
+}
+
+// Latest balance point on or before a target ISO date. Robust to gaps (the
+// series only emits points within [minTxnDate..maxTxnDate], so dates outside
+// that window fall back to the nearest prior point — or null if before the
+// series starts). String comparison is correct on ISO YYYY-MM-DD strings.
+export function balanceAtOrBefore(series: BalancePoint[], targetDate: string | null): number | null {
+  if (!targetDate) return null;
+  let found: number | null = null;
+  for (const point of series) {
+    if (point.dateISO <= targetDate) found = point.balance;
+    else break;
+  }
+  return found;
+}
+
+// Same calendar month/day in the prior year. For 2024-02-29 this produces
+// '2023-02-29' (an invalid calendar date but a valid string). The caller
+// passes the result to balanceAtOrBefore, which string-compares against
+// the actual series dates and naturally falls back to '2023-02-28'. This
+// is preferred over -365d which drifts by a day in leap years. The user-
+// facing copy says "same POINT last year" (not "same date") so the rare
+// Feb-29 → Feb-28 falloff isn't a copy lie.
+export function sameCalendarDayPriorYear(dateISO: string): string {
+  const year = Number(dateISO.slice(0, 4));
+  const monthDay = dateISO.slice(5); // "MM-DD"
+  return `${year - 1}-${monthDay}`;
 }
 
 export type SustainabilityRow = {
@@ -249,40 +303,60 @@ export function buildSustainabilityRows(
   model: DashboardModel,
   cashBalanceSeries: BalancePoint[],
 ): SustainabilityRow[] {
+  const thisMonth = model.kpiYoYComparisonByTimeframe.thisMonth;
   const lastMonth = model.kpiYoYComparisonByTimeframe.lastMonth;
   const ttm = model.kpiYoYComparisonByTimeframe.ttm;
 
-  // Cash Reserve shares the OTHER three rows' exact basis: last completed month
-  // (lastMonth.currentEndMonth) vs the same month one year earlier
-  // (lastMonth.previousEndMonth). Reading those month identifiers off the same
-  // comparison the flow rows use guarantees all four answer one question —
-  // "stronger or weaker than a year ago" — with zero window drift.
-  const currentMonth = lastMonth?.currentEndMonth ?? null;
-  const priorMonth = lastMonth?.previousEndMonth ?? null;
-  const currentBalance = monthEndBalance(cashBalanceSeries, currentMonth);
-  const priorBalance = monthEndBalance(cashBalanceSeries, priorMonth);
+  // ── Cash Reserve — split anchoring for label-truthfulness ──────────────────
+  // The visible column header is "Current month" — every row underneath it
+  // must honor that. But long-term funded ratio (the THUMB glyph) reads more
+  // honestly off a CLOSED month than a partial one: a trailing-3-month
+  // expense target divided into a still-moving balance jitters around mid-
+  // month. So Reserve splits its two beats:
+  //   - Long-term (thumb glyph): funded ratio at LAST COMPLETED month-end
+  //     (lastMonth.currentEndMonth) vs same month one year prior. Same
+  //     anchors the compute layer has always used; same as #324.
+  //   - This-month (right column): AS-OF-LATEST-UPDATE balance in the
+  //     current month vs balance on the same CALENDAR DAY a year ago.
+  //     Transaction-date anchored — no wall-clock "today" anywhere.
 
-  // This-month reserve: month-end total bank cash, this year vs last year.
-  const reserveThisMonth: MetricPair =
-    currentBalance !== null && priorBalance !== null
-      ? { current: currentBalance, previous: priorBalance }
-      : null;
+  // Long-term reserve anchors (closed-month basis, unchanged).
+  const ltCurrentMonth = lastMonth?.currentEndMonth ?? null;
+  const ltPriorMonth = lastMonth?.previousEndMonth ?? null;
+  const ltCurrentBalance = monthEndBalance(cashBalanceSeries, ltCurrentMonth);
+  const ltPriorBalance = monthEndBalance(cashBalanceSeries, ltPriorMonth);
 
   // Long-term reserve: funded ratio (cash ÷ trailing-3-month expense target)
   // now vs one year ago, both via the canonical exported computeRunwayMetric so
   // the target formula is never reimplemented. percentFunded is null when the
   // prior-year 3-month target window is missing — that drops the row to 'none'.
   const fundedNow =
-    currentBalance !== null && currentMonth
-      ? computeRunwayMetric(model.monthlyRollups, currentBalance, currentMonth, currentMonth).percentFunded
+    ltCurrentBalance !== null && ltCurrentMonth
+      ? computeRunwayMetric(model.monthlyRollups, ltCurrentBalance, ltCurrentMonth, ltCurrentMonth).percentFunded
       : null;
   const fundedPrior =
-    priorBalance !== null && priorMonth
-      ? computeRunwayMetric(model.monthlyRollups, priorBalance, priorMonth, priorMonth).percentFunded
+    ltPriorBalance !== null && ltPriorMonth
+      ? computeRunwayMetric(model.monthlyRollups, ltPriorBalance, ltPriorMonth, ltPriorMonth).percentFunded
       : null;
   const reserveLongTerm: MetricPair =
     fundedNow !== null && fundedPrior !== null
       ? { current: fundedNow, previous: fundedPrior }
+      : null;
+
+  // This-month reserve: as-of-latest-update vs same-calendar-day prior year.
+  // The "current" anchor month is the in-progress month (thisMonth.currentEndMonth);
+  // the latest balance point IN that month is the as-of-latest-update balance,
+  // and its dateISO is the latest-current-month-txn-date that the data was
+  // imported through. The prior-year comparison uses the same calendar day,
+  // string-compared against the series — leap-year invariant.
+  const mtdCurrentMonth = thisMonth?.currentEndMonth ?? null;
+  const lastPointInCurrent = lastBalancePointInMonth(cashBalanceSeries, mtdCurrentMonth);
+  const mtdCurrentBalance = lastPointInCurrent?.balance ?? null;
+  const mtdPriorDate = lastPointInCurrent ? sameCalendarDayPriorYear(lastPointInCurrent.dateISO) : null;
+  const mtdPriorBalance = balanceAtOrBefore(cashBalanceSeries, mtdPriorDate);
+  const reserveThisMonth: MetricPair =
+    mtdCurrentBalance !== null && mtdPriorBalance !== null
+      ? { current: mtdCurrentBalance, previous: mtdPriorBalance }
       : null;
 
   const PCT: FlatRule = { kind: 'pct', band: FLAT_BAND_PCT };
@@ -299,31 +373,33 @@ export function buildSustainabilityRows(
 
   // Revenue Momentum — up = good, percentage basis.
   const revLongTermMetric = metricIfBothWindows(ttm, (c) => c.revenue);
-  const revThisMonthMetric = metricIfBothWindows(lastMonth, (c) => c.revenue);
+  const revThisMonthMetric = metricIfBothWindows(thisMonth, (c) => c.revenue);
   const revLongTerm = sustainabilityState(revLongTermMetric, 'up', PCT);
   const revThisMonth = sustainabilityState(revThisMonthMetric, 'up', PCT);
 
   // Cost Discipline — down = good (inverted), percentage basis.
   const costLongTermMetric = metricIfBothWindows(ttm, (c) => c.expenses);
-  const costThisMonthMetric = metricIfBothWindows(lastMonth, (c) => c.expenses);
+  const costThisMonthMetric = metricIfBothWindows(thisMonth, (c) => c.expenses);
   const costLongTerm = sustainabilityState(costLongTermMetric, 'down', PCT);
   const costThisMonth = sustainabilityState(costThisMonthMetric, 'down', PCT);
 
   // Monthly Cash Result — up = good, signed dollars (annual sum long-term,
-  // single month this-month). The label tracks the YoY direction, but a month
-  // that improved YoY while STILL losing money must not render green — green
-  // reads as "fine," and a money-losing month is not fine. So when the current
-  // month's net is negative, force the COLOR to neutral while leaving the LABEL
-  // as the honest trend. The dollar evidence carries the level.
+  // month-to-date this-month). The label tracks the YoY direction, but an
+  // in-progress month that improved YoY while STILL losing money must not
+  // render green — green reads as "fine," and a money-losing month is not
+  // fine. So when the current month's net is negative, force the COLOR to
+  // neutral while leaving the LABEL as the honest trend. The dollar evidence
+  // carries the level.
   const cashLongTermMetric = metricIfBothWindows(ttm, (c) => c.netCashFlow);
-  const cashThisMonthMetric = metricIfBothWindows(lastMonth, (c) => c.netCashFlow);
+  const cashThisMonthMetric = metricIfBothWindows(thisMonth, (c) => c.netCashFlow);
   const cashLongTerm = sustainabilityState(cashLongTermMetric, 'up', USD_ANNUAL);
   const cashThisMonth = sustainabilityState(cashThisMonthMetric, 'up', USD_MONTH);
   const cashIsNegative = (cashThisMonthMetric?.current ?? 0) < 0;
   const cashThisMonthTone: Verdict = cashThisMonth === 'up' && cashIsNegative ? 'flat' : cashThisMonth;
 
-  // Cash Reserve — up = good. Long-term = funded-ratio YoY (a position, matching
-  // the shipped glyph); this-month = month-end dollar balance YoY.
+  // Cash Reserve — up = good. Long-term = funded-ratio YoY at last completed
+  // month-end (a stable position matching the shipped glyph); this-month =
+  // as-of-latest-update balance vs balance on the same calendar day a year ago.
   const reserveLong = sustainabilityState(reserveLongTerm, 'up', RATIO);
   const reserveMonth = sustainabilityState(reserveThisMonth, 'up', USD_MONTH);
 
@@ -351,7 +427,7 @@ export function buildSustainabilityRows(
     },
     {
       label: 'Cash Reserve',
-      sublabel: 'Month-end reserve vs same month last year',
+      sublabel: 'As of latest update vs same point last year',
       longTerm: reserveLong,
       thisMonth: reserveMonth,
       thisMonthTone: reserveMonth,

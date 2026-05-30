@@ -2960,7 +2960,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <span className="sustain-h">Long term</span>
-                  <span className="sustain-h">Last month</span>
+                  <span className="sustain-h">Current month</span>
                 </div>
                 {sustainability.map((row, index) => {
                   const message = [row.sublabel, row.evidence].filter(Boolean).join(' · ');
