@@ -22,7 +22,9 @@ function metric(current: number, previous: number): KpiMetricComparison {
 function comparison(
   currentEndMonth: string | null,
   previousEndMonth: string | null,
-  metrics: Partial<Pick<KpiTimeframeComparison, 'revenue' | 'expenses' | 'netCashFlow' | 'savingsRate'>>,
+  metrics: Partial<
+    Pick<KpiTimeframeComparison, 'revenue' | 'expenses' | 'netCashFlow' | 'savingsRate' | 'previousMonthCount'>
+  >,
 ): KpiTimeframeComparison {
   return {
     timeframe: 'lastMonth',
@@ -250,6 +252,40 @@ describe('Monthly Cash Result', () => {
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
     expect(cash.thisMonth).toBe('up'); // +$4,999 > $2,000, no Infinity/NaN
     expect(cash.evidence).not.toMatch(/Infinity|NaN|%/);
+  });
+
+  it('missing prior history is unavailable, NOT a comparison against a fabricated $0', () => {
+    // computeKpiYoYComparisons fabricates previous:0 when the prior window has no
+    // months, but flags it with previousMonthCount:0. The dollar rule treats a real
+    // $0 prior as valid, so without the month-count guard this would render
+    // "Last month improved — $5.0K vs $0 a year ago" instead of empty.
+    const lastMonth = comparison('2026-04', '2025-04', {
+      netCashFlow: metric(5_000, 0),
+      previousMonthCount: 0,
+    });
+    const ttm = comparison('2026-04', '2025-04', {
+      netCashFlow: metric(48_000, 0),
+      previousMonthCount: 0,
+    });
+    const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
+    expect(cash.longTerm).toBe('none');
+    expect(cash.thisMonth).toBe('none');
+    expect(cash.thisMonthTone).toBe('none');
+    expect(cash.evidence).toBe('Not enough history yet.');
+    expect(cash.evidence).not.toMatch(/\$0/);
+  });
+
+  it('a REAL $0 prior (history present) stays a valid breakeven comparison', () => {
+    // Same fabricated-looking previous:0, but previousMonthCount>0 means the prior
+    // month genuinely netted $0 — that is a real breakeven and must compare, not drop.
+    const lastMonth = comparison('2026-04', '2025-04', {
+      netCashFlow: metric(5_000, 0),
+      previousMonthCount: 1,
+    });
+    const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(40_000, 10_000) });
+    const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
+    expect(cash.thisMonth).toBe('up'); // +$5,000 > $2,000 floor
+    expect(cash.evidence).toBe('Cash flow strengthening. Last month improved — $5.0K vs $0 a year ago.');
   });
 });
 

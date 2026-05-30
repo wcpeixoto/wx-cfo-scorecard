@@ -34,7 +34,7 @@
 // always means "bad" — the renderer stays dumb and cannot reintroduce a
 // polarity bug (Cost Discipline is good when costs fall).
 
-import type { DashboardModel } from '../data/contract';
+import type { DashboardModel, KpiTimeframeComparison } from '../data/contract';
 import type { BalancePoint } from '../data/balanceSeries';
 import { computeRunwayMetric } from './compute';
 
@@ -89,6 +89,19 @@ export function sustainabilityState(metric: MetricPair, goodWhen: 'up' | 'down',
   const t = rawState(metric, flat);
   if (t === 'none' || t === 'flat') return t;
   return t === goodWhen ? 'up' : 'down';
+}
+
+// The dollar net-cash beats treat a prior of $0 as a VALID comparison
+// (breakeven is a real state), so they can't lean on the percentage rows'
+// divide-by-zero guard to reject an absent prior. But computeKpiYoYComparisons
+// fabricates `previous: 0` for a window with no history while recording the
+// truth in `previousMonthCount: 0`. Pull the metric only when that prior window
+// actually has months — otherwise return null so the dollar rule (and the
+// evidence built from the same value) both fall to 'none' / "Not enough history
+// yet." rather than comparing against a fabricated $0.
+function netCashIfPriorExists(comparison: KpiTimeframeComparison | null | undefined): MetricPair {
+  if (!comparison || comparison.previousMonthCount <= 0) return null;
+  return comparison.netCashFlow;
 }
 
 // Whole-number absolute YoY percentage for the "{x}%" copy. Only called for
@@ -282,9 +295,15 @@ export function buildSustainabilityRows(
   // reads as "fine," and a money-losing month is not fine. So when the current
   // month's net is negative, force the COLOR to neutral while leaving the LABEL
   // as the honest trend. The dollar evidence carries the level.
-  const cashLongTerm = sustainabilityState(ttm?.netCashFlow, 'up', USD_ANNUAL);
-  const cashThisMonth = sustainabilityState(lastMonth?.netCashFlow, 'up', USD_MONTH);
-  const cashIsNegative = (lastMonth?.netCashFlow?.current ?? 0) < 0;
+  // Gate each beat on its own prior window having real history (see
+  // netCashIfPriorExists) so an absent prior renders "Not enough history yet."
+  // instead of a comparison against a fabricated $0. The SAME gated value feeds
+  // both the state and the evidence string, so they can never disagree.
+  const cashLongTermMetric = netCashIfPriorExists(ttm);
+  const cashThisMonthMetric = netCashIfPriorExists(lastMonth);
+  const cashLongTerm = sustainabilityState(cashLongTermMetric, 'up', USD_ANNUAL);
+  const cashThisMonth = sustainabilityState(cashThisMonthMetric, 'up', USD_MONTH);
+  const cashIsNegative = (cashThisMonthMetric?.current ?? 0) < 0;
   const cashThisMonthTone: Verdict = cashThisMonth === 'up' && cashIsNegative ? 'flat' : cashThisMonth;
 
   // Cash Reserve — up = good. Long-term = funded-ratio YoY (a position, matching
@@ -312,7 +331,7 @@ export function buildSustainabilityRows(
       longTerm: cashLongTerm,
       thisMonth: cashThisMonth,
       thisMonthTone: cashThisMonthTone,
-      evidence: cashResultEvidence(cashLongTerm, cashThisMonth, lastMonth?.netCashFlow),
+      evidence: cashResultEvidence(cashLongTerm, cashThisMonth, cashThisMonthMetric),
     },
     {
       label: 'Cash Reserve',
