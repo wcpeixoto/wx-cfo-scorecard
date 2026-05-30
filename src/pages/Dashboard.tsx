@@ -737,7 +737,7 @@ export default function Dashboard() {
   // (Settings → Forecast style). Reality → Conservative Floor;
   // Recovery → Split Conservative. See sub-phase 2c.1.
   const [customScenarioInput, setCustomScenarioInput] = useState<ScenarioInput>(DEFAULT_CUSTOM_SCENARIO);
-  const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('lastMonth');
+  const [kpiTimeframe, setKpiTimeframe] = useState<BigPictureFrameValue>('thisMonth');
   const [topCategoriesTimeframe, setTopCategoriesTimeframe] = useState<KpiComparisonTimeframe>('lastMonth');
   const [netCashFlowChartMode, setNetCashFlowChartMode] = useState<CashFlowMode>('operating');
   const [forecastRange, setForecastRange] = useState<ForecastRangeValue>('6m');
