@@ -2740,6 +2740,72 @@ body {
   text-align: right;
 }
 
+/* Sustainability health card — two YoY columns (long-term thumb + this-month
+   verdict) per signal. Colors reuse the canonical --positive / --negative
+   tokens so 'up' = good and 'down' = bad read consistently with the rest of
+   the page; flat / no-data fall back to muted secondary text. */
+.sustain-health {
+  display: flex;
+  flex-direction: column;
+}
+.sustain-health-head,
+.sustain-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px 124px;
+  align-items: center;
+  gap: 12px;
+}
+.sustain-health-head {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+}
+.sustain-health-head span {
+  text-align: right;
+}
+.sustain-row {
+  font-size: 0.92rem;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.sustain-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.sustain-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sustain-thumb {
+  text-align: right;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.sustain-thumb.is-up {
+  color: var(--positive);
+}
+.sustain-thumb.is-down {
+  color: var(--negative);
+}
+.sustain-verdict {
+  text-align: right;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.sustain-verdict.is-up {
+  color: var(--positive);
+}
+.sustain-verdict.is-down {
+  color: var(--negative);
+}
+
 .tab-grid,
 .stack-grid {
   display: grid;
