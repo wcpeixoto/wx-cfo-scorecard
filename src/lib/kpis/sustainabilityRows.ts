@@ -50,9 +50,9 @@ function verdictFor(metric: MetricPair, goodWhen: 'up' | 'down'): Verdict {
 }
 
 // "Up 8% YoY" / "Down 5% YoY" / "Flat YoY" — describes the RAW metric move
-// (the verdict, not the evidence, carries good/bad). Mirrors the formatter the
-// prior Sustainability block used so wording does not drift.
-function yoyEvidence(metric: MetricPair): string | undefined {
+// (the verdict, not the evidence, carries good/bad). For metrics with a large,
+// stable positive base (revenue, expenses) the percentage is meaningful.
+function yoyPercentEvidence(metric: MetricPair): string | undefined {
   if (!metric) return undefined;
   const t = trendOf(metric);
   if (t === 'none') return undefined;
@@ -70,6 +70,16 @@ function formatCompactUsd(value: number): string {
   if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
   if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`;
   return `${sign}$${Math.round(abs)}`;
+}
+
+// Monthly Cash Result is a FLOW that crosses zero, so a YoY *percentage*
+// explodes off a near-zero prior month (e.g. a $50 prior April reads as
+// "+6624%") — the same owner-facing nonsense the reserve-coverage delta
+// avoided by switching from relative to absolute. Show signed dollar
+// magnitudes instead, with the same "vs a year ago" phrasing as Cash Reserve.
+function dollarYoYEvidence(metric: MetricPair): string | undefined {
+  if (!metric) return undefined;
+  return `${formatCompactUsd(metric.current)} vs ${formatCompactUsd(metric.previous)} a year ago`;
 }
 
 // Last point of the (dense, daily, ascending) cashBalanceSeries that falls in
@@ -146,19 +156,19 @@ export function buildSustainabilityRows(
       label: 'Revenue Momentum',
       longTerm: verdictFor(ttm?.revenue, 'up'),
       thisMonth: verdictFor(lastMonth?.revenue, 'up'),
-      evidence: yoyEvidence(lastMonth?.revenue),
+      evidence: yoyPercentEvidence(lastMonth?.revenue),
     },
     {
       label: 'Cost Discipline',
       longTerm: verdictFor(ttm?.expenses, 'down'),
       thisMonth: verdictFor(lastMonth?.expenses, 'down'),
-      evidence: yoyEvidence(lastMonth?.expenses),
+      evidence: yoyPercentEvidence(lastMonth?.expenses),
     },
     {
       label: 'Monthly Cash Result',
       longTerm: verdictFor(ttm?.netCashFlow, 'up'),
       thisMonth: verdictFor(lastMonth?.netCashFlow, 'up'),
-      evidence: yoyEvidence(lastMonth?.netCashFlow),
+      evidence: dollarYoYEvidence(lastMonth?.netCashFlow),
     },
     {
       label: 'Cash Reserve',

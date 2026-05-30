@@ -193,3 +193,27 @@ describe('Cash Reserve', () => {
     expect(reserve.thisMonth).toBe('up'); // balance comparison still valid
   });
 });
+
+// ── Monthly Cash Result evidence (verification: no exploding %) ────────────────
+
+describe('Monthly Cash Result evidence', () => {
+  it('shows signed dollar magnitudes, not an exploding percentage off a near-zero prior', () => {
+    // netCashFlow crosses zero, so a tiny prior month would yield "+6588% YoY".
+    const lastMonth = comparison('2026-04', '2025-04', { netCashFlow: metric(3_344, 50) });
+    const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(40_000, 10_000) });
+    const rows = buildSustainabilityRows(modelWith(lastMonth, ttm, []), []);
+    const cash = rows.find((r) => r.label === 'Monthly Cash Result')!;
+    expect(cash.thisMonth).toBe('up');
+    expect(cash.evidence).toBe('$3.3K vs $50 a year ago');
+    expect(cash.evidence).not.toMatch(/%/);
+  });
+
+  it('handles a negative current flow', () => {
+    const lastMonth = comparison('2026-04', '2025-04', { netCashFlow: metric(-3_394, 1_200) });
+    const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(0, 0) });
+    const rows = buildSustainabilityRows(modelWith(lastMonth, ttm, []), []);
+    const cash = rows.find((r) => r.label === 'Monthly Cash Result')!;
+    expect(cash.evidence).toBe('-$3.4K vs $1.2K a year ago');
+    expect(cash.thisMonth).toBe('down');
+  });
+});
