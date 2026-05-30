@@ -45,7 +45,7 @@ import { computeWhatNeedsAttention } from '../lib/kpis/digHere';
 import { computeCashTrend } from '../lib/kpis/cashTrend';
 import { computeCashTrendDelta } from '../lib/data/cashTrendDelta';
 import { buildCashBalanceSeries } from '../lib/data/balanceSeries';
-import { formatCompact } from '../lib/utils/formatCompact';
+import { buildSustainabilityRows, longTermGlyph, longTermLabel, thisMonthLabel, type SustainabilityRow } from '../lib/kpis/sustainabilityRows';
 import { computePriorYearActuals } from '../lib/kpis/priorYearActuals';
 import { runDataSanityChecks } from '../lib/dataSanity';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
@@ -2438,7 +2438,6 @@ export default function Dashboard() {
     return [...new Set([...injected, ...defaultYears])].sort((a, b) => b - a);
   }, [priorYearActuals.detectedYears, currentForecastYear, projectionActiveYears]);
 
-  const latestRollup = model.monthlyRollups[model.monthlyRollups.length - 1] ?? null;
   const previousRollup = model.monthlyRollups[model.monthlyRollups.length - 2] ?? null;
   const selectedBigPictureTitle = useMemo(() => {
     if (kpiTimeframe === 'custom') return 'Custom Range';
@@ -2543,95 +2542,10 @@ export default function Dashboard() {
   }, [kpiTimeframe]);
 
 
-  const sustainability = useMemo<Array<{ label: string; value: string; evidence?: string }>>(() => {
-    // Sustainability is a FIXED Big Picture health basis: last complete month vs
-    // the same month last year (YoY). It deliberately does NOT read the KPI
-    // timeframe — those controls now live on Today, and Big Picture health must
-    // not react to a Today-only control. Same trend rule as metricToCard.
-    const healthBasis = model.kpiYoYComparisonByTimeframe.lastMonth;
-    const trendOf = (metric: { current: number; previous: number } | undefined) => {
-      if (!metric) return 'flat';
-      const delta = metric.current - metric.previous;
-      return Math.abs(delta) <= EPSILON ? 'flat' : delta > 0 ? 'up' : 'down';
-    };
-    // Revenue Momentum / Cost Discipline evidence shares the badge's exact basis:
-    // last-complete-month YoY (healthBasis), via the same trendOf used for the
-    // badge — so the evidence direction can never contradict the verdict, and it
-    // never reads the in-progress month. No MoM, no streak (a single YoY
-    // {current, previous} carries no streak history).
-    const formatYoYEvidence = (
-      metric: { current: number; previous: number } | undefined,
-    ): string | undefined => {
-      if (!metric) return undefined;
-      const direction = trendOf(metric);
-      if (direction === 'flat') return 'Flat YoY';
-      const pct =
-        Math.abs(metric.previous) <= EPSILON
-          ? null
-          : Math.round((Math.abs(metric.current - metric.previous) / Math.abs(metric.previous)) * 100);
-      const directionLabel = direction === 'up' ? 'Up' : 'Down';
-      const pctText = pct === null ? '' : ` ${pct}%`;
-      return `${directionLabel}${pctText} YoY`;
-    };
-
-    // Monthly Cash Result evidence: verb carries direction (figure is always
-    // unsigned), plus a same-sign streak walked backward from the latest
-    // rollup. $0 counts as non-negative — matches the badge's `>= 0 ? Healthy`
-    // rule, so a $0 month is "Added" and breaks a negative streak.
-    let monthlyCashEvidence: string | undefined;
-    if (latestRollup) {
-      const isNegative = latestRollup.netCashFlow < 0;
-      const verb = isNegative ? 'Burned' : 'Added';
-      const amount = formatCurrency(Math.abs(latestRollup.netCashFlow));
-      let streak = 0;
-      for (let i = model.monthlyRollups.length - 1; i >= 0; i--) {
-        if ((model.monthlyRollups[i].netCashFlow < 0) !== isNegative) break;
-        streak++;
-      }
-      const streakClause = streak > 1 ? ` · ${streak} months in a row` : '';
-      monthlyCashEvidence = `${verb} ${amount} this month${streakClause}`;
-    }
-    // Consistency evidence = the SPREAD of monthly cash results across the
-    // trailing 6, not a positivity count. Positivity ("4 of 6 positive")
-    // duplicated Monthly Cash Result's metric AND understated the real story —
-    // it reads "mostly fine" over a business that can swing -$12K to +$17K. The
-    // range is purely descriptive (no steady/choppy verdict ⇒ no threshold to
-    // calibrate); a steadiness *verdict* badge is a deferred, larger decision
-    // gated on threshold calibration (dollar floor vs ratio vs CoV).
-    // <6 months ⇒ no honest 6-mo window, so keep the "Need More History" depth
-    // read. At ≥6mo, Consistency is deliberately verdict-exempt — the row
-    // ships with an empty verdict cell, and the evidence range IS the answer.
-    const consistencyWindow = model.monthlyRollups.slice(-6);
-    const consistencyEvidence =
-      consistencyWindow.length >= 6
-        ? `${formatCompact(Math.min(...consistencyWindow.map((r) => r.netCashFlow)))} to ${formatCompact(
-            Math.max(...consistencyWindow.map((r) => r.netCashFlow)),
-          )} · 6 mo`
-        : `${model.monthlyRollups.length} months imported`;
-
-    return [
-      {
-        label: 'Revenue Momentum',
-        value: trendOf(healthBasis?.revenue) === 'up' ? 'Getting Better' : 'Getting Worse',
-        evidence: formatYoYEvidence(healthBasis?.revenue),
-      },
-      {
-        label: 'Cost Discipline',
-        value: trendOf(healthBasis?.expenses) === 'down' ? 'Getting Better' : 'Getting Worse',
-        evidence: formatYoYEvidence(healthBasis?.expenses),
-      },
-      {
-        label: 'Monthly Cash Result',
-        value: (latestRollup?.netCashFlow ?? 0) >= 0 ? 'Healthy' : 'Negative',
-        evidence: monthlyCashEvidence,
-      },
-      {
-        label: 'Consistency',
-        value: model.monthlyRollups.length >= 6 ? '' : 'Need More History',
-        evidence: consistencyEvidence,
-      },
-    ];
-  }, [latestRollup, model.kpiYoYComparisonByTimeframe.lastMonth, model.monthlyRollups]);
+  const sustainability = useMemo<SustainabilityRow[]>(
+    () => buildSustainabilityRows(model, cashBalanceSeries),
+    [model, cashBalanceSeries],
+  );
 
 
   useEffect(() => {
@@ -3012,23 +2926,32 @@ export default function Dashboard() {
 
         {hasImportedData && activeTab === 'big-picture' && (
           <>
-            {/* Sustainability — health at a glance, pinned to last-month YoY; top of Big Picture */}
+            {/* Sustainability — four health signals, each vs the same period a year ago; top of Big Picture */}
             <article className="card summary-card">
               <div className="card-head">
                 <h3>Sustainability</h3>
-                <p className="subtle">Health checks in one glance</p>
+                <p className="subtle">Stronger or weaker than a year ago</p>
               </div>
-              <ul className="status-list">
-                {sustainability.map((item) => (
-                  <li key={item.label}>
-                    <span className="status-row-text">
-                      {item.label}
-                      {item.evidence ? <small className="status-evidence">{item.evidence}</small> : null}
+              <div className="sustain-health">
+                <div className="sustain-health-head" aria-hidden="true">
+                  <span />
+                  <span>Long term</span>
+                  <span>Latest month</span>
+                </div>
+                {sustainability.map((row) => (
+                  <div className="sustain-row" key={row.label}>
+                    <span className="sustain-row-text">
+                      {row.label}
+                      {row.sublabel ? <small className="status-evidence">{row.sublabel}</small> : null}
+                      {row.evidence ? <small className="status-evidence">{row.evidence}</small> : null}
                     </span>
-                    {item.value ? <strong>{item.value}</strong> : null}
-                  </li>
+                    <span className={`sustain-thumb is-${row.longTerm}`} title={longTermLabel(row.longTerm)}>
+                      {longTermGlyph(row.longTerm)}
+                    </span>
+                    <span className={`sustain-verdict is-${row.thisMonthTone}`}>{thisMonthLabel(row.thisMonth)}</span>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </article>
 
             {/* Row 2: Income & Expense (60%) | Top Expense Categories (40%) */}
