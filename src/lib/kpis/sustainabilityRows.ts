@@ -12,56 +12,112 @@
 //     revenue/expense/rollup contribution functions and does NOT re-sum
 //     account balances — a second source of truth would be a drift risk.
 //
-// Each row carries two year-over-year verdicts:
-//   longTerm  — thumb, 12-month-vs-prior basis (ttm / funded-ratio YoY)
+// Each row carries two year-over-year beats:
+//   longTerm  — glyph, 12-month-vs-prior basis (ttm / funded-ratio YoY)
 //   thisMonth — last completed month vs the same month one year ago
 //
-// Both verdicts are polarity-normalized so 'up' always means "good" and
-// 'down' always means "bad" — the renderer stays dumb and cannot reintroduce
-// a polarity bug (Cost Discipline is good when costs fall).
+// ONE calibrated state per beat drives the glyph, the verdict word, the color,
+// AND the two-beat evidence sentence — there is no separate path, so the four
+// can never contradict (the bug this card had: a near-zero +0.04% TTM rendered
+// a confident "up" glyph beside a "down 15%" month evidence string).
+//
+// Flat band, by metric kind (calibration surface — see PR / pre-commit gate):
+//   - Percentage rows (Revenue, Cost) have a large, stable, positive base, so
+//     a RELATIVE ±3% band is meaningful and safe.
+//   - Dollar rows (Monthly Cash Result, Cash Reserve balance) cross zero and
+//     sit near zero, where a relative % explodes (the bug 82c412f fixed for the
+//     evidence). They use an ABSOLUTE dollar floor instead.
+//   - The funded-ratio long-term reserve beat is a bounded 0–5 ratio, so it
+//     uses a small ABSOLUTE ratio band.
+//
+// Both beats are polarity-normalized so 'up' always means "good" and 'down'
+// always means "bad" — the renderer stays dumb and cannot reintroduce a
+// polarity bug (Cost Discipline is good when costs fall).
 
-import type { DashboardModel } from '../data/contract';
+import type { DashboardModel, KpiMetricComparison, KpiTimeframeComparison } from '../data/contract';
 import type { BalancePoint } from '../data/balanceSeries';
 import { computeRunwayMetric } from './compute';
 
-const EPSILON = 0.00001;
+// ── Calibration constants ─────────────────────────────────────────────────────
+// A move within these bands reads "flat" — neither better nor worse.
+const FLAT_BAND_PCT = 3; // % rows: |YoY %| ≤ 3 → flat
+const FLAT_FLOOR_MONTH_USD = 2_000; // single-month dollar beats (net cash, reserve balance)
+const FLAT_FLOOR_ANNUAL_USD = 6_000; // 12-month-sum dollar beat (TTM net cash)
+const FLAT_BAND_FUNDED_RATIO = 0.1; // funded-ratio beat (0–5 scale; 0.1 ≈ a tenth of target coverage)
 
-/** 'up' = good · 'down' = bad · 'flat' = no meaningful change · 'none' = no data. */
+/** 'up' = better · 'down' = worse · 'flat' = no meaningful change · 'none' = no data. */
 export type Verdict = 'up' | 'down' | 'flat' | 'none';
 
 type MetricPair = { current: number; previous: number } | null | undefined;
 
-// Raw trend rule, identical to the prior Sustainability block: a single
-// {current, previous} carries no streak, so direction is just the sign of the
-// delta measured against EPSILON. Exported so card + tests share one rule.
-export function trendOf(metric: MetricPair): Verdict {
+/**
+ * How "flat" is decided for a beat:
+ *  - 'pct'   relative band on a large, stable, positive base; prior 0 → 'none'
+ *            (can't divide), matching the percentage-row unavailable rule.
+ *  - 'usd'   absolute dollar floor; a 0 or negative prior is a VALID state
+ *            (breakeven / a money-losing month are real), so only a missing
+ *            pair is 'none'.
+ *  - 'ratio' absolute band on a bounded ratio; same prior-0-is-valid rule.
+ */
+type FlatRule =
+  | { kind: 'pct'; band: number }
+  | { kind: 'usd'; floor: number }
+  | { kind: 'ratio'; band: number };
+
+// Raw direction with the kind-appropriate flat band. No polarity here.
+function rawState(metric: MetricPair, flat: FlatRule): Verdict {
   if (!metric) return 'none';
   const delta = metric.current - metric.previous;
-  return Math.abs(delta) <= EPSILON ? 'flat' : delta > 0 ? 'up' : 'down';
+  if (flat.kind === 'pct') {
+    if (metric.previous === 0) return 'none'; // divide-by-zero → unavailable
+    const pct = (delta / Math.abs(metric.previous)) * 100;
+    if (Math.abs(pct) <= flat.band) return 'flat';
+    return pct > 0 ? 'up' : 'down';
+  }
+  // 'usd' | 'ratio' — absolute band; prior 0/negative is a valid comparison.
+  const tol = flat.kind === 'usd' ? flat.floor : flat.band;
+  if (Math.abs(delta) <= tol) return 'flat';
+  return delta > 0 ? 'up' : 'down';
 }
 
-// Normalize a raw trend into good/bad space. `goodWhen` names the raw
-// direction that is GOOD for this metric — 'down' for costs (a fall is good),
-// 'up' for everything else here.
-function verdictFor(metric: MetricPair, goodWhen: 'up' | 'down'): Verdict {
-  const t = trendOf(metric);
+/**
+ * Polarity-normalized state. `goodWhen` names the RAW direction that is GOOD
+ * for this metric — 'down' for costs (a fall is good), 'up' for everything else.
+ * Exported so card + tests share one rule.
+ */
+export function sustainabilityState(metric: MetricPair, goodWhen: 'up' | 'down', flat: FlatRule): Verdict {
+  const t = rawState(metric, flat);
   if (t === 'none' || t === 'flat') return t;
   return t === goodWhen ? 'up' : 'down';
 }
 
-// "Up 8% YoY" / "Down 5% YoY" / "Flat YoY" — describes the RAW metric move
-// (the verdict, not the evidence, carries good/bad). For metrics with a large,
-// stable positive base (revenue, expenses) the percentage is meaningful.
-function yoyPercentEvidence(metric: MetricPair): string | undefined {
-  if (!metric) return undefined;
-  const t = trendOf(metric);
-  if (t === 'none') return undefined;
-  if (t === 'flat') return 'Flat YoY';
-  const pct =
-    Math.abs(metric.previous) <= EPSILON
-      ? null
-      : Math.round((Math.abs(metric.current - metric.previous) / Math.abs(metric.previous)) * 100);
-  return `${t === 'up' ? 'Up' : 'Down'}${pct === null ? '' : ` ${pct}%`} YoY`;
+// A flow beat (Revenue / Cost / Monthly Cash Result) is a real YoY comparison
+// only when BOTH of its windows actually have history. computeKpiYoYComparisons
+// fabricates a zero for an empty window — current AND previous — while recording
+// the truth in current/previousMonthCount. resolveAnchorMonth pins the current
+// window to the literal calendar month without clamping to available data, so a
+// thin- or lagging-history workspace can land currentMonthCount: 0 with a real
+// prior (or vice-versa). Without a window-presence gate those render a phantom
+// verdict — "$0 vs $11K a year ago" (no current data), or "down 100%" for the
+// percentage rows — instead of "Not enough history yet."
+//
+// Gate on window PRESENCE, not value: a genuine $0 month (count > 0) still
+// compares as a real breakeven, and the percentage rows keep their own
+// divide-by-zero guard for a real zero prior. The same gated value feeds both
+// state and evidence, so the verdict and the sentence can never disagree.
+function metricIfBothWindows(
+  comparison: KpiTimeframeComparison | null | undefined,
+  pick: (c: KpiTimeframeComparison) => KpiMetricComparison,
+): MetricPair {
+  if (!comparison || comparison.currentMonthCount <= 0 || comparison.previousMonthCount <= 0) return null;
+  return pick(comparison);
+}
+
+// Whole-number absolute YoY percentage for the "{x}%" copy. Only called for
+// up/down beats, where the prior is non-zero (a zero prior is 'none').
+function absYoyPctText(metric: MetricPair): string {
+  if (!metric || metric.previous === 0) return '0';
+  return String(Math.abs(Math.round(((metric.current - metric.previous) / Math.abs(metric.previous)) * 100)));
 }
 
 function formatCompactUsd(value: number): string {
@@ -72,14 +128,89 @@ function formatCompactUsd(value: number): string {
   return `${sign}$${Math.round(abs)}`;
 }
 
-// Monthly Cash Result is a FLOW that crosses zero, so a YoY *percentage*
-// explodes off a near-zero prior month (e.g. a $50 prior April reads as
-// "+6624%") — the same owner-facing nonsense the reserve-coverage delta
-// avoided by switching from relative to absolute. Show signed dollar
-// magnitudes instead, with the same "vs a year ago" phrasing as Cash Reserve.
-function dollarYoYEvidence(metric: MetricPair): string | undefined {
-  if (!metric) return undefined;
-  return `${formatCompactUsd(metric.current)} vs ${formatCompactUsd(metric.previous)} a year ago`;
+const NOT_ENOUGH = 'Not enough history yet.';
+
+// Join a row's two beats. When BOTH are unavailable, collapse to a single
+// "Not enough history yet." rather than repeating it.
+function twoBeat(longTermPhrase: string, monthPhrase: string, ltNone: boolean, moNone: boolean): string {
+  if (ltNone && moNone) return NOT_ENOUGH;
+  return `${longTermPhrase} ${monthPhrase}`;
+}
+
+// ── Per-row evidence (copy is locked; verbatim except interpolation) ───────────
+
+function revenueEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): string {
+  const longTerm =
+    lt === 'up' ? 'Growing over the year.' : lt === 'flat' ? 'Flat over the year.' : lt === 'down' ? 'Down over the year.' : NOT_ENOUGH;
+  const x = absYoyPctText(moMetric);
+  const month =
+    mo === 'up' ? `Last month up ${x}%.` : mo === 'flat' ? 'Last month about even.' : mo === 'down' ? `Last month down ${x}%.` : NOT_ENOUGH;
+  return twoBeat(longTerm, month, lt === 'none', mo === 'none');
+}
+
+function costEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): string {
+  const longTerm =
+    lt === 'up'
+      ? 'Costs improved over the year.'
+      : lt === 'flat'
+        ? 'Costs steady over the year.'
+        : lt === 'down'
+          ? 'Costs up over the year.'
+          : NOT_ENOUGH;
+  const x = absYoyPctText(moMetric);
+  const month =
+    mo === 'up'
+      ? `Last month spending improved ${x}%.`
+      : mo === 'flat'
+        ? 'Last month spending about even.'
+        : mo === 'down'
+          ? `Last month spending rose ${x}%.`
+          : NOT_ENOUGH;
+  return twoBeat(longTerm, month, lt === 'none', mo === 'none');
+}
+
+function cashResultEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): string {
+  const longTerm =
+    lt === 'up'
+      ? 'Cash flow strengthening.'
+      : lt === 'flat'
+        ? 'Cash flow steady.'
+        : lt === 'down'
+          ? 'Cash flow getting tighter.'
+          : NOT_ENOUGH;
+  const pair = moMetric
+    ? `${formatCompactUsd(moMetric.current)} vs ${formatCompactUsd(moMetric.previous)} a year ago`
+    : '';
+  const month =
+    mo === 'up'
+      ? `Last month improved — ${pair}.`
+      : mo === 'flat'
+        ? 'Last month about the same.'
+        : mo === 'down'
+          ? `Last month weaker — ${pair}.`
+          : NOT_ENOUGH;
+  return twoBeat(longTerm, month, lt === 'none', mo === 'none');
+}
+
+function reserveEvidence(lt: Verdict, mo: Verdict, moPair: MetricPair): string {
+  const longTerm =
+    lt === 'up'
+      ? 'Cash cushion stronger over the year.'
+      : lt === 'flat'
+        ? 'Cash cushion steady over the year.'
+        : lt === 'down'
+          ? 'Cash cushion weaker over the year.'
+          : NOT_ENOUGH;
+  const pair = moPair ? `${formatCompactUsd(moPair.current)} vs ${formatCompactUsd(moPair.previous)}` : '';
+  const month =
+    mo === 'up'
+      ? `Cash cushion stronger than last year — ${pair}.`
+      : mo === 'flat'
+        ? `Cash cushion about the same as last year — ${pair}.`
+        : mo === 'down'
+          ? `Cash cushion lower than last year — ${pair}.`
+          : NOT_ENOUGH;
+  return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
 
 // Last point of the (dense, daily, ascending) cashBalanceSeries that falls in
@@ -110,6 +241,7 @@ export type SustainabilityRow = {
    *  is neutralized — green must never signal "fine" on a month that lost
    *  money, even though the trend genuinely improved. */
   thisMonthTone: Verdict;
+  /** Two-beat sentence: "[long-term phrase] [latest-month phrase]". */
   evidence?: string;
 };
 
@@ -153,50 +285,77 @@ export function buildSustainabilityRows(
       ? { current: fundedNow, previous: fundedPrior }
       : null;
 
-  const reserveEvidence = reserveThisMonth
-    ? `${formatCompactUsd(currentBalance as number)} vs ${formatCompactUsd(priorBalance as number)} a year ago`
-    : 'Not enough history';
+  const PCT: FlatRule = { kind: 'pct', band: FLAT_BAND_PCT };
+  const USD_MONTH: FlatRule = { kind: 'usd', floor: FLAT_FLOOR_MONTH_USD };
+  const USD_ANNUAL: FlatRule = { kind: 'usd', floor: FLAT_FLOOR_ANNUAL_USD };
+  const RATIO: FlatRule = { kind: 'ratio', band: FLAT_BAND_FUNDED_RATIO };
 
-  // Monthly Cash Result this-month verdict + the color guard. The label tracks
-  // the YoY direction (improving = "Getting Better"), but a month that improved
-  // YoY while STILL losing money must not render green — green reads as "fine,"
-  // and a money-losing month is not fine. So when the current month's net is
-  // negative, force the COLOR to neutral while leaving the LABEL as the honest
-  // trend. The dollar evidence ("-$3.8K vs -$6.5K a year ago") carries the level.
-  const cashThisMonth = verdictFor(lastMonth?.netCashFlow, 'up');
-  const cashIsNegative = (lastMonth?.netCashFlow?.current ?? 0) < 0;
-  const cashThisMonthTone: Verdict =
-    cashThisMonth === 'up' && cashIsNegative ? 'flat' : cashThisMonth;
+  // Each flow beat is gated on BOTH its windows having real history (see
+  // metricIfBothWindows), so a thin/lagging-history workspace renders "Not
+  // enough history yet." instead of a phantom verdict against a fabricated zero
+  // ("$0 vs $11K a year ago", or "down 100%" for the percentage rows). The SAME
+  // gated value feeds both the state and the evidence string, so the verdict and
+  // the sentence can never disagree.
+
+  // Revenue Momentum — up = good, percentage basis.
+  const revLongTermMetric = metricIfBothWindows(ttm, (c) => c.revenue);
+  const revThisMonthMetric = metricIfBothWindows(lastMonth, (c) => c.revenue);
+  const revLongTerm = sustainabilityState(revLongTermMetric, 'up', PCT);
+  const revThisMonth = sustainabilityState(revThisMonthMetric, 'up', PCT);
+
+  // Cost Discipline — down = good (inverted), percentage basis.
+  const costLongTermMetric = metricIfBothWindows(ttm, (c) => c.expenses);
+  const costThisMonthMetric = metricIfBothWindows(lastMonth, (c) => c.expenses);
+  const costLongTerm = sustainabilityState(costLongTermMetric, 'down', PCT);
+  const costThisMonth = sustainabilityState(costThisMonthMetric, 'down', PCT);
+
+  // Monthly Cash Result — up = good, signed dollars (annual sum long-term,
+  // single month this-month). The label tracks the YoY direction, but a month
+  // that improved YoY while STILL losing money must not render green — green
+  // reads as "fine," and a money-losing month is not fine. So when the current
+  // month's net is negative, force the COLOR to neutral while leaving the LABEL
+  // as the honest trend. The dollar evidence carries the level.
+  const cashLongTermMetric = metricIfBothWindows(ttm, (c) => c.netCashFlow);
+  const cashThisMonthMetric = metricIfBothWindows(lastMonth, (c) => c.netCashFlow);
+  const cashLongTerm = sustainabilityState(cashLongTermMetric, 'up', USD_ANNUAL);
+  const cashThisMonth = sustainabilityState(cashThisMonthMetric, 'up', USD_MONTH);
+  const cashIsNegative = (cashThisMonthMetric?.current ?? 0) < 0;
+  const cashThisMonthTone: Verdict = cashThisMonth === 'up' && cashIsNegative ? 'flat' : cashThisMonth;
+
+  // Cash Reserve — up = good. Long-term = funded-ratio YoY (a position, matching
+  // the shipped glyph); this-month = month-end dollar balance YoY.
+  const reserveLong = sustainabilityState(reserveLongTerm, 'up', RATIO);
+  const reserveMonth = sustainabilityState(reserveThisMonth, 'up', USD_MONTH);
 
   return [
     {
       label: 'Revenue Momentum',
-      longTerm: verdictFor(ttm?.revenue, 'up'),
-      thisMonth: verdictFor(lastMonth?.revenue, 'up'),
-      thisMonthTone: verdictFor(lastMonth?.revenue, 'up'),
-      evidence: yoyPercentEvidence(lastMonth?.revenue),
+      longTerm: revLongTerm,
+      thisMonth: revThisMonth,
+      thisMonthTone: revThisMonth,
+      evidence: revenueEvidence(revLongTerm, revThisMonth, revThisMonthMetric),
     },
     {
       label: 'Cost Discipline',
-      longTerm: verdictFor(ttm?.expenses, 'down'),
-      thisMonth: verdictFor(lastMonth?.expenses, 'down'),
-      thisMonthTone: verdictFor(lastMonth?.expenses, 'down'),
-      evidence: yoyPercentEvidence(lastMonth?.expenses),
+      longTerm: costLongTerm,
+      thisMonth: costThisMonth,
+      thisMonthTone: costThisMonth,
+      evidence: costEvidence(costLongTerm, costThisMonth, costThisMonthMetric),
     },
     {
       label: 'Monthly Cash Result',
-      longTerm: verdictFor(ttm?.netCashFlow, 'up'),
+      longTerm: cashLongTerm,
       thisMonth: cashThisMonth,
       thisMonthTone: cashThisMonthTone,
-      evidence: dollarYoYEvidence(lastMonth?.netCashFlow),
+      evidence: cashResultEvidence(cashLongTerm, cashThisMonth, cashThisMonthMetric),
     },
     {
       label: 'Cash Reserve',
       sublabel: 'Month-end reserve vs same month last year',
-      longTerm: verdictFor(reserveLongTerm, 'up'),
-      thisMonth: verdictFor(reserveThisMonth, 'up'),
-      thisMonthTone: verdictFor(reserveThisMonth, 'up'),
-      evidence: reserveEvidence,
+      longTerm: reserveLong,
+      thisMonth: reserveMonth,
+      thisMonthTone: reserveMonth,
+      evidence: reserveEvidence(reserveLong, reserveMonth, reserveThisMonth),
     },
   ];
 }
