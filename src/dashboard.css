@@ -2833,7 +2833,7 @@ body {
   color: var(--fg-primary, var(--text-primary));
 }
 .sustain-metric .m-msg {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 400;
   color: var(--fg-muted, var(--text-secondary));
 }
