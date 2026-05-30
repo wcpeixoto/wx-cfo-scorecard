@@ -2948,7 +2948,7 @@ export default function Dashboard() {
                     <span className={`sustain-thumb is-${row.longTerm}`} title={longTermLabel(row.longTerm)}>
                       {longTermGlyph(row.longTerm)}
                     </span>
-                    <span className={`sustain-verdict is-${row.thisMonth}`}>{thisMonthLabel(row.thisMonth)}</span>
+                    <span className={`sustain-verdict is-${row.thisMonthTone}`}>{thisMonthLabel(row.thisMonth)}</span>
                   </div>
                 ))}
               </div>

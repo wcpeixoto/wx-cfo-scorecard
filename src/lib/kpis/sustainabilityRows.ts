@@ -103,7 +103,13 @@ export type SustainabilityRow = {
    *  flow rows that share the same two columns. */
   sublabel?: string;
   longTerm: Verdict;
+  /** Drives the this-month LABEL ("Getting Better" / "Getting Worse"). */
   thisMonth: Verdict;
+  /** Drives the this-month COLOR. Equal to `thisMonth` for every row except
+   *  the guarded case where an improving-but-still-negative Monthly Cash Result
+   *  is neutralized — green must never signal "fine" on a month that lost
+   *  money, even though the trend genuinely improved. */
+  thisMonthTone: Verdict;
   evidence?: string;
 };
 
@@ -151,23 +157,37 @@ export function buildSustainabilityRows(
     ? `${formatCompactUsd(currentBalance as number)} vs ${formatCompactUsd(priorBalance as number)} a year ago`
     : 'Not enough history';
 
+  // Monthly Cash Result this-month verdict + the color guard. The label tracks
+  // the YoY direction (improving = "Getting Better"), but a month that improved
+  // YoY while STILL losing money must not render green — green reads as "fine,"
+  // and a money-losing month is not fine. So when the current month's net is
+  // negative, force the COLOR to neutral while leaving the LABEL as the honest
+  // trend. The dollar evidence ("-$3.8K vs -$6.5K a year ago") carries the level.
+  const cashThisMonth = verdictFor(lastMonth?.netCashFlow, 'up');
+  const cashIsNegative = (lastMonth?.netCashFlow?.current ?? 0) < 0;
+  const cashThisMonthTone: Verdict =
+    cashThisMonth === 'up' && cashIsNegative ? 'flat' : cashThisMonth;
+
   return [
     {
       label: 'Revenue Momentum',
       longTerm: verdictFor(ttm?.revenue, 'up'),
       thisMonth: verdictFor(lastMonth?.revenue, 'up'),
+      thisMonthTone: verdictFor(lastMonth?.revenue, 'up'),
       evidence: yoyPercentEvidence(lastMonth?.revenue),
     },
     {
       label: 'Cost Discipline',
       longTerm: verdictFor(ttm?.expenses, 'down'),
       thisMonth: verdictFor(lastMonth?.expenses, 'down'),
+      thisMonthTone: verdictFor(lastMonth?.expenses, 'down'),
       evidence: yoyPercentEvidence(lastMonth?.expenses),
     },
     {
       label: 'Monthly Cash Result',
       longTerm: verdictFor(ttm?.netCashFlow, 'up'),
-      thisMonth: verdictFor(lastMonth?.netCashFlow, 'up'),
+      thisMonth: cashThisMonth,
+      thisMonthTone: cashThisMonthTone,
       evidence: dollarYoYEvidence(lastMonth?.netCashFlow),
     },
     {
@@ -175,6 +195,7 @@ export function buildSustainabilityRows(
       sublabel: 'Month-end reserve vs same month last year',
       longTerm: verdictFor(reserveLongTerm, 'up'),
       thisMonth: verdictFor(reserveThisMonth, 'up'),
+      thisMonthTone: verdictFor(reserveThisMonth, 'up'),
       evidence: reserveEvidence,
     },
   ];

@@ -217,3 +217,50 @@ describe('Monthly Cash Result evidence', () => {
     expect(cash.thisMonth).toBe('down');
   });
 });
+
+// ── Monthly Cash Result color guard ───────────────────────────────────────────
+// Label tracks the YoY trend; color must never say "fine" (green) on a month
+// that still lost money. thisMonth = the trend; thisMonthTone = the color.
+
+describe('Monthly Cash Result color guard', () => {
+  it('improving-but-still-negative: label "Getting Better", color neutral (not green)', () => {
+    // The live April case: -$3,802 this year, up from -$6,519 last year.
+    const lastMonth = comparison('2026-04', '2025-04', { netCashFlow: metric(-3_802, -6_519) });
+    const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(0, 12_979) });
+    const rows = buildSustainabilityRows(modelWith(lastMonth, ttm, []), []);
+    const cash = rows.find((r) => r.label === 'Monthly Cash Result')!;
+    expect(cash.thisMonth).toBe('up'); // trend label: Getting Better
+    expect(cash.thisMonthTone).toBe('flat'); // color: neutral, NOT green
+  });
+
+  it('improving and positive: both label and color are up (green)', () => {
+    const lastMonth = comparison('2026-04', '2025-04', { netCashFlow: metric(5_000, 1_000) });
+    const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(0, 0) });
+    const rows = buildSustainabilityRows(modelWith(lastMonth, ttm, []), []);
+    const cash = rows.find((r) => r.label === 'Monthly Cash Result')!;
+    expect(cash.thisMonth).toBe('up');
+    expect(cash.thisMonthTone).toBe('up'); // genuinely fine → green is allowed
+  });
+
+  it('worsening: label and color both down (guard does not touch the down case)', () => {
+    const lastMonth = comparison('2026-04', '2025-04', { netCashFlow: metric(-3_394, 1_200) });
+    const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(0, 0) });
+    const rows = buildSustainabilityRows(modelWith(lastMonth, ttm, []), []);
+    const cash = rows.find((r) => r.label === 'Monthly Cash Result')!;
+    expect(cash.thisMonth).toBe('down');
+    expect(cash.thisMonthTone).toBe('down');
+  });
+
+  it('other rows: tone always equals verdict (guard is Cash-Result-only)', () => {
+    const lastMonth = comparison('2026-04', '2025-04', {
+      revenue: metric(110, 100),
+      expenses: metric(110, 100),
+    });
+    const ttm = comparison('2026-04', '2025-04', { revenue: metric(1, 1), expenses: metric(1, 1) });
+    const rows = buildSustainabilityRows(modelWith(lastMonth, ttm, []), []);
+    for (const label of ['Revenue Momentum', 'Cost Discipline']) {
+      const row = rows.find((r) => r.label === label)!;
+      expect(row.thisMonthTone).toBe(row.thisMonth);
+    }
+  });
+});
