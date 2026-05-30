@@ -23,7 +23,10 @@ function comparison(
   currentEndMonth: string | null,
   previousEndMonth: string | null,
   metrics: Partial<
-    Pick<KpiTimeframeComparison, 'revenue' | 'expenses' | 'netCashFlow' | 'savingsRate' | 'previousMonthCount'>
+    Pick<
+      KpiTimeframeComparison,
+      'revenue' | 'expenses' | 'netCashFlow' | 'savingsRate' | 'currentMonthCount' | 'previousMonthCount'
+    >
   >,
 ): KpiTimeframeComparison {
   return {
@@ -254,10 +257,10 @@ describe('Monthly Cash Result', () => {
     expect(cash.evidence).not.toMatch(/Infinity|NaN|%/);
   });
 
-  it('missing prior history is unavailable, NOT a comparison against a fabricated $0', () => {
+  it('missing PRIOR history is unavailable, NOT a comparison against a fabricated $0', () => {
     // computeKpiYoYComparisons fabricates previous:0 when the prior window has no
     // months, but flags it with previousMonthCount:0. The dollar rule treats a real
-    // $0 prior as valid, so without the month-count guard this would render
+    // $0 prior as valid, so without the window-presence guard this would render
     // "Last month improved — $5.0K vs $0 a year ago" instead of empty.
     const lastMonth = comparison('2026-04', '2025-04', {
       netCashFlow: metric(5_000, 0),
@@ -266,6 +269,26 @@ describe('Monthly Cash Result', () => {
     const ttm = comparison('2026-04', '2025-04', {
       netCashFlow: metric(48_000, 0),
       previousMonthCount: 0,
+    });
+    const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
+    expect(cash.longTerm).toBe('none');
+    expect(cash.thisMonth).toBe('none');
+    expect(cash.thisMonthTone).toBe('none');
+    expect(cash.evidence).toBe('Not enough history yet.');
+    expect(cash.evidence).not.toMatch(/\$0/);
+  });
+
+  it('missing CURRENT history is unavailable, NOT "$0 vs $X" (the symmetric P1)', () => {
+    // resolveAnchorMonth pins the current window to the literal calendar month, so a
+    // lagging-data workspace lands currentMonthCount:0 with a real prior. Without the
+    // current-side guard this renders a phantom "Last month weaker — $0 vs $11K".
+    const lastMonth = comparison('2026-04', '2025-04', {
+      netCashFlow: metric(0, 11_000),
+      currentMonthCount: 0,
+    });
+    const ttm = comparison('2026-04', '2025-04', {
+      netCashFlow: metric(0, 44_000),
+      currentMonthCount: 0,
     });
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
     expect(cash.longTerm).toBe('none');
@@ -286,6 +309,54 @@ describe('Monthly Cash Result', () => {
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
     expect(cash.thisMonth).toBe('up'); // +$5,000 > $2,000 floor
     expect(cash.evidence).toBe('Cash flow strengthening. Last month improved — $5.0K vs $0 a year ago.');
+  });
+});
+
+// ── Percentage rows: window-presence guard (the symmetric P1, % side) ──────────
+// An empty current window fabricates current:0 against a real prior, which the
+// percentage path would otherwise render as "down 100%" — a no-data month looking
+// like a total collapse. Gate on window presence, same as the cash row.
+
+describe('percentage rows — window-presence guard', () => {
+  it('Revenue/Cost render unavailable (not "down 100%") when the current window is empty', () => {
+    const lastMonth = comparison('2026-04', '2025-04', {
+      revenue: metric(0, 46_000),
+      expenses: metric(0, 52_000),
+      currentMonthCount: 0,
+    });
+    const ttm = comparison('2026-04', '2025-04', {
+      revenue: metric(0, 489_000),
+      expenses: metric(0, 460_000),
+      currentMonthCount: 0,
+    });
+    const rows = rowsFor(lastMonth, ttm);
+    for (const label of ['Revenue Momentum', 'Cost Discipline']) {
+      const row = rows.find((r) => r.label === label)!;
+      expect(row.longTerm).toBe('none');
+      expect(row.thisMonth).toBe('none');
+      expect(row.evidence).toBe('Not enough history yet.');
+      expect(row.evidence).not.toMatch(/100%|%/);
+    }
+  });
+
+  it('Revenue/Cost render unavailable when the prior window is empty', () => {
+    const lastMonth = comparison('2026-04', '2025-04', {
+      revenue: metric(46_000, 0),
+      expenses: metric(52_000, 0),
+      previousMonthCount: 0,
+    });
+    const ttm = comparison('2026-04', '2025-04', {
+      revenue: metric(489_000, 0),
+      expenses: metric(460_000, 0),
+      previousMonthCount: 0,
+    });
+    const rows = rowsFor(lastMonth, ttm);
+    for (const label of ['Revenue Momentum', 'Cost Discipline']) {
+      const row = rows.find((r) => r.label === label)!;
+      expect(row.longTerm).toBe('none');
+      expect(row.thisMonth).toBe('none');
+      expect(row.evidence).toBe('Not enough history yet.');
+    }
   });
 });
 

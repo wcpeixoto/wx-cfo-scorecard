@@ -34,7 +34,7 @@
 // always means "bad" — the renderer stays dumb and cannot reintroduce a
 // polarity bug (Cost Discipline is good when costs fall).
 
-import type { DashboardModel, KpiTimeframeComparison } from '../data/contract';
+import type { DashboardModel, KpiMetricComparison, KpiTimeframeComparison } from '../data/contract';
 import type { BalancePoint } from '../data/balanceSeries';
 import { computeRunwayMetric } from './compute';
 
@@ -91,17 +91,26 @@ export function sustainabilityState(metric: MetricPair, goodWhen: 'up' | 'down',
   return t === goodWhen ? 'up' : 'down';
 }
 
-// The dollar net-cash beats treat a prior of $0 as a VALID comparison
-// (breakeven is a real state), so they can't lean on the percentage rows'
-// divide-by-zero guard to reject an absent prior. But computeKpiYoYComparisons
-// fabricates `previous: 0` for a window with no history while recording the
-// truth in `previousMonthCount: 0`. Pull the metric only when that prior window
-// actually has months — otherwise return null so the dollar rule (and the
-// evidence built from the same value) both fall to 'none' / "Not enough history
-// yet." rather than comparing against a fabricated $0.
-function netCashIfPriorExists(comparison: KpiTimeframeComparison | null | undefined): MetricPair {
-  if (!comparison || comparison.previousMonthCount <= 0) return null;
-  return comparison.netCashFlow;
+// A flow beat (Revenue / Cost / Monthly Cash Result) is a real YoY comparison
+// only when BOTH of its windows actually have history. computeKpiYoYComparisons
+// fabricates a zero for an empty window — current AND previous — while recording
+// the truth in current/previousMonthCount. resolveAnchorMonth pins the current
+// window to the literal calendar month without clamping to available data, so a
+// thin- or lagging-history workspace can land currentMonthCount: 0 with a real
+// prior (or vice-versa). Without a window-presence gate those render a phantom
+// verdict — "$0 vs $11K a year ago" (no current data), or "down 100%" for the
+// percentage rows — instead of "Not enough history yet."
+//
+// Gate on window PRESENCE, not value: a genuine $0 month (count > 0) still
+// compares as a real breakeven, and the percentage rows keep their own
+// divide-by-zero guard for a real zero prior. The same gated value feeds both
+// state and evidence, so the verdict and the sentence can never disagree.
+function metricIfBothWindows(
+  comparison: KpiTimeframeComparison | null | undefined,
+  pick: (c: KpiTimeframeComparison) => KpiMetricComparison,
+): MetricPair {
+  if (!comparison || comparison.currentMonthCount <= 0 || comparison.previousMonthCount <= 0) return null;
+  return pick(comparison);
 }
 
 // Whole-number absolute YoY percentage for the "{x}%" copy. Only called for
@@ -281,13 +290,24 @@ export function buildSustainabilityRows(
   const USD_ANNUAL: FlatRule = { kind: 'usd', floor: FLAT_FLOOR_ANNUAL_USD };
   const RATIO: FlatRule = { kind: 'ratio', band: FLAT_BAND_FUNDED_RATIO };
 
+  // Each flow beat is gated on BOTH its windows having real history (see
+  // metricIfBothWindows), so a thin/lagging-history workspace renders "Not
+  // enough history yet." instead of a phantom verdict against a fabricated zero
+  // ("$0 vs $11K a year ago", or "down 100%" for the percentage rows). The SAME
+  // gated value feeds both the state and the evidence string, so the verdict and
+  // the sentence can never disagree.
+
   // Revenue Momentum — up = good, percentage basis.
-  const revLongTerm = sustainabilityState(ttm?.revenue, 'up', PCT);
-  const revThisMonth = sustainabilityState(lastMonth?.revenue, 'up', PCT);
+  const revLongTermMetric = metricIfBothWindows(ttm, (c) => c.revenue);
+  const revThisMonthMetric = metricIfBothWindows(lastMonth, (c) => c.revenue);
+  const revLongTerm = sustainabilityState(revLongTermMetric, 'up', PCT);
+  const revThisMonth = sustainabilityState(revThisMonthMetric, 'up', PCT);
 
   // Cost Discipline — down = good (inverted), percentage basis.
-  const costLongTerm = sustainabilityState(ttm?.expenses, 'down', PCT);
-  const costThisMonth = sustainabilityState(lastMonth?.expenses, 'down', PCT);
+  const costLongTermMetric = metricIfBothWindows(ttm, (c) => c.expenses);
+  const costThisMonthMetric = metricIfBothWindows(lastMonth, (c) => c.expenses);
+  const costLongTerm = sustainabilityState(costLongTermMetric, 'down', PCT);
+  const costThisMonth = sustainabilityState(costThisMonthMetric, 'down', PCT);
 
   // Monthly Cash Result — up = good, signed dollars (annual sum long-term,
   // single month this-month). The label tracks the YoY direction, but a month
@@ -295,12 +315,8 @@ export function buildSustainabilityRows(
   // reads as "fine," and a money-losing month is not fine. So when the current
   // month's net is negative, force the COLOR to neutral while leaving the LABEL
   // as the honest trend. The dollar evidence carries the level.
-  // Gate each beat on its own prior window having real history (see
-  // netCashIfPriorExists) so an absent prior renders "Not enough history yet."
-  // instead of a comparison against a fabricated $0. The SAME gated value feeds
-  // both the state and the evidence string, so they can never disagree.
-  const cashLongTermMetric = netCashIfPriorExists(ttm);
-  const cashThisMonthMetric = netCashIfPriorExists(lastMonth);
+  const cashLongTermMetric = metricIfBothWindows(ttm, (c) => c.netCashFlow);
+  const cashThisMonthMetric = metricIfBothWindows(lastMonth, (c) => c.netCashFlow);
   const cashLongTerm = sustainabilityState(cashLongTermMetric, 'up', USD_ANNUAL);
   const cashThisMonth = sustainabilityState(cashThisMonthMetric, 'up', USD_MONTH);
   const cashIsNegative = (cashThisMonthMetric?.current ?? 0) < 0;
@@ -317,14 +333,14 @@ export function buildSustainabilityRows(
       longTerm: revLongTerm,
       thisMonth: revThisMonth,
       thisMonthTone: revThisMonth,
-      evidence: revenueEvidence(revLongTerm, revThisMonth, lastMonth?.revenue),
+      evidence: revenueEvidence(revLongTerm, revThisMonth, revThisMonthMetric),
     },
     {
       label: 'Cost Discipline',
       longTerm: costLongTerm,
       thisMonth: costThisMonth,
       thisMonthTone: costThisMonth,
-      evidence: costEvidence(costLongTerm, costThisMonth, lastMonth?.expenses),
+      evidence: costEvidence(costLongTerm, costThisMonth, costThisMonthMetric),
     },
     {
       label: 'Monthly Cash Result',
