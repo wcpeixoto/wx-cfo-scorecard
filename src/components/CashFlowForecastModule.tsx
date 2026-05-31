@@ -1001,9 +1001,10 @@ export default function CashFlowForecastModule({
               <button type="button" className="cashflow-tooltip" aria-label="Projected Reserve Need explanation">&#9432;</button>
               <div role="tooltip" className="cashflow-tooltip-panel forecast-reserve-tooltip-panel">
                 <ul className="cashflow-tooltip-list">
-                  <li className="cashflow-tooltip-body">This shows how much cash reserve the business may need based on projected monthly expenses.</li>
-                  <li className="cashflow-tooltip-body">Revenue changes affect your future cash balance, but they do not change the reserve need.</li>
-                  <li className="cashflow-tooltip-body">Expense changes affect both the reserve need and your future cash balance.</li>
+                  <li className="cashflow-tooltip-body">This shows the cash reserve target the business should plan around.</li>
+                  <li className="cashflow-tooltip-body">Revenue changes affect future cash balance, but they do not change the reserve target.</li>
+                  <li className="cashflow-tooltip-body">Expense changes may affect both reserve target and future cash balance.</li>
+                  <li className="cashflow-tooltip-body">Planning view: based on the next 12 months. The chart range below does not change this card.</li>
                 </ul>
               </div>
             </span>
@@ -1037,8 +1038,9 @@ export default function CashFlowForecastModule({
               <button type="button" className="cashflow-tooltip" aria-label="Projected Monthly Result explanation">&#9432;</button>
               <div role="tooltip" className="cashflow-tooltip-panel forecast-result-tooltip-panel">
                 <ul className="cashflow-tooltip-list">
-                  <li className="cashflow-tooltip-body">This shows the average monthly result based on the active forecast scenario.</li>
+                  <li className="cashflow-tooltip-body">This shows the average monthly result from the active forecast scenario.</li>
                   <li className="cashflow-tooltip-body">Revenue and expense changes affect this number because they change projected cash in, cash out, and net profit.</li>
+                  <li className="cashflow-tooltip-body">Planning view: average of the next 12 months. The chart range below does not change this card.</li>
                 </ul>
               </div>
             </span>
@@ -1055,7 +1057,19 @@ export default function CashFlowForecastModule({
 
         {/* Card 3 — Net Profit Target */}
         <article className="forecast-decision-card">
-          <span className="forecast-decision-label">Net Profit Target: {Math.round(effectiveTargetNetMargin * 100)}%</span>
+          <span className="forecast-decision-label forecast-decision-label--with-tooltip">
+            Net Profit Target: {Math.round(effectiveTargetNetMargin * 100)}%
+            <span className="cashflow-help">
+              <button type="button" className="cashflow-tooltip" aria-label="Net Profit Target explanation">&#9432;</button>
+              <div role="tooltip" className="cashflow-tooltip-panel forecast-target-tooltip-panel">
+                <ul className="cashflow-tooltip-list">
+                  <li className="cashflow-tooltip-body">This shows how much additional monthly revenue is needed to reach your net profit target.</li>
+                  <li className="cashflow-tooltip-body">The target percentage is set in Settings.</li>
+                  <li className="cashflow-tooltip-body">Planning view: based on the next 12 months. The chart range below does not change this card.</li>
+                </ul>
+              </div>
+            </span>
+          </span>
           {isAtGoal && avgNet !== null ? (
             <>
               <strong className="forecast-decision-value forecast-decision-value--md forecast-decision-value--safe">{fmtMonthlyValue(avgNet)}</strong>
