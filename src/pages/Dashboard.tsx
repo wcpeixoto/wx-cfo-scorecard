@@ -2979,7 +2979,11 @@ export default function Dashboard() {
                           </button>
                           <div id={rowTipId} role="tooltip" className="db-tooltip-panel">
                             <ul className="db-tooltip-list">
-                              <li className="db-tooltip-body">Replace Copy</li>
+                              {(row.tooltip ?? []).map((line, lineIndex) => (
+                                <li className="db-tooltip-body" key={lineIndex}>
+                                  {line}
+                                </li>
+                              ))}
                             </ul>
                           </div>
                         </span>
@@ -3029,7 +3033,9 @@ export default function Dashboard() {
                         )}
                       </div>
                       <div className="sustain-pill-cell">
-                        <span className={`sustain-pill is-${row.thisMonthTone}`}>{thisMonthLabel(row.thisMonth)}</span>
+                        <span className={`sustain-pill is-${row.thisMonthTone}`}>
+                          {row.thisMonthLabel ?? thisMonthLabel(row.thisMonth)}
+                        </span>
                       </div>
                     </div>
                   );
