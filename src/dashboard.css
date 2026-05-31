@@ -2954,6 +2954,14 @@ body {
   left: 0;
 }
 
+/* Cash / Reserve rows append a proof line as a second .db-tooltip-body <li>.
+   The global rule sets `li + li { margin-top: 1px }` which is too tight for
+   consecutive prose lines — scope a real gap to this panel only so the basis
+   sentence and proof sentence don't collide. */
+.sustain-label-tip .db-tooltip-panel .db-tooltip-list li + li {
+  margin-top: 8px;
+}
+
 .tab-grid,
 .stack-grid {
   display: grid;

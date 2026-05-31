@@ -507,10 +507,10 @@ describe('per-row tooltips', () => {
     const ttm = comparison('2026-04', '2025-04', { revenue: metric(1100, 1000), expenses: metric(900, 1000) });
     const rows = rowsFor(lastMonth, ttm);
     expect(rows.find((r) => r.label === 'Revenue Momentum')!.tooltip?.[0]).toBe(
-      'Compares revenue from the last 12 months and month to date against the same periods last year.',
+      'Compares revenue over two periods: the last 12 months vs the prior 12 months, and month to date vs the same period one year ago.',
     );
     expect(rows.find((r) => r.label === 'Cost Discipline')!.tooltip?.[0]).toBe(
-      'Compares spending from the last 12 months and month to date against the same periods last year. Lower spending is better.',
+      'Compares spending over two periods: the last 12 months vs the prior 12 months, and month to date vs the same period one year ago. Lower spending is better.',
     );
   });
 
@@ -519,7 +519,7 @@ describe('per-row tooltips', () => {
     const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(16_397, 28_968) });
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
     expect(cash.tooltip).toEqual([
-      'Compares net cash result from the last 12 months and month to date against the same periods last year.',
+      'Compares net cash result over two periods: the last 12 months vs the prior 12 months, and month to date vs the same period one year ago.',
       'Month to date: -$3.4K. Last year: -$6.5K.',
     ]);
   });
@@ -530,7 +530,7 @@ describe('per-row tooltips', () => {
     const rows = buildSustainabilityRows(modelWith(lm, comparison('2026-04', '2025-04', {}), rollupHistory()), series);
     const reserve = rows.find((r) => r.label === 'Cash Reserve')!;
     expect(reserve.tooltip).toEqual([
-      'Long-term compares reserve strength using the latest closed month. Current reserve compares the latest update against the same point last year.',
+      'Long-term compares reserve strength over the last 12 months, using the latest closed month. Current reserve compares cash after the latest transaction update to the same point one year ago.',
       'Current reserve: $60.0K. Last year: $20.0K.',
     ]);
   });
