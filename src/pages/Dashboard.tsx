@@ -626,6 +626,64 @@ type BusinessRules = WorkspaceSettings;
 
 const DEFAULT_BUSINESS_RULES: BusinessRules = { ...DEFAULT_WORKSPACE_SETTINGS };
 
+// Local draft buffer so users can type intermediate non-numeric states ("-",
+// "", "-0") without the controlled input snapping back to the last valid
+// number mid-keystroke (which produced "type -4, get 54" before the fix).
+type ScenarioPctInputProps = {
+  value: number;
+  min: number;
+  max: number;
+  ariaLabel: string;
+  onCommit: (next: number) => void;
+};
+function ScenarioPctInput({ value, min, max, ariaLabel, onCommit }: ScenarioPctInputProps) {
+  const [draft, setDraft] = React.useState<string>(() => String(Math.round(value)));
+  const focusedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!focusedRef.current) setDraft(String(Math.round(value)));
+  }, [value]);
+
+  return (
+    <input
+      className="rules-pct-input"
+      // type="text" (not "number") so intermediate non-numeric states like
+      // "-" or "" survive onChange — number inputs silently drop them, which
+      // caused "type -4, get 54": "-" was reported as "", state snapped back
+      // to "5", then "4" appended to make "54".
+      type="text"
+      inputMode="numeric"
+      pattern="-?[0-9]*"
+      aria-label={ariaLabel}
+      value={draft}
+      onFocus={() => {
+        focusedRef.current = true;
+      }}
+      onChange={(event) => {
+        const next = event.target.value;
+        // Allow empty and a lone "-" as in-progress edits; reject any other
+        // non-integer input so the field can't hold garbage like "5-4".
+        if (next === '' || next === '-' || /^-?\d+$/.test(next)) {
+          setDraft(next);
+          const parsed = Number.parseInt(next, 10);
+          if (Number.isFinite(parsed) && parsed >= min && parsed <= max) {
+            onCommit(parsed);
+          }
+        }
+      }}
+      onBlur={() => {
+        focusedRef.current = false;
+        const parsed = Number.parseInt(draft, 10);
+        if (Number.isFinite(parsed) && parsed >= min && parsed <= max) {
+          setDraft(String(parsed));
+        } else {
+          setDraft(String(Math.round(value)));
+        }
+      }}
+    />
+  );
+}
+
 // One-time migration: read legacy localStorage values into WorkspaceSettings shape.
 // Returns null if no localStorage values found (caller should use Supabase defaults).
 function migrateLocalStorageBusinessRules(): Partial<BusinessRules> | null {
@@ -4416,20 +4474,14 @@ export default function Dashboard() {
                               <label className="rules-pct-field">
                                 <span className="rules-pct-field-label">Revenue</span>
                                 <div className="rules-pct-input-wrap">
-                                  <input
-                                    className="rules-pct-input"
-                                    type="number"
-                                    min="-100"
-                                    max="100"
-                                    step="1"
-                                    aria-label={`${row.label} revenue growth percentage`}
-                                    value={Math.round(businessRules[row.revKey])}
-                                    onChange={(event) => {
-                                      const raw = Number.parseFloat(event.target.value);
-                                      if (Number.isFinite(raw) && raw >= -100 && raw <= 100) {
-                                        updateBusinessRules({ [row.revKey]: raw } as Partial<BusinessRules>);
-                                      }
-                                    }}
+                                  <ScenarioPctInput
+                                    value={businessRules[row.revKey]}
+                                    min={-100}
+                                    max={100}
+                                    ariaLabel={`${row.label} revenue growth percentage`}
+                                    onCommit={(next) =>
+                                      updateBusinessRules({ [row.revKey]: next } as Partial<BusinessRules>)
+                                    }
                                   />
                                   <span className="rules-pct-suffix">%</span>
                                 </div>
@@ -4437,20 +4489,14 @@ export default function Dashboard() {
                               <label className="rules-pct-field">
                                 <span className="rules-pct-field-label">Expenses</span>
                                 <div className="rules-pct-input-wrap">
-                                  <input
-                                    className="rules-pct-input"
-                                    type="number"
-                                    min="-100"
-                                    max="100"
-                                    step="1"
-                                    aria-label={`${row.label} expense change percentage`}
-                                    value={Math.round(businessRules[row.expKey])}
-                                    onChange={(event) => {
-                                      const raw = Number.parseFloat(event.target.value);
-                                      if (Number.isFinite(raw) && raw >= -100 && raw <= 100) {
-                                        updateBusinessRules({ [row.expKey]: raw } as Partial<BusinessRules>);
-                                      }
-                                    }}
+                                  <ScenarioPctInput
+                                    value={businessRules[row.expKey]}
+                                    min={-100}
+                                    max={100}
+                                    ariaLabel={`${row.label} expense change percentage`}
+                                    onCommit={(next) =>
+                                      updateBusinessRules({ [row.expKey]: next } as Partial<BusinessRules>)
+                                    }
                                   />
                                   <span className="rules-pct-suffix">%</span>
                                 </div>
