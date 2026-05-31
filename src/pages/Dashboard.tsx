@@ -4358,8 +4358,29 @@ export default function Dashboard() {
                   </div>
 
                   <div className="ta-card">
-                    <div className="ta-card-header">
+                    <div
+                      className="ta-card-header"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
+                    >
                       <h3 className="ta-card-title">Forecast Scenario Assumptions</h3>
+                      <button
+                        type="button"
+                        className="btn-secondary-card"
+                        onClick={() => {
+                          if (window.confirm('Restore Best / Base / Worst Case to their default values? Your current entries will be overwritten.')) {
+                            updateBusinessRules({
+                              scenarioBestRevenueGrowthPct: DEFAULT_WORKSPACE_SETTINGS.scenarioBestRevenueGrowthPct,
+                              scenarioBestExpenseChangePct: DEFAULT_WORKSPACE_SETTINGS.scenarioBestExpenseChangePct,
+                              scenarioBaseRevenueGrowthPct: DEFAULT_WORKSPACE_SETTINGS.scenarioBaseRevenueGrowthPct,
+                              scenarioBaseExpenseChangePct: DEFAULT_WORKSPACE_SETTINGS.scenarioBaseExpenseChangePct,
+                              scenarioWorstRevenueGrowthPct: DEFAULT_WORKSPACE_SETTINGS.scenarioWorstRevenueGrowthPct,
+                              scenarioWorstExpenseChangePct: DEFAULT_WORKSPACE_SETTINGS.scenarioWorstExpenseChangePct,
+                            });
+                          }
+                        }}
+                      >
+                        Restore defaults
+                      </button>
                     </div>
                     <div className="ta-card-body">
                       <div className="rules-list">
