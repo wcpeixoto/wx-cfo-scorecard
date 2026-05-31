@@ -133,6 +133,16 @@ function formatCompactUsd(value: number): string {
   return `${sign}$${Math.round(abs)}`;
 }
 
+// Display-only absolute YoY dollar delta for the "{diff}" copy slots. Pure
+// subtraction over the SAME gated MetricPair the verdict already uses — no new
+// math, no new threshold. The direction-bearing verb in the sentence
+// ("improved" / "down" / "higher" / "lower") carries the sign, so the magnitude
+// is always shown absolute.
+function formatAbsDiff(metric: MetricPair): string {
+  if (!metric) return '';
+  return formatCompactUsd(Math.abs(metric.current - metric.previous));
+}
+
 const NOT_ENOUGH = 'Not enough history yet.';
 
 // Join a row's two beats. When BOTH are unavailable, collapse to a single
@@ -146,15 +156,21 @@ function twoBeat(longTermPhrase: string, monthPhrase: string, ltNone: boolean, m
 
 function revenueEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): string {
   const longTerm =
-    lt === 'up' ? 'Growing over the year.' : lt === 'flat' ? 'Flat over the year.' : lt === 'down' ? 'Down over the year.' : NOT_ENOUGH;
+    lt === 'up'
+      ? 'Revenue up over the last 12 months.'
+      : lt === 'flat'
+        ? 'Revenue steady over the last 12 months.'
+        : lt === 'down'
+          ? 'Revenue down over the last 12 months.'
+          : NOT_ENOUGH;
   const x = absYoyPctText(moMetric);
   const month =
     mo === 'up'
-      ? `Month to date up ${x}%.`
+      ? `Revenue up ${x}% month to date.`
       : mo === 'flat'
-        ? 'Month to date about even.'
+        ? 'Revenue about even month to date.'
         : mo === 'down'
-          ? `Month to date down ${x}%.`
+          ? `Revenue down ${x}% month to date.`
           : NOT_ENOUGH;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
@@ -162,43 +178,43 @@ function revenueEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): string
 function costEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): string {
   const longTerm =
     lt === 'up'
-      ? 'Costs improved over the year.'
+      ? 'Costs down over the last 12 months.'
       : lt === 'flat'
-        ? 'Costs steady over the year.'
+        ? 'Costs steady over the last 12 months.'
         : lt === 'down'
-          ? 'Costs up over the year.'
+          ? 'Costs up over the last 12 months.'
           : NOT_ENOUGH;
   const x = absYoyPctText(moMetric);
   const month =
     mo === 'up'
-      ? `Month to date spending improved ${x}%.`
+      ? `Spending down ${x}% month to date.`
       : mo === 'flat'
-        ? 'Month to date spending about even.'
+        ? 'Spending about even month to date.'
         : mo === 'down'
-          ? `Month to date spending rose ${x}%.`
+          ? `Spending up ${x}% month to date.`
           : NOT_ENOUGH;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
 
-function cashResultEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): string {
+function cashResultEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair, smallerLoss: boolean): string {
   const longTerm =
     lt === 'up'
-      ? 'Cash flow strengthening.'
+      ? 'Cash result better over the last 12 months.'
       : lt === 'flat'
-        ? 'Cash flow steady.'
+        ? 'Cash result steady over the last 12 months.'
         : lt === 'down'
-          ? 'Cash flow getting tighter.'
+          ? 'Cash result weaker over the last 12 months.'
           : NOT_ENOUGH;
-  const pair = moMetric
-    ? `${formatCompactUsd(moMetric.current)} vs ${formatCompactUsd(moMetric.previous)} same period last year`
-    : '';
+  const diff = formatAbsDiff(moMetric);
   const month =
     mo === 'up'
-      ? `Month to date improved — ${pair}.`
+      ? smallerLoss
+        ? `Smaller loss: ${diff} better month to date.`
+        : `Monthly result improved ${diff} month to date.`
       : mo === 'flat'
-        ? 'Month to date about the same.'
+        ? 'Monthly result about the same month to date.'
         : mo === 'down'
-          ? `Month to date weaker — ${pair}.`
+          ? `Monthly result down ${diff} month to date.`
           : NOT_ENOUGH;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
@@ -206,20 +222,20 @@ function cashResultEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): str
 function reserveEvidence(lt: Verdict, mo: Verdict, moPair: MetricPair): string {
   const longTerm =
     lt === 'up'
-      ? 'Cash cushion stronger over the year.'
+      ? 'Cash reserve stronger over the last 12 months.'
       : lt === 'flat'
-        ? 'Cash cushion steady over the year.'
+        ? 'Cash reserve steady over the last 12 months.'
         : lt === 'down'
-          ? 'Cash cushion weaker over the year.'
+          ? 'Cash reserve weaker over the last 12 months.'
           : NOT_ENOUGH;
-  const pair = moPair ? `${formatCompactUsd(moPair.current)} vs ${formatCompactUsd(moPair.previous)}` : '';
+  const diff = formatAbsDiff(moPair);
   const month =
     mo === 'up'
-      ? `As of latest update: cash cushion stronger than same point last year — ${pair}.`
+      ? `Reserve is ${diff} higher vs same point last year.`
       : mo === 'flat'
-        ? `As of latest update: cash cushion about the same as same point last year — ${pair}.`
+        ? 'Reserve is about the same vs same point last year.'
         : mo === 'down'
-          ? `As of latest update: cash cushion lower than same point last year — ${pair}.`
+          ? `Reserve is ${diff} lower vs same point last year.`
           : NOT_ENOUGH;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
@@ -288,15 +304,23 @@ export type SustainabilityRow = {
    *  flow rows that share the same two columns. */
   sublabel?: string;
   longTerm: Verdict;
-  /** Drives the this-month LABEL ("Getting Better" / "Getting Worse"). */
+  /** Drives the this-month verdict — pill color and the shared pill label. */
   thisMonth: Verdict;
-  /** Drives the this-month COLOR. Equal to `thisMonth` for every row except
-   *  the guarded case where an improving-but-still-negative Monthly Cash Result
-   *  is neutralized — green must never signal "fine" on a month that lost
-   *  money, even though the trend genuinely improved. */
+  /** Drives the this-month COLOR. Now equal to `thisMonth` for every row;
+   *  retained as a per-row color extension point. (Previously neutralized an
+   *  improving-but-still-negative Monthly Cash Result to gray; that case is now
+   *  a green "Smaller Loss" pill via thisMonthLabel.) */
   thisMonthTone: Verdict;
+  /** Optional per-row pill-label override. When set, the renderer uses this
+   *  instead of the shared thisMonthLabel(verdict) mapping. Used by Monthly
+   *  Cash Result to show "Smaller Loss" on an improved-but-still-negative month. */
+  thisMonthLabel?: string;
   /** Two-beat sentence: "[long-term phrase] [latest-month phrase]". */
   evidence?: string;
+  /** Per-row tooltip body lines (comparison-basis explanation + optional proof
+   *  values), rendered one <li> each. Built in the data layer so proof values
+   *  reuse the same MetricPair as the inline evidence — no new selector. */
+  tooltip?: string[];
 };
 
 export function buildSustainabilityRows(
@@ -384,24 +408,54 @@ export function buildSustainabilityRows(
   const costThisMonth = sustainabilityState(costThisMonthMetric, 'down', PCT);
 
   // Monthly Cash Result — up = good, signed dollars (annual sum long-term,
-  // month-to-date this-month). The label tracks the YoY direction, but an
-  // in-progress month that improved YoY while STILL losing money must not
-  // render green — green reads as "fine," and a money-losing month is not
-  // fine. So when the current month's net is negative, force the COLOR to
-  // neutral while leaving the LABEL as the honest trend. The dollar evidence
-  // carries the level.
+  // month-to-date this-month). An in-progress month that improved YoY while
+  // STILL losing money is surfaced as a GREEN "Smaller Loss" pill: the label
+  // carries the truth that the month lost money, so the color can honor the
+  // genuine improvement. (Reverses the prior gray-pill guard — the label, not
+  // the color, now does the truth-telling.) thisMonthTone tracks the verdict
+  // for every row now and is retained only as a per-row color extension point.
   const cashLongTermMetric = metricIfBothWindows(ttm, (c) => c.netCashFlow);
   const cashThisMonthMetric = metricIfBothWindows(thisMonth, (c) => c.netCashFlow);
   const cashLongTerm = sustainabilityState(cashLongTermMetric, 'up', USD_ANNUAL);
   const cashThisMonth = sustainabilityState(cashThisMonthMetric, 'up', USD_MONTH);
-  const cashIsNegative = (cashThisMonthMetric?.current ?? 0) < 0;
-  const cashThisMonthTone: Verdict = cashThisMonth === 'up' && cashIsNegative ? 'flat' : cashThisMonth;
+  // Smaller-loss case: improved YoY (verdict 'up') but the month is still in the
+  // red. Gate on the CURRENT value (< 0), not the diff.
+  const cashSmallerLoss = cashThisMonth === 'up' && (cashThisMonthMetric?.current ?? 0) < 0;
+  const cashThisMonthTone: Verdict = cashThisMonth;
+  const cashThisMonthPillLabel: string | undefined = cashSmallerLoss ? 'Smaller Loss' : undefined;
 
   // Cash Reserve — up = good. Long-term = funded-ratio YoY at last completed
   // month-end (a stable position matching the shipped glyph); this-month =
   // as-of-latest-update balance vs balance on the same calendar day a year ago.
   const reserveLong = sustainabilityState(reserveLongTerm, 'up', RATIO);
   const reserveMonth = sustainabilityState(reserveThisMonth, 'up', USD_MONTH);
+
+  // ── Per-row tooltips ───────────────────────────────────────────────────────
+  // Comparison-basis explanation + (where available) proof values. Proof values
+  // reuse the SAME gated MetricPair the inline evidence uses — no new selector,
+  // no new data path. A proof line is omitted when the pair is unavailable.
+  const revenueTooltip = [
+    'Compares revenue from the last 12 months and month to date against the same periods last year.',
+  ];
+  const costTooltip = [
+    'Compares spending from the last 12 months and month to date against the same periods last year. Lower spending is better.',
+  ];
+  const cashTooltip = [
+    'Compares net cash result from the last 12 months and month to date against the same periods last year.',
+  ];
+  if (cashThisMonthMetric) {
+    cashTooltip.push(
+      `Month to date: ${formatCompactUsd(cashThisMonthMetric.current)}. Last year: ${formatCompactUsd(cashThisMonthMetric.previous)}.`,
+    );
+  }
+  const reserveTooltip = [
+    'Long-term compares reserve strength using the latest closed month. Current reserve compares the latest update against the same point last year.',
+  ];
+  if (reserveThisMonth) {
+    reserveTooltip.push(
+      `Current reserve: ${formatCompactUsd(reserveThisMonth.current)}. Last year: ${formatCompactUsd(reserveThisMonth.previous)}.`,
+    );
+  }
 
   return [
     {
@@ -410,6 +464,7 @@ export function buildSustainabilityRows(
       thisMonth: revThisMonth,
       thisMonthTone: revThisMonth,
       evidence: revenueEvidence(revLongTerm, revThisMonth, revThisMonthMetric),
+      tooltip: revenueTooltip,
     },
     {
       label: 'Cost Discipline',
@@ -417,21 +472,24 @@ export function buildSustainabilityRows(
       thisMonth: costThisMonth,
       thisMonthTone: costThisMonth,
       evidence: costEvidence(costLongTerm, costThisMonth, costThisMonthMetric),
+      tooltip: costTooltip,
     },
     {
       label: 'Monthly Cash Result',
       longTerm: cashLongTerm,
       thisMonth: cashThisMonth,
       thisMonthTone: cashThisMonthTone,
-      evidence: cashResultEvidence(cashLongTerm, cashThisMonth, cashThisMonthMetric),
+      thisMonthLabel: cashThisMonthPillLabel,
+      evidence: cashResultEvidence(cashLongTerm, cashThisMonth, cashThisMonthMetric, cashSmallerLoss),
+      tooltip: cashTooltip,
     },
     {
       label: 'Cash Reserve',
-      sublabel: 'As of latest update vs same point last year',
       longTerm: reserveLong,
       thisMonth: reserveMonth,
       thisMonthTone: reserveMonth,
       evidence: reserveEvidence(reserveLong, reserveMonth, reserveThisMonth),
+      tooltip: reserveTooltip,
     },
   ];
 }
@@ -471,7 +529,7 @@ export function longTermLabel(v: Verdict): string {
 export function thisMonthLabel(v: Verdict): string {
   switch (v) {
     case 'up':
-      return 'Getting Better';
+      return 'Improving';
     case 'down':
       return 'Getting Worse';
     case 'flat':
