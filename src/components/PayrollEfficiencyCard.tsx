@@ -152,18 +152,22 @@ export default function PayrollEfficiencyCard({
               </button>
               <div id={tooltipId} role="tooltip" className="db-tooltip-panel pe-tooltip-panel">
                 <ul className="db-tooltip-list">
-                  <li>
+                  <li><strong>What it shows</strong></li>
+                  <li className="db-tooltip-body">
                     Payroll is usually the biggest bite out of revenue. This card shows whether that
                     cost is getting more or less efficient over time.
                   </li>
-                  <li>
-                    Best year means your lowest payroll % in the yearly trend.
+                  <li><strong>Best year</strong></li>
+                  <li className="db-tooltip-body">
+                    Your lowest payroll % in the yearly trend.
                   </li>
-                  <li>
-                    “More than your best stretch” compares this year's average monthly payroll cost
-                    against your lowest 3-month payroll stretch.
+                  <li><strong>More than your best stretch</strong></li>
+                  <li className="db-tooltip-body">
+                    Compares this year's average monthly payroll cost against your lowest 3-month
+                    payroll stretch.
                   </li>
-                  <li>
+                  <li><strong>Change the target</strong></li>
+                  <li className="db-tooltip-body">
                     You can adjust the Payroll Target % in Settings → Rules.
                   </li>
                 </ul>

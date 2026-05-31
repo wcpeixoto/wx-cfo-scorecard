@@ -117,9 +117,12 @@ export default function DigHereHighlights({ result }: Props) {
             </button>
             <div id={titleTooltipId} role="tooltip" className="db-tooltip-panel wna-tooltip-panel">
               <ul className="db-tooltip-list">
-                <li>Shows costs that ran higher than usual last month.</li>
-                <li>Fixed costs, like rent or insurance, are compared to their 6-month average.</li>
-                <li>Costs that move with revenue, like marketing or merchant fees, are compared to their usual share of revenue.</li>
+                <li><strong>What it shows</strong></li>
+                <li className="db-tooltip-body">Shows costs that ran higher than usual last month.</li>
+                <li><strong>Fixed costs</strong></li>
+                <li className="db-tooltip-body">Like rent or insurance &mdash; compared to their 6-month average.</li>
+                <li><strong>Revenue-tied costs</strong></li>
+                <li className="db-tooltip-body">Like marketing or merchant fees &mdash; compared to their usual share of revenue.</li>
               </ul>
             </div>
           </div>
