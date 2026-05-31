@@ -2551,6 +2551,8 @@ export default function Dashboard() {
   // own ids derived from this base via row index (see render below).
   const sustainTitleTipId = useId();
   const sustainRowTipBaseId = useId();
+  // ⓘ next to the Big Picture page title (e.g. "May 2026") — explains KPI scope.
+  const dataTrustTipId = useId();
 
 
   useEffect(() => {
@@ -2941,7 +2943,26 @@ export default function Dashboard() {
             <header className="top-bar glass-panel top-bar--big-picture">
               <div className="top-bar-main">
                 <div className="top-bar-copy">
-                  <h2>{selectedBigPictureTitle}</h2>
+                  <div className="top-bar-title-wrap">
+                    <h2>{selectedBigPictureTitle}</h2>
+                    <div className="db-tooltip-wrap">
+                      <button
+                        type="button"
+                        className="db-tooltip-btn"
+                        aria-label="What's included in these KPIs"
+                        aria-describedby={dataTrustTipId}
+                      >
+                        &#9432;
+                      </button>
+                      <div id={dataTrustTipId} role="tooltip" className="db-tooltip-panel is-wide top-bar-title-tooltip-panel">
+                        <ul className="db-tooltip-list">
+                          <li className="db-tooltip-body">
+                            Excludes transfers &amp; financing · operating cash flow only
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
                   <p className="top-bar-context">{selectedHeaderComparisonLabel}</p>
                 </div>
 
@@ -3037,7 +3058,6 @@ export default function Dashboard() {
               <div className="bp-overview-tray">
                 <KpiCards cards={selectedKpiCards} vsLabel={kpiVsLabel} sparklinesById={kpiSparklinesById} />
               </div>
-              <p className="data-trust-note">Excludes transfers &amp; financing · operating cash flow only</p>
             </header>
 
             {/* Row 2: Income & Expense (60%) | Top Expense Categories (40%) */}
