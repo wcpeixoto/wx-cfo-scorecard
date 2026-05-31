@@ -2959,8 +2959,8 @@ export default function Dashboard() {
                       </div>
                     </div>
                   </div>
-                  <span className="sustain-h">Long term</span>
-                  <span className="sustain-h">Current month</span>
+                  <span className="sustain-h">Long Term</span>
+                  <span className="sustain-h">This Month</span>
                 </div>
                 {sustainability.map((row, index) => {
                   const message = [row.sublabel, row.evidence].filter(Boolean).join(' · ');
