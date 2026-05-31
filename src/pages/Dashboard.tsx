@@ -789,7 +789,7 @@ export default function Dashboard() {
   // The password is a casual-edit speed bump — anything in this bundle (constant
   // or VITE_*) is visible to a determined viewer. Designed to stop accidents,
   // not attackers. To change the password, edit SETTINGS_UNLOCK_PASSWORD below.
-  const SETTINGS_UNLOCK_PASSWORD = 'gracie2026';
+  const SETTINGS_UNLOCK_PASSWORD = 'Linda';
   const [isSettingsLocked, setIsSettingsLocked] = useState(true);
   const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false);
   const [unlockPasswordInput, setUnlockPasswordInput] = useState('');
