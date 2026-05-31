@@ -3789,6 +3789,12 @@ body {
   margin-top: 6px;
 }
 
+.import-summary-reviewed-line {
+  margin: 0 0 10px;
+  color: #274468;
+  font-size: 14px;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
