@@ -186,19 +186,6 @@ export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData,
       </div>
 
       <div className="priority-card-v2__body">
-        {cashRunOut !== null && (
-          <p className="priority-card-v2__body-row">
-            <span className="priority-card-v2__body-row-icon" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="22 17 13.5 8.5 8.5 13.5 2 7" stroke="currentColor" />
-                <polyline points="16 17 22 17 22 11" stroke="currentColor" />
-              </svg>
-            </span>
-            <span>
-              At this pace, you are projected to run out of cash in {cashRunOut.date}.
-            </span>
-          </p>
-        )}
         {cashBreakEven && (
           <p className="priority-card-v2__body-row">
             <span className="priority-card-v2__body-row-icon" aria-hidden="true">
@@ -216,6 +203,19 @@ export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData,
                 if (state === 'deficit') return `At your current margins and spending levels, you need ${amount} more per month to break even.`;
                 return `You're running a ${amount} monthly surplus above break-even.`;
               })()}
+            </span>
+          </p>
+        )}
+        {cashRunOut !== null && (
+          <p className="priority-card-v2__body-row">
+            <span className="priority-card-v2__body-row-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 17 13.5 8.5 8.5 13.5 2 7" stroke="currentColor" />
+                <polyline points="16 17 22 17 22 11" stroke="currentColor" />
+              </svg>
+            </span>
+            <span>
+              At this pace, you are projected to run out of cash in {cashRunOut.date}.
             </span>
           </p>
         )}
