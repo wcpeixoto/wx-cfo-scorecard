@@ -3688,7 +3688,7 @@ export default function Dashboard() {
               <div className={`settings-section-pane${activeSection === 'data' ? '' : ' is-hidden'}`}>
               <div className="ta-section">
                 <div className="ta-section-header">
-                  <h2 className="ta-section-title">Data</h2>
+                  <h2 className="ta-section-title sr-only">Data</h2>
                 </div>
                 <div className="ta-section-body">
 
@@ -3958,7 +3958,7 @@ export default function Dashboard() {
               <div className={`settings-section-pane${activeSection === 'accounts' ? '' : ' is-hidden'}`}>
               <div className="ta-section">
                 <div className="ta-section-header">
-                  <h2 className="ta-section-title">Accounts</h2>
+                  <h2 className="ta-section-title sr-only">Accounts</h2>
                 </div>
                 <div className="ta-section-body">
 
@@ -4007,142 +4007,155 @@ export default function Dashboard() {
                           <table className="account-settings-table">
                             <thead>
                               <tr>
-                                <th>Detected Account</th>
-                                <th>Account Name</th>
+                                <th>Account</th>
                                 <th>Type</th>
-                                <th>Starting Balance at Window Start</th>
-                                <th>Current Balance (computed)</th>
-                                <th>In Forecast</th>
-                                <th>Active</th>
-                                <th>Status</th>
+                                <th className="num">Starting balance</th>
+                                <th className="num">Current balance</th>
+                                <th className="ctr">In forecast</th>
+                                <th className="ctr">Active</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {accountRecords.map((record) => (
-                                <tr key={record.id}>
-                                  <td>
-                                    <span className="account-source-name">{record.discoveredAccountName}</span>
-                                  </td>
-                                  <td>
-                                    <input
-                                      className="settings-table-input"
-                                      type="text"
-                                      value={record.accountName}
-                                      onChange={(event) => handleAccountRecordChange(record.id, 'accountName', event.target.value)}
-                                    />
-                                  </td>
-                                  <td>
-                                    <select
-                                      className="settings-table-input"
-                                      value={record.accountType}
-                                      onChange={(event) =>
-                                        handleAccountRecordChange(record.id, 'accountType', event.target.value as AccountType)
-                                      }
-                                    >
-                                      <option value="Cash">Cash</option>
-                                      <option value="Credit Card">Credit Card</option>
-                                      <option value="Loan">Loan</option>
-                                      <option value="Other">Other</option>
-                                    </select>
-                                  </td>
-                                  <td>
-                                    <div className="account-balance-input-cell">
+                              {accountRecords.map((record) => {
+                                const computedBalance =
+                                  record.startingBalance + (accountBalanceMap.get(record.id) ?? 0);
+                                const showCashAnchorNote =
+                                  record.accountType === 'Cash' && record.includeInCashForecast;
+                                const isAcknowledgedNoncash =
+                                  record.accountType !== 'Cash' &&
+                                  record.includeInCashForecast &&
+                                  businessRules.acknowledgedNoncashAccounts.includes(record.id);
+                                const showIncludeVerify =
+                                  record.accountType !== 'Cash' && record.includeInCashForecast;
+                                const sourceLabel = record.isUserConfigured ? 'User configured' : 'Auto-discovered';
+                                return (
+                                  <tr key={record.id}>
+                                    <td className="acct-cell">
                                       <input
+                                        className="settings-table-input acct-name"
+                                        type="text"
+                                        value={record.accountName}
+                                        onChange={(event) => handleAccountRecordChange(record.id, 'accountName', event.target.value)}
+                                      />
+                                      <span className="acct-sub">
+                                        {sourceLabel} · {record.discoveredAccountName}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <select
                                         className="settings-table-input"
-                                        type="number"
-                                        step="0.01"
-                                        value={record.startingBalance}
-                                        aria-label={`${record.accountName} starting balance at window start`}
-                                        onChange={(event) => {
-                                          const nextValue = Number.parseFloat(event.target.value);
-                                          handleAccountRecordChange(
-                                            record.id,
-                                            'startingBalance',
-                                            Number.isFinite(nextValue) ? nextValue : 0
-                                          );
-                                        }}
-                                      />
-                                      <span className="account-input-hint">
-                                        {Math.abs(record.startingBalance) <= EPSILON && record.includeInCashForecast && record.active
-                                          ? `Needed for forecast basis as of ${forecastWindowStartLabel}`
-                                          : `Balance on ${forecastWindowStartLabel}`}
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td>
-                                    <div className="account-balance-cell">
-                                      <span className="account-balance-computed">
-                                        {formatCurrency(
-                                          record.startingBalance +
-                                            (accountBalanceMap.get(record.id) ?? 0)
-                                        )}
-                                      </span>
-                                      <span className="account-balance-note">
-                                        {record.accountType === 'Cash' && record.includeInCashForecast
-                                          ? 'Cash anchor'
-                                          : record.accountType !== 'Cash' && record.includeInCashForecast
-                                            ? businessRules.acknowledgedNoncashAccounts.includes(record.id)
-                                              ? <>
-                                                  Included in forecast{' '}
-                                                  <span className="account-balance-note-ok">✓</span>
-                                                </>
-                                              : <>
-                                                  Included in forecast{' '}
-                                                  <span
-                                                    className="account-balance-note-warn"
-                                                    title="This account is included in the forecast but is not a cash account. Verify this is intentional."
-                                                  >
-                                                    ⚠
-                                                  </span>
-                                                  {' '}
-                                                  <button
-                                                    type="button"
-                                                    className="noncash-ack-btn"
-                                                    onClick={() =>
-                                                      updateBusinessRules({
-                                                        acknowledgedNoncashAccounts: [
-                                                          ...businessRules.acknowledgedNoncashAccounts,
-                                                          record.id,
-                                                        ],
-                                                      })
-                                                    }
-                                                  >
-                                                    This inclusion is intentional
-                                                  </button>
-                                                </>
-                                            : 'Excluded'}
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td>
-                                    <label className="settings-checkbox">
-                                      <input
-                                        type="checkbox"
-                                        checked={record.includeInCashForecast}
+                                        value={record.accountType}
                                         onChange={(event) =>
-                                          handleAccountRecordChange(record.id, 'includeInCashForecast', event.target.checked)
+                                          handleAccountRecordChange(record.id, 'accountType', event.target.value as AccountType)
                                         }
-                                      />
-                                      <span>{record.includeInCashForecast ? 'Included' : 'Excluded'}</span>
-                                    </label>
-                                  </td>
-                                  <td>
-                                    <label className="settings-checkbox">
-                                      <input
-                                        type="checkbox"
-                                        checked={record.active}
-                                        onChange={(event) => handleAccountRecordChange(record.id, 'active', event.target.checked)}
-                                      />
-                                      <span>{record.active ? 'Active' : 'Inactive'}</span>
-                                    </label>
-                                  </td>
-                                  <td>
-                                    <span className={record.isUserConfigured ? 'settings-badge is-user' : 'settings-badge is-auto'}>
-                                      {record.isUserConfigured ? 'User configured' : 'Auto-discovered'}
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
+                                      >
+                                        <option value="Cash">Cash</option>
+                                        <option value="Credit Card">Credit Card</option>
+                                        <option value="Loan">Loan</option>
+                                        <option value="Other">Other</option>
+                                      </select>
+                                    </td>
+                                    <td className="num">
+                                      <div className="account-balance-input-cell">
+                                        <input
+                                          className="settings-table-input"
+                                          type="number"
+                                          step="0.01"
+                                          value={record.startingBalance}
+                                          aria-label={`${record.accountName} starting balance at window start`}
+                                          onChange={(event) => {
+                                            const nextValue = Number.parseFloat(event.target.value);
+                                            handleAccountRecordChange(
+                                              record.id,
+                                              'startingBalance',
+                                              Number.isFinite(nextValue) ? nextValue : 0
+                                            );
+                                          }}
+                                        />
+                                        <span className="account-input-hint">
+                                          {Math.abs(record.startingBalance) <= EPSILON && record.includeInCashForecast && record.active
+                                            ? `Needed for forecast basis as of ${forecastWindowStartLabel}`
+                                            : `Balance on ${forecastWindowStartLabel}`}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="num">
+                                      <div className="account-balance-cell">
+                                        <span className="account-balance-computed">
+                                          {formatCurrency(computedBalance)}
+                                        </span>
+                                        {showCashAnchorNote ? (
+                                          <span className="account-balance-note is-anchor">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                              <polyline points="20 6 9 17 4 12" />
+                                            </svg>
+                                            Cash anchor
+                                          </span>
+                                        ) : isAcknowledgedNoncash ? (
+                                          <span className="account-balance-note">
+                                            Included in forecast{' '}
+                                            <span className="account-balance-note-ok" aria-hidden="true">✓</span>
+                                          </span>
+                                        ) : showIncludeVerify ? (
+                                          <span className="account-balance-note">
+                                            Included — verify{' '}
+                                            <span
+                                              className="account-balance-note-warn"
+                                              title="This account is included in the forecast but is not a cash account. Verify this is intentional."
+                                              aria-label="Verify intentional non-cash inclusion"
+                                            >
+                                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                                <line x1="12" y1="9" x2="12" y2="13" />
+                                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                                              </svg>
+                                            </span>
+                                            {' '}
+                                            <button
+                                              type="button"
+                                              className="noncash-ack-btn"
+                                              onClick={() =>
+                                                updateBusinessRules({
+                                                  acknowledgedNoncashAccounts: [
+                                                    ...businessRules.acknowledgedNoncashAccounts,
+                                                    record.id,
+                                                  ],
+                                                })
+                                              }
+                                            >
+                                              This inclusion is intentional
+                                            </button>
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </td>
+                                    <td className="ctr">
+                                      <label className="settings-switch">
+                                        <span className="sr-only">{`${record.accountName || record.discoveredAccountName} in forecast`}</span>
+                                        <input
+                                          type="checkbox"
+                                          checked={record.includeInCashForecast}
+                                          onChange={(event) =>
+                                            handleAccountRecordChange(record.id, 'includeInCashForecast', event.target.checked)
+                                          }
+                                        />
+                                        <span className="track" aria-hidden="true" />
+                                      </label>
+                                    </td>
+                                    <td className="ctr">
+                                      <label className="settings-switch">
+                                        <span className="sr-only">{`${record.accountName || record.discoveredAccountName} active`}</span>
+                                        <input
+                                          type="checkbox"
+                                          checked={record.active}
+                                          onChange={(event) => handleAccountRecordChange(record.id, 'active', event.target.checked)}
+                                        />
+                                        <span className="track" aria-hidden="true" />
+                                      </label>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -4158,7 +4171,7 @@ export default function Dashboard() {
               <div className={`settings-section-pane${activeSection === 'rules' ? '' : ' is-hidden'}`}>
               <div className="ta-section">
                 <div className="ta-section-header">
-                  <h2 className="ta-section-title">Rules</h2>
+                  <h2 className="ta-section-title sr-only">Rules</h2>
                 </div>
                 <div className="ta-section-body">
 

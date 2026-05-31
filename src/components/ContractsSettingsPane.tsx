@@ -254,7 +254,7 @@ export default function ContractsSettingsPane({
   return (
     <div className="ta-section">
       <div className="ta-section-header">
-        <h2 className="ta-section-title">Contracts &amp; Renewals</h2>
+        <h2 className="ta-section-title sr-only">Contracts &amp; Renewals</h2>
       </div>
       <div className="ta-section-body">
         <div className="ta-card">

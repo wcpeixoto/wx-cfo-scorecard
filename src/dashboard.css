@@ -3550,74 +3550,126 @@ body {
   border-bottom: none;
 }
 
+/* ── Settings page (design-system pass) ───────────────────────────────────
+   Surfaces: page #F9FAFB · card #FFFFFF · nested well #FCFCFD · muted #F2F4F7
+   Borders:  default #E4E7EC · strong/trigger #D0D5DD · divider #F2F4F7
+   Text:     primary #1D2939 · strong-2nd #344054 · secondary #667085 · muted #98A2B3
+   Brand:    #465FFF · hover #3641F5 · pressed #2A31D8 · soft #ECF3FF
+   Controls: inputs/selects 44px · buttons 44/40/36 · radius 8px on both
+   Per Settings Redesign Mockup + UI_RULES.md tokens.
+*/
+
 .settings-actions {
   margin-top: 12px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
 }
 
+/* 40px flat-brand primary, card-level action (e.g. Import Quicken CSV). */
 .settings-actions button {
-  border: none;
-  border-radius: 12px;
-  background: linear-gradient(130deg, #5078ff 0%, #314ba7 100%);
-  color: #fff;
-  min-height: 40px;
-  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #465FFF;
+  color: #FFFFFF;
+  height: 40px;
+  padding: 0 16px;
   cursor: pointer;
-  font-weight: 600;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 150ms ease, border-color 150ms ease;
 }
 
+.settings-actions button:hover {
+  background: #3641F5;
+}
+
+.settings-actions button:active {
+  background: #2A31D8;
+}
+
+.settings-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 40px outline secondary, sits alongside the primary brand action. */
 .settings-actions .ghost-btn {
-  border: 1px solid #cedbef;
-  background: #f4f8ff;
-  color: #264778;
+  background: #FFFFFF;
+  border: 1px solid #D0D5DD;
+  color: #344054;
 }
 
+.settings-actions .ghost-btn:hover {
+  background: #F9FAFB;
+}
+
+.settings-actions .ghost-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Nested information well — quiet gray-25 on default border, 12px radius. */
 .settings-meta {
   margin-top: 14px;
-  padding: 10px;
+  padding: 16px 20px;
   border-radius: 12px;
-  background: #f2f7ff;
-  border: 1px solid #d9e5f8;
+  background: #FCFCFD;
+  border: 1px solid #E4E7EC;
 }
 
 .settings-meta p {
   margin: 6px 0;
   font-size: 14px;
+  color: #667085;
+}
+
+.settings-meta strong {
+  color: #344054;
+  font-weight: 600;
 }
 
 .settings-meta code {
   word-break: break-all;
-  color: #274468;
+  color: #344054;
 }
 
 .account-setup-summary {
   margin-top: 14px;
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px solid #d9e5f8;
-  background: #f7faff;
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 1px solid #E4E7EC;
+  background: #FCFCFD;
   display: grid;
   gap: 12px;
 }
 
 .account-setup-summary-title {
   margin: 0;
-  font-size: 0.92rem;
-  font-weight: 700;
-  color: #274468;
+  font-size: 14px;
+  font-weight: 600;
+  color: #344054;
 }
 
 .account-setup-summary-copy {
   margin: 0;
   font-size: 14px;
-  color: #48627f;
+  color: #667085;
+}
+
+.account-setup-summary-copy strong {
+  color: #344054;
+  font-weight: 600;
 }
 
 .account-setup-summary-grid {
   display: grid;
-  gap: 12px;
+  gap: 16px;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
 
@@ -3628,25 +3680,29 @@ body {
 
 .account-setup-summary-label {
   font-size: 12px;
-  color: #667c94;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-weight: 500;
+  color: #667085;
 }
 
 .account-setup-summary-notes {
   margin: 0;
   padding-left: 18px;
-  color: #48627f;
+  color: #667085;
   font-size: 14px;
 }
 
 .account-setup-summary-notes li + li {
-  margin-top: 6px;
+  margin-top: 8px;
+}
+
+.account-setup-summary-notes strong {
+  color: #344054;
+  font-weight: 600;
 }
 
 .settings-error {
   margin: 12px 0 0;
-  color: #b42318;
+  color: #F04438;
   font-size: 14px;
 }
 
@@ -3657,34 +3713,77 @@ body {
 .account-settings-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 860px;
+  min-width: 760px;
 }
 
 .account-settings-table th,
 .account-settings-table td {
-  border-bottom: 1px solid #e7edf9;
-  padding: 10px 8px;
+  border-bottom: 1px solid #F2F4F7;
+  padding: 12px;
   text-align: left;
   vertical-align: middle;
-  font-size: 0.88rem;
+  font-size: 14px;
+  color: #344054;
+}
+
+.account-settings-table tr:last-child td {
+  border-bottom: none;
 }
 
 .account-settings-table th {
-  color: #667c94;
-  font-size: 0.76rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
+.account-settings-table th.num,
+.account-settings-table td.num {
+  text-align: right;
+}
+
+.account-settings-table th.ctr,
+.account-settings-table td.ctr {
+  text-align: center;
+  width: 96px;
+}
+
+/* 44px input/select. Default #E4E7EC border (Part 6 — reserve #D0D5DD for triggers). */
 .settings-table-input {
   width: 100%;
-  min-height: 38px;
-  border: 1px solid #d4def1;
-  border-radius: 10px;
-  padding: 0 10px;
-  background: #fff;
-  font: inherit;
-  color: inherit;
+  height: 44px;
+  border: 1px solid #E4E7EC;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #FFFFFF;
+  font-family: inherit;
+  font-size: 14px;
+  color: #1D2939;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.settings-table-input:focus {
+  outline: none;
+  border-color: #A4BCFF;
+  box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.20);
+}
+
+/* Account-name input wider so values don't truncate. */
+.account-settings-table .settings-table-input.acct-name {
+  min-width: 180px;
+}
+
+/* Collapsed identity cell: editable name + muted source/status sub-line. */
+.account-settings-table td.acct-cell {
+  min-width: 220px;
+}
+
+.acct-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #98A2B3;
 }
 
 .account-balance-input-cell,
@@ -3693,21 +3792,57 @@ body {
   gap: 4px;
 }
 
-.account-input-hint,
-.account-balance-note {
-  font-size: 0.74rem;
+.account-balance-input-cell {
+  justify-items: end;
+}
+
+.account-balance-cell {
+  align-items: end;
+}
+
+.account-balance-computed {
+  font-weight: 600;
+  color: #1D2939;
+  font-variant-numeric: tabular-nums;
+}
+
+.account-input-hint {
+  font-size: 12px;
   line-height: 1.3;
-  color: #667c94;
+  color: #667085;
+  text-align: right;
 }
 
 .account-balance-note {
-  color: #4f6785;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: #98A2B3;
+}
+
+.account-balance-note.is-anchor {
+  color: #039855;
+}
+
+.account-balance-note.is-anchor svg {
+  width: 13px;
+  height: 13px;
 }
 
 .account-balance-note-warn {
+  /* Standard warn — not the CashTrendHero pressure reservation (#DC6803). */
   color: #F79009;
+  display: inline-flex;
+  align-items: center;
   font-style: normal;
   cursor: help;
+}
+
+.account-balance-note-warn svg {
+  width: 13px;
+  height: 13px;
 }
 
 .settings-checkbox {
@@ -3715,17 +3850,81 @@ body {
   align-items: center;
   gap: 8px;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+/* Visually-styled native checkbox = canonical switch (44×24 track / 20 knob).
+   Semantically remains a <input type=checkbox> for AT — paired with an
+   sr-only <label> for context. Do not add role="switch" here. */
+.settings-switch {
+  display: inline-block;
+  line-height: 0;
+  cursor: pointer;
+  position: relative;
+}
+
+.settings-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.settings-switch .track {
+  display: block;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: #E4E7EC;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.settings-switch .track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  transition: transform 150ms ease;
+}
+
+.settings-switch input:checked + .track {
+  background: #465FFF;
+}
+
+.settings-switch input:checked + .track::after {
+  transform: translateX(20px);
+}
+
+.settings-switch input:focus-visible + .track {
+  box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.20);
+}
+
+.settings-switch input:disabled + .track {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .account-source-name {
-  color: #425a78;
+  color: #344054;
 }
 
 .settings-badge {
   display: inline-flex;
   align-items: center;
   min-height: 26px;
-  padding: 0 10px;
+  padding: 3px 10px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 500;
@@ -3733,26 +3932,26 @@ body {
 }
 
 .settings-badge.is-user {
-  background: #e7f0ff;
-  color: #2c4f90;
+  background: #ECF3FF;
+  color: #465FFF;
 }
 
 .settings-badge.is-auto {
-  background: #eef4fb;
-  color: #5b728e;
+  background: #F2F4F7;
+  color: #667085;
 }
 
 .import-summary {
   margin-top: 14px;
-  padding: 14px;
-  border-radius: 14px;
-  background: #f7faff;
-  border: 1px solid #d9e5f8;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: #FCFCFD;
+  border: 1px solid #E4E7EC;
 }
 
 .import-summary-grid {
   display: grid;
-  gap: 12px;
+  gap: 16px;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
@@ -3762,10 +3961,16 @@ body {
 }
 
 .import-summary-label {
-  font-size: 0.74rem;
-  color: #667c94;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 12px;
+  font-weight: 500;
+  color: #667085;
+}
+
+.import-summary-grid strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1D2939;
+  font-variant-numeric: tabular-nums;
 }
 
 .import-summary-section {
@@ -3774,24 +3979,25 @@ body {
 
 .import-summary-section h4 {
   margin: 0 0 8px;
-  font-size: 0.9rem;
-  color: #274468;
+  font-size: 14px;
+  font-weight: 600;
+  color: #344054;
 }
 
 .import-issue-list {
   margin: 0;
   padding-left: 18px;
-  color: #425a78;
+  color: #344054;
   font-size: 14px;
 }
 
 .import-issue-list li + li {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .import-summary-reviewed-line {
   margin: 0 0 10px;
-  color: #274468;
+  color: #344054;
   font-size: 14px;
 }
 
@@ -4767,9 +4973,9 @@ body {
 }
 
 .rules-row-label {
-  font-size: 1rem;
+  font-size: 16px;
   font-weight: 500;
-  color: #101828;
+  color: #1D2939;
 }
 
 .rules-row-sub {
@@ -4822,20 +5028,26 @@ body {
   gap: 0;
   border: 1px solid #E4E7EC;
   border-radius: 8px;
-  overflow: hidden;
   background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.rules-pct-input-wrap:focus-within {
+  border-color: #A4BCFF;
+  box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.20);
 }
 
 .rules-pct-input {
   border: none;
   outline: none;
   width: 64px;
-  height: 40px;
+  height: 44px;
   padding: 0 8px 0 12px;
   font: inherit;
-  font-size: 1rem;
+  font-size: 14px;
   font-weight: 500;
-  color: #101828;
+  color: #1D2939;
   text-align: right;
   background: transparent;
   -moz-appearance: textfield;
@@ -4849,7 +5061,7 @@ body {
 
 .rules-pct-suffix {
   padding: 0 10px 0 4px;
-  font-size: 1rem;
+  font-size: 14px;
   font-weight: 500;
   color: #667085;
   user-select: none;
@@ -4922,13 +5134,19 @@ body {
   gap: 0;
   border: 1px solid #E4E7EC;
   border-radius: 8px;
-  overflow: hidden;
   background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.rules-currency-input-wrap:focus-within {
+  border-color: #A4BCFF;
+  box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.20);
 }
 
 .rules-currency-prefix {
   padding: 0 6px 0 12px;
-  font-size: 1rem;
+  font-size: 14px;
   font-weight: 500;
   color: #667085;
   user-select: none;
@@ -4938,12 +5156,12 @@ body {
   border: none;
   outline: none;
   width: 110px;
-  height: 40px;
+  height: 44px;
   padding: 0 12px 0 4px;
   font: inherit;
-  font-size: 1rem;
+  font-size: 14px;
   font-weight: 500;
-  color: #101828;
+  color: #1D2939;
   background: transparent;
   -moz-appearance: textfield;
 }
@@ -5103,7 +5321,7 @@ body {
 .ta-section-body { display: flex; flex-direction: column; gap: 16px; }
 .ta-card { background: #FFFFFF; border: 1px solid #E4E7EC; border-radius: 16px; padding: 24px; }
 .ta-card-header { margin-bottom: 12px; }
-.ta-card-title { font-size: 16px; font-weight: 600; color: #101828; }
+.ta-card-title { font-size: 18px; font-weight: 600; color: #1D2939; }
 .ta-card-body { font-size: 14px; }
 
 /* ── UI Lab (dev-only page) ─────────────────────────────────────────── */
@@ -9677,7 +9895,7 @@ body {
 .contracts-row-name {
   font-size: 14px;
   font-weight: 600;
-  color: #101828;
+  color: #1D2939;
 }
 
 .contracts-row-meta {
