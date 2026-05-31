@@ -2787,112 +2787,118 @@ export default function Dashboard() {
           </article>
         )}
 
-        {/* KPI snapshot — moved here from the Big Picture header. KPI state is still
-            owned by Dashboard.tsx (rendered above TodayPage, which is untouched). The
-            top-bar--big-picture / bp-overview-tray class names are legacy from the
-            block's previous home on Big Picture. */}
+        {/* Sustainability — four health signals, each vs the same period a year ago; top of Today.
+            Visual restyle per Claude Design handoff (Sustainability — Three Column).
+            Logic / data / copy strings are governed by buildSustainabilityRows() and unchanged. */}
         {hasImportedData && activeTab === 'today' && (
-          <header className="top-bar glass-panel top-bar--big-picture">
-            <div className="top-bar-main">
-              <div className="top-bar-copy">
-                <h2>{selectedBigPictureTitle}</h2>
-                <p className="top-bar-context">{selectedHeaderComparisonLabel}</p>
-              </div>
-
-              <div className="top-controls top-controls-timeframe">
-                <div className="kpi-timeframe-control">
-                  <div className="segmented-toggle" role="group" aria-label="KPI timeframe selector">
-                    {BIG_PICTURE_VISIBLE_FRAME_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={`segmented-toggle-btn${kpiTimeframe === option.value ? ' is-active' : ''}`}
-                        onClick={() => {
-                          setKpiTimeframe(option.value);
-                          setIsBigPictureFilterOpen(false);
-                        }}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                    <div className="timeframe-menu" ref={bigPictureFilterMenuRef}>
-                      <button
-                        type="button"
-                        className="segmented-toggle-btn timeframe-trigger"
-                        onClick={() => setIsBigPictureFilterOpen((current) => !current)}
-                        aria-haspopup="menu"
-                        aria-expanded={isBigPictureFilterOpen}
-                      >
-                        More ▾
-                      </button>
-                      {isBigPictureFilterOpen && (
-                        <ul className="timeframe-list" role="menu" aria-label="Select KPI timeframe">
-                          {BIG_PICTURE_FILTER_FRAME_OPTIONS.map((option) => (
-                            <li key={option.value}>
-                              <button
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={kpiTimeframe === option.value}
-                                className={kpiTimeframe === option.value ? 'is-active' : ''}
-                                onClick={() => {
-                                  setKpiTimeframe(option.value);
-                                  setIsBigPictureFilterOpen(false);
-                                }}
-                              >
-                                {option.label}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+          <article className="card summary-card">
+            <div className="sustain-health">
+              <div className="sustain-health-head">
+                <div className="sustain-title-wrap">
+                  <h3>Sustainability</h3>
+                  <div className="db-tooltip-wrap">
+                    <button
+                      type="button"
+                      className="db-tooltip-btn"
+                      aria-label="Sustainability explanation"
+                      aria-describedby={sustainTitleTipId}
+                    >
+                      &#9432;
+                    </button>
+                    <div id={sustainTitleTipId} role="tooltip" className="db-tooltip-panel is-wide sustain-tooltip-panel">
+                      <ul className="db-tooltip-list">
+                        <li><strong>What it shows</strong></li>
+                        <li className="db-tooltip-body">
+                          Tracks whether the business is structurally stronger or weaker than a year ago — the durable
+                          trend underneath this month&rsquo;s swings.
+                        </li>
+                      </ul>
                     </div>
                   </div>
-                  {kpiTimeframe === 'custom' && (
-                    <div className="kpi-custom-range" aria-label="Custom KPI date range">
-                      <label>
-                        <span>Start</span>
-                        <input
-                          type="date"
-                          onClick={openNativeDatePicker}
-                          value={customStartDate}
-                          min={earliestAvailableDate || undefined}
-                          max={latestAvailableDate || undefined}
-                          onChange={(event) => {
-                            const nextStart = event.target.value;
-                            setCustomStartDate(nextStart);
-                            if (customEndDate && nextStart > customEndDate) {
-                              setCustomEndDate(nextStart);
-                            }
-                          }}
-                        />
-                      </label>
-                      <label>
-                        <span>End</span>
-                        <input
-                          type="date"
-                          onClick={openNativeDatePicker}
-                          value={customEndDate}
-                          min={customStartDate || earliestAvailableDate || undefined}
-                          max={latestAvailableDate || undefined}
-                          onChange={(event) => {
-                            const nextEnd = event.target.value;
-                            setCustomEndDate(nextEnd);
-                            if (customStartDate && nextEnd < customStartDate) {
-                              setCustomStartDate(nextEnd);
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
-                  )}
                 </div>
+                <span className="sustain-h">Long Term</span>
+                <span className="sustain-h">This Month</span>
               </div>
+              {sustainability.map((row, index) => {
+                const message = [row.sublabel, row.evidence].filter(Boolean).join(' · ');
+                const rowTipId = `${sustainRowTipBaseId}-${index}`;
+                return (
+                  <div className="sustain-row" key={row.label}>
+                    <div className="sustain-metric">
+                      <span className="db-tooltip-wrap sustain-label-tip">
+                        <button
+                          type="button"
+                          className="db-tooltip-btn sustain-label-trigger"
+                          aria-label={`${row.label} explanation`}
+                          aria-describedby={rowTipId}
+                        >
+                          <span className="m-label">{row.label}:</span>
+                        </button>
+                        <div id={rowTipId} role="tooltip" className="db-tooltip-panel">
+                          <ul className="db-tooltip-list">
+                            {(row.tooltip ?? []).map((line, lineIndex) => (
+                              <li className="db-tooltip-body" key={lineIndex}>
+                                {line}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </span>
+                      {message ? <> <span className="m-msg">{message}</span></> : null}
+                    </div>
+                    <div className="sustain-thumb-cell">
+                      {row.longTerm === 'up' ? (
+                        // Heroicons solid hand-thumb-up — path lifted verbatim from prototype .thumb.up
+                        <svg
+                          className="sustain-thumb up"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          aria-label={longTermLabel(row.longTerm)}
+                          role="img"
+                        >
+                          <path d="M7.493 18.5c-.425 0-.82-.236-.975-.632A7.48 7.48 0 0 1 6 15.125c0-1.75.599-3.358 1.602-4.634.151-.192.373-.309.6-.397.473-.183.89-.514 1.212-.924a9.042 9.042 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V3a.75.75 0 0 1 .75-.75 2.25 2.25 0 0 1 2.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H14.23c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23h-.777Z" />
+                        </svg>
+                      ) : row.longTerm === 'down' ? (
+                        // Heroicons solid hand-thumb-down — path lifted verbatim from prototype .thumb.down
+                        <svg
+                          className="sustain-thumb down"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          aria-label={longTermLabel(row.longTerm)}
+                          role="img"
+                        >
+                          <path d="M15.73 5.5h1.035A7.465 7.465 0 0 1 18 9.625a7.465 7.465 0 0 1-1.235 4.125h-.148c-.806 0-1.534.446-2.031 1.08a9.04 9.04 0 0 1-2.861 2.4c-.723.384-1.35.956-1.653 1.715a4.498 4.498 0 0 0-.322 1.672V21a.75.75 0 0 1-.75.75 2.25 2.25 0 0 1-2.25-2.25c0-1.152.26-2.243.723-3.218.266-.558-.107-1.282-.725-1.282H3.622c-1.026 0-1.945-.694-2.054-1.715A12.134 12.134 0 0 1 1.5 12c0-2.848.992-5.464 2.649-7.521.388-.482.987-.729 1.605-.729H9.77a4.5 4.5 0 0 1 1.423.23l3.114 1.04a4.5 4.5 0 0 0 1.423.23Z" />
+                        </svg>
+                      ) : row.longTerm === 'flat' ? (
+                        // Equal SVG — flat-trend.svg from design_handoff_flat_indicator.
+                        // 18px to match sibling thumbs (NOT the README's 22px which assumes ▲/▼).
+                        <svg
+                          className="sustain-thumb flat"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          role="img"
+                          aria-label={longTermLabel(row.longTerm)}
+                        >
+                          <path d="M3 6h10M3 10h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                        </svg>
+                      ) : (
+                        <span className="sustain-na" aria-label={longTermLabel(row.longTerm)}>
+                          N/A
+                        </span>
+                      )}
+                    </div>
+                    <div className="sustain-pill-cell">
+                      <span className={`sustain-pill is-${row.thisMonthTone}`}>
+                        {row.thisMonthLabel ?? thisMonthLabel(row.thisMonth)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="bp-overview-tray">
-              <KpiCards cards={selectedKpiCards} vsLabel={kpiVsLabel} sparklinesById={kpiSparklinesById} />
-            </div>
-            <p className="data-trust-note">Excludes transfers &amp; financing · operating cash flow only</p>
-          </header>
+          </article>
         )}
 
         {hasImportedData && activeTab === 'today' && (
@@ -2931,117 +2937,108 @@ export default function Dashboard() {
 
         {hasImportedData && activeTab === 'big-picture' && (
           <>
-            {/* Sustainability — four health signals, each vs the same period a year ago; top of Big Picture.
-                Visual restyle per Claude Design handoff (Sustainability — Three Column).
-                Logic / data / copy strings are governed by buildSustainabilityRows() and unchanged. */}
-            <article className="card summary-card">
-              <div className="sustain-health">
-                <div className="sustain-health-head">
-                  <div className="sustain-title-wrap">
-                    <h3>Sustainability</h3>
-                    <div className="db-tooltip-wrap">
-                      <button
-                        type="button"
-                        className="db-tooltip-btn"
-                        aria-label="Sustainability explanation"
-                        aria-describedby={sustainTitleTipId}
-                      >
-                        &#9432;
-                      </button>
-                      <div id={sustainTitleTipId} role="tooltip" className="db-tooltip-panel is-wide sustain-tooltip-panel">
-                        <ul className="db-tooltip-list">
-                          <li><strong>What it shows</strong></li>
-                          <li className="db-tooltip-body">
-                            Tracks whether the business is structurally stronger or weaker than a year ago — the durable
-                            trend underneath this month&rsquo;s swings.
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                  <span className="sustain-h">Long Term</span>
-                  <span className="sustain-h">This Month</span>
+            {/* KPI snapshot — top of Big Picture. KPI state is owned by Dashboard.tsx. */}
+            <header className="top-bar glass-panel top-bar--big-picture">
+              <div className="top-bar-main">
+                <div className="top-bar-copy">
+                  <h2>{selectedBigPictureTitle}</h2>
+                  <p className="top-bar-context">{selectedHeaderComparisonLabel}</p>
                 </div>
-                {sustainability.map((row, index) => {
-                  const message = [row.sublabel, row.evidence].filter(Boolean).join(' · ');
-                  const rowTipId = `${sustainRowTipBaseId}-${index}`;
-                  return (
-                    <div className="sustain-row" key={row.label}>
-                      <div className="sustain-metric">
-                        <span className="db-tooltip-wrap sustain-label-tip">
-                          <button
-                            type="button"
-                            className="db-tooltip-btn sustain-label-trigger"
-                            aria-label={`${row.label} explanation`}
-                            aria-describedby={rowTipId}
-                          >
-                            <span className="m-label">{row.label}:</span>
-                          </button>
-                          <div id={rowTipId} role="tooltip" className="db-tooltip-panel">
-                            <ul className="db-tooltip-list">
-                              {(row.tooltip ?? []).map((line, lineIndex) => (
-                                <li className="db-tooltip-body" key={lineIndex}>
-                                  {line}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </span>
-                        {message ? <> <span className="m-msg">{message}</span></> : null}
-                      </div>
-                      <div className="sustain-thumb-cell">
-                        {row.longTerm === 'up' ? (
-                          // Heroicons solid hand-thumb-up — path lifted verbatim from prototype .thumb.up
-                          <svg
-                            className="sustain-thumb up"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            aria-label={longTermLabel(row.longTerm)}
-                            role="img"
-                          >
-                            <path d="M7.493 18.5c-.425 0-.82-.236-.975-.632A7.48 7.48 0 0 1 6 15.125c0-1.75.599-3.358 1.602-4.634.151-.192.373-.309.6-.397.473-.183.89-.514 1.212-.924a9.042 9.042 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V3a.75.75 0 0 1 .75-.75 2.25 2.25 0 0 1 2.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H14.23c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23h-.777Z" />
-                          </svg>
-                        ) : row.longTerm === 'down' ? (
-                          // Heroicons solid hand-thumb-down — path lifted verbatim from prototype .thumb.down
-                          <svg
-                            className="sustain-thumb down"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            aria-label={longTermLabel(row.longTerm)}
-                            role="img"
-                          >
-                            <path d="M15.73 5.5h1.035A7.465 7.465 0 0 1 18 9.625a7.465 7.465 0 0 1-1.235 4.125h-.148c-.806 0-1.534.446-2.031 1.08a9.04 9.04 0 0 1-2.861 2.4c-.723.384-1.35.956-1.653 1.715a4.498 4.498 0 0 0-.322 1.672V21a.75.75 0 0 1-.75.75 2.25 2.25 0 0 1-2.25-2.25c0-1.152.26-2.243.723-3.218.266-.558-.107-1.282-.725-1.282H3.622c-1.026 0-1.945-.694-2.054-1.715A12.134 12.134 0 0 1 1.5 12c0-2.848.992-5.464 2.649-7.521.388-.482.987-.729 1.605-.729H9.77a4.5 4.5 0 0 1 1.423.23l3.114 1.04a4.5 4.5 0 0 0 1.423.23Z" />
-                          </svg>
-                        ) : row.longTerm === 'flat' ? (
-                          // Equal SVG — flat-trend.svg from design_handoff_flat_indicator.
-                          // 18px to match sibling thumbs (NOT the README's 22px which assumes ▲/▼).
-                          <svg
-                            className="sustain-thumb flat"
-                            width="18"
-                            height="18"
-                            viewBox="0 0 16 16"
-                            fill="none"
-                            role="img"
-                            aria-label={longTermLabel(row.longTerm)}
-                          >
-                            <path d="M3 6h10M3 10h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                          </svg>
-                        ) : (
-                          <span className="sustain-na" aria-label={longTermLabel(row.longTerm)}>
-                            N/A
-                          </span>
+
+                <div className="top-controls top-controls-timeframe">
+                  <div className="kpi-timeframe-control">
+                    <div className="segmented-toggle" role="group" aria-label="KPI timeframe selector">
+                      {BIG_PICTURE_VISIBLE_FRAME_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          className={`segmented-toggle-btn${kpiTimeframe === option.value ? ' is-active' : ''}`}
+                          onClick={() => {
+                            setKpiTimeframe(option.value);
+                            setIsBigPictureFilterOpen(false);
+                          }}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                      <div className="timeframe-menu" ref={bigPictureFilterMenuRef}>
+                        <button
+                          type="button"
+                          className="segmented-toggle-btn timeframe-trigger"
+                          onClick={() => setIsBigPictureFilterOpen((current) => !current)}
+                          aria-haspopup="menu"
+                          aria-expanded={isBigPictureFilterOpen}
+                        >
+                          More ▾
+                        </button>
+                        {isBigPictureFilterOpen && (
+                          <ul className="timeframe-list" role="menu" aria-label="Select KPI timeframe">
+                            {BIG_PICTURE_FILTER_FRAME_OPTIONS.map((option) => (
+                              <li key={option.value}>
+                                <button
+                                  type="button"
+                                  role="menuitemradio"
+                                  aria-checked={kpiTimeframe === option.value}
+                                  className={kpiTimeframe === option.value ? 'is-active' : ''}
+                                  onClick={() => {
+                                    setKpiTimeframe(option.value);
+                                    setIsBigPictureFilterOpen(false);
+                                  }}
+                                >
+                                  {option.label}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
                         )}
                       </div>
-                      <div className="sustain-pill-cell">
-                        <span className={`sustain-pill is-${row.thisMonthTone}`}>
-                          {row.thisMonthLabel ?? thisMonthLabel(row.thisMonth)}
-                        </span>
-                      </div>
                     </div>
-                  );
-                })}
+                    {kpiTimeframe === 'custom' && (
+                      <div className="kpi-custom-range" aria-label="Custom KPI date range">
+                        <label>
+                          <span>Start</span>
+                          <input
+                            type="date"
+                            onClick={openNativeDatePicker}
+                            value={customStartDate}
+                            min={earliestAvailableDate || undefined}
+                            max={latestAvailableDate || undefined}
+                            onChange={(event) => {
+                              const nextStart = event.target.value;
+                              setCustomStartDate(nextStart);
+                              if (customEndDate && nextStart > customEndDate) {
+                                setCustomEndDate(nextStart);
+                              }
+                            }}
+                          />
+                        </label>
+                        <label>
+                          <span>End</span>
+                          <input
+                            type="date"
+                            onClick={openNativeDatePicker}
+                            value={customEndDate}
+                            min={customStartDate || earliestAvailableDate || undefined}
+                            max={latestAvailableDate || undefined}
+                            onChange={(event) => {
+                              const nextEnd = event.target.value;
+                              setCustomEndDate(nextEnd);
+                              if (customStartDate && nextEnd < customStartDate) {
+                                setCustomStartDate(nextEnd);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            </article>
+              <div className="bp-overview-tray">
+                <KpiCards cards={selectedKpiCards} vsLabel={kpiVsLabel} sparklinesById={kpiSparklinesById} />
+              </div>
+              <p className="data-trust-note">Excludes transfers &amp; financing · operating cash flow only</p>
+            </header>
 
             {/* Row 2: Income & Expense (60%) | Top Expense Categories (40%) */}
             <div className="two-col-grid two-col-grid--income-expense">
