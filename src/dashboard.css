@@ -491,6 +491,10 @@ body {
   top: calc(100% + 6px);
   right: 0;
   min-width: 260px;
+  /* Cap width at viewport-minus-padding so narrow viewports cannot grow the
+     panel wider than the screen. Per-tooltip `width:` overrides further down
+     still win on max-width comparison; this is the floor-of-the-ceiling. */
+  max-width: calc(100vw - 24px);
   border: 1px solid var(--tooltip-border);
   border-radius: var(--tooltip-radius);
   background: var(--tooltip-bg);
@@ -502,6 +506,16 @@ body {
   display: none;
   pointer-events: none;
   z-index: 30;
+}
+
+/* Left-anchored variant — opens rightward from the trigger. Use when the
+   trigger sits near the LEFT edge of its container; without this the default
+   right:0 anchor clips off the left viewport edge. Shared modifier so the
+   per-tooltip `*-tooltip-panel { right: auto; left: 0; }` overrides can
+   collapse onto this single class in PR-3. */
+.cashflow-tooltip-panel.is-left {
+  right: auto;
+  left: 0;
 }
 
 /* Tooltip content layout — Projected Cash Balance pattern is the standard.
@@ -619,6 +633,9 @@ body {
   top: calc(100% + 6px);
   right: 0;
   min-width: 260px;
+  /* See .cashflow-tooltip-panel for the rationale — viewport-minus-padding
+     ceiling that per-tooltip overrides cannot exceed. */
+  max-width: calc(100vw - 24px);
   border: 1px solid var(--tooltip-border);
   border-radius: var(--tooltip-radius);
   background: var(--tooltip-bg);
@@ -632,10 +649,23 @@ body {
   z-index: 30;
 }
 
-/* Wide variant — for paragraph-length tooltip content */
+/* Left-anchored variant — opens rightward from the trigger. Use when the
+   trigger sits near the LEFT edge of its container; without this the default
+   right:0 anchor clips off the left viewport edge. Shared modifier so the
+   per-tooltip `*-tooltip-panel { right: auto; left: 0; }` overrides can
+   collapse onto this single class in PR-3. */
+.db-tooltip-panel.is-left {
+  right: auto;
+  left: 0;
+}
+
+/* Wide variant — for paragraph-length tooltip content. Both min- and
+   max-width are wrapped in min() so the viewport ceiling wins on narrow
+   screens (a bare `min-width: 380px` would force overflow on a 375px
+   viewport because min-width beats max-width in the CSS cascade). */
 .db-tooltip-panel.is-wide {
-  min-width: 380px;
-  max-width: 420px;
+  min-width: min(380px, calc(100vw - 24px));
+  max-width: min(420px, calc(100vw - 24px));
   white-space: normal;
 }
 
