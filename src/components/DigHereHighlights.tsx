@@ -73,9 +73,12 @@ function CostSpikeRow({ row, isMiddle }: { row: WhatNeedsAttentionRow; isMiddle:
       <div className="wna-label-row">
         <span className="wna-category wna-category--refined">{row.categoryName}</span>
       </div>
-      <div className="wna-headline-row">
-        <div className="wna-headline">
-          <span className="wna-arrow">&#8593;</span>&nbsp;{headline}
+      <div className="wna-value-row">
+        <div className="wna-value-block">
+          <div className="wna-headline">
+            <span className="wna-arrow">&#8593;</span>&nbsp;{headline}
+          </div>
+          <div className="wna-detail wna-detail--sm">{detail}</div>
         </div>
         <div className="wna-spark">
           <ReactApexChart
@@ -83,11 +86,10 @@ function CostSpikeRow({ row, isMiddle }: { row: WhatNeedsAttentionRow; isMiddle:
             series={[{ data: row.sparklineData }]}
             options={SPARK_OPTIONS}
             width="100%"
-            height={40}
+            height={70}
           />
         </div>
       </div>
-      <div className="wna-detail wna-detail--sm">{detail}</div>
     </div>
   );
 }
