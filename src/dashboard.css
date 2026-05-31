@@ -758,6 +758,14 @@ body {
   margin-top: 8px;
 }
 
+/* Sustainability title tooltip — left-anchored so the panel opens rightward
+   from the ⓘ (the icon sits near the card's left edge). Without this, the
+   default `right: 0` anchor clips the panel off the left viewport edge. */
+.sustain-tooltip-panel {
+  right: auto;
+  left: 0;
+}
+
 /* "Your best" column-header tooltip — left-anchored, single sentence. Reset the
    inherited header typography (14px/600) back to tooltip-body styling. */
 .eff-col-tooltip-panel {

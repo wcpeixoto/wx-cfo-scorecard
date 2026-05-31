@@ -2948,7 +2948,7 @@ export default function Dashboard() {
                       >
                         &#9432;
                       </button>
-                      <div id={sustainTitleTipId} role="tooltip" className="db-tooltip-panel is-wide">
+                      <div id={sustainTitleTipId} role="tooltip" className="db-tooltip-panel is-wide sustain-tooltip-panel">
                         <ul className="db-tooltip-list">
                           <li><strong>What it shows</strong></li>
                           <li className="db-tooltip-body">
