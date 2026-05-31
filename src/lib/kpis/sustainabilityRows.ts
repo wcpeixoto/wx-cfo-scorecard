@@ -435,13 +435,13 @@ export function buildSustainabilityRows(
   // reuse the SAME gated MetricPair the inline evidence uses — no new selector,
   // no new data path. A proof line is omitted when the pair is unavailable.
   const revenueTooltip = [
-    'Compares revenue from the last 12 months and month to date against the same periods last year.',
+    'Compares revenue over two periods: the last 12 months vs the prior 12 months, and month to date vs the same period one year ago.',
   ];
   const costTooltip = [
-    'Compares spending from the last 12 months and month to date against the same periods last year. Lower spending is better.',
+    'Compares spending over two periods: the last 12 months vs the prior 12 months, and month to date vs the same period one year ago. Lower spending is better.',
   ];
   const cashTooltip = [
-    'Compares net cash result from the last 12 months and month to date against the same periods last year.',
+    'Compares net cash result over two periods: the last 12 months vs the prior 12 months, and month to date vs the same period one year ago.',
   ];
   if (cashThisMonthMetric) {
     cashTooltip.push(
@@ -449,7 +449,7 @@ export function buildSustainabilityRows(
     );
   }
   const reserveTooltip = [
-    'Long-term compares reserve strength using the latest closed month. Current reserve compares the latest update against the same point last year.',
+    'Long-term compares reserve strength over the last 12 months, using the latest closed month. Current reserve compares cash after the latest transaction update to the same point one year ago.',
   ];
   if (reserveThisMonth) {
     reserveTooltip.push(
