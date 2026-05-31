@@ -8630,12 +8630,16 @@ body {
   font-family: 'Outfit', sans-serif;
 }
 
-/* Stat row */
+/* Stat row — column stack: label · (headline + spark inline) · detail.
+   Was a flex-row with align-items: flex-end which bottom-pinned the
+   sparkline to the detail line — chart drifted away from the number it
+   illustrates. Now the sparkline rides next to the headline via
+   .wna-headline-row so they read as one unit (matches Today KPI rhythm). */
 .wna-row {
   position: relative;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  flex-direction: column;
+  min-width: 0;
   padding: 20px 0;
 }
 
@@ -8645,8 +8649,18 @@ body {
   border-bottom: 1px solid #F2F4F7;
 }
 
-/* Left stack */
-.wna-row-left {
+/* Value-block + sparkline paired on one row — mirrors Cash on Hand's
+   `.priority-card-v2__amount-row`: the chart and the value-block share
+   a baseline (flex-end), and the chart's height equals the block's
+   stacked height so they read as one unit. */
+.wna-value-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.wna-value-block {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -8710,12 +8724,15 @@ body {
   font-size: 12px;
 }
 
-/* Right — sparkline container */
+/* Sparkline — 150×70, matching Cash on Hand's
+   `.priority-card-v2__sparkline-slot` 1:1 so the two cards read as
+   the same family. Fixed pixel size (like CoH) — the chart needs
+   visual mass to balance the value-block beside it; fluid+small
+   reads as disconnected. */
 .wna-spark {
   flex-shrink: 0;
-  width: 180px;
-  height: 56px;
-  margin-left: 16px;
+  width: 150px;
+  height: 70px;
 }
 
 

@@ -70,23 +70,25 @@ function CostSpikeRow({ row, isMiddle }: { row: WhatNeedsAttentionRow; isMiddle:
 
   return (
     <div className={`wna-row${isMiddle ? ' wna-row--middle' : ''}`}>
-      <div className="wna-row-left">
-        <div className="wna-label-row">
-          <span className="wna-category wna-category--refined">{row.categoryName}</span>
-        </div>
-        <div className="wna-headline">
-          <span className="wna-arrow">&#8593;</span>&nbsp;{headline}
-        </div>
-        <div className="wna-detail wna-detail--sm">{detail}</div>
+      <div className="wna-label-row">
+        <span className="wna-category wna-category--refined">{row.categoryName}</span>
       </div>
-      <div className="wna-spark">
-        <ReactApexChart
-          type="area"
-          series={[{ data: row.sparklineData }]}
-          options={SPARK_OPTIONS}
-          width={180}
-          height={56}
-        />
+      <div className="wna-value-row">
+        <div className="wna-value-block">
+          <div className="wna-headline">
+            <span className="wna-arrow">&#8593;</span>&nbsp;{headline}
+          </div>
+          <div className="wna-detail wna-detail--sm">{detail}</div>
+        </div>
+        <div className="wna-spark">
+          <ReactApexChart
+            type="area"
+            series={[{ data: row.sparklineData }]}
+            options={SPARK_OPTIONS}
+            width="100%"
+            height={70}
+          />
+        </div>
       </div>
     </div>
   );
