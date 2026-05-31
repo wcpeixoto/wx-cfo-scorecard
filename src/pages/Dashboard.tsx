@@ -783,6 +783,36 @@ export default function Dashboard() {
   // sufficient against re-entrancy.
   const renewalRegenerationCompletedRef = useRef(false);
   const [activeSection, setActiveSection] = useState<'data' | 'accounts' | 'rules' | 'contracts'>('data');
+
+  // Settings edit lock — partner-walkthrough protection.
+  // Default LOCKED on mount; React state (no sessionStorage) so refresh re-locks.
+  // The password is a casual-edit speed bump — anything in this bundle (constant
+  // or VITE_*) is visible to a determined viewer. Designed to stop accidents,
+  // not attackers. To change the password, edit SETTINGS_UNLOCK_PASSWORD below.
+  const SETTINGS_UNLOCK_PASSWORD = 'gracie2026';
+  const [isSettingsLocked, setIsSettingsLocked] = useState(true);
+  const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false);
+  const [unlockPasswordInput, setUnlockPasswordInput] = useState('');
+  const [unlockError, setUnlockError] = useState(false);
+  const openUnlockModal = () => {
+    setUnlockPasswordInput('');
+    setUnlockError(false);
+    setIsUnlockModalOpen(true);
+  };
+  const closeUnlockModal = () => {
+    setIsUnlockModalOpen(false);
+    setUnlockPasswordInput('');
+    setUnlockError(false);
+  };
+  const submitUnlock = (event?: React.FormEvent) => {
+    event?.preventDefault();
+    if (unlockPasswordInput === SETTINGS_UNLOCK_PASSWORD) {
+      setIsSettingsLocked(false);
+      closeUnlockModal();
+    } else {
+      setUnlockError(true);
+    }
+  };
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [isBigPictureFilterOpen, setIsBigPictureFilterOpen] = useState(false);
@@ -3541,6 +3571,40 @@ export default function Dashboard() {
                 <p className="ta-page-subtitle">Where your data comes from and how your forecast works</p>
               </div>
 
+              {/* Edit-lock banner — sits above the subnav so subnav navigation
+                  stays clickable while content is locked. */}
+              <div className={`settings-lock-banner${isSettingsLocked ? ' is-locked' : ' is-unlocked'}`} role="status">
+                <span className="settings-lock-banner__icon" aria-hidden="true">
+                  {isSettingsLocked ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
+                      <rect x="3" y="11" width="18" height="11" rx="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
+                      <rect x="3" y="11" width="18" height="11" rx="2" />
+                      <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                    </svg>
+                  )}
+                </span>
+                <span className="settings-lock-banner__copy">
+                  {isSettingsLocked
+                    ? 'Settings are locked for viewing. Unlock changes to edit.'
+                    : 'Settings are unlocked for this session. Refresh the page to lock again.'}
+                </span>
+                <div className="settings-lock-banner__actions">
+                  {isSettingsLocked ? (
+                    <button type="button" className="settings-lock-banner__btn" onClick={openUnlockModal}>
+                      Unlock changes
+                    </button>
+                  ) : (
+                    <button type="button" className="settings-lock-banner__btn" onClick={() => setIsSettingsLocked(true)}>
+                      Lock again
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="settings-subnav-wrap">
                 <div className="settings-subnav">
                   <button
@@ -3574,7 +3638,10 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="settings-content-shell">
+              {/* <fieldset disabled> cascades the disabled attribute to every nested
+                  form control — required because Settings persists on input change,
+                  not on an explicit Save click. Subnav above remains clickable. */}
+              <fieldset className="settings-content-shell settings-lock-fieldset" disabled={isSettingsLocked}>
 
               {/* ── Section 1: DATA ─────────────────────────────────────── */}
               <div className={`settings-section-pane${activeSection === 'data' ? '' : ' is-hidden'}`}>
@@ -4458,8 +4525,51 @@ export default function Dashboard() {
                 />
               </div>
 
-              </div>{/* end settings-content-shell */}
+              </fieldset>{/* end settings-content-shell */}
             </div>
+
+            {isUnlockModalOpen && (
+              <div
+                className="settings-unlock-modal-backdrop"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="settings-unlock-modal-title"
+                onClick={closeUnlockModal}
+                onKeyDown={(event) => { if (event.key === 'Escape') closeUnlockModal(); }}
+              >
+                <div className="settings-unlock-modal" onClick={(event) => event.stopPropagation()}>
+                  <h3 id="settings-unlock-modal-title" className="settings-unlock-modal__title">Unlock Settings</h3>
+                  <p className="settings-unlock-modal__copy">
+                    Enter the password to edit Settings for this browser session. A page refresh re-locks.
+                  </p>
+                  <form onSubmit={submitUnlock}>
+                    <input
+                      type="password"
+                      className="settings-unlock-modal__input"
+                      value={unlockPasswordInput}
+                      onChange={(event) => { setUnlockPasswordInput(event.target.value); setUnlockError(false); }}
+                      autoFocus
+                      aria-label="Password"
+                      aria-invalid={unlockError}
+                      aria-describedby={unlockError ? 'settings-unlock-error' : undefined}
+                    />
+                    {unlockError && (
+                      <p id="settings-unlock-error" className="settings-unlock-modal__error" role="alert">
+                        Incorrect password.
+                      </p>
+                    )}
+                    <div className="settings-unlock-modal__actions">
+                      <button type="button" className="settings-unlock-modal__btn settings-unlock-modal__btn--ghost" onClick={closeUnlockModal}>
+                        Cancel
+                      </button>
+                      <button type="submit" className="settings-unlock-modal__btn settings-unlock-modal__btn--primary">
+                        Unlock
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

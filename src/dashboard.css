@@ -6843,12 +6843,193 @@ body {
   gap: 24px;
 }
 
+/* Settings edit lock — fieldset reset so the shell renders identically to
+   the prior <div>, then a faint opacity cue when disabled. The browser's
+   built-in disabled cascade does the actual interaction blocking. */
+.settings-lock-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.settings-lock-fieldset[disabled] {
+  opacity: 0.7;
+}
+
 /* Section pane visibility */
 .settings-section-pane {
   display: block;
 }
 .settings-section-pane.is-hidden {
   display: none;
+}
+
+/* Edit-lock banner — sits above the subnav. Two tones: warning (locked) and
+   success (unlocked); same shape, same 40px secondary action button. */
+.settings-lock-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  border: 1px solid #E4E7EC;
+  border-radius: 12px;
+  background: #F9FAFB;
+  color: #344054;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+}
+.settings-lock-banner.is-locked {
+  background: #FFFAEB;
+  border-color: #F79009;
+}
+.settings-lock-banner.is-unlocked {
+  background: #ECFDF3;
+  border-color: #12B76A;
+}
+.settings-lock-banner__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: #475467;
+}
+.settings-lock-banner.is-locked .settings-lock-banner__icon { color: #DC6803; }
+.settings-lock-banner.is-unlocked .settings-lock-banner__icon { color: #039855; }
+.settings-lock-banner__copy {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: #344054;
+}
+.settings-lock-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-lock-banner__btn {
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #344054;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.settings-lock-banner__btn:hover {
+  background: #F9FAFB;
+}
+.settings-lock-banner__btn:focus-visible {
+  outline: 2px solid #465FFF;
+  outline-offset: 2px;
+}
+
+/* Unlock modal — minimal single-input password prompt. Reuses the project's
+   gray-900/25 backdrop pattern (see .eff-drawer-backdrop). */
+.settings-unlock-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(16, 24, 40, 0.25);
+}
+.settings-unlock-modal {
+  width: 100%;
+  max-width: 400px;
+  padding: 24px;
+  border: 1px solid #E4E7EC;
+  border-radius: 24px;
+  background: #FFFFFF;
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.12);
+}
+.settings-unlock-modal__title {
+  margin: 0 0 8px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  color: #1D2939;
+}
+.settings-unlock-modal__copy {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 20px;
+  color: #667085;
+}
+.settings-unlock-modal__input {
+  width: 100%;
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  background: #FFFFFF;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  color: #1D2939;
+  box-sizing: border-box;
+}
+.settings-unlock-modal__input:focus {
+  outline: none;
+  border-color: #465FFF;
+  box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.2);
+}
+.settings-unlock-modal__input[aria-invalid="true"] {
+  border-color: #F04438;
+}
+.settings-unlock-modal__error {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: #F04438;
+}
+.settings-unlock-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+.settings-unlock-modal__btn {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.settings-unlock-modal__btn--ghost {
+  border: 1px solid #D0D5DD;
+  background: #FFFFFF;
+  color: #344054;
+}
+.settings-unlock-modal__btn--ghost:hover {
+  background: #F9FAFB;
+}
+.settings-unlock-modal__btn--primary {
+  border: 1px solid #465FFF;
+  background: #465FFF;
+  color: #FFFFFF;
+}
+.settings-unlock-modal__btn--primary:hover {
+  background: #3641F5;
+  border-color: #3641F5;
+}
+.settings-unlock-modal__btn:focus-visible {
+  outline: 2px solid #465FFF;
+  outline-offset: 2px;
 }
 
 /* Mobile overflow fix — allow grid chain to shrink below content size */
