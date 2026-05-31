@@ -8630,12 +8630,16 @@ body {
   font-family: 'Outfit', sans-serif;
 }
 
-/* Stat row */
+/* Stat row — column stack: label · (headline + spark inline) · detail.
+   Was a flex-row with align-items: flex-end which bottom-pinned the
+   sparkline to the detail line — chart drifted away from the number it
+   illustrates. Now the sparkline rides next to the headline via
+   .wna-headline-row so they read as one unit (matches Today KPI rhythm). */
 .wna-row {
   position: relative;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  flex-direction: column;
+  min-width: 0;
   padding: 20px 0;
 }
 
@@ -8645,11 +8649,13 @@ body {
   border-bottom: 1px solid #F2F4F7;
 }
 
-/* Left stack */
-.wna-row-left {
+/* Headline + sparkline on one line. align-items: center so the 40px chart
+   visually anchors to the 24px number. */
+.wna-headline-row {
   display: flex;
-  flex-direction: column;
-  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 /* Line 1 — category label + ⓘ wrapper */
@@ -8710,12 +8716,13 @@ body {
   font-size: 12px;
 }
 
-/* Right — sparkline container */
+/* Sparkline — fluid with a 120px cap (was hardcoded 180px). 120px keeps
+   the chart at ~27% of the card's content width, matching the Today KPI
+   sparkline's proportion. Height 40px also matches Today KPIs. */
 .wna-spark {
-  flex-shrink: 0;
-  width: 180px;
-  height: 56px;
-  margin-left: 16px;
+  flex: 0 1 120px;
+  max-width: 120px;
+  height: 40px;
 }
 
 
