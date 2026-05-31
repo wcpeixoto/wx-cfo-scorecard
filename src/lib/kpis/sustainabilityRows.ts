@@ -332,7 +332,7 @@ export function buildSustainabilityRows(
   const ttm = model.kpiYoYComparisonByTimeframe.ttm;
 
   // ── Cash Reserve — split anchoring for label-truthfulness ──────────────────
-  // The visible column header is "Current month" — every row underneath it
+  // The visible column header is "This Month" — every row underneath it
   // must honor that. But long-term funded ratio (the THUMB glyph) reads more
   // honestly off a CLOSED month than a partial one: a trailing-3-month
   // expense target divided into a still-moving balance jitters around mid-

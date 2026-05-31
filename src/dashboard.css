@@ -2815,7 +2815,7 @@ body {
 .sustain-health-head .sustain-h {
   font-size: 13px;
   font-weight: 500;
-  color: var(--fg-muted, var(--text-secondary));
+  color: var(--text-primary);
   text-align: center;
 }
 
