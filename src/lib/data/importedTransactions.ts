@@ -229,7 +229,7 @@ type ParsedCandidate = {
   rowPreview: string[];
 };
 
-function parseQuickenReportCsv(text: string, sourceFileName: string, importId: string, importedAtIso: string): {
+export function parseQuickenReportCsv(text: string, sourceFileName: string, importId: string, importedAtIso: string): {
   candidates: ParsedCandidate[];
   parseErrors: TransactionImportIssue[];
   skippedStructuralRows: number;
@@ -470,7 +470,7 @@ function buildSummary(
   };
 }
 
-function computeImportOutcome(
+export function computeImportOutcome(
   candidates: ParsedCandidate[],
   parseErrors: TransactionImportIssue[],
   existingRecords: ImportedTransactionRecord[],

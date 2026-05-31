@@ -50,6 +50,13 @@ import { computePriorYearActuals } from '../lib/kpis/priorYearActuals';
 import { runDataSanityChecks } from '../lib/dataSanity';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
 import {
+  clearPossibleDuplicateReview,
+  isPossibleDuplicateReviewed,
+  readPossibleDuplicateReview,
+  writePossibleDuplicateReview,
+  type PossibleDuplicateReview,
+} from '../lib/data/possibleDuplicateReview';
+import {
   DEFAULT_WORKSPACE_SETTINGS,
   deleteSharedRenewalContract,
   getSharedAccountSettings,
@@ -728,6 +735,12 @@ export default function Dashboard() {
     parseFailureExamples: TransactionImportIssue[];
   } | null>(null);
   const [storedImportedTransactionCount, setStoredImportedTransactionCount] = useState(0);
+  const [possibleDuplicateReview, setPossibleDuplicateReview] = useState<PossibleDuplicateReview | null>(
+    () => readPossibleDuplicateReview(
+      typeof window === 'undefined' ? null : window.localStorage,
+      STORAGE_KEYS.possibleDuplicateReview
+    )
+  );
   const [accountRecords, setAccountRecords] = useState<AccountRecord[]>(getStoredAccountSettings);
   const [selectedScenarioKey, setSelectedScenarioKey] = useState<ForecastScenarioKey>('base');
   // Stage 3 production wiring: opt-in switch between the locked engine,
@@ -2676,6 +2689,10 @@ export default function Dashboard() {
       setImportedDataSet(null);
       setLastImportSummary(null);
       setStoredImportedTransactionCount(0);
+      if (typeof window !== 'undefined') {
+        clearPossibleDuplicateReview(window.localStorage, STORAGE_KEYS.possibleDuplicateReview);
+      }
+      setPossibleDuplicateReview(null);
       await loadImportedState();
       setAccountRecords(preservedAccountRecords);
     } catch (clearError) {
@@ -2686,6 +2703,26 @@ export default function Dashboard() {
       setImportLoading(false);
     }
   }, [accountRecords, loadImportedState]);
+
+  const handleMarkPossibleDuplicatesReviewed = useCallback(() => {
+    const importId = lastImportSummary?.importId;
+    if (!importId) return;
+    const review: PossibleDuplicateReview = {
+      importId,
+      reviewedAtIso: new Date().toISOString(),
+    };
+    if (typeof window !== 'undefined') {
+      writePossibleDuplicateReview(window.localStorage, STORAGE_KEYS.possibleDuplicateReview, review);
+    }
+    setPossibleDuplicateReview(review);
+  }, [lastImportSummary?.importId]);
+
+  const handleUndoPossibleDuplicateReview = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      clearPossibleDuplicateReview(window.localStorage, STORAGE_KEYS.possibleDuplicateReview);
+    }
+    setPossibleDuplicateReview(null);
+  }, []);
 
   const handleAccountRecordChange = useCallback(
     <K extends keyof Pick<AccountRecord, 'accountName' | 'accountType' | 'startingBalance' | 'includeInCashForecast' | 'active'>>(
@@ -2756,6 +2793,10 @@ export default function Dashboard() {
       : importExamples?.importId === lastImportSummary?.importId
         ? importExamples?.parseFailureExamples ?? []
         : [];
+  const possibleDuplicatesReviewedForCurrentImport = isPossibleDuplicateReviewed(
+    possibleDuplicateReview,
+    lastImportSummary?.importId
+  );
   const accountSettingsSourceLabel = sharedPersistenceEnabled
     ? sharedAccountSettingsHasRemoteData
       ? 'Shared account settings'
@@ -3681,7 +3722,11 @@ export default function Dashboard() {
                         if (!rulesMarginValid) atRiskLines.push('Required rules are missing');
 
                         const needsReviewLines: string[] = [];
-                        if (!businessRules.suppressDuplicateWarnings && possibleDuplicates > 0) needsReviewLines.push(`${possibleDuplicates} possible duplicate${possibleDuplicates === 1 ? '' : 's'} to review`);
+                        if (
+                          !businessRules.suppressDuplicateWarnings &&
+                          !possibleDuplicatesReviewedForCurrentImport &&
+                          possibleDuplicates > 0
+                        ) needsReviewLines.push(`${possibleDuplicates} possible duplicate${possibleDuplicates === 1 ? '' : 's'} to review`);
                         if (nonCashCount > 0) needsReviewLines.push(`${nonCashCount} non-cash account${nonCashCount === 1 ? '' : 's'} included in forecast — verify this is intentional`);
 
                         if (atRiskLines.length > 0) {
@@ -3770,7 +3815,11 @@ export default function Dashboard() {
                           Active analysis source:{' '}
                           <strong>{activeDataSet?.sourceLabel ?? 'No imported dataset loaded'}</strong>
                         </p>
-                        {lastImportSummary?.latestTxnMonth ? (
+                        {latestAvailableTxnDate ? (
+                          <p>
+                            Updated through: <strong>{formatDateLabel(latestAvailableTxnDate)}</strong>
+                          </p>
+                        ) : lastImportSummary?.latestTxnMonth ? (
                           <p>
                             Updated through: <strong>{toMonthLabel(lastImportSummary.latestTxnMonth)}</strong>
                           </p>
@@ -3821,7 +3870,12 @@ export default function Dashboard() {
                             </div>
                             <div>
                               <span className="import-summary-label">Possible duplicates imported</span>
-                              <strong>{lastImportSummary.possibleDuplicatesFlagged}</strong>
+                              <strong>
+                                {lastImportSummary.possibleDuplicatesFlagged}
+                                {possibleDuplicatesReviewedForCurrentImport && lastImportSummary.possibleDuplicatesFlagged > 0
+                                  ? ' · reviewed'
+                                  : ''}
+                              </strong>
                             </div>
                             <div>
                               <span className="import-summary-label">Parse failures</span>
@@ -3829,17 +3883,54 @@ export default function Dashboard() {
                             </div>
                           </div>
 
-                          {renderedDuplicateExamples.length > 0 ? (
-                            <div className="import-summary-section">
-                              <h4>Possible duplicates</h4>
-                              <ul className="import-issue-list">
-                                {renderedDuplicateExamples.map((issue) => (
-                                  <li key={`dup-${issue.lineNumber}`}>
-                                    <strong>Line {issue.lineNumber}.</strong> {issue.message}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
+                          {lastImportSummary.possibleDuplicatesFlagged > 0 ? (
+                            possibleDuplicatesReviewedForCurrentImport ? (
+                              <div className="import-summary-section import-summary-reviewed">
+                                <p className="import-summary-reviewed-line">
+                                  Possible duplicates marked reviewed on{' '}
+                                  <strong>{formatTimestamp(possibleDuplicateReview?.reviewedAtIso ?? null)}</strong>.
+                                </p>
+                                <div className="settings-actions">
+                                  <button
+                                    type="button"
+                                    className="ghost-btn"
+                                    onClick={handleUndoPossibleDuplicateReview}
+                                  >
+                                    Undo review
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                {renderedDuplicateExamples.length > 0 ? (
+                                  <div className="import-summary-section">
+                                    <h4>Possible duplicates</h4>
+                                    <ul className="import-issue-list">
+                                      {renderedDuplicateExamples.map((issue) => (
+                                        <li key={`dup-${issue.lineNumber}`}>
+                                          <strong>Line {issue.lineNumber}.</strong> {issue.message}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                ) : null}
+                                <div className="import-summary-section">
+                                  <p className="subtle">
+                                    Possible duplicates are imported. Mark them reviewed once you have reconciled the
+                                    balance against Quicken.
+                                  </p>
+                                  <div className="settings-actions">
+                                    <button
+                                      type="button"
+                                      className="ghost-btn"
+                                      onClick={handleMarkPossibleDuplicatesReviewed}
+                                    >
+                                      Mark possible duplicates as reviewed
+                                    </button>
+                                  </div>
+                                </div>
+                              </>
+                            )
                           ) : null}
 
                           {renderedParseFailureExamples.length > 0 ? (
