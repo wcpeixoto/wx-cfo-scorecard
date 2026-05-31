@@ -50,25 +50,31 @@ export function EfficiencyOpportunitiesCard({ result }: Props) {
             </button>
             <div id={tooltipId} role="tooltip" className="db-tooltip-panel eff-tooltip-panel">
               <ul className="db-tooltip-list">
-                <li>
-                  Money that could move back to the owner’s pocket each month if your biggest cost
+                <li><strong>What it shows</strong></li>
+                <li className="db-tooltip-body">
+                  Money that could move back to the owner&rsquo;s pocket each month if your biggest cost
                   categories returned to your best 3-month efficiency level.
                 </li>
-                <li>
-                  “Your best” — your lowest cost % of revenue for that category over a 3-month stretch.
+                <li><strong>Your best</strong></li>
+                <li className="db-tooltip-body">
+                  Your lowest cost % of revenue for that category over a 3-month stretch.
                 </li>
                 {!benchmarkRevenueQualified && (
-                  <li>
-                    Too few 3-month stretches had high enough revenue to be a reliable benchmark, so
-                    “your best” falls back to all of the last 24 months and may be less comparable to today.
-                  </li>
+                  <>
+                    <li><strong>Benchmark caveat</strong></li>
+                    <li className="db-tooltip-body">
+                      Too few 3-month stretches had high enough revenue to be a reliable benchmark, so
+                      &ldquo;your best&rdquo; falls back to all of the last 24 months and may be less comparable to today.
+                    </li>
+                  </>
                 )}
-                <li>
-                  “Today” — your current 3-month average.
+                <li><strong>Today</strong></li>
+                <li className="db-tooltip-body">
+                  Your current 3-month average.
                 </li>
-                <li>
-                  “Recoverable/mo” — the monthly dollars you could recover by getting that cost back to
-                  your best level.
+                <li><strong>Recoverable per month</strong></li>
+                <li className="db-tooltip-body">
+                  The monthly dollars you could recover by getting that cost back to your best level.
                 </li>
               </ul>
             </div>

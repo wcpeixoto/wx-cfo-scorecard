@@ -172,9 +172,12 @@ export function NextOwnerDistributionCard({
             </button>
             <div id={tooltipId} role="tooltip" className="db-tooltip-panel nod-tooltip-panel">
               <ul className="db-tooltip-list">
-                <li>Shows when you can next take an owner distribution without breaching your operating reserve.</li>
-                <li>Uses a 4-month safety window: the projected cash must stay above your reserve floor for the payout month plus the next 3 months.</li>
-                <li>Slide the revenue lever to see how a change would shift the timeline.</li>
+                <li><strong>What it shows</strong></li>
+                <li className="db-tooltip-body">Shows when you can next take an owner distribution without breaching your operating reserve.</li>
+                <li><strong>How it&rsquo;s calculated</strong></li>
+                <li className="db-tooltip-body">Uses a 4-month safety window: the projected cash must stay above your reserve floor for the payout month plus the next 3 months.</li>
+                <li><strong>Test a scenario</strong></li>
+                <li className="db-tooltip-body">Slide the revenue lever to see how a change would shift the timeline.</li>
               </ul>
             </div>
           </span>
