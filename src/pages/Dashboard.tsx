@@ -3589,7 +3589,7 @@ export default function Dashboard() {
                 </span>
                 <span className="settings-lock-banner__copy">
                   {isSettingsLocked
-                    ? 'Settings are locked for viewing. Unlock changes to edit.'
+                    ? 'Settings are locked for viewing.'
                     : 'Settings are unlocked for this session. Refresh the page to lock again.'}
                 </span>
                 <div className="settings-lock-banner__actions">
