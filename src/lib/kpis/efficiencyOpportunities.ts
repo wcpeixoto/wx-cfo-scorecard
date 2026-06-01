@@ -233,9 +233,16 @@ export function computeCore(
   const monthIndex = new Map<string, number>();
   months.forEach((m, i) => monthIndex.set(m, i));
 
-  // Revenue per month + expense per (parent category, month)
+  // Revenue per month + expense per (parent category, month).
+  // firstActiveMonth records the earliest month index where a category had any
+  // accepted expense transaction (presence, not summed-spend nonzero — sign
+  // flips and same-month offsets can net to $0 while real tracking exists). It
+  // gates the "best window" search below so a category's pre-tracking zero-
+  // padded months can't win as its 0% benchmark (e.g. Customer Refunds, whose
+  // import history starts mid-2025).
   const revenueByMonth = new Array<number>(months.length).fill(0);
   const expenseByCatMonth = new Map<string, number[]>();
+  const firstActiveMonth = new Map<string, number>();
 
   for (const txn of txns) {
     if (!txn || !txn.month) continue;
@@ -261,6 +268,11 @@ export function computeCore(
         expenseByCatMonth.set(parent, arr);
       }
       arr[idx] += Math.abs(txn.amount);
+
+      const existingFirst = firstActiveMonth.get(parent);
+      if (existingFirst === undefined || idx < existingFirst) {
+        firstActiveMonth.set(parent, idx);
+      }
     }
   }
 
@@ -343,11 +355,18 @@ export function computeCore(
 
     const todayRatio = currentAvgSpend / currentWindow.avgRevenue;
 
+    // Skip "best window" candidates whose start predates this category's first
+    // tracked month — otherwise pre-tracking $0 padding wins as the 0% best.
+    // `?? 0` is defensive: every category we iterate here was populated above,
+    // so the map entry should always exist.
+    const categoryFirstActive = firstActiveMonth.get(category) ?? 0;
+
     // Best = lowest cost ratio among the revenue-qualified candidate windows
     // (or all valid windows when the floor disqualified too many — see fallback).
     let bestRatio = Number.POSITIVE_INFINITY;
     let bestWindow: Window | null = null;
     for (const w of candidateWindows) {
+      if (w.startIdx < categoryFirstActive) continue;
       let sumSpend = 0;
       for (let k = w.startIdx; k <= w.endIdx; k += 1) {
         sumSpend += spendByMonth[k];
