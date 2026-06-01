@@ -3762,6 +3762,7 @@ body {
   margin: 12px 0 0;
   color: #F04438;
   font-size: 14px;
+  white-space: pre-line;
 }
 
 .settings-table-wrap {
