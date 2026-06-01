@@ -55,6 +55,54 @@ export type Verdict = 'up' | 'down' | 'flat' | 'none';
 
 type MetricPair = { current: number; previous: number } | null | undefined;
 
+/** Which period the right-hand column reports. Default (and the post-refresh
+ *  reset state) is 'thisMonth'; the header dropdown can flip it to 'lastMonth'.
+ *  The Long-Term column is unaffected — only the right column re-anchors. */
+export type SustainTimeframe = 'thisMonth' | 'lastMonth';
+
+/** Per-period copy. Kept explicit (not derived) so the two bases are visible in
+ *  the source and pinned by tests — the comparison genuinely differs by period:
+ *   • thisMonth — flows are month-to-date; Reserve is the as-of-latest-update
+ *     balance vs the SAME CALENDAR DAY one year ago.
+ *   • lastMonth — flows are the last closed month; Reserve is that month's
+ *     CLOSING balance vs the same MONTH-END one year ago.
+ *  Only phrasing lives here; the math branch lives in buildSustainabilityRows. */
+type PeriodCopy = {
+  /** Inline flow-beat suffix: "month to date" | "last month". */
+  flowSuffix: string;
+  /** Inline reserve-beat comparison basis. */
+  reserveBasis: string;
+  /** Tooltip flow clause (the "and …" half of the basis sentence). */
+  tooltipFlowClause: string;
+  /** Tooltip reserve sentence (full sentence — the bases read differently). */
+  tooltipReserveClause: string;
+  /** Cash proof-line label for the current value. */
+  cashProofLabel: string;
+  /** Reserve proof-line label for the current value. */
+  reserveProofLabel: string;
+};
+
+const PERIOD_COPY: Record<SustainTimeframe, PeriodCopy> = {
+  thisMonth: {
+    flowSuffix: 'month to date',
+    reserveBasis: 'vs same point last year',
+    tooltipFlowClause: 'month to date vs the same period one year ago',
+    tooltipReserveClause:
+      'Current reserve compares cash after the latest transaction update to the same point one year ago.',
+    cashProofLabel: 'Month to date',
+    reserveProofLabel: 'Current reserve',
+  },
+  lastMonth: {
+    flowSuffix: 'last month',
+    reserveBasis: 'vs the same month last year',
+    tooltipFlowClause: 'last month vs the same month one year ago',
+    tooltipReserveClause:
+      'Last month compares the closing reserve to the same month-end one year ago.',
+    cashProofLabel: 'Last month',
+    reserveProofLabel: 'Last month reserve',
+  },
+};
+
 /**
  * How "flat" is decided for a beat:
  *  - 'pct'   relative band on a large, stable, positive base; prior 0 → 'none'
@@ -154,7 +202,7 @@ function twoBeat(longTermPhrase: string, monthPhrase: string, ltNone: boolean, m
 
 // ── Per-row evidence (copy is locked; verbatim except interpolation) ───────────
 
-function revenueEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): string {
+function revenueEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair, p: PeriodCopy): string {
   const longTerm =
     lt === 'up'
       ? 'Revenue up over the last 12 months.'
@@ -166,16 +214,16 @@ function revenueEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): string
   const x = absYoyPctText(moMetric);
   const month =
     mo === 'up'
-      ? `Revenue up ${x}% month to date.`
+      ? `Revenue up ${x}% ${p.flowSuffix}.`
       : mo === 'flat'
-        ? 'Revenue about even month to date.'
+        ? `Revenue about even ${p.flowSuffix}.`
         : mo === 'down'
-          ? `Revenue down ${x}% month to date.`
+          ? `Revenue down ${x}% ${p.flowSuffix}.`
           : NOT_ENOUGH;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
 
-function costEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): string {
+function costEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair, p: PeriodCopy): string {
   const longTerm =
     lt === 'up'
       ? 'Costs down over the last 12 months.'
@@ -187,16 +235,16 @@ function costEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair): string {
   const x = absYoyPctText(moMetric);
   const month =
     mo === 'up'
-      ? `Spending down ${x}% month to date.`
+      ? `Spending down ${x}% ${p.flowSuffix}.`
       : mo === 'flat'
-        ? 'Spending about even month to date.'
+        ? `Spending about even ${p.flowSuffix}.`
         : mo === 'down'
-          ? `Spending up ${x}% month to date.`
+          ? `Spending up ${x}% ${p.flowSuffix}.`
           : NOT_ENOUGH;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
 
-function cashResultEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair, smallerLoss: boolean): string {
+function cashResultEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair, smallerLoss: boolean, p: PeriodCopy): string {
   const longTerm =
     lt === 'up'
       ? 'Cash result better over the last 12 months.'
@@ -209,17 +257,17 @@ function cashResultEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair, smal
   const month =
     mo === 'up'
       ? smallerLoss
-        ? `Smaller loss: ${diff} better month to date.`
-        : `Monthly result improved ${diff} month to date.`
+        ? `Smaller loss: ${diff} better ${p.flowSuffix}.`
+        : `Monthly result improved ${diff} ${p.flowSuffix}.`
       : mo === 'flat'
-        ? 'Monthly result about the same month to date.'
+        ? `Monthly result about the same ${p.flowSuffix}.`
         : mo === 'down'
-          ? `Monthly result down ${diff} month to date.`
+          ? `Monthly result down ${diff} ${p.flowSuffix}.`
           : NOT_ENOUGH;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
 
-function reserveEvidence(lt: Verdict, mo: Verdict, moPair: MetricPair): string {
+function reserveEvidence(lt: Verdict, mo: Verdict, moPair: MetricPair, p: PeriodCopy): string {
   const longTerm =
     lt === 'up'
       ? 'Cash reserve stronger over the last 12 months.'
@@ -231,11 +279,11 @@ function reserveEvidence(lt: Verdict, mo: Verdict, moPair: MetricPair): string {
   const diff = formatAbsDiff(moPair);
   const month =
     mo === 'up'
-      ? `Reserve is ${diff} higher vs same point last year.`
+      ? `Reserve is ${diff} higher ${p.reserveBasis}.`
       : mo === 'flat'
-        ? 'Reserve is about the same vs same point last year.'
+        ? `Reserve is about the same ${p.reserveBasis}.`
         : mo === 'down'
-          ? `Reserve is ${diff} lower vs same point last year.`
+          ? `Reserve is ${diff} lower ${p.reserveBasis}.`
           : NOT_ENOUGH;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
@@ -304,17 +352,18 @@ export type SustainabilityRow = {
    *  flow rows that share the same two columns. */
   sublabel?: string;
   longTerm: Verdict;
-  /** Drives the this-month verdict — pill color and the shared pill label. */
-  thisMonth: Verdict;
-  /** Drives the this-month COLOR. Now equal to `thisMonth` for every row;
-   *  retained as a per-row color extension point. (Previously neutralized an
-   *  improving-but-still-negative Monthly Cash Result to gray; that case is now
-   *  a green "Smaller Loss" pill via thisMonthLabel.) */
-  thisMonthTone: Verdict;
+  /** Right-column verdict for the selected period (This Month / Last Month) —
+   *  drives the pill color and the shared pill label. */
+  period: Verdict;
+  /** Right-column COLOR for the selected period. Equal to `period` for every
+   *  row; retained as a per-row color extension point. (Previously neutralized
+   *  an improving-but-still-negative Monthly Cash Result to gray; that case is
+   *  now a green "Smaller Loss" pill via periodLabel.) */
+  periodTone: Verdict;
   /** Optional per-row pill-label override. When set, the renderer uses this
-   *  instead of the shared thisMonthLabel(verdict) mapping. Used by Monthly
+   *  instead of the shared periodVerdictLabel(verdict) mapping. Used by Monthly
    *  Cash Result to show "Smaller Loss" on an improved-but-still-negative month. */
-  thisMonthLabel?: string;
+  periodLabel?: string;
   /** Two-beat sentence: "[long-term phrase] [latest-month phrase]". */
   evidence?: string;
   /** Per-row tooltip body lines (comparison-basis explanation + optional proof
@@ -326,23 +375,32 @@ export type SustainabilityRow = {
 export function buildSustainabilityRows(
   model: DashboardModel,
   cashBalanceSeries: BalancePoint[],
+  timeframe: SustainTimeframe = 'thisMonth',
 ): SustainabilityRow[] {
   const thisMonth = model.kpiYoYComparisonByTimeframe.thisMonth;
   const lastMonth = model.kpiYoYComparisonByTimeframe.lastMonth;
   const ttm = model.kpiYoYComparisonByTimeframe.ttm;
 
+  const p = PERIOD_COPY[timeframe];
+  // The right column reports the SELECTED period; the flow rows read their YoY
+  // pair straight off the matching comparison window. (Long Term is unaffected.)
+  const periodComparison = timeframe === 'lastMonth' ? lastMonth : thisMonth;
+
   // ── Cash Reserve — split anchoring for label-truthfulness ──────────────────
-  // The visible column header is "This Month" — every row underneath it
-  // must honor that. But long-term funded ratio (the THUMB glyph) reads more
-  // honestly off a CLOSED month than a partial one: a trailing-3-month
-  // expense target divided into a still-moving balance jitters around mid-
-  // month. So Reserve splits its two beats:
+  // The Long-Term funded ratio (the THUMB glyph) reads more honestly off a
+  // CLOSED month than a partial one: a trailing-3-month expense target divided
+  // into a still-moving balance jitters around mid-month. So Reserve's two
+  // beats anchor independently, and the right-column beat ALSO depends on the
+  // selected period:
   //   - Long-term (thumb glyph): funded ratio at LAST COMPLETED month-end
-  //     (lastMonth.currentEndMonth) vs same month one year prior. Same
-  //     anchors the compute layer has always used; same as #324.
-  //   - This-month (right column): AS-OF-LATEST-UPDATE balance in the
-  //     current month vs balance on the same CALENDAR DAY a year ago.
-  //     Transaction-date anchored — no wall-clock "today" anywhere.
+  //     (lastMonth.currentEndMonth) vs same month one year prior. Same anchors
+  //     the compute layer has always used; same as #324. Period-INDEPENDENT.
+  //   - This Month (right column): AS-OF-LATEST-UPDATE balance in the current
+  //     month vs balance on the same CALENDAR DAY a year ago.
+  //   - Last Month (right column): the last completed month's CLOSING balance
+  //     vs the same MONTH-END a year ago (the same month-end anchors the
+  //     funded ratio uses, but as raw dollars — not a ratio).
+  // All transaction-date anchored — no wall-clock "today" anywhere.
 
   // Long-term reserve anchors (closed-month basis, unchanged).
   const ltCurrentMonth = lastMonth?.currentEndMonth ?? null;
@@ -383,6 +441,17 @@ export function buildSustainabilityRows(
       ? { current: mtdCurrentBalance, previous: mtdPriorBalance }
       : null;
 
+  // Last-month reserve: the last closed month's month-END balance vs the same
+  // month-end one year ago — the SAME anchors the funded ratio uses, as raw
+  // dollars. Reuses the already-computed month-end balances (no new lookup).
+  const reserveLastMonth: MetricPair =
+    ltCurrentBalance !== null && ltPriorBalance !== null
+      ? { current: ltCurrentBalance, previous: ltPriorBalance }
+      : null;
+
+  // The right-column reserve pair follows the selected period.
+  const reservePeriodPair: MetricPair = timeframe === 'lastMonth' ? reserveLastMonth : reserveThisMonth;
+
   const PCT: FlatRule = { kind: 'pct', band: FLAT_BAND_PCT };
   const USD_MONTH: FlatRule = { kind: 'usd', floor: FLAT_FLOOR_MONTH_USD };
   const USD_ANNUAL: FlatRule = { kind: 'usd', floor: FLAT_FLOOR_ANNUAL_USD };
@@ -397,63 +466,63 @@ export function buildSustainabilityRows(
 
   // Revenue Momentum — up = good, percentage basis.
   const revLongTermMetric = metricIfBothWindows(ttm, (c) => c.revenue);
-  const revThisMonthMetric = metricIfBothWindows(thisMonth, (c) => c.revenue);
+  const revPeriodMetric = metricIfBothWindows(periodComparison, (c) => c.revenue);
   const revLongTerm = sustainabilityState(revLongTermMetric, 'up', PCT);
-  const revThisMonth = sustainabilityState(revThisMonthMetric, 'up', PCT);
+  const revPeriod = sustainabilityState(revPeriodMetric, 'up', PCT);
 
   // Cost Discipline — down = good (inverted), percentage basis.
   const costLongTermMetric = metricIfBothWindows(ttm, (c) => c.expenses);
-  const costThisMonthMetric = metricIfBothWindows(thisMonth, (c) => c.expenses);
+  const costPeriodMetric = metricIfBothWindows(periodComparison, (c) => c.expenses);
   const costLongTerm = sustainabilityState(costLongTermMetric, 'down', PCT);
-  const costThisMonth = sustainabilityState(costThisMonthMetric, 'down', PCT);
+  const costPeriod = sustainabilityState(costPeriodMetric, 'down', PCT);
 
   // Monthly Cash Result — up = good, signed dollars (annual sum long-term,
-  // month-to-date this-month). An in-progress month that improved YoY while
+  // single-month for the selected period). A month that improved YoY while
   // STILL losing money is surfaced as a GREEN "Smaller Loss" pill: the label
   // carries the truth that the month lost money, so the color can honor the
   // genuine improvement. (Reverses the prior gray-pill guard — the label, not
-  // the color, now does the truth-telling.) thisMonthTone tracks the verdict
+  // the color, now does the truth-telling.) periodTone tracks the verdict
   // for every row now and is retained only as a per-row color extension point.
   const cashLongTermMetric = metricIfBothWindows(ttm, (c) => c.netCashFlow);
-  const cashThisMonthMetric = metricIfBothWindows(thisMonth, (c) => c.netCashFlow);
+  const cashPeriodMetric = metricIfBothWindows(periodComparison, (c) => c.netCashFlow);
   const cashLongTerm = sustainabilityState(cashLongTermMetric, 'up', USD_ANNUAL);
-  const cashThisMonth = sustainabilityState(cashThisMonthMetric, 'up', USD_MONTH);
-  // Smaller-loss case: improved YoY (verdict 'up') but the month is still in the
+  const cashPeriod = sustainabilityState(cashPeriodMetric, 'up', USD_MONTH);
+  // Smaller-loss case: improved YoY (verdict 'up') but the period is still in the
   // red. Gate on the CURRENT value (< 0), not the diff.
-  const cashSmallerLoss = cashThisMonth === 'up' && (cashThisMonthMetric?.current ?? 0) < 0;
-  const cashThisMonthTone: Verdict = cashThisMonth;
-  const cashThisMonthPillLabel: string | undefined = cashSmallerLoss ? 'Smaller Loss' : undefined;
+  const cashSmallerLoss = cashPeriod === 'up' && (cashPeriodMetric?.current ?? 0) < 0;
+  const cashPeriodTone: Verdict = cashPeriod;
+  const cashPeriodPillLabel: string | undefined = cashSmallerLoss ? 'Smaller Loss' : undefined;
 
   // Cash Reserve — up = good. Long-term = funded-ratio YoY at last completed
-  // month-end (a stable position matching the shipped glyph); this-month =
-  // as-of-latest-update balance vs balance on the same calendar day a year ago.
+  // month-end (a stable position matching the shipped glyph); right column =
+  // the selected-period balance pair (see reservePeriodPair above).
   const reserveLong = sustainabilityState(reserveLongTerm, 'up', RATIO);
-  const reserveMonth = sustainabilityState(reserveThisMonth, 'up', USD_MONTH);
+  const reservePeriod = sustainabilityState(reservePeriodPair, 'up', USD_MONTH);
 
   // ── Per-row tooltips ───────────────────────────────────────────────────────
   // Comparison-basis explanation + (where available) proof values. Proof values
   // reuse the SAME gated MetricPair the inline evidence uses — no new selector,
   // no new data path. A proof line is omitted when the pair is unavailable.
   const revenueTooltip = [
-    'Compares revenue over two periods: the last 12 months vs the prior 12 months, and month to date vs the same period one year ago.',
+    `Compares revenue over two periods: the last 12 months vs the prior 12 months, and ${p.tooltipFlowClause}.`,
   ];
   const costTooltip = [
-    'Compares spending over two periods: the last 12 months vs the prior 12 months, and month to date vs the same period one year ago. Lower spending is better.',
+    `Compares spending over two periods: the last 12 months vs the prior 12 months, and ${p.tooltipFlowClause}. Lower spending is better.`,
   ];
   const cashTooltip = [
-    'Compares net cash result over two periods: the last 12 months vs the prior 12 months, and month to date vs the same period one year ago.',
+    `Compares net cash result over two periods: the last 12 months vs the prior 12 months, and ${p.tooltipFlowClause}.`,
   ];
-  if (cashThisMonthMetric) {
+  if (cashPeriodMetric) {
     cashTooltip.push(
-      `Month to date: ${formatCompactUsd(cashThisMonthMetric.current)}. Last year: ${formatCompactUsd(cashThisMonthMetric.previous)}.`,
+      `${p.cashProofLabel}: ${formatCompactUsd(cashPeriodMetric.current)}. Last year: ${formatCompactUsd(cashPeriodMetric.previous)}.`,
     );
   }
   const reserveTooltip = [
-    'Long-term compares reserve strength over the last 12 months, using the latest closed month. Current reserve compares cash after the latest transaction update to the same point one year ago.',
+    `Long-term compares reserve strength over the last 12 months, using the latest closed month. ${p.tooltipReserveClause}`,
   ];
-  if (reserveThisMonth) {
+  if (reservePeriodPair) {
     reserveTooltip.push(
-      `Current reserve: ${formatCompactUsd(reserveThisMonth.current)}. Last year: ${formatCompactUsd(reserveThisMonth.previous)}.`,
+      `${p.reserveProofLabel}: ${formatCompactUsd(reservePeriodPair.current)}. Last year: ${formatCompactUsd(reservePeriodPair.previous)}.`,
     );
   }
 
@@ -461,34 +530,34 @@ export function buildSustainabilityRows(
     {
       label: 'Revenue Momentum',
       longTerm: revLongTerm,
-      thisMonth: revThisMonth,
-      thisMonthTone: revThisMonth,
-      evidence: revenueEvidence(revLongTerm, revThisMonth, revThisMonthMetric),
+      period: revPeriod,
+      periodTone: revPeriod,
+      evidence: revenueEvidence(revLongTerm, revPeriod, revPeriodMetric, p),
       tooltip: revenueTooltip,
     },
     {
       label: 'Cost Discipline',
       longTerm: costLongTerm,
-      thisMonth: costThisMonth,
-      thisMonthTone: costThisMonth,
-      evidence: costEvidence(costLongTerm, costThisMonth, costThisMonthMetric),
+      period: costPeriod,
+      periodTone: costPeriod,
+      evidence: costEvidence(costLongTerm, costPeriod, costPeriodMetric, p),
       tooltip: costTooltip,
     },
     {
       label: 'Monthly Cash Result',
       longTerm: cashLongTerm,
-      thisMonth: cashThisMonth,
-      thisMonthTone: cashThisMonthTone,
-      thisMonthLabel: cashThisMonthPillLabel,
-      evidence: cashResultEvidence(cashLongTerm, cashThisMonth, cashThisMonthMetric, cashSmallerLoss),
+      period: cashPeriod,
+      periodTone: cashPeriodTone,
+      periodLabel: cashPeriodPillLabel,
+      evidence: cashResultEvidence(cashLongTerm, cashPeriod, cashPeriodMetric, cashSmallerLoss, p),
       tooltip: cashTooltip,
     },
     {
       label: 'Cash Reserve',
       longTerm: reserveLong,
-      thisMonth: reserveMonth,
-      thisMonthTone: reserveMonth,
-      evidence: reserveEvidence(reserveLong, reserveMonth, reserveThisMonth),
+      period: reservePeriod,
+      periodTone: reservePeriod,
+      evidence: reserveEvidence(reserveLong, reservePeriod, reservePeriodPair, p),
       tooltip: reserveTooltip,
     },
   ];
@@ -497,8 +566,8 @@ export function buildSustainabilityRows(
 // ── Display mapping (single source so card + tests can't drift) ───────────────
 // Long-term column renders a directional glyph in the existing card vocabulary
 // (↑ / ↓ / → / —, matching the Operating Reserve + Cash on Hand cards); the
-// this-month column renders descriptive words. Both are colored by the same
-// 'up'=good / 'down'=bad verdict.
+// selected-period column renders descriptive words. Both are colored by the
+// same 'up'=good / 'down'=bad verdict.
 
 export function longTermGlyph(v: Verdict): string {
   switch (v) {
@@ -526,7 +595,7 @@ export function longTermLabel(v: Verdict): string {
   }
 }
 
-export function thisMonthLabel(v: Verdict): string {
+export function periodVerdictLabel(v: Verdict): string {
   switch (v) {
     case 'up':
       return 'Improving';

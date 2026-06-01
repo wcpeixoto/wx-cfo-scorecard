@@ -45,7 +45,13 @@ import { computeWhatNeedsAttention } from '../lib/kpis/digHere';
 import { computeCashTrend } from '../lib/kpis/cashTrend';
 import { computeCashTrendDelta } from '../lib/data/cashTrendDelta';
 import { buildCashBalanceSeries } from '../lib/data/balanceSeries';
-import { buildSustainabilityRows, longTermLabel, thisMonthLabel, type SustainabilityRow } from '../lib/kpis/sustainabilityRows';
+import {
+  buildSustainabilityRows,
+  longTermLabel,
+  periodVerdictLabel,
+  type SustainabilityRow,
+  type SustainTimeframe,
+} from '../lib/kpis/sustainabilityRows';
 import { computePriorYearActuals } from '../lib/kpis/priorYearActuals';
 import { runDataSanityChecks } from '../lib/dataSanity';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
@@ -2643,9 +2649,12 @@ export default function Dashboard() {
   }, [kpiTimeframe]);
 
 
+  // Sustainability right-column period. Defaults to 'thisMonth' and is NOT
+  // persisted — every refresh resets to This Month by design.
+  const [sustainTimeframe, setSustainTimeframe] = useState<SustainTimeframe>('thisMonth');
   const sustainability = useMemo<SustainabilityRow[]>(
-    () => buildSustainabilityRows(model, cashBalanceSeries),
-    [model, cashBalanceSeries],
+    () => buildSustainabilityRows(model, cashBalanceSeries, sustainTimeframe),
+    [model, cashBalanceSeries, sustainTimeframe],
   );
   // Title ⓘ tooltip id — hover/focus-within only, no React state.
   // Per-row label tooltips use the same .db-tooltip-* convention with their
@@ -2948,7 +2957,17 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <span className="sustain-h">Long Term</span>
-                <span className="sustain-h">This Month</span>
+                <div className="sustain-h sustain-h-control">
+                  <select
+                    className="sustain-period-select"
+                    value={sustainTimeframe}
+                    onChange={(event) => setSustainTimeframe(event.target.value as SustainTimeframe)}
+                    aria-label="Period shown in this column"
+                  >
+                    <option value="thisMonth">This Month</option>
+                    <option value="lastMonth">Last Month</option>
+                  </select>
+                </div>
               </div>
               {sustainability.map((row, index) => {
                 const message = [row.sublabel, row.evidence].filter(Boolean).join(' · ');
@@ -3021,8 +3040,8 @@ export default function Dashboard() {
                       )}
                     </div>
                     <div className="sustain-pill-cell">
-                      <span className={`sustain-pill is-${row.thisMonthTone}`}>
-                        {row.thisMonthLabel ?? thisMonthLabel(row.thisMonth)}
+                      <span className={`sustain-pill is-${row.periodTone}`}>
+                        {row.periodLabel ?? periodVerdictLabel(row.period)}
                       </span>
                     </div>
                   </div>

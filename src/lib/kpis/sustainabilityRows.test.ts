@@ -6,7 +6,7 @@ import type {
   KpiTimeframeComparison,
   MonthlyRollup,
 } from '../data/contract';
-import { buildSustainabilityRows, sustainabilityState, monthEndBalance, thisMonthLabel } from './sustainabilityRows';
+import { buildSustainabilityRows, sustainabilityState, monthEndBalance, periodVerdictLabel } from './sustainabilityRows';
 
 // ── Fixture builders ────────────────────────────────────────────────────────
 
@@ -72,6 +72,22 @@ function modelWith(
 ): DashboardModel {
   return {
     kpiYoYComparisonByTimeframe: { thisMonth: monthYoY, lastMonth: monthYoY, ttm },
+    monthlyRollups,
+  } as unknown as DashboardModel;
+}
+
+// Split variant: DISTINCT thisMonth and lastMonth windows, so a timeframe-toggle
+// test can prove the right column re-reads the SELECTED window — not the same
+// fixture for both. Mirrors the live model on a day when the current month has
+// no data yet (thisMonth current window empty; lastMonth = the last closed month).
+function modelWithSplit(
+  thisMonth: KpiTimeframeComparison,
+  lastMonth: KpiTimeframeComparison,
+  ttm: KpiTimeframeComparison,
+  monthlyRollups: MonthlyRollup[],
+): DashboardModel {
+  return {
+    kpiYoYComparisonByTimeframe: { thisMonth, lastMonth, ttm },
     monthlyRollups,
   } as unknown as DashboardModel;
 }
@@ -149,7 +165,7 @@ describe('Revenue — live full-April anchor', () => {
     const ttm = comparison('2026-04', '2025-04', { revenue: metric(489_807, 489_630) });
     const revenue = rowsFor(lastMonth, ttm).find((r) => r.label === 'Revenue Momentum')!;
     expect(revenue.longTerm).toBe('flat'); // NOT 'up' — the intended correction
-    expect(revenue.thisMonth).toBe('down');
+    expect(revenue.period).toBe('down');
     expect(revenue.evidence).toBe('Revenue steady over the last 12 months. Revenue down 15% month to date.');
   });
 });
@@ -173,11 +189,11 @@ describe('polarity', () => {
     const cost = rows.find((r) => r.label === 'Cost Discipline')!;
     const cash = rows.find((r) => r.label === 'Monthly Cash Result')!;
 
-    expect(revenue.thisMonth).toBe('up');
+    expect(revenue.period).toBe('up');
     expect(revenue.longTerm).toBe('up');
-    expect(cost.thisMonth).toBe('down'); // costs up = bad
+    expect(cost.period).toBe('down'); // costs up = bad
     expect(cost.longTerm).toBe('down');
-    expect(cash.thisMonth).toBe('up');
+    expect(cash.period).toBe('up');
     expect(cash.longTerm).toBe('up');
   });
 
@@ -185,7 +201,7 @@ describe('polarity', () => {
     const lastMonth = comparison('2026-04', '2025-04', { expenses: metric(90, 100) });
     const ttm = comparison('2026-04', '2025-04', { expenses: metric(900, 1000) });
     const cost = rowsFor(lastMonth, ttm).find((r) => r.label === 'Cost Discipline')!;
-    expect(cost.thisMonth).toBe('up');
+    expect(cost.period).toBe('up');
     expect(cost.longTerm).toBe('up');
   });
 });
@@ -235,7 +251,7 @@ describe('Monthly Cash Result', () => {
     const lastMonth = comparison('2026-04', '2025-04', { netCashFlow: metric(3_344, 50) });
     const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(40_000, 10_000) });
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
-    expect(cash.thisMonth).toBe('up');
+    expect(cash.period).toBe('up');
     expect(cash.evidence).toBe('Cash result better over the last 12 months. Monthly result improved $3.3K month to date.');
     expect(cash.evidence).not.toMatch(/%/);
   });
@@ -244,7 +260,7 @@ describe('Monthly Cash Result', () => {
     const lastMonth = comparison('2026-04', '2025-04', { netCashFlow: metric(-3_394, 1_200) });
     const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(0, 0) });
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
-    expect(cash.thisMonth).toBe('down');
+    expect(cash.period).toBe('down');
     // Inline now shows the absolute DELTA (a +1,200 → −3,394 swing is −$4,594);
     // the raw levels move to the tooltip. Magnitude is always shown unsigned.
     expect(cash.evidence).toBe('Cash result steady over the last 12 months. Monthly result down $4.6K month to date.');
@@ -256,7 +272,7 @@ describe('Monthly Cash Result', () => {
     const lastMonth = comparison('2026-04', '2025-04', { netCashFlow: metric(1_900, 1_000) });
     const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(40_000, 38_000) }); // +$2K ≤ $6K annual floor
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
-    expect(cash.thisMonth).toBe('flat');
+    expect(cash.period).toBe('flat');
     expect(cash.evidence).toBe('Cash result steady over the last 12 months. Monthly result about the same month to date.');
   });
 
@@ -264,7 +280,7 @@ describe('Monthly Cash Result', () => {
     const lastMonth = comparison('2026-04', '2025-04', { netCashFlow: metric(5_000, 1) });
     const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(40_000, 10_000) });
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
-    expect(cash.thisMonth).toBe('up'); // +$4,999 > $2,000, no Infinity/NaN
+    expect(cash.period).toBe('up'); // +$4,999 > $2,000, no Infinity/NaN
     expect(cash.evidence).not.toMatch(/Infinity|NaN|%/);
   });
 
@@ -283,8 +299,8 @@ describe('Monthly Cash Result', () => {
     });
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
     expect(cash.longTerm).toBe('none');
-    expect(cash.thisMonth).toBe('none');
-    expect(cash.thisMonthTone).toBe('none');
+    expect(cash.period).toBe('none');
+    expect(cash.periodTone).toBe('none');
     expect(cash.evidence).toBe('Not enough history yet.');
     expect(cash.evidence).not.toMatch(/\$0/);
   });
@@ -303,8 +319,8 @@ describe('Monthly Cash Result', () => {
     });
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
     expect(cash.longTerm).toBe('none');
-    expect(cash.thisMonth).toBe('none');
-    expect(cash.thisMonthTone).toBe('none');
+    expect(cash.period).toBe('none');
+    expect(cash.periodTone).toBe('none');
     expect(cash.evidence).toBe('Not enough history yet.');
     expect(cash.evidence).not.toMatch(/\$0/);
   });
@@ -318,7 +334,7 @@ describe('Monthly Cash Result', () => {
     });
     const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(40_000, 10_000) });
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
-    expect(cash.thisMonth).toBe('up'); // +$5,000 > $2,000 floor
+    expect(cash.period).toBe('up'); // +$5,000 > $2,000 floor
     expect(cash.evidence).toBe('Cash result better over the last 12 months. Monthly result improved $5.0K month to date.');
   });
 });
@@ -344,7 +360,7 @@ describe('percentage rows — window-presence guard', () => {
     for (const label of ['Revenue Momentum', 'Cost Discipline']) {
       const row = rows.find((r) => r.label === label)!;
       expect(row.longTerm).toBe('none');
-      expect(row.thisMonth).toBe('none');
+      expect(row.period).toBe('none');
       expect(row.evidence).toBe('Not enough history yet.');
       expect(row.evidence).not.toMatch(/100%|%/);
     }
@@ -365,7 +381,7 @@ describe('percentage rows — window-presence guard', () => {
     for (const label of ['Revenue Momentum', 'Cost Discipline']) {
       const row = rows.find((r) => r.label === label)!;
       expect(row.longTerm).toBe('none');
-      expect(row.thisMonth).toBe('none');
+      expect(row.period).toBe('none');
       expect(row.evidence).toBe('Not enough history yet.');
     }
   });
@@ -375,7 +391,7 @@ describe('percentage rows — window-presence guard', () => {
 // A month that improved YoY but is STILL negative is surfaced as a GREEN
 // "Smaller Loss" pill: the label carries the truth, so the color honors the
 // genuine improvement. This reverses the prior gray-pill guard — the gate is
-// the CURRENT value (< 0), not the diff. thisMonth = trend; thisMonthTone = color.
+// the CURRENT value (< 0), not the diff. period = trend; periodTone = color.
 
 describe('Monthly Cash Result — Smaller Loss', () => {
   it('improving-but-still-negative: green "Smaller Loss" pill + smaller-loss copy', () => {
@@ -383,9 +399,9 @@ describe('Monthly Cash Result — Smaller Loss', () => {
     const lastMonth = comparison('2026-04', '2025-04', { netCashFlow: metric(-3_394, -6_519) });
     const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(16_397, 28_968) });
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
-    expect(cash.thisMonth).toBe('up'); // +$3,125 > $2,000 floor → improving trend
-    expect(cash.thisMonthTone).toBe('up'); // GREEN now — label carries the "still losing money" truth
-    expect(cash.thisMonthLabel).toBe('Smaller Loss'); // per-row pill override
+    expect(cash.period).toBe('up'); // +$3,125 > $2,000 floor → improving trend
+    expect(cash.periodTone).toBe('up'); // GREEN now — label carries the "still losing money" truth
+    expect(cash.periodLabel).toBe('Smaller Loss'); // per-row pill override
     expect(cash.evidence).toBe('Cash result weaker over the last 12 months. Smaller loss: $3.1K better month to date.');
   });
 
@@ -393,18 +409,18 @@ describe('Monthly Cash Result — Smaller Loss', () => {
     const lastMonth = comparison('2026-04', '2025-04', { netCashFlow: metric(5_000, 1_000) });
     const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(0, 0) });
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
-    expect(cash.thisMonth).toBe('up');
-    expect(cash.thisMonthTone).toBe('up'); // green
-    expect(cash.thisMonthLabel).toBeUndefined(); // NOT Smaller Loss — current ≥ 0
+    expect(cash.period).toBe('up');
+    expect(cash.periodTone).toBe('up'); // green
+    expect(cash.periodLabel).toBeUndefined(); // NOT Smaller Loss — current ≥ 0
   });
 
   it('worsening (still negative): down/red, NOT Smaller Loss (requires verdict up)', () => {
     const lastMonth = comparison('2026-04', '2025-04', { netCashFlow: metric(-3_394, 1_200) });
     const ttm = comparison('2026-04', '2025-04', { netCashFlow: metric(0, 0) });
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
-    expect(cash.thisMonth).toBe('down');
-    expect(cash.thisMonthTone).toBe('down');
-    expect(cash.thisMonthLabel).toBeUndefined();
+    expect(cash.period).toBe('down');
+    expect(cash.periodTone).toBe('down');
+    expect(cash.periodLabel).toBeUndefined();
   });
 
   it('other rows: tone always equals verdict, no label override', () => {
@@ -416,29 +432,29 @@ describe('Monthly Cash Result — Smaller Loss', () => {
     const rows = rowsFor(lastMonth, ttm);
     for (const label of ['Revenue Momentum', 'Cost Discipline', 'Cash Reserve']) {
       const row = rows.find((r) => r.label === label)!;
-      expect(row.thisMonthTone).toBe(row.thisMonth);
-      expect(row.thisMonthLabel).toBeUndefined(); // shared mapping only
+      expect(row.periodTone).toBe(row.period);
+      expect(row.periodLabel).toBeUndefined(); // shared mapping only
     }
   });
 });
 
 // ── Shared pill-label mapping + per-row override fallback ──────────────────────
 
-describe('thisMonthLabel mapping', () => {
+describe('periodVerdictLabel mapping', () => {
   it('maps each verdict to the shared owner-friendly pill label', () => {
-    expect(thisMonthLabel('up')).toBe('Improving');
-    expect(thisMonthLabel('down')).toBe('Getting Worse');
-    expect(thisMonthLabel('flat')).toBe('About the Same');
-    expect(thisMonthLabel('none')).toBe('—');
+    expect(periodVerdictLabel('up')).toBe('Improving');
+    expect(periodVerdictLabel('down')).toBe('Getting Worse');
+    expect(periodVerdictLabel('flat')).toBe('About the Same');
+    expect(periodVerdictLabel('none')).toBe('—');
   });
 
-  it('rows without a thisMonthLabel override fall back to the shared mapping', () => {
-    // Renderer does `row.thisMonthLabel ?? thisMonthLabel(row.thisMonth)`.
+  it('rows without a periodVerdictLabel override fall back to the shared mapping', () => {
+    // Renderer does `row.periodLabel ?? periodVerdictLabel(row.period)`.
     const lastMonth = comparison('2026-04', '2025-04', { revenue: metric(110, 100) });
     const ttm = comparison('2026-04', '2025-04', { revenue: metric(1100, 1000) });
     const revenue = rowsFor(lastMonth, ttm).find((r) => r.label === 'Revenue Momentum')!;
-    expect(revenue.thisMonthLabel).toBeUndefined();
-    expect(revenue.thisMonthLabel ?? thisMonthLabel(revenue.thisMonth)).toBe('Improving');
+    expect(revenue.periodLabel).toBeUndefined();
+    expect(revenue.periodLabel ?? periodVerdictLabel(revenue.period)).toBe('Improving');
   });
 });
 
@@ -451,7 +467,7 @@ describe('Cash Reserve', () => {
     const rows = buildSustainabilityRows(modelWith(lm, comparison('2026-04', '2025-04', {}), rollupHistory()), series);
     const reserve = rows.find((r) => r.label === 'Cash Reserve')!;
     // equal target both years; balance 60k vs 20k → funded ratio clearly up (> 0.1 band)
-    expect(reserve.thisMonth).toBe('up');
+    expect(reserve.period).toBe('up');
     expect(reserve.longTerm).toBe('up');
     expect(reserve.sublabel).toBeUndefined(); // inline sublabel removed; basis moved to tooltip
     expect(reserve.evidence).toBe(
@@ -467,8 +483,8 @@ describe('Cash Reserve', () => {
     const rows = buildSustainabilityRows(modelWith(lm, comparison('2026-04', '2025-04', {}), rollupHistory()), series);
     const reserve = rows.find((r) => r.label === 'Cash Reserve')!;
     const cash = rows.find((r) => r.label === 'Monthly Cash Result')!;
-    expect(cash.thisMonth).toBe('up'); // flow ignores the draw
-    expect(reserve.thisMonth).toBe('down'); // balance reflects the draw
+    expect(cash.period).toBe('up'); // flow ignores the draw
+    expect(reserve.period).toBe('down'); // balance reflects the draw
     expect(reserve.evidence).toContain('Reserve is $40.0K lower vs same point last year.');
   });
 
@@ -477,7 +493,7 @@ describe('Cash Reserve', () => {
     const series = seriesWith({ '2026-04': 50_000 }); // prior-year point absent
     const rows = buildSustainabilityRows(modelWith(lm, comparison('2026-04', '2025-04', {}), rollupHistory()), series);
     const reserve = rows.find((r) => r.label === 'Cash Reserve')!;
-    expect(reserve.thisMonth).toBe('none');
+    expect(reserve.period).toBe('none');
     expect(reserve.longTerm).toBe('none');
     expect(reserve.evidence).toBe('Not enough history yet.'); // both beats none → collapsed
   });
@@ -490,7 +506,7 @@ describe('Cash Reserve', () => {
     const rows = buildSustainabilityRows(modelWith(lm, comparison('2026-04', '2025-04', {}), sparseRollups), series);
     const reserve = rows.find((r) => r.label === 'Cash Reserve')!;
     expect(reserve.longTerm).toBe('none'); // prior funded ratio uncomputable
-    expect(reserve.thisMonth).toBe('up'); // balance comparison still valid
+    expect(reserve.period).toBe('up'); // balance comparison still valid
     // LT beat unavailable, month beat present — NOT collapsed.
     expect(reserve.evidence).toBe('Not enough history yet. Reserve is $20.0K higher vs same point last year.');
   });
@@ -541,5 +557,123 @@ describe('per-row tooltips', () => {
     const cash = rowsFor(lastMonth, ttm).find((r) => r.label === 'Monthly Cash Result')!;
     expect(cash.tooltip).toHaveLength(1); // basis line only — no "$0" proof
     expect(cash.tooltip?.[0]).not.toMatch(/\$/);
+  });
+});
+
+// ── Timeframe toggle (This Month / Last Month) ─────────────────────────────────
+// The right column reports the SELECTED period. Default is 'thisMonth'; the
+// header dropdown can flip it to 'lastMonth'. The two bases genuinely differ:
+//   • Flows — month-to-date vs the last CLOSED month.
+//   • Reserve — This Month = as-of-latest-update balance vs the same calendar
+//     day a year ago; Last Month = that month's CLOSING balance vs the same
+//     month-end a year ago.
+// Long Term is period-independent and unchanged.
+
+describe('timeframe toggle', () => {
+  const ttm = comparison('2026-05', '2025-05', { revenue: metric(1200, 1000) });
+
+  it('flows read the SELECTED window — different values + suffix per period', () => {
+    // thisMonth = June MTD (+20%); lastMonth = full May (+50%). Same row, two windows.
+    const thisMonthCmp = comparison('2026-06', '2025-06', { revenue: metric(120, 100) });
+    const lastMonthCmp = comparison('2026-05', '2025-05', { revenue: metric(150, 100) });
+    const model = modelWithSplit(thisMonthCmp, lastMonthCmp, ttm, []);
+
+    const tmRev = buildSustainabilityRows(model, [], 'thisMonth').find((r) => r.label === 'Revenue Momentum')!;
+    expect(tmRev.period).toBe('up');
+    expect(tmRev.evidence).toContain('Revenue up 20% month to date.');
+
+    const lmRev = buildSustainabilityRows(model, [], 'lastMonth').find((r) => r.label === 'Revenue Momentum')!;
+    expect(lmRev.period).toBe('up');
+    expect(lmRev.evidence).toContain('Revenue up 50% last month.');
+    expect(lmRev.evidence).not.toMatch(/month to date/);
+  });
+
+  it('Reserve basis differs by period: same-point-prior-year vs closed month-end YoY', () => {
+    const thisMonthCmp = comparison('2026-06', '2025-06', {});
+    const lastMonthCmp = comparison('2026-05', '2025-05', {});
+    // Distinct May and June month-ends (and prior-year points) so the two bases
+    // produce DIFFERENT numbers — proving the anchor, not just the copy, swaps.
+    const series = seriesWith({ '2025-05': 29_000, '2026-05': 33_000, '2025-06': 28_000, '2026-06': 41_000 });
+    const model = modelWithSplit(thisMonthCmp, lastMonthCmp, ttm, rollupHistory());
+
+    // This Month: June as-of-latest (41,000) vs same day June 2025 (28,000) = +$13K.
+    const tmReserve = buildSustainabilityRows(model, series, 'thisMonth').find((r) => r.label === 'Cash Reserve')!;
+    expect(tmReserve.evidence).toContain('Reserve is $13.0K higher vs same point last year.');
+    expect(tmReserve.tooltip?.[0]).toContain('Current reserve compares cash after the latest transaction update');
+
+    // Last Month: May close (33,000) vs May 2025 close (29,000) = +$4K, month-end basis.
+    const lmReserve = buildSustainabilityRows(model, series, 'lastMonth').find((r) => r.label === 'Cash Reserve')!;
+    expect(lmReserve.evidence).toContain('Reserve is $4.0K higher vs the same month last year.');
+    expect(lmReserve.tooltip?.[0]).toContain('Last month compares the closing reserve to the same month-end one year ago');
+  });
+
+  it('Smaller Loss applies to the SELECTED period (Last Month)', () => {
+    // Current month empty; last month improved YoY but is still in the red.
+    const thisMonthCmp = comparison('2026-06', '2025-06', { netCashFlow: metric(0, 5_000), currentMonthCount: 0 });
+    const lastMonthCmp = comparison('2026-05', '2025-05', { netCashFlow: metric(-3_394, -6_519) });
+    const cashTtm = comparison('2026-05', '2025-05', { netCashFlow: metric(16_397, 28_968) });
+    const model = modelWithSplit(thisMonthCmp, lastMonthCmp, cashTtm, []);
+
+    const lmCash = buildSustainabilityRows(model, [], 'lastMonth').find((r) => r.label === 'Monthly Cash Result')!;
+    expect(lmCash.period).toBe('up');
+    expect(lmCash.periodTone).toBe('up'); // green
+    expect(lmCash.periodLabel).toBe('Smaller Loss');
+    expect(lmCash.evidence).toContain('Smaller loss: $3.1K better last month.');
+
+    // Same model under This Month: current window empty → none (no phantom verdict).
+    const tmCash = buildSustainabilityRows(model, [], 'thisMonth').find((r) => r.label === 'Monthly Cash Result')!;
+    expect(tmCash.period).toBe('none');
+    expect(tmCash.periodLabel).toBeUndefined();
+  });
+
+  it('tooltip flow clause + proof label switch with the period', () => {
+    const thisMonthCmp = comparison('2026-06', '2025-06', { netCashFlow: metric(5_000, 1_000) });
+    const lastMonthCmp = comparison('2026-05', '2025-05', { netCashFlow: metric(5_000, 1_000) });
+    const cashTtm = comparison('2026-05', '2025-05', { netCashFlow: metric(40_000, 10_000) });
+    const model = modelWithSplit(thisMonthCmp, lastMonthCmp, cashTtm, []);
+
+    const tmCash = buildSustainabilityRows(model, [], 'thisMonth').find((r) => r.label === 'Monthly Cash Result')!;
+    expect(tmCash.tooltip?.[0]).toContain('month to date vs the same period one year ago');
+    expect(tmCash.tooltip?.[1]).toContain('Month to date:');
+
+    const lmCash = buildSustainabilityRows(model, [], 'lastMonth').find((r) => r.label === 'Monthly Cash Result')!;
+    expect(lmCash.tooltip?.[0]).toContain('last month vs the same month one year ago');
+    expect(lmCash.tooltip?.[1]).toContain('Last month:');
+  });
+
+  it('live June-1 shape: empty This Month renders dashes, Last Month shows verdicts', () => {
+    // 2026-06-01 with data through 2026-05-31: June has no transactions yet, so
+    // This Month is all "none" (the dashes the owner sees); Last Month (May) is
+    // the last closed month and reports real verdicts. Intentional, not a bug.
+    const thisMonthCmp = comparison('2026-06', '2025-06', {
+      revenue: metric(0, 50_000),
+      expenses: metric(0, 40_000),
+      netCashFlow: metric(0, 10_000),
+      currentMonthCount: 0,
+    });
+    const lastMonthCmp = comparison('2026-05', '2025-05', {
+      revenue: metric(54_000, 37_000),
+      expenses: metric(42_000, 37_000),
+      netCashFlow: metric(12_000, 100),
+    });
+    const model = modelWithSplit(thisMonthCmp, lastMonthCmp, ttm, []);
+
+    const tm = buildSustainabilityRows(model, [], 'thisMonth');
+    for (const label of ['Revenue Momentum', 'Cost Discipline', 'Monthly Cash Result']) {
+      expect(tm.find((r) => r.label === label)!.period).toBe('none');
+    }
+    const lm = buildSustainabilityRows(model, [], 'lastMonth');
+    expect(lm.find((r) => r.label === 'Revenue Momentum')!.period).toBe('up');
+    expect(lm.find((r) => r.label === 'Monthly Cash Result')!.period).toBe('up');
+  });
+
+  it('defaults to This Month when no timeframe argument is passed', () => {
+    const thisMonthCmp = comparison('2026-06', '2025-06', { revenue: metric(120, 100) });
+    const lastMonthCmp = comparison('2026-05', '2025-05', { revenue: metric(150, 100) });
+    const model = modelWithSplit(thisMonthCmp, lastMonthCmp, ttm, []);
+    const def = buildSustainabilityRows(model, []).find((r) => r.label === 'Revenue Momentum')!;
+    const explicit = buildSustainabilityRows(model, [], 'thisMonth').find((r) => r.label === 'Revenue Momentum')!;
+    expect(def.evidence).toBe(explicit.evidence);
+    expect(def.evidence).toContain('month to date');
   });
 });
