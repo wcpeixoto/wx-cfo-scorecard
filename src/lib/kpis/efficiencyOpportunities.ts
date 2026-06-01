@@ -15,6 +15,12 @@ const MAX_ROWS = 4;
 const REVENUE_FLOOR_RATIO = 0.7;  // a window's avg revenue must clear 0.7 × floor
 const MIN_WINDOWS = 2;            // ≥2 windows needed for a credible benchmark
 
+// A category becomes "benchmark-ready" only after its first run of this many
+// consecutive months where ≥1 transaction was recorded. Matches the 3-month
+// window size by design — the smallest unit the card considers as a "best
+// stretch" is also the smallest unit of demonstrated sustained tracking.
+const SUSTAINED_TRACKING_MIN_MONTHS = 3;
+
 // Categories the owner has no near-term operational lever to change.
 // Suppressed from Efficiency Opportunities regardless of gap size.
 // Names are exact matches against parentCategoryName() output — case-sensitive.
@@ -244,16 +250,21 @@ export function computeCore(
   const monthIndex = new Map<string, number>();
   months.forEach((m, i) => monthIndex.set(m, i));
 
-  // Revenue per month + expense per (parent category, month).
-  // firstActiveMonth records the earliest month index where a category had any
-  // accepted expense transaction (presence, not summed-spend nonzero — sign
-  // flips and same-month offsets can net to $0 while real tracking exists). It
-  // gates the "best window" search below so a category's pre-tracking zero-
-  // padded months can't win as its 0% benchmark (e.g. Customer Refunds, whose
-  // import history starts mid-2025).
+  // Revenue per month + expense per (parent category, month) + presence per
+  // (parent category, month). Presence is by transaction existence (not
+  // summed-spend nonzero — sign flips / same-month offsets can net to $0 while
+  // real tracking exists). After the loop we derive each category's
+  // `firstActiveMonth`: the start index of its first SUSTAINED_TRACKING_MIN_MONTHS-
+  // consecutive run of presence. That gates the "best window" search below.
+  //
+  // First-appearance (PR #360) wasn't enough: real Customer Refunds data has
+  // stray 2022–early-2025 transactions before sustained mid-2025 tracking, so
+  // first-appearance unlocked years of zero-padded pre-sustained windows. The
+  // sustained run is the right signal — once a category has ≥3 consecutive
+  // months of recorded activity, the data path is credible enough to benchmark.
   const revenueByMonth = new Array<number>(months.length).fill(0);
   const expenseByCatMonth = new Map<string, number[]>();
-  const firstActiveMonth = new Map<string, number>();
+  const presenceByCatMonth = new Map<string, boolean[]>();
 
   for (const txn of txns) {
     if (!txn || !txn.month) continue;
@@ -280,9 +291,30 @@ export function computeCore(
       }
       arr[idx] += Math.abs(txn.amount);
 
-      const existingFirst = firstActiveMonth.get(parent);
-      if (existingFirst === undefined || idx < existingFirst) {
-        firstActiveMonth.set(parent, idx);
+      let presence = presenceByCatMonth.get(parent);
+      if (!presence) {
+        presence = new Array<boolean>(months.length).fill(false);
+        presenceByCatMonth.set(parent, presence);
+      }
+      presence[idx] = true;
+    }
+  }
+
+  // Derive firstActiveMonth from presence runs. A category that never gets a
+  // 3-consecutive-month run gets no entry → its row is dropped below (no fair
+  // benchmark exists when sustained tracking can't be demonstrated).
+  const firstActiveMonth = new Map<string, number>();
+  for (const [category, presence] of presenceByCatMonth.entries()) {
+    let runLength = 0;
+    for (let i = 0; i < presence.length; i += 1) {
+      if (presence[i]) {
+        runLength += 1;
+        if (runLength >= SUSTAINED_TRACKING_MIN_MONTHS) {
+          firstActiveMonth.set(category, i - SUSTAINED_TRACKING_MIN_MONTHS + 1);
+          break;
+        }
+      } else {
+        runLength = 0;
       }
     }
   }
@@ -367,10 +399,11 @@ export function computeCore(
     const todayRatio = currentAvgSpend / currentWindow.avgRevenue;
 
     // Skip "best window" candidates whose start predates this category's first
-    // tracked month — otherwise pre-tracking $0 padding wins as the 0% best.
-    // `?? 0` is defensive: every category we iterate here was populated above,
-    // so the map entry should always exist.
-    const categoryFirstActive = firstActiveMonth.get(category) ?? 0;
+    // sustained-tracking run. Categories without any sustained run (no entry
+    // in firstActiveMonth) get no benchmark row at all — there's no credible
+    // "best" when the data path can't be demonstrated to be reliable.
+    const categoryFirstActive = firstActiveMonth.get(category);
+    if (categoryFirstActive === undefined) continue;
 
     // Best = lowest cost ratio among the revenue-qualified candidate windows
     // (or all valid windows when the floor disqualified too many — see fallback).
@@ -458,28 +491,34 @@ export function computeCore(
     }
     payrollTodayPct = Math.round(((sumCurrent / WINDOW_SIZE_MONTHS) / currentWindow.avgRevenue) * 100);
 
-    // Apply the same firstActiveMonth best-window gate the per-row loop uses
-    // (#360), so the hero's best stretch can't pick a pre-tracking zero-padded
-    // window that the gated Payroll row would reject — keeps payrollBestPct /
-    // payrollBestWindowLabel aligned with the Money Left Payroll row.
-    const payrollFirstActive = firstActiveMonth.get('Payroll') ?? 0;
-    let bestRatio = Number.POSITIVE_INFINITY;
-    let bestWin: Window | null = null;
-    for (const w of candidateWindows) {
-      if (w.startIdx < payrollFirstActive) continue;
-      let sumSpend = 0;
-      for (let k = w.startIdx; k <= w.endIdx; k += 1) {
-        sumSpend += payrollSpendByMonth[k];
+    // Apply the same sustained-tracking gate the per-row loop uses (#362), so
+    // the hero's best stretch can't pick a pre-sustained zero-padded window
+    // that the gated Payroll row would reject — keeps payrollBestPct /
+    // payrollBestWindowLabel aligned with the Money Left Payroll row. If
+    // Payroll has no sustained run (very unlikely in practice but possible
+    // with sparse imports), the best fields stay null; payrollTodayPct above
+    // is still populated so the hero can show "today" without a misleading
+    // benchmark.
+    const payrollFirstActive = firstActiveMonth.get('Payroll');
+    if (payrollFirstActive !== undefined) {
+      let bestRatio = Number.POSITIVE_INFINITY;
+      let bestWin: Window | null = null;
+      for (const w of candidateWindows) {
+        if (w.startIdx < payrollFirstActive) continue;
+        let sumSpend = 0;
+        for (let k = w.startIdx; k <= w.endIdx; k += 1) {
+          sumSpend += payrollSpendByMonth[k];
+        }
+        const ratio = sumSpend / WINDOW_SIZE_MONTHS / w.avgRevenue;
+        if (ratio < bestRatio) {
+          bestRatio = ratio;
+          bestWin = w;
+        }
       }
-      const ratio = sumSpend / WINDOW_SIZE_MONTHS / w.avgRevenue;
-      if (ratio < bestRatio) {
-        bestRatio = ratio;
-        bestWin = w;
+      if (bestWin && Number.isFinite(bestRatio)) {
+        payrollBestPct = Math.round(bestRatio * 100);
+        payrollBestWindowLabel = formatWindowLabel(months[bestWin.startIdx], months[bestWin.endIdx]);
       }
-    }
-    if (bestWin && Number.isFinite(bestRatio)) {
-      payrollBestPct = Math.round(bestRatio * 100);
-      payrollBestWindowLabel = formatWindowLabel(months[bestWin.startIdx], months[bestWin.endIdx]);
     }
   }
 

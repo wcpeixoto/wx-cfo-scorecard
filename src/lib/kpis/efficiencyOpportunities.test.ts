@@ -196,11 +196,12 @@ describe('computeEfficiencyOpportunities — payroll hero basis (Payroll Efficie
     expect(res.payrollBestWindowLabel).toBeNull();
   });
 
-  it('hero best-stretch respects the #360 firstActiveMonth gate (stays aligned with the gated Payroll row)', () => {
-    // Payroll tracking starts at idx 17 (Jun 2025); idx 0–16 are pre-tracking $0.
-    // Ungated, an all-$0 pre-tracking window would win as a bogus 0% best; with
-    // the gate (mirroring #360's per-row loop) the best is the genuine Jun–Aug
-    // 2025 dip, and the hero fields equal the gated Money Left Payroll row.
+  it('hero best-stretch respects the firstActiveMonth gate (stays aligned with the gated Payroll row)', () => {
+    // Payroll tracking starts at idx 17 (Jun 2025) with 7 consecutive present
+    // months ⇒ sustained-tracking rule (#362) sets firstActive=17. Ungated, the
+    // pre-tracking $0 windows would win as a bogus 0% best; with the gate the
+    // best is the genuine Jun–Aug 2025 dip, and the hero fields equal the gated
+    // Money Left Payroll row.
     const revenue = arr(30000);
     const payroll = set(set(arr(0), [17, 18, 19], 6000), [20, 21, 22, 23], 9000);
     const res = computeCore(MODEL, buildPayrollTxns(revenue, payroll), REF_DATE);
@@ -218,10 +219,13 @@ describe('computeEfficiencyOpportunities — payroll hero basis (Payroll Efficie
   });
 });
 
-describe('computeEfficiencyOpportunities — per-category data presence floor', () => {
-  // Customer Refunds is the real-world motivator: its imported history starts
-  // mid-2025, leaving pre-tracking months at $0. Without the floor, the card
-  // picks one of those zero-padded windows as the 0% "best" benchmark.
+describe('computeEfficiencyOpportunities — sustained-tracking gate', () => {
+  // A category is benchmark-ready only after its first run of
+  // SUSTAINED_TRACKING_MIN_MONTHS = 3 consecutive months with at least one
+  // recorded transaction. Customer Refunds motivates this: real data has
+  // stray 2022–early-2025 txns before sustained mid-2025 tracking, so a
+  // first-appearance rule (PR #360) wasn't enough — zero-padded pre-sustained
+  // windows still won as 0% bests.
   function buildTxnsWithRefunds(revenue: number[], refunds: number[]): Txn[] {
     const txns: Txn[] = [];
     MONTHS.forEach((month, i) => {
@@ -236,11 +240,10 @@ describe('computeEfficiencyOpportunities — per-category data presence floor', 
     return { res, row: res.rows.find((r) => r.category === 'Customer Refunds') };
   }
 
-  it('late-arriving category does not choose a pre-tracking zero-padded best window', () => {
-    // Refunds tracking starts at idx 17 (Jun 2025). Pre-fix, every window in
-    // idx 0–14 sums to $0 spend → ratio 0% → "best" lands on a 2024 window the
-    // gym never actually achieved. Post-fix, candidates are gated to
-    // startIdx ≥ 17 and the best is the genuine Jun–Aug 2025 dip.
+  it('late-arriving category: best is the start of the sustained run, not a pre-tracking zero window', () => {
+    // Refunds present idx 17–23 (7 consecutive months ⇒ firstActiveMonth = 17,
+    // Jun 2025). Pre-sustained windows are zero-padded and would win as 0%
+    // "best" without the gate; the rule blocks them.
     const revenue = arr(30000);
     const refunds = set(
       set(set(arr(0), [17, 18, 19], 200), [20, 21, 22], 500),
@@ -254,24 +257,87 @@ describe('computeEfficiencyOpportunities — per-category data presence floor', 
     expect(row!.todayPct).toBe(2); // 2.22% rounded
   });
 
-  it('zero-spend window after the category started being tracked is still eligible', () => {
-    // Refunds tracking starts at idx 17 with one $500 txn, then idx 18–20
-    // (Jul–Sep 2025) are genuinely $0 — refunds happen, but not every month.
-    // That window must REMAIN eligible: a $0 month inside an active period is
-    // real efficiency signal, not pre-tracking padding.
+  it('ghost-history: stray pre-sustained txns do NOT unlock pre-sustained zero windows', () => {
+    // Mimics real Customer Refunds data: stray txns scattered across 2024
+    // (idx 2, 6, 9) before sustained tracking begins idx 16 (May 2025). A
+    // first-appearance rule (PR #360) would set firstActive = 2 and let
+    // zero-padded windows between strays win as 0% bests — exactly the bug
+    // observed in production. K=3 sets firstActive = 16 instead, so the best
+    // window comes from the genuine sustained period.
     const revenue = arr(30000);
-    const refunds = set(set(arr(0), [17], 500), [21, 22, 23], 500);
+    const refunds = arr(0);
+    refunds[2] = 800; refunds[6] = 500; refunds[9] = 600;   // strays
+    for (let i = 16; i <= 20; i += 1) refunds[i] = 200;     // sustained low
+    for (let i = 21; i <= 23; i += 1) refunds[i] = 1000;    // current
     const { row } = refundsRow(revenue, refunds);
 
     expect(row).toBeDefined();
-    expect(row!.bestWindow.label).toBe('Jul – Sep 2025');
+    expect(row!.bestWindow.label).toBe('May – Jul 2025'); // NOT a 2024 window
+    expect(row!.bestPct).toBe(1);  // 0.67% rounded
+    expect(row!.todayPct).toBe(3); // 3.33% rounded
+  });
+
+  it('low-spend window inside the sustained period is still eligible (regression guard)', () => {
+    // Refunds present idx 11–23 (13 consecutive ⇒ firstActive = 11). The
+    // sustained period contains a 3-month dip to trivially-low spend at
+    // idx 15–17 (Apr–Jun 2025). The gate must NOT block this — a low-spend
+    // window inside an active period is real efficiency signal, not padding.
+    const revenue = arr(30000);
+    const refunds = set(
+      set(arr(0), [11, 12, 13, 14, 18, 19, 20, 21, 22, 23], 500),
+      [15, 16, 17], 1,
+    );
+    const { row } = refundsRow(revenue, refunds);
+
+    expect(row).toBeDefined();
+    expect(row!.bestWindow.label).toBe('Apr – Jun 2025');
+    expect(row!.bestPct).toBe(0); // ~0.003% rounded
+    expect(row!.todayPct).toBe(2); // 1.67% rounded
+  });
+
+  it('amount=0 transactions count as presence (sign-flip / same-month-offset safety)', () => {
+    // Sign-flipped refund pairs or same-month offsets can leave a category
+    // with $0 net spend in a month even though transactions exist. Presence
+    // must be by txn existence, not summed-spend nonzero — otherwise the
+    // first sustained run could be skipped past a real start of tracking
+    // because of an arithmetic quirk. Three consecutive amount=0 txns at
+    // idx 11–13 must mark presence and satisfy the K=3 rule.
+    const txns: Txn[] = [];
+    MONTHS.forEach((month, i) => {
+      txns.push(mk(month, 'income', 'Business Income', 30000));
+      if (i >= 11 && i <= 13) txns.push(mk(month, 'expense', 'Customer Refunds', 0));
+    });
+    txns.push(mk(MONTHS[21], 'expense', 'Customer Refunds', 500));
+    txns.push(mk(MONTHS[22], 'expense', 'Customer Refunds', 500));
+    txns.push(mk(MONTHS[23], 'expense', 'Customer Refunds', 500));
+    const res = computeCore(MODEL, txns, REF_DATE);
+    const row = res.rows.find((r) => r.category === 'Customer Refunds');
+
+    // K=3 satisfied at idx 11 thanks to the amount=0 txns. The row exists
+    // (sustained run found) with bestPct = 0 (the all-$0 windows in the
+    // pre-current sustained stretch are legitimately eligible).
+    expect(row).toBeDefined();
     expect(row!.bestPct).toBe(0);
   });
 
-  it('full-history category is unaffected: firstActiveMonth = 0 leaves every window eligible', () => {
-    // When a category has txns in every lookback month, firstActiveMonth = 0
-    // and the gate is a no-op. The existing best-window selection runs
-    // unchanged — Apr–Jun 2024 wins as the genuine dip.
+  it('category without any 3-consecutive-month run gets no row (no fair benchmark exists)', () => {
+    // Sparse presence with no K-consecutive run anywhere in the lookback.
+    // Current-window spend passes materiality, but there is no credible
+    // benchmark — the row drops. Better than fabricating a 0% best from a
+    // zero-padded window.
+    const revenue = arr(30000);
+    const refunds = arr(0);
+    refunds[10] = 500; refunds[11] = 500;                  // 2-consecutive stray
+    refunds[14] = 200; refunds[15] = 200;                  // 2-consecutive stray
+    refunds[20] = 200; refunds[22] = 200; refunds[23] = 200; // alternating around current
+    const { row } = refundsRow(revenue, refunds);
+
+    expect(row).toBeUndefined();
+  });
+
+  it('full-history category is unaffected: K=3 satisfied at idx 0 ⇒ all windows eligible', () => {
+    // Marketing-style category present every month. firstActive = 0, the gate
+    // is a no-op, and the existing best-window selection runs unchanged.
     const revenue = arr(30000);
     const refunds = set(arr(3000), [3, 4, 5], 1500);
     const { row } = refundsRow(revenue, refunds);
