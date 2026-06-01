@@ -1409,7 +1409,7 @@ class on the card root. Child elements that need status color inherit via
 
 ### Compact trend sparkline (right column)
 Bottom-right of the card, a 160×70 ApexCharts area sparkline plots a
-**straight two-point result line** from a `$0` baseline to the 6-month
+**straight two-point result line** from a `0%` baseline to the 6-month
 cumulative profit margin (`t6mMargin`). The slope direction follows the
 sign of the margin: a meaningfully positive margin slopes up, a
 meaningfully negative one slopes down, and a near-zero margin (below

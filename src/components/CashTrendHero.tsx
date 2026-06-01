@@ -107,7 +107,7 @@ function CashTrendSparkline({ margin }: { margin: number }) {
       ? chartTokens.brand
       : chartTokens.error;
 
-  // Straight two-point line — [$0 baseline, t6mMargin]. Slope direction
+  // Straight two-point line — [0% baseline, t6mMargin]. Slope direction
   // and steepness both follow the margin value: positive margin slopes
   // up, negative slopes down, and a near-zero margin (below the display
   // rounding cutoff) renders flat at the baseline. Margins beyond
