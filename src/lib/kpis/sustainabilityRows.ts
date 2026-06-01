@@ -3,10 +3,12 @@
 // compute layer already exports, so the card can never disagree with the
 // rest of the page:
 //
-//   - Revenue Momentum / Cost Discipline / Monthly Cash Result read
-//     model.kpiYoYComparisonByTimeframe.thisMonth (month-to-date YoY,
-//     day-truncated by thisMonthPriorYearRollup so the prior-year window
-//     covers the same number of days) and .ttm for long term.
+//   - Revenue Momentum / Cost Discipline / Monthly Cash Result read the
+//     SELECTED-PERIOD window of model.kpiYoYComparisonByTimeframe — .thisMonth
+//     (month-to-date YoY, day-truncated by thisMonthPriorYearRollup so the
+//     prior-year window covers the same number of days) by default, or
+//     .lastMonth (the last closed month) when the toggle picks it — and .ttm
+//     for long term.
 //   - Cash Reserve reads the existing cashBalanceSeries (total bank cash,
 //     built by buildCashBalanceSeries) and the exported computeRunwayMetric
 //     for the canonical funded ratio. It does NOT re-import the raw
@@ -15,11 +17,13 @@
 //
 // Each row carries two year-over-year beats:
 //   longTerm  — glyph, 12-month-vs-prior basis (ttm / funded-ratio YoY at
-//               last completed month-end)
-//   thisMonth — current month-to-date vs the same calendar window prior
-//               year. Flow rows reuse the day-truncated thisMonth YoY from
-//               compute; Cash Reserve reads as-of-latest-update balance vs
-//               balance on the same calendar date a year ago.
+//               last completed month-end). Period-INDEPENDENT.
+//   period    — the SELECTED period vs the same window a year prior. Flow rows
+//               reuse the YoY pair from compute (thisMonth = day-truncated
+//               month-to-date; lastMonth = full closed month); Cash Reserve
+//               reads as-of-latest-update balance vs the same calendar date a
+//               year ago (This Month) or the closed month-end balance vs the
+//               same month-end a year ago (Last Month).
 //
 // ONE calibrated state per beat drives the glyph, the verdict word, the color,
 // AND the two-beat evidence sentence — there is no separate path, so the four

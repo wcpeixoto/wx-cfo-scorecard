@@ -2840,7 +2840,7 @@ body {
      'flat' → muted rounded dash .thumb.flat
      'none' → "N/A" muted text   .na
 
-   Pill tone classes (driven by row.thisMonthTone, not row.thisMonth):
+   Pill tone classes (driven by row.periodTone, not row.period):
      'up'/is-up   → green pill   .sustain-pill.is-up
      'down'/is-down → red pill   .sustain-pill.is-down
      'flat'/'none' → gray pill   .sustain-pill.is-flat / .is-none */
