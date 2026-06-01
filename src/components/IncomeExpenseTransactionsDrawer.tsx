@@ -2,9 +2,11 @@
 // transactions behind it.
 //
 // Mirrors TopExpensesTransactionsDrawer's body UX (sort, search, account
-// narrow, CSV export) and now shares the chrome via <DrawerShell> — backdrop,
-// Escape, dialog ARIA. CSS prefix `ie-drawer-*` is preserved; the table,
-// header, and footer all stay in this file because they're content-specific.
+// narrow, CSV export). Shell chrome comes from <DrawerShell>; the sortable
+// table + footer + empty state come from <TransactionTable>. CSS prefix
+// `ie-drawer-*` is preserved; the header (title, chart-anchored sum,
+// Export) and the search/account controls stay in this file because they
+// own the chart-displayed-value semantics.
 //
 // The source (computeIncomeExpenseRows) owns the math: it hands this drawer
 // the contributing rows, each carrying its already-computed `contribution`.
@@ -17,6 +19,17 @@
 import { useMemo, useState } from 'react';
 import type { IncomeExpenseRow } from '../lib/kpis/compute';
 import { DrawerShell } from './DrawerShell';
+import {
+  TransactionTable,
+  compareTransactionRows,
+  formatUsd,
+  nextSort,
+  round2,
+  vendorMemo,
+  type SortKey,
+  type SortState,
+} from './TransactionTable';
+import { exportCsv } from '../lib/csvExport';
 
 interface Props {
   side: 'income' | 'expense';
@@ -24,65 +37,6 @@ interface Props {
   chartDisplayedValue: number;
   windowLabel: string;
   onClose: () => void;
-}
-
-type SortKey = 'date' | 'vendor' | 'category' | 'account' | 'amount';
-type SortDir = 'asc' | 'desc';
-
-const DEFAULT_DIR: Record<SortKey, SortDir> = {
-  date: 'desc',
-  amount: 'desc',
-  vendor: 'asc',
-  category: 'asc',
-  account: 'asc',
-};
-
-const COLUMNS: { key: SortKey; label: string }[] = [
-  { key: 'date', label: 'Date' },
-  { key: 'vendor', label: 'Vendor / Memo' },
-  { key: 'category', label: 'Category' },
-  { key: 'account', label: 'Account' },
-  { key: 'amount', label: 'Amount' },
-];
-
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
-function formatUsd(value: number): string {
-  return value.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  if (!y || !m || !d) return iso;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(m)}/${pad(d)}/${pad(y % 100)}`;
-}
-
-const vendorName = (payee?: string, memo?: string): string => payee?.trim() || memo?.trim() || '';
-const vendorMemoLine = (payee?: string, memo?: string): string =>
-  payee?.trim() && memo?.trim() ? memo.trim() : '';
-const vendorMemo = (payee?: string, memo?: string): string =>
-  [payee?.trim(), memo?.trim()].filter(Boolean).join(' — ');
-
-function csvCell(value: string): string {
-  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
-}
-
-function SortIcon() {
-  return (
-    <svg className="ie-drawer-sort-ico" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-      <path className="ic-up" d="M8 3.2 11.2 7H4.8z" />
-      <path className="ic-dn" d="M8 12.8 4.8 9h6.4z" />
-    </svg>
-  );
 }
 
 export function IncomeExpenseTransactionsDrawer({
@@ -94,7 +48,7 @@ export function IncomeExpenseTransactionsDrawer({
 }: Props) {
   const [accountFilter, setAccountFilter] = useState<string>('');
   const [search, setSearch] = useState<string>('');
-  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'date', dir: 'desc' });
+  const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' });
 
   const accountOptions = useMemo(() => {
     const names = new Set<string>();
@@ -105,6 +59,9 @@ export function IncomeExpenseTransactionsDrawer({
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
+  // Narrow by account + search, then order by the active column. The same
+  // sorted list is what the table renders and what CSV export writes, so
+  // display order and export order stay aligned.
   const visibleRows = useMemo(() => {
     const needle = search.trim().toLowerCase();
     const filtered = rows.filter((row) => {
@@ -116,30 +73,7 @@ export function IncomeExpenseTransactionsDrawer({
         .toLowerCase();
       return haystack.includes(needle);
     });
-    const dir = sort.dir === 'asc' ? 1 : -1;
-    return filtered.slice().sort((a, b) => {
-      let c = 0;
-      switch (sort.key) {
-        case 'amount':
-          c = a.txn.rawAmount - b.txn.rawAmount;
-          break;
-        case 'date':
-          c = a.txn.date.localeCompare(b.txn.date);
-          break;
-        case 'vendor':
-          c = vendorName(a.txn.payee, a.txn.memo)
-            .toLowerCase()
-            .localeCompare(vendorName(b.txn.payee, b.txn.memo).toLowerCase());
-          break;
-        case 'category':
-          c = (a.txn.category ?? '').toLowerCase().localeCompare((b.txn.category ?? '').toLowerCase());
-          break;
-        case 'account':
-          c = (a.txn.account ?? '').toLowerCase().localeCompare((b.txn.account ?? '').toLowerCase());
-          break;
-      }
-      return c * dir;
-    });
+    return filtered.slice().sort((a, b) => compareTransactionRows(a, b, sort));
   }, [rows, accountFilter, search, sort]);
 
   const isNarrowed = accountFilter !== '' || search.trim() !== '';
@@ -160,39 +94,25 @@ export function IncomeExpenseTransactionsDrawer({
     setSearch('');
   };
 
-  const handleSort = (key: SortKey) => {
-    setSort((prev) =>
-      prev.key === key
-        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
-        : { key, dir: DEFAULT_DIR[key] },
-    );
-  };
+  const handleSort = (key: SortKey) => setSort((prev) => nextSort(prev, key));
 
   const sideLabel = side === 'income' ? 'Income' : 'Expense';
   const title = `${sideLabel} — ${windowLabel}`;
   const ariaLabel = `${sideLabel} transactions for ${windowLabel}`;
 
   const handleExport = () => {
-    const headers = ['Date', 'Vendor / Memo', 'Category', 'Account', 'Amount'];
-    const lines = [headers.join(',')];
-    visibleRows.forEach((row) => {
-      const cells = [
+    const slug = `${side}-${windowLabel}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || side;
+    exportCsv({
+      filename: `income-expense-${slug}.csv`,
+      headers: ['Date', 'Vendor / Memo', 'Category', 'Account', 'Amount'],
+      rows: visibleRows.map((row) => [
         row.txn.date,
         vendorMemo(row.txn.payee, row.txn.memo),
         row.txn.category ?? '',
         row.txn.account ?? '',
         String(row.txn.rawAmount),
-      ];
-      lines.push(cells.map(csvCell).join(','));
+      ]),
     });
-    const slug = `${side}-${windowLabel}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || side;
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `income-expense-${slug}.csv`;
-    anchor.click();
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -255,75 +175,14 @@ export function IncomeExpenseTransactionsDrawer({
           </button>
         </div>
 
-        {isEmpty ? (
-          <div className="ie-drawer-empty">
-            <div className="ie-drawer-empty-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="8" y1="11" x2="14" y2="11" />
-              </svg>
-            </div>
-            <p className="ie-drawer-empty-primary">No transactions found for this filter.</p>
-            <p className="ie-drawer-empty-secondary">Try changing the account or clearing the search.</p>
-          </div>
-        ) : (
-          <>
-            <div className="ie-drawer-body">
-              <table className="ie-drawer-table">
-                <colgroup>
-                  <col className="ie-drawer-col-date" />
-                  <col className="ie-drawer-col-vendor" />
-                  <col className="ie-drawer-col-category" />
-                  <col className="ie-drawer-col-account" />
-                  <col className="ie-drawer-col-amount" />
-                </colgroup>
-                <thead>
-                  <tr>
-                    {COLUMNS.map((col) => {
-                      const active = sort.key === col.key;
-                      return (
-                        <th
-                          key={col.key}
-                          className={`ie-drawer-th${active ? ` is-sorted dir-${sort.dir}` : ''}`}
-                          aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                        >
-                          <button className="ie-drawer-th-sort" type="button" onClick={() => handleSort(col.key)}>
-                            {col.label}
-                            <SortIcon />
-                          </button>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleRows.map((row, i) => {
-                    const name = vendorName(row.txn.payee, row.txn.memo) || '—';
-                    const memoLine = vendorMemoLine(row.txn.payee, row.txn.memo);
-                    return (
-                      <tr key={row.txn.id || i}>
-                        <td className="ie-drawer-td-date">{formatDate(row.txn.date)}</td>
-                        <td className="ie-drawer-td-vendor">
-                          <span className="ie-drawer-vname" title={name}>{name}</span>
-                          {memoLine && <span className="ie-drawer-memo" title={memoLine}>{memoLine}</span>}
-                        </td>
-                        <td>{row.txn.category || '—'}</td>
-                        <td>{row.txn.account || '—'}</td>
-                        <td className={`ie-drawer-td-amount${row.txn.rawAmount > 0 ? ' ie-drawer-amount--credit' : ''}`}>
-                          {formatUsd(row.txn.rawAmount)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="ie-drawer-foot">
-              {isNarrowed
-                ? `Showing ${visibleRows.length} of ${total}`
-                : `Showing all ${total} transaction${total === 1 ? '' : 's'}`}
-            </div>
-          </>
-        )}
+        <TransactionTable
+          classPrefix="ie-drawer"
+          rows={visibleRows}
+          totalCount={total}
+          isNarrowed={isNarrowed}
+          sort={sort}
+          onSort={handleSort}
+        />
     </DrawerShell>
   );
 }
