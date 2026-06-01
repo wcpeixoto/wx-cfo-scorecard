@@ -232,7 +232,6 @@ export default function PayrollEfficiencyCard({
         </div>
       </div>
 
-      <p className="pe-chart-caption">Last 24 months · 3-month rolling</p>
       <div className="pe-chart">
         {hasData ? (
           <Chart options={options} series={series} type="area" height={144} />
