@@ -10981,10 +10981,12 @@ body {
 }
 
 .bv-driver-tooltip-panel {
-  left: 0;
-  right: auto;
-  min-width: 240px;
-  max-width: 320px;
+  /* Left anchor + width cap. .is-left modifier on the JSX provides
+     `left: 0; right: auto`; per-tooltip width is local. Cap shrinks with
+     viewport so split-screen / narrow windows don't push the panel out of
+     the visible area (the BV card is a narrow rightSlot on Forecast). */
+  min-width: min(200px, calc(100vw - 48px));
+  max-width: min(260px, calc(100vw - 48px));
   white-space: normal;
   line-height: 1.5;
 }
@@ -11234,13 +11236,12 @@ body {
    The viewport-based clamp keeps it from overflowing on mobile, where
    the card spans the full viewport minus page padding. */
 .db-tooltip-panel.bv-card-tooltip-panel {
-  right: auto;
-  left: 0;
+  /* .is-left modifier on JSX now provides `left: 0; right: auto`. */
   min-width: 0;
-  /* 300px fits the narrowest observed rightSlot card (343px on mobile)
-     with room for the wrap's left inset. Viewport clamp guards against
-     even narrower devices. 50–60 char measure stays readable. */
-  max-width: min(300px, calc(100vw - 48px));
+  /* 240px (down from 300) fits split-screen / stage-manager arrangements
+     where the browser's visible width is reduced below the full BV card.
+     Viewport clamp guards even narrower devices. */
+  max-width: min(240px, calc(100vw - 48px));
   width: max-content;
 }
 

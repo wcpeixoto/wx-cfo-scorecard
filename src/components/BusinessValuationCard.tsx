@@ -509,7 +509,7 @@ function EditableValue({
       <span
         id={tooltipId}
         role="tooltip"
-        className="db-tooltip-panel bv-driver-tooltip-panel"
+        className="db-tooltip-panel bv-driver-tooltip-panel is-left"
       >
         {tooltipText}
       </span>
@@ -539,7 +539,7 @@ function ReadOnlyValue({ displayText, tooltipText, isMuted }: ReadOnlyValueProps
       <span
         id={tooltipId}
         role="tooltip"
-        className="db-tooltip-panel bv-driver-tooltip-panel"
+        className="db-tooltip-panel bv-driver-tooltip-panel is-left"
       >
         {tooltipText}
       </span>
@@ -723,7 +723,7 @@ export function BusinessValuationCard({
             <span
               id={sdeTooltipId}
               role="tooltip"
-              className="db-tooltip-panel is-wide bv-card-tooltip-panel"
+              className="db-tooltip-panel is-wide bv-card-tooltip-panel is-left"
             >
               {SDE_METHOD_TOOLTIP_PARAGRAPHS.map((para, idx) => (
                 <p
@@ -778,7 +778,7 @@ export function BusinessValuationCard({
               <span
                 id={bvHeroTooltipId}
                 role="tooltip"
-                className="db-tooltip-panel bv-driver-tooltip-panel"
+                className="db-tooltip-panel bv-driver-tooltip-panel is-left"
               >
                 {heroTooltipText}
               </span>
@@ -799,7 +799,7 @@ export function BusinessValuationCard({
             <span
               id={goalHeroTooltipId}
               role="tooltip"
-              className="db-tooltip-panel bv-driver-tooltip-panel"
+              className="db-tooltip-panel bv-driver-tooltip-panel is-left"
             >
               {GOAL_HERO_TOOLTIP}
             </span>
@@ -897,7 +897,7 @@ export function BusinessValuationCard({
             <span
               id={ttmSdeTooltipId}
               role="tooltip"
-              className="db-tooltip-panel bv-driver-tooltip-panel"
+              className="db-tooltip-panel bv-driver-tooltip-panel is-left"
             >
               {TTM_SDE_TOOLTIP}
             </span>
@@ -928,7 +928,7 @@ export function BusinessValuationCard({
             <span
               id={derivedMultipleTooltipId}
               role="tooltip"
-              className="db-tooltip-panel bv-driver-tooltip-panel"
+              className="db-tooltip-panel bv-driver-tooltip-panel is-left"
             >
               {DERIVED_MULTIPLE_TOOLTIP}
             </span>
@@ -950,7 +950,7 @@ export function BusinessValuationCard({
             <span
               id={buyerReadyTooltipId}
               role="tooltip"
-              className="db-tooltip-panel bv-driver-tooltip-panel"
+              className="db-tooltip-panel bv-driver-tooltip-panel is-left"
             >
               {BUYER_READY_TOOLTIP}
             </span>
@@ -980,7 +980,7 @@ export function BusinessValuationCard({
             <span
               id={ownerDepGapTooltipId}
               role="tooltip"
-              className="db-tooltip-panel bv-driver-tooltip-panel"
+              className="db-tooltip-panel bv-driver-tooltip-panel is-left"
             >
               {OWNER_DEPENDENCE_GAP_TOOLTIP}
             </span>
@@ -1014,7 +1014,7 @@ export function BusinessValuationCard({
             <span
               id={replacementCostTooltipId}
               role="tooltip"
-              className="db-tooltip-panel bv-driver-tooltip-panel"
+              className="db-tooltip-panel bv-driver-tooltip-panel is-left"
             >
               {REPLACEMENT_COST_TOOLTIP}
             </span>
