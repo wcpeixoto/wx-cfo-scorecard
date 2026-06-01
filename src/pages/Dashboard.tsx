@@ -3239,6 +3239,9 @@ export default function Dashboard() {
                 txns={filteredTxns}
                 monthlyRollups={model.monthlyRollups}
                 payrollTargetPercent={businessRules.payrollTargetPercent}
+                payrollTodayPct={efficiencyResult.payrollTodayPct}
+                payrollBestPct={efficiencyResult.payrollBestPct}
+                payrollBestWindowLabel={efficiencyResult.payrollBestWindowLabel}
                 payrollExcessPerMonth={efficiencyResult.payrollExtraPerMonth}
               />
             </div>

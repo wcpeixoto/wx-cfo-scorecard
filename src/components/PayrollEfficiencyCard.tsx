@@ -25,8 +25,13 @@ type Props = {
   txns: readonly Txn[];
   monthlyRollups: MonthlyRollup[];
   payrollTargetPercent: number;
-  /** Payroll-specific excess $/mo, reused from the excess-cost card's
-   *  methodology (computeEfficiencyOpportunities). Null when unavailable. */
+  /** Hero basis — payroll % of revenue over the last 3 completed months, plus
+   *  the lowest such % (best stretch) and its window. Same 3-month engine as
+   *  Money Left (computeEfficiencyOpportunities), so the two cards agree. */
+  payrollTodayPct: number | null;
+  payrollBestPct: number | null;
+  payrollBestWindowLabel: string | null;
+  /** Footer excess $/mo vs. the best 3-month stretch (same engine). */
   payrollExcessPerMonth: number | null;
 };
 
@@ -34,6 +39,9 @@ export default function PayrollEfficiencyCard({
   txns,
   monthlyRollups,
   payrollTargetPercent,
+  payrollTodayPct,
+  payrollBestPct,
+  payrollBestWindowLabel,
   payrollExcessPerMonth,
 }: Props) {
   const { points, current, bestYear } = useMemo(
@@ -154,12 +162,12 @@ export default function PayrollEfficiencyCard({
                 <ul className="db-tooltip-list">
                   <li><strong>What it shows</strong></li>
                   <li className="db-tooltip-body">
-                    Payroll is usually the biggest bite out of revenue. This card shows whether that
-                    cost is getting more or less efficient over time.
+                    Payroll is usually the biggest bite out of revenue. The headline is your last
+                    3 completed months; the chart below tracks the longer yearly trend.
                   </li>
-                  <li><strong>Best year</strong></li>
+                  <li><strong>Best stretch</strong></li>
                   <li className="db-tooltip-body">
-                    Your lowest payroll % in the yearly trend.
+                    Your lowest payroll % of revenue over any 3 consecutive months.
                   </li>
                   <li><strong>More than your best stretch</strong></li>
                   <li className="db-tooltip-body">
@@ -175,19 +183,20 @@ export default function PayrollEfficiencyCard({
             </div>
           </div>
           <p className="subtle">
-            Best: {formatWholePct(bestYear?.payrollPct ?? null)}
-            {bestYear ? ` in ${bestYear.year}` : ''}
+            Best stretch: {formatWholePct(payrollBestPct)}
+            {payrollBestWindowLabel ? ` · ${payrollBestWindowLabel}` : ''}
           </p>
         </div>
       </div>
 
       <div className="pe-hero">
         <div className="pe-hero-line">
-          <span className="pe-hero-value">{formatWholePct(current?.payrollPct ?? null)}</span>
+          <span className="pe-hero-value">{formatWholePct(payrollTodayPct)}</span>
           <span className="pe-hero-sub">of revenue</span>
         </div>
       </div>
 
+      <p className="pe-chart-caption">Yearly trend</p>
       <div className="pe-chart">
         {hasData ? (
           <Chart options={options} series={series} type="area" height={144} />
@@ -200,7 +209,7 @@ export default function PayrollEfficiencyCard({
         <div className="pe-kpi">
           <span className="pe-kpi-value">{revCurrent}</span>
           <span className="pe-kpi-label">Revenue per $1 payroll</span>
-          <span className="pe-kpi-helper">Best year: {revBest}</span>
+          <span className="pe-kpi-helper">Yearly trend best: {revBest}</span>
         </div>
         <div className="pe-kpi">
           <span className="pe-kpi-value">{formatExcess(payrollExcessPerMonth)}</span>
