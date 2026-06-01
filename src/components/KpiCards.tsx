@@ -7,7 +7,7 @@ type KpiCardSparkline = { data: number[]; color: string };
 
 type KpiCardsProps = {
   cards: KpiCard[];
-  vsLabel?: string;
+  comparisonPeriodLabel?: string;
   sparklinesById?: Record<string, KpiCardSparkline>;
 };
 
@@ -80,6 +80,26 @@ function formatAbsoluteDelta(card: KpiCard): string {
   return `Δ ${sign}${magnitude.toLocaleString()}`;
 }
 
+// Prior comparison value shown in the footer ("vs $147 in May 2025").
+// Currency renders as whole dollars and number as locale, matching the main
+// value; percent uses two decimals so small prior rates (e.g. 0.27%) stay
+// legible rather than rounding to a single decimal.
+function formatPriorValue(value: number, format: KpiCard['format']): string {
+  if (format === 'currency') {
+    return value.toLocaleString(undefined, {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    });
+  }
+
+  if (format === 'percent') {
+    return `${value.toFixed(2)}%`;
+  }
+
+  return value.toLocaleString();
+}
+
 function formatPercentDelta(value: number | null): string {
   if (value === null || Number.isNaN(value)) {
     return '—';
@@ -88,7 +108,7 @@ function formatPercentDelta(value: number | null): string {
   return `${prefix}${Math.round(value)}%`;
 }
 
-export default function KpiCards({ cards, vsLabel = 'vs prior period', sparklinesById }: KpiCardsProps) {
+export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period', sparklinesById }: KpiCardsProps) {
   const netTooltipId = useId();
   return (
     <section className="kpi-grid" aria-label="Key metrics">
@@ -156,7 +176,7 @@ export default function KpiCards({ cards, vsLabel = 'vs prior period', sparkline
                 </span>
                 <span className="kpi-change-percent">{percentDelta}</span>
               </span>
-              <span className="kpi-vs-label">{vsLabel}</span>
+              <span className="kpi-vs-label">vs {formatPriorValue(card.previousValue, card.format)} {comparisonPeriodLabel}</span>
             </div>
           </article>
         );
