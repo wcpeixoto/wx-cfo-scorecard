@@ -47,11 +47,16 @@ const TREND_MIN_MONTHS = 6;
 // hero text also slopes visibly in the sparkline.
 const NEAR_ZERO_MARGIN = 0.0005;
 
-// Y-axis half-range floor. Without this, a tiny but non-flat margin
-// would be padded into a near-edge line; with it, small margins still
-// render close to the center line. 0.02 = 2 percentage points, large
-// enough that a +0.5% margin slopes gently rather than sharply.
-const MIN_Y_HALF_RANGE = 0.02;
+// Y-axis visual half-range. Fixed at ±20 percentage points so the
+// plotted endpoint position scales with margin magnitude up to the
+// domain edge: +2% ends at 10% above center, +8.1% at 40.5%, +15% at
+// 75%, +20% at 100% (the domain edge). Margins outside [−20%, +20%]
+// are clamped at the edge so they don't clip the container — the
+// aria-label still describes the true sign, just the visual maxes out.
+// Picked over a data-driven half-range (max(|m|, floor)) because that
+// flattens the visual at every margin above the floor — +2%, +8.1%,
+// and +20% would all read as the same steepness.
+const VISUAL_HALF_RANGE = 0.20;
 
 type Props = {
   result: CashTrendResult;
@@ -105,16 +110,22 @@ function CashTrendSparkline({ margin }: { margin: number }) {
   // Straight two-point line — [$0 baseline, t6mMargin]. Slope direction
   // and steepness both follow the margin value: positive margin slopes
   // up, negative slopes down, and a near-zero margin (below the display
-  // rounding cutoff) renders flat at the baseline.
-  const series = [0, isFlat ? 0 : margin];
+  // rounding cutoff) renders flat at the baseline. Margins beyond
+  // ±VISUAL_HALF_RANGE are clamped so the line hits the domain edge
+  // without overshooting the container.
+  const clampedEnd = Math.max(
+    -VISUAL_HALF_RANGE,
+    Math.min(VISUAL_HALF_RANGE, margin),
+  );
+  const series = [0, isFlat ? 0 : clampedEnd];
 
-  // Y-axis symmetric around 0 so the visual baseline is the center line
-  // and slope direction reads as "ends above center" vs "ends below
-  // center". Half-range floors at MIN_Y_HALF_RANGE so tiny margins don't
-  // get padded into a near-edge line.
-  const halfRange = Math.max(Math.abs(margin), MIN_Y_HALF_RANGE);
-  const chartMin = -halfRange * 1.15;
-  const chartMax = halfRange * 1.15;
+  // Y-axis symmetric around 0 with a FIXED domain (±VISUAL_HALF_RANGE),
+  // so the visual baseline is the center line and steepness scales
+  // linearly with margin magnitude across the realistic gym P&L range.
+  // 15% padding on each side keeps the line off the container edges
+  // even at the domain edge.
+  const chartMin = -VISUAL_HALF_RANGE * 1.15;
+  const chartMax = VISUAL_HALF_RANGE * 1.15;
 
   const options: ApexOptions = {
     chart: {

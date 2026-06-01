@@ -9404,13 +9404,15 @@ body {
   flex-shrink: 0;
 }
 
-/* Compact area sparkline — best-fit line over 6 monthly net-cash values,
-   no axes, labels, markers, or tooltips. Color (brand-blue or red) is
-   set by the ApexCharts options object per the slope/worsening rule;
-   container only constrains size and places the sparkline in row 2
-   col 2 bottom-aligned with the supporting-metric line on the left.
-   Hidden entirely when <6 months OR when the card is narrower than
-   the responsive threshold below.
+/* Compact area sparkline — straight 2-point result line from a $0
+   baseline to t6mMargin (the 6-month cumulative profit margin). No
+   axes, labels, markers, or tooltips. Color (brand-blue, error-red,
+   or neutral grey) is set by the ApexCharts options object per the
+   margin-sign rule in CashTrendHero.tsx; container only constrains
+   size and places the sparkline in row 2 col 2 bottom-aligned with
+   the supporting-metric line on the left. Hidden entirely when
+   <6 months OR when the card is narrower than the responsive
+   threshold below.
 
    Area fill is Apex-native: `plotOptions.area.fillTo: 'end'` makes the
    area extend to the chart canvas bottom (= container bottom = the

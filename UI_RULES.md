@@ -1483,17 +1483,23 @@ an `aria-label` driven by the same sign test as the color rule:
 - `t6mMargin < 0` (and not flat): "6-month cash result — net negative"
 - `|t6mMargin| < 0.0005`: "6-month cash result — net flat"
 
-**Y-axis scaling.** Symmetric around 0 so the visual baseline is the
-chart's center line — `chartMin = -halfRange × 1.15`, `chartMax =
-+halfRange × 1.15`. The half-range floors at `MIN_Y_HALF_RANGE = 0.02`
-(two percentage points) so a tiny margin doesn't get padded into a
-near-edge line:
-- `halfRange = max(|t6mMargin|, MIN_Y_HALF_RANGE)`.
-- A margin at the floor (`|m| < 0.02`) renders close to the center
-  line, sloping gently up to ~43% of the half-range.
-- A margin above the floor (`|m| ≥ 0.02`) renders with the line ending
-  at ~87% of the half-range (`1 / 1.15`), so steeper margins read
-  visibly steeper without ever clipping the container.
+**Y-axis scaling.** Symmetric around 0 with a **fixed** half-range so
+steepness scales with margin magnitude across the realistic gym P&L
+range — not with a per-data-point auto-fit, which would flatten the
+visual at any margin above the floor.
+- `VISUAL_HALF_RANGE = 0.20` (±20 percentage points). Picked to cover
+  razor-thin (0–5%), healthy (5–15%), and strong (15–25%) margins
+  without clipping at the high end of the typical range.
+- `chartMin = −VISUAL_HALF_RANGE × 1.15`,
+  `chartMax = +VISUAL_HALF_RANGE × 1.15` (15% padding keeps the line
+  off the container edges even at the domain edge).
+- **Plotted endpoint is clamped** to `[−VISUAL_HALF_RANGE,
+  +VISUAL_HALF_RANGE]` so margins outside the domain (e.g. +30%) hit
+  the visual edge without overshooting. The aria-label still describes
+  the true sign — only the visual maxes out.
+- Resulting line positions: +2% ends at 10% above center; +8.1% at
+  40.5%; +15% at 75%; +20% at 100% of the half-range (the domain
+  edge); +30% clamps to 100%.
 
 **Card layout.** `.cth-card` is a 2-column CSS grid (`minmax(0, 1fr) auto`).
 Row 1: title block (col 1) + pill (col 2). Row 2: metric block (col 1,
@@ -1508,26 +1514,19 @@ the card is narrower than 380px (`@container (max-width: 380px)`), the
 sparkline hides (`display: none`) so it can't collide with text. Pill
 remains in the right column; metric and verdict reflow naturally.
 
-**Threshold evidence.** Backtest of 12 successive 6-month windows on
-the live fixture (Jun 2025 → May 2026) produced slopes in
-[−$1,760, +$2,598]/mo with median −$109/mo. −$1,500/mo flags 3 windows
-— all visually-bad months (Jul 2025, Dec 2025, Mar 2026). Tighter
-thresholds (−$2,000/mo) never trigger on this fixture; looser ones
-(−$1,000/mo) chase noise. Adjacent windows can flicker color when the
-underlying data flickers; this is an accepted edge case (outlier handling
-deferred to a future pass). Re-run the backtest via
-[`scripts/backtest/slopeBacktest.ts`](scripts/backtest/slopeBacktest.ts)
-(`npx tsx scripts/backtest/slopeBacktest.ts`).
-
 **Edge cases.**
-- Fewer than 6 monthly bars: the sparkline is hidden; the rest of the
-  card renders normally.
+- Fewer than 6 monthly bars: the sparkline is hidden by the
+  `showTrendLine` gate (`result.monthlyBars.length >= 6`); the rest of
+  the card renders normally.
 - Card narrower than 380px: the sparkline is hidden via container query;
   the rest of the card renders normally.
-- Slope above the worsening threshold: render neutral blue. Do not
-  flicker between blue and red within a single render.
-- Non-finite input values: `leastSquaresSlope` returns `{ slope: 0,
-  intercept: 0 }` and the visual goes blue/flat. No NaN propagation.
+- `t6mMargin` outside `[−0.20, +0.20]`: clamped at the visual edge.
+  The line still finishes at the top or bottom of the half-range,
+  visually identical to any other margin past the edge — but the
+  hero amount + supporting margin line carry the true magnitude.
+- `t6mMargin` exactly at the near-zero band (`|m| < 0.0005`): flat
+  line at center, neutral grey, "net flat" aria-label. Matches the
+  `"0.0%"` display rounding so the chart and the supporting line agree.
 
 ### Operating cash definition
 Cash Trend's T6M metrics are computed from `computeMonthlyRollups('operating')`.
