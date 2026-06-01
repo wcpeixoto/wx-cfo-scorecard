@@ -9496,9 +9496,11 @@ body {
 }
 
 .cth-metric-amount {
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 32px;
+  /* Matches .priority-card-v2__amount (Cash on Hand hero) — canonical
+     Big Picture hero-number scale. */
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 36px;
   color: #1D2939;
   letter-spacing: -0.01em;
 }
