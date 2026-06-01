@@ -58,24 +58,19 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
       background: 'transparent',
       sparkline: { enabled: false },
       events: {
+        // ApexCharts reports the clicked donut slice via dataPointIndex;
+        // seriesIndex is always 0 for a single-series donut. (This differs from
+        // the custom tooltip callback below, which receives the slice index as
+        // seriesIndex — the two ApexCharts callbacks use different conventions.)
         dataPointSelection: (
           _event: unknown,
           _chartContext: unknown,
-          config?: { dataPointIndex?: number; seriesIndex?: number }
+          config?: { dataPointIndex?: number }
         ) => {
-          // ApexCharts reports the clicked donut slice via seriesIndex (the same
-          // field the custom tooltip uses); dataPointIndex is a fallback for
-          // version variance.
-          const fromSeries = config?.seriesIndex;
-          const fromPoint = config?.dataPointIndex;
-          const idx =
-            typeof fromSeries === 'number' && fromSeries >= 0 && fromSeries < slices.length
-              ? fromSeries
-              : typeof fromPoint === 'number'
-                ? fromPoint
-                : -1;
-          const clicked = slices[idx];
-          if (clicked) setSelectedSlice(clicked);
+          const idx = config?.dataPointIndex;
+          if (typeof idx === 'number' && idx >= 0 && idx < slices.length) {
+            setSelectedSlice(slices[idx]);
+          }
         },
       },
     },
