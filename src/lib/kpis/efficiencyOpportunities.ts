@@ -60,6 +60,27 @@ export interface EfficiencyRow {
   todayWindow: WindowDetail;
 }
 
+// Payroll Efficiency card chart data — one entry per VALID 3-month window in
+// the 24-month lookback (revenue > 0 in all 3 months). Ineligible windows are
+// still included so the chart can show context, but isBenchmarkEligible is
+// false and the renderer hides their y-value so they can't be misread as
+// candidates for "best stretch". `isBest` only marks the eligible window the
+// hero/card label points to; `isCurrent` only marks the last-complete window
+// the hero "today %" reads from. Series respects the same gates as
+// payrollTodayPct / payrollBestPct so all four card surfaces (hero, subtitle,
+// chart, footer) read from the same logic.
+export interface PayrollRollingPoint {
+  label: string;                    // e.g. "Jan – Mar 2025"
+  payrollPct: number;               // payroll / revenue * 100, rounded
+  revenue: number;                  // sum revenue across the 3-month window
+  payroll: number;                  // sum payroll across the 3-month window
+  revenuePerPayrollDollar: number;  // revenue / payroll
+  isCurrent: boolean;               // matches the "today" window
+  isBest: boolean;                  // matches the picked best window
+  isBenchmarkEligible: boolean;     // passes both the firstActiveMonth gate
+                                    // AND revenue-qualification gate
+}
+
 export interface EfficiencyOpportunitiesResult {
   windowLabel: string;        // "Jan – Mar 2026"
   rows: EfficiencyRow[];      // top N by extraPerMonth
@@ -76,6 +97,10 @@ export interface EfficiencyOpportunitiesResult {
   payrollTodayPct: number | null;        // payroll % of revenue, last 3 complete months
   payrollBestPct: number | null;         // lowest payroll % over the candidate 3-month windows
   payrollBestWindowLabel: string | null; // e.g. "Jan – Mar 2025"
+  // Chart series for the Payroll Efficiency card — every valid 3-month window
+  // in the lookback, with isCurrent/isBest/isBenchmarkEligible flags. Empty
+  // when there is no payroll spend / no valid window. See PayrollRollingPoint.
+  payrollRollingSeries: PayrollRollingPoint[];
   // True when "best" was chosen from revenue-qualified windows (≥2 windows
   // clearing the dual revenue floor). False when too few qualified and every
   // category fell back to the unfiltered best. Globally uniform per run today
@@ -217,6 +242,7 @@ export function computeCore(
     payrollTodayPct: null,
     payrollBestPct: null,
     payrollBestWindowLabel: null,
+    payrollRollingSeries: [],
     benchmarkRevenueQualified: false,
   };
 
@@ -470,8 +496,7 @@ export function computeCore(
   const totalExtraPerMonth = rowsAll.reduce((acc, r) => acc + r.extraPerMonth, 0);
   const rows = rowsAll.slice(0, MAX_ROWS);
 
-  // Payroll-specific excess from the FULL set (parent category 'Payroll' matches
-  // PAYROLL_PARENT in payrollSeries.ts) — survives the top-N truncation above.
+  // Payroll-specific excess from the FULL set — survives the top-N truncation above.
   const payrollRow = rowsAll.find((r) => r.category === 'Payroll');
 
   // Payroll 3-month basis for the Payroll Efficiency card hero. Recomputed here
@@ -483,6 +508,7 @@ export function computeCore(
   let payrollTodayPct: number | null = null;
   let payrollBestPct: number | null = null;
   let payrollBestWindowLabel: string | null = null;
+  let payrollBestStartIdx: number | null = null;
   const payrollSpendByMonth = expenseByCatMonth.get('Payroll');
   if (payrollSpendByMonth && currentWindow.avgRevenue > 0) {
     let sumCurrent = 0;
@@ -518,7 +544,48 @@ export function computeCore(
       if (bestWin && Number.isFinite(bestRatio)) {
         payrollBestPct = Math.round(bestRatio * 100);
         payrollBestWindowLabel = formatWindowLabel(months[bestWin.startIdx], months[bestWin.endIdx]);
+        payrollBestStartIdx = bestWin.startIdx;
       }
+    }
+  }
+
+  // Chart series for the Payroll Efficiency card — one entry per VALID 3-month
+  // window in the lookback (revenue > 0 in all 3 months, so up to 22 entries
+  // for a 24-month lookback). Each entry carries the same eligibility flags
+  // the hero/best logic applies, so the chart can hide or de-emphasize windows
+  // the "best stretch" math wouldn't pick.
+  //
+  // - isCurrent: window ends at windowAnchor (the "today" window).
+  // - isBest: window === the selected payroll-best window (null if no best).
+  // - isBenchmarkEligible: window is in candidateWindows (passed the revenue
+  //   floor when applicable) AND starts at/after Payroll's firstActiveMonth.
+  //   The renderer hides ineligible points so they can't be misread as
+  //   candidates for "best stretch".
+  const candidateStartIdxSet = new Set(candidateWindows.map((w) => w.startIdx));
+  const payrollFirstActiveForSeries = firstActiveMonth.get('Payroll');
+  const payrollRollingSeries: PayrollRollingPoint[] = [];
+  if (payrollSpendByMonth) {
+    for (const w of validWindows) {
+      let revSum = 0;
+      let payrollSum = 0;
+      for (let k = w.startIdx; k <= w.endIdx; k += 1) {
+        revSum += revenueByMonth[k];
+        payrollSum += payrollSpendByMonth[k];
+      }
+      const pct = revSum > 0 ? Math.round((payrollSum / revSum) * 100) : 0;
+      const isInCandidates = candidateStartIdxSet.has(w.startIdx);
+      const isAfterFirstActive =
+        payrollFirstActiveForSeries !== undefined && w.startIdx >= payrollFirstActiveForSeries;
+      payrollRollingSeries.push({
+        label: formatWindowLabel(months[w.startIdx], months[w.endIdx]),
+        payrollPct: pct,
+        revenue: revSum,
+        payroll: payrollSum,
+        revenuePerPayrollDollar: payrollSum > 0 ? revSum / payrollSum : 0,
+        isCurrent: w.endIdx === latestIdx,
+        isBest: payrollBestStartIdx !== null && w.startIdx === payrollBestStartIdx,
+        isBenchmarkEligible: isInCandidates && isAfterFirstActive,
+      });
     }
   }
 
@@ -530,6 +597,7 @@ export function computeCore(
     payrollTodayPct,
     payrollBestPct,
     payrollBestWindowLabel,
+    payrollRollingSeries,
     benchmarkRevenueQualified,
   };
 }

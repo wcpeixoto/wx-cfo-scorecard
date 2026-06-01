@@ -1,8 +1,7 @@
 import { useId, useMemo } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import type { MonthlyRollup, Txn } from '../lib/data/contract';
-import { selectPayrollHealth } from '../lib/kpis/payrollSeries';
+import type { PayrollRollingPoint } from '../lib/kpis/efficiencyOpportunities';
 import { chartTokens } from '../lib/ui/chartTokens';
 
 function formatWholePct(value: number | null): string {
@@ -10,9 +9,9 @@ function formatWholePct(value: number | null): string {
   return `${Math.round(value)}%`;
 }
 
-function formatRevPerDollar(revenue: number, payroll: number): string {
-  if (!(payroll > 0)) return '—';
-  return `$${(revenue / payroll).toFixed(2)}`;
+function formatRevPerDollar(value: number | null): string {
+  if (value == null || !Number.isFinite(value) || value <= 0) return '—';
+  return `$${value.toFixed(2)}`;
 }
 
 function formatExcess(perMonth: number | null): string {
@@ -22,8 +21,6 @@ function formatExcess(perMonth: number | null): string {
 }
 
 type Props = {
-  txns: readonly Txn[];
-  monthlyRollups: MonthlyRollup[];
   payrollTargetPercent: number;
   /** Hero basis — payroll % of revenue over the last 3 completed months, plus
    *  the lowest such % (best stretch) and its window. Same 3-month engine as
@@ -33,32 +30,84 @@ type Props = {
   payrollBestWindowLabel: string | null;
   /** Footer excess $/mo vs. the best 3-month stretch (same engine). */
   payrollExcessPerMonth: number | null;
+  /** Chart series — one entry per valid 3-month rolling window in the
+   *  24-month lookback (up to 22). Same engine path as the hero/best fields,
+   *  so chart, footer, hero, and subtitle all read from one basis. */
+  payrollRollingSeries: readonly PayrollRollingPoint[];
 };
 
 export default function PayrollEfficiencyCard({
-  txns,
-  monthlyRollups,
   payrollTargetPercent,
   payrollTodayPct,
   payrollBestPct,
   payrollBestWindowLabel,
   payrollExcessPerMonth,
+  payrollRollingSeries,
 }: Props) {
-  const { points, current, bestYear } = useMemo(
-    () => selectPayrollHealth(txns, monthlyRollups),
-    [txns, monthlyRollups],
-  );
   const tooltipId = useId();
 
-  const hasData = points.length > 0;
+  const hasData = payrollRollingSeries.length > 0;
+
+  const currentIdx = useMemo(
+    () => payrollRollingSeries.findIndex((p) => p.isCurrent),
+    [payrollRollingSeries],
+  );
+  const bestIdx = useMemo(
+    () => payrollRollingSeries.findIndex((p) => p.isBest),
+    [payrollRollingSeries],
+  );
+  const currentPoint = currentIdx >= 0 ? payrollRollingSeries[currentIdx] : null;
+  const bestPoint = bestIdx >= 0 ? payrollRollingSeries[bestIdx] : null;
 
   const categories = useMemo(
-    () => points.map((p) => (p.isCurrent && p.isPartial ? `${p.year} YTD` : p.year)),
-    [points],
+    () => payrollRollingSeries.map((p) => p.label),
+    [payrollRollingSeries],
   );
 
-  const options: ApexOptions = useMemo(
-    () => ({
+  // Hide ineligible windows by passing null y-values (Apex renders a gap).
+  // The current window is always shown so the hero ↔ rightmost-point invariant
+  // holds even in the theoretical edge case where the current window is
+  // somehow ineligible — Wesley's hard rule is that ineligible windows can't
+  // be misread as best-stretch candidates, and a null-gap satisfies that.
+  const seriesData = useMemo(
+    () =>
+      payrollRollingSeries.map((p) =>
+        p.isBenchmarkEligible || p.isCurrent ? p.payrollPct : null,
+      ),
+    [payrollRollingSeries],
+  );
+
+  const options: ApexOptions = useMemo(() => {
+    // Markers: current (brand) + best (success). Best lands on an eligible
+    // window by construction (engine gate), so the marker can't visually
+    // imply a different best than the card label.
+    const discrete: Array<{
+      seriesIndex: number;
+      dataPointIndex: number;
+      fillColor: string;
+      strokeColor: string;
+      size: number;
+    }> = [];
+    if (hasData && currentIdx >= 0) {
+      discrete.push({
+        seriesIndex: 0,
+        dataPointIndex: currentIdx,
+        fillColor: chartTokens.brand,
+        strokeColor: '#FFFFFF',
+        size: 5,
+      });
+    }
+    if (hasData && bestIdx >= 0 && bestIdx !== currentIdx) {
+      discrete.push({
+        seriesIndex: 0,
+        dataPointIndex: bestIdx,
+        fillColor: chartTokens.success,
+        strokeColor: '#FFFFFF',
+        size: 5,
+      });
+    }
+
+    return {
       chart: {
         type: 'area',
         sparkline: { enabled: true },
@@ -73,7 +122,7 @@ export default function PayrollEfficiencyCard({
         type: 'gradient',
         gradient: { shadeIntensity: 1, opacityFrom: 0.32, opacityTo: 0.04, stops: [0, 100] },
       },
-      // Subtle dashed reference line + far-right label at the wired payroll target.
+      // Subtle dashed reference line at the wired payroll target.
       annotations: {
         yaxis: hasData
           ? [
@@ -101,21 +150,9 @@ export default function PayrollEfficiencyCard({
             ]
           : [],
       },
-      // Subtle marker on the trailing (current / YTD) point only.
       markers: {
         size: 0,
-        discrete:
-          hasData && current?.isCurrent
-            ? [
-                {
-                  seriesIndex: 0,
-                  dataPointIndex: points.length - 1,
-                  fillColor: chartTokens.brand,
-                  strokeColor: '#FFFFFF',
-                  size: 4,
-                },
-              ]
-            : [],
+        discrete,
         hover: { size: 4 },
       },
       xaxis: { categories },
@@ -126,22 +163,21 @@ export default function PayrollEfficiencyCard({
             opts ? categories[opts.dataPointIndex] ?? '' : '',
         },
         y: {
-          formatter: (val: number | null) => (val == null ? 'No revenue' : `${Math.round(val)}%`),
+          formatter: (val: number | null) => (val == null ? 'Not benchmarked' : `${Math.round(val)}%`),
           title: { formatter: () => 'Payroll' },
         },
         marker: { show: false },
       },
-    }),
-    [categories, hasData, current, points.length, payrollTargetPercent],
-  );
+    };
+  }, [categories, hasData, currentIdx, bestIdx, payrollTargetPercent]);
 
   const series = useMemo(
-    () => [{ name: 'Payroll % of revenue', data: points.map((p) => p.payrollPct) }],
-    [points],
+    () => [{ name: 'Payroll % of revenue', data: seriesData }],
+    [seriesData],
   );
 
-  const revCurrent = current ? formatRevPerDollar(current.revenue, current.payroll) : '—';
-  const revBest = bestYear ? formatRevPerDollar(bestYear.revenue, bestYear.payroll) : '—';
+  const revCurrent = currentPoint ? formatRevPerDollar(currentPoint.revenuePerPayrollDollar) : '—';
+  const revBest = bestPoint ? formatRevPerDollar(bestPoint.revenuePerPayrollDollar) : '—';
 
   return (
     <article className="pe-card">
@@ -162,8 +198,8 @@ export default function PayrollEfficiencyCard({
                 <ul className="db-tooltip-list">
                   <li><strong>What it shows</strong></li>
                   <li className="db-tooltip-body">
-                    Payroll is usually the biggest bite out of revenue. The headline is your last
-                    3 completed months; the chart below tracks the longer yearly trend.
+                    Payroll is usually the biggest bite out of revenue. The headline, chart, and
+                    footer all read from the same 3-month rolling basis across the last 24 months.
                   </li>
                   <li><strong>Best stretch</strong></li>
                   <li className="db-tooltip-body">
@@ -196,7 +232,7 @@ export default function PayrollEfficiencyCard({
         </div>
       </div>
 
-      <p className="pe-chart-caption">Yearly trend</p>
+      <p className="pe-chart-caption">Last 24 months · 3-month rolling</p>
       <div className="pe-chart">
         {hasData ? (
           <Chart options={options} series={series} type="area" height={144} />
@@ -208,8 +244,8 @@ export default function PayrollEfficiencyCard({
       <div className="pe-footer">
         <div className="pe-kpi">
           <span className="pe-kpi-value">{revCurrent}</span>
-          <span className="pe-kpi-label">Current year revenue per $1 payroll</span>
-          <span className="pe-kpi-helper">Yearly trend best: {revBest}</span>
+          <span className="pe-kpi-label">Last 3 months revenue per $1 payroll</span>
+          <span className="pe-kpi-helper">Best 3-month stretch: {revBest}</span>
         </div>
         <div className="pe-kpi">
           <span className="pe-kpi-value">{formatExcess(payrollExcessPerMonth)}</span>

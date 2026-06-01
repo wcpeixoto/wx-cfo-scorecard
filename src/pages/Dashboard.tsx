@@ -3255,13 +3255,12 @@ export default function Dashboard() {
             <div className="two-col-grid two-col-grid--efficiency">
               <EfficiencyOpportunitiesCard result={efficiencyResult} />
               <PayrollEfficiencyCard
-                txns={filteredTxns}
-                monthlyRollups={model.monthlyRollups}
                 payrollTargetPercent={businessRules.payrollTargetPercent}
                 payrollTodayPct={efficiencyResult.payrollTodayPct}
                 payrollBestPct={efficiencyResult.payrollBestPct}
                 payrollBestWindowLabel={efficiencyResult.payrollBestWindowLabel}
                 payrollExcessPerMonth={efficiencyResult.payrollExtraPerMonth}
+                payrollRollingSeries={efficiencyResult.payrollRollingSeries}
               />
             </div>
 
