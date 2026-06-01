@@ -9171,35 +9171,43 @@ body {
 /* ═══════════════════════════════════════════════════════════════════════════
    Top Expense Categories — transactions drawer
    Drills a clicked donut slice (incl. "Other") down to its contributing
-   transactions. Shell pattern mirrors .eff-drawer-* / .pcd-drawer-* (right
-   slide-in on desktop, bottom sheet at 85vh on mobile). CSS prefix `txn-drawer-*`
-   keeps it independent — no shared <Drawer> primitive yet (Phase 1 boundary).
+   transactions. Restyled to the Claude Design "Transactions Drawer" spec: a
+   640px flex-column shell (fixed header + controls + footer; the table scrolls
+   with a sticky header), Export in the header, sortable columns, vendor
+   truncation, and a richer empty state. Shell still mirrors .eff-drawer-* /
+   .pcd-drawer-* (right slide-in on desktop, bottom sheet at 85vh on mobile) and
+   keeps its `txn-drawer-*` prefix — no shared <Drawer> primitive yet (Phase 1).
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .txn-drawer-backdrop {
   position: fixed;
   inset: 0;
   z-index: 99999;
-  background: rgba(16, 24, 40, 0.25);
+  background: rgba(16, 24, 40, 0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .dark .txn-drawer-backdrop {
-  background: rgba(0, 0, 0, 0.40);
+  background: rgba(0, 0, 0, 0.55);
 }
 
 .txn-drawer-panel {
   position: fixed;
   top: 0;
   right: 0;
-  bottom: 0;
-  width: clamp(480px, 52vw, 720px);
+  width: 640px;
   max-width: 100vw;
+  height: 100vh;
   background: #FFFFFF;
   border-left: 1px solid #E4E7EC;
-  overflow-y: auto;
-  padding: 24px;
+  border-top-left-radius: 16px;
+  border-bottom-left-radius: 16px;
+  box-shadow: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   pointer-events: auto;
-  transform: translateX(0);
   animation: txn-drawer-slide-in 0.22s ease-out;
 }
 
@@ -9215,98 +9223,150 @@ body {
 
 /* ─── Header ────────────────────────────────────────────────────────────── */
 .txn-drawer-header {
-  position: relative;
-  margin-bottom: 20px;
-  padding-right: 40px;
+  flex: 0 0 auto;
+  padding: 24px 24px 20px;
+  border-bottom: 1px solid #E4E7EC;
 }
+.dark .txn-drawer-header { border-bottom-color: #344054; }
 
-.txn-drawer-close {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 28px;
-  height: 28px;
+.txn-drawer-titlerow {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 22px;
-  line-height: 1;
-  color: #98A2B3;
-  padding: 0;
-  border-radius: 50%;
-  transition: color 0.15s;
-  font-family: inherit;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
-
-.txn-drawer-close:hover { color: #667085; }
-.dark .txn-drawer-close { color: #667085; }
-.dark .txn-drawer-close:hover { color: #9CA3AF; }
 
 .txn-drawer-title {
   margin: 0;
-  font-size: 18px;
+  min-width: 0;
+  font-size: 20px;
   font-weight: 600;
   color: #101828;
-  line-height: 1.3;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dark .txn-drawer-title {
   color: rgba(255, 255, 255, 0.90);
 }
 
-/* Reconciling stat line: count · sum. The sum is the contribution total over
-   visible rows — on first open it equals the clicked slice value. */
-.txn-drawer-stat {
-  margin: 4px 0 0;
+.txn-drawer-close {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  margin: -6px -6px 0 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #667085;
+  transition: background-color 0.12s, color 0.12s;
+  font-family: inherit;
+}
+.txn-drawer-close svg { width: 20px; height: 20px; }
+.txn-drawer-close:hover { background: #F2F4F7; color: #1D2939; }
+.dark .txn-drawer-close { color: #9CA3AF; }
+.dark .txn-drawer-close:hover { background: rgba(242, 244, 247, 0.08); color: rgba(255, 255, 255, 0.90); }
+
+/* Summary row — subtle count·sum (left) + Export (right). Not a hero. The sum
+   is the contribution total over visible rows; on first open it equals the
+   clicked slice value. */
+.txn-drawer-summaryrow {
+  margin-top: 8px;
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.txn-drawer-summary {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
   color: #667085;
 }
 
-.txn-drawer-stat-sum {
+.txn-drawer-sum-num {
   font-weight: 600;
-  color: #1D2939;
+  color: #344054;
+  font-variant-numeric: tabular-nums;
 }
 
-.dark .txn-drawer-stat { color: #9CA3AF; }
-.dark .txn-drawer-stat-sum { color: rgba(255, 255, 255, 0.90); }
+.dark .txn-drawer-summary { color: #9CA3AF; }
+.dark .txn-drawer-sum-num { color: rgba(255, 255, 255, 0.90); }
 
 /* ─── Controls ──────────────────────────────────────────────────────────── */
 .txn-drawer-controls {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 8px;
+  flex-wrap: nowrap;
+  padding: 16px 24px;
+  border-bottom: 1px solid #E4E7EC;
+}
+.dark .txn-drawer-controls { border-bottom-color: #344054; }
+
+/* Search grows to fill; account select stays content-sized. */
+.txn-drawer-search-field {
+  position: relative;
+  flex: 1 1 90px;
+  min-width: 0;
+}
+.txn-drawer-search-field svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #98A2B3;
+  pointer-events: none;
 }
 
 /* Inputs/selects: 44px (UI_RULES Control Sizing). */
 .txn-drawer-select,
 .txn-drawer-search {
   height: 44px;
-  border: 1px solid #D0D5DD;
+  border: 1px solid #E4E7EC;
   border-radius: 8px;
   padding: 0 12px;
   font-family: inherit;
   font-size: 14px;
-  color: #344054;
+  color: #1D2939;
   background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  transition: border-color 0.12s, box-shadow 0.12s;
 }
 
 .txn-drawer-search {
-  flex: 1 1 160px;
-  min-width: 0;
+  width: 100%;
+  padding-left: 36px;
+}
+.txn-drawer-search::placeholder { color: #98A2B3; }
+
+.txn-drawer-select {
+  flex: 0 0 auto;
+  width: 120px;
+  appearance: none;
+  cursor: pointer;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
 }
 
 .txn-drawer-select:focus,
 .txn-drawer-search:focus {
   outline: none;
-  border-color: #465FFF;
+  border-color: #A4BCFF;
+  box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.20);
 }
 
 .dark .txn-drawer-select,
@@ -9315,15 +9375,23 @@ body {
   border-color: #344054;
   color: rgba(255, 255, 255, 0.90);
 }
+.dark .txn-drawer-search::placeholder { color: #667085; }
 
-/* Buttons: 40px secondary card-level (UI_RULES button taxonomy). */
+/* Buttons: Export (header) + Clear (controls) — 40px bordered secondary
+   (UI_RULES button taxonomy). */
 .txn-drawer-btn {
   height: 40px;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 16px;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid #D0D5DD;
   border-radius: 8px;
+  background: #FFFFFF;
+  color: #344054;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
   font-family: inherit;
   font-size: 14px;
   font-weight: 500;
@@ -9331,51 +9399,24 @@ body {
   white-space: nowrap;
   transition: background-color 0.15s, color 0.15s, border-color 0.15s;
 }
-
+.txn-drawer-btn svg { width: 16px; height: 16px; }
+.txn-drawer-btn:not(:disabled):hover { background: #F9FAFB; }
 .txn-drawer-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-
-.txn-drawer-btn--ghost {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: #667085;
-}
-
-.txn-drawer-btn--ghost:not(:disabled):hover {
-  background: #F2F4F7;
-  color: #344054;
-}
-
-.txn-drawer-btn--outline {
-  background: #FFFFFF;
-  border: 1px solid #D0D5DD;
-  color: #344054;
-}
-
-.txn-drawer-btn--outline:not(:disabled):hover {
-  background: #F9FAFB;
-}
-
-.dark .txn-drawer-btn--ghost { color: #9CA3AF; }
-.dark .txn-drawer-btn--ghost:not(:disabled):hover {
-  background: rgba(242, 244, 247, 0.08);
-  color: rgba(255, 255, 255, 0.90);
-}
-.dark .txn-drawer-btn--outline {
+.dark .txn-drawer-btn {
   background: #1D2939;
   border-color: #344054;
   color: rgba(255, 255, 255, 0.90);
 }
-.dark .txn-drawer-btn--outline:not(:disabled):hover {
-  background: rgba(242, 244, 247, 0.06);
-}
+.dark .txn-drawer-btn:not(:disabled):hover { background: rgba(242, 244, 247, 0.06); }
 
 /* ─── Table ─────────────────────────────────────────────────────────────── */
-.txn-drawer-table-wrap {
-  overflow-x: auto;
+.txn-drawer-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -9383,74 +9424,148 @@ body {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  min-width: 520px;
+  min-width: 540px;
 }
 
-.txn-drawer-col-date     { width: 16%; }
-.txn-drawer-col-vendor   { width: 30%; }
-.txn-drawer-col-category { width: 22%; }
-.txn-drawer-col-account  { width: 18%; }
-.txn-drawer-col-amount   { width: 14%; }
+/* Fixed column widths tuned to the 640px drawer; Vendor takes the slack. */
+.txn-drawer-col-date     { width: 84px; }
+.txn-drawer-col-vendor   { width: auto; }
+.txn-drawer-col-category { width: 136px; }
+.txn-drawer-col-account  { width: 134px; }
+.txn-drawer-col-amount   { width: 108px; }
 
-.txn-drawer-th {
-  padding: 6px 8px 6px 0;
+.txn-drawer-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #FFFFFF;
+  text-align: left;
+  white-space: nowrap;
+  padding: 0;
+  border-bottom: 1px solid #E4E7EC;
+}
+.dark .txn-drawer-table thead th { background: #1D2939; border-bottom-color: #344054; }
+
+/* Sortable header button fills the cell so the whole header is the hit target. */
+.txn-drawer-th-sort {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 12px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
   font-size: 12px;
   font-weight: 500;
   color: #667085;
-  text-align: left;
-  white-space: nowrap;
-  border-bottom: 1px solid var(--line);
+  line-height: 1;
+  transition: color 0.12s, background-color 0.12s;
 }
+.txn-drawer-th-sort:hover { color: #344054; background: #FCFCFD; }
+.txn-drawer-th-sort:focus-visible { outline: none; color: #344054; box-shadow: inset 0 0 0 2px rgba(70, 95, 255, 0.20); }
+.txn-drawer-table thead th:first-child .txn-drawer-th-sort { padding-left: 18px; }
+.txn-drawer-table thead th:last-child .txn-drawer-th-sort { padding-right: 24px; }
+.dark .txn-drawer-th-sort { color: #9CA3AF; }
+.dark .txn-drawer-th-sort:hover { color: rgba(255, 255, 255, 0.90); background: rgba(242, 244, 247, 0.04); }
 
-.txn-drawer-th--right { text-align: right; }
+/* Sort indicator: neutral double-arrow at rest, brand directional when active. */
+.txn-drawer-sort-ico { width: 13px; height: 13px; flex: 0 0 auto; color: #98A2B3; }
+.txn-drawer-sort-ico .ic-up,
+.txn-drawer-sort-ico .ic-dn { opacity: 0.4; transition: opacity 0.12s; }
+.txn-drawer-th.is-sorted .txn-drawer-th-sort { color: #344054; }
+.txn-drawer-th.is-sorted .txn-drawer-sort-ico { color: #465FFF; }
+.txn-drawer-th.is-sorted .txn-drawer-sort-ico .ic-up,
+.txn-drawer-th.is-sorted .txn-drawer-sort-ico .ic-dn { opacity: 0.22; }
+.txn-drawer-th.is-sorted.dir-asc  .txn-drawer-sort-ico .ic-up { opacity: 1; }
+.txn-drawer-th.is-sorted.dir-desc .txn-drawer-sort-ico .ic-dn { opacity: 1; }
+.dark .txn-drawer-th.is-sorted .txn-drawer-th-sort { color: rgba(255, 255, 255, 0.90); }
 
-.dark .txn-drawer-th {
-  color: #9CA3AF;
-  border-bottom-color: #344054;
-}
-
-.txn-drawer-td {
-  padding: 8px 8px 8px 0;
-  font-size: 14px;
-  color: #1D2939;
+.txn-drawer-table tbody td {
+  padding: 14px 10px;
   border-bottom: 1px solid #F2F4F7;
+  font-size: 14px;
+  color: #344054;
   vertical-align: top;
-  overflow-wrap: anywhere;
 }
+.txn-drawer-table tbody td:first-child { padding-left: 18px; }
+.txn-drawer-table tbody td:last-child { padding-right: 24px; }
+.txn-drawer-table tbody tr:last-child td { border-bottom: none; }
+.txn-drawer-table tbody tr:hover td { background: #FCFCFD; }
+.dark .txn-drawer-table tbody td { color: rgba(255, 255, 255, 0.80); border-bottom-color: #344054; }
+.dark .txn-drawer-table tbody tr:hover td { background: rgba(242, 244, 247, 0.04); }
 
-/* Date stays on one line; amount stays on one line and tabular. */
-.txn-drawer-row .txn-drawer-td:first-child { white-space: nowrap; }
+.txn-drawer-td-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-.dark .txn-drawer-td {
-  color: rgba(255, 255, 255, 0.80);
-  border-bottom-color: #344054;
+/* Vendor: name + optional memo, each on one line, truncating with an ellipsis.
+   The full value is available via the native title tooltip on hover. */
+.txn-drawer-td-vendor { max-width: 0; }
+.txn-drawer-vname {
+  display: block;
+  color: #1D2939;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.txn-drawer-memo {
+  display: block;
+  margin-top: 2px;
+  color: #667085;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dark .txn-drawer-vname { color: rgba(255, 255, 255, 0.90); }
+.dark .txn-drawer-memo { color: #9CA3AF; }
 
-.txn-drawer-td--muted { color: #667085; }
-.dark .txn-drawer-td--muted { color: #9CA3AF; }
-
-.txn-drawer-td--right {
+.txn-drawer-td-amount {
   text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-
 /* Refunds/credits (positive raw amount) read as money returning — honest
    coloring, not a signal the row is excluded from the slice. */
 .txn-drawer-amount--credit { color: #039855; }
 .dark .txn-drawer-amount--credit { color: #32D583; }
 
-.txn-drawer-row:hover { background: #F9FAFB; }
-.dark .txn-drawer-row:hover { background: rgba(242, 244, 247, 0.04); }
-
-.txn-drawer-empty {
-  padding: 32px 0;
-  text-align: center;
-  font-size: 14px;
-  color: #667085;
+/* ─── Footer ────────────────────────────────────────────────────────────── */
+.txn-drawer-foot {
+  flex: 0 0 auto;
+  padding: 14px 24px;
+  border-top: 1px solid #E4E7EC;
+  font-size: 12px;
+  color: #98A2B3;
 }
+.dark .txn-drawer-foot { border-top-color: #344054; color: #667085; }
 
-.dark .txn-drawer-empty { color: #9CA3AF; }
+/* ─── Empty state ───────────────────────────────────────────────────────── */
+.txn-drawer-empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+  gap: 6px;
+}
+.txn-drawer-empty-icon {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: #F2F4F7;
+  display: grid;
+  place-items: center;
+  color: #98A2B3;
+}
+.txn-drawer-empty-icon svg { width: 26px; height: 26px; }
+.txn-drawer-empty-primary { margin: 0; font-size: 16px; font-weight: 600; color: #1D2939; }
+.txn-drawer-empty-secondary { margin: 0; max-width: 30ch; font-size: 14px; color: #667085; }
+.dark .txn-drawer-empty-icon { background: #344054; color: #9CA3AF; }
+.dark .txn-drawer-empty-primary { color: rgba(255, 255, 255, 0.90); }
+.dark .txn-drawer-empty-secondary { color: #9CA3AF; }
 
 /* ─── Mobile — bottom sheet ─────────────────────────────────────────────── */
 @media (max-width: 767px) {
@@ -9464,7 +9579,7 @@ body {
     height: 85vh;
     border-left: none;
     border-top: 1px solid #E4E7EC;
-    border-radius: 20px 20px 0 0;
+    border-radius: 16px 16px 0 0;
     animation: txn-drawer-slide-up 0.22s ease-out;
   }
 
