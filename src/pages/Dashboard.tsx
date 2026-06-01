@@ -4071,7 +4071,7 @@ export default function Dashboard() {
                       <div className="account-setup-summary">
                         <p className="account-setup-summary-title">Cash anchor</p>
                         <p className="account-setup-summary-copy">
-                          Forecast starting cash uses <strong>active Cash accounts only</strong>. Non-cash accounts are ignored in the forecast anchor even if they are marked <strong>In Forecast</strong>.
+                          Current cash basis includes every active <strong>In Forecast</strong> account, any type — each adds its Starting Balance plus loaded net transactions.
                         </p>
                         <div className="account-setup-summary-grid">
                           <div>
