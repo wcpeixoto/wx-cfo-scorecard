@@ -6084,6 +6084,28 @@ body {
   color: #1D2939;
 }
 
+/* Inline row that lets the ⓘ tooltip sit baseline-aligned next to the
+   title without disturbing the column stack inside .__title-block. */
+.priority-card-v2__title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Title tooltip — left-anchored so the panel opens rightward from the ⓘ
+   (the icon sits near the card's left edge). */
+.priority-card-v2__title-tooltip-panel {
+  right: auto;
+  left: 0;
+  min-width: 260px;
+  max-width: 320px;
+  white-space: normal;
+}
+
+.priority-card-v2__title-tooltip-panel .db-tooltip-list li + li {
+  margin-top: 8px;
+}
+
 .priority-card-v2__amount-row {
   display: flex;
   align-items: flex-end;
