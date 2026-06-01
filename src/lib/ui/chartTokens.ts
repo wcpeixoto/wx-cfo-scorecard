@@ -28,6 +28,10 @@ export const chartTokens = {
   pressure:        '#DC6803',
   costSpike:       '#FB5454',
 
+  // Neutral — used when a stroke needs to read as "no direction" / "flat"
+  // (e.g. Cash Trend straight result line when t6mMargin is near zero).
+  neutral:         '#98A2B3',
+
   // Structural
   gridBorder:      '#e0e0e0',
   crosshairStroke: '#b6b6b6',

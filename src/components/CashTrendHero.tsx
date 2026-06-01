@@ -7,15 +7,13 @@
  *
  * Body content: dominant metric line, status-driven interpretation line,
  * and a single proof line. A compact area sparkline sits in the right
- * column of the header rendering the running CUMULATIVE net cash over
- * the same 6 months — the chart's end-point matches the direction of
- * the hero number (t6mNetCash) so the visual reinforces the headline
- * instead of carrying an independent slope signal. Color stays driven
- * by the monthly best-fit slope (red below the worsening threshold,
- * brand-blue otherwise) so a positive cumulative with a sharply
- * deteriorating month-over-month trend still reads as a warning.
- * No visible label above the sparkline; the chart container carries a
- * three-state accessible name instead (worsening / improving / stable).
+ * column of the header — a STRAIGHT two-point result line from a $0
+ * baseline to t6mMargin. The chart's only job is to support the hero
+ * number: positive 6-month margin slopes up, negative slopes down,
+ * near-zero renders flat. Color is keyed off the same margin sign
+ * (brand blue / error red / neutral). No visible label above the
+ * sparkline; the chart container carries a three-state accessible name
+ * instead (net positive / net negative / net flat).
  *
  * Layout is a 2-column CSS grid on .cth-card. Row 1: title block (col 1)
  * + pill (col 2). Row 2: metric block (col 1, bottom-aligned) + sparkline
@@ -35,31 +33,30 @@ import { useId } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type {
-  CashTrendBar,
   CashTrendResult,
   CashTrendStatus,
 } from '../lib/kpis/cashTrend';
 import { formatCompact } from '../lib/utils/formatCompact';
 import { chartTokens } from '../lib/ui/chartTokens';
 
-// Slope (dollars per month) at or below which the compact trend line turns
-// red. Backtest-justified: 12 successive 6-month windows on the live
-// fixture (Jun 2025 → May 2026) produced slopes in [-$1,760, +$2,598]/mo
-// with median -$109/mo. At -$1,500, the line flags 3 windows (Jul 2025,
-// Dec 2025, Mar 2026) — all visually-bad windows. Tighter thresholds
-// (-$2,000) never trigger on this fixture; looser ones (-$1,000) chase
-// noise. The line will flicker month-to-month when the underlying data
-// flickers; this is the spec's accepted edge case 3 (outlier handling
-// deferred).
-const WORSENING_SLOPE_PER_MONTH = -1500;
-
 const TREND_MIN_MONTHS = 6;
 
-// Defensive y-axis half-window for the degenerate case where every month
-// is exactly zero (cumulative series collapses to a flat 0-line). The
-// real series has natural variance and pads from its own min/max — this
-// constant only kicks in when rawRange === 0.
-const DEGENERATE_Y_HALF_WINDOW = 1000;
+// Below this absolute decimal margin the chart renders flat and grey.
+// Matches formatSignedPct's "0.0%" rounding cutoff (|pct| < 0.05 →
+// "0.0%"), so any margin that displays as a non-zero percentage in the
+// hero text also slopes visibly in the sparkline.
+const NEAR_ZERO_MARGIN = 0.0005;
+
+// Y-axis visual half-range. Fixed at ±20 percentage points so the
+// plotted endpoint position scales with margin magnitude up to the
+// domain edge: +2% ends at 10% above center, +8.1% at 40.5%, +15% at
+// 75%, +20% at 100% (the domain edge). Margins outside [−20%, +20%]
+// are clamped at the edge so they don't clip the container — the
+// aria-label still describes the true sign, just the visual maxes out.
+// Picked over a data-driven half-range (max(|m|, floor)) because that
+// flattens the visual at every margin above the floor — +2%, +8.1%,
+// and +20% would all read as the same steepness.
+const VISUAL_HALF_RANGE = 0.20;
 
 type Props = {
   result: CashTrendResult;
@@ -86,82 +83,49 @@ function formatSignedPct(decimal: number): string {
   return `${sign}${Math.abs(pct).toFixed(1)}%`;
 }
 
-function leastSquaresSlope(values: number[]): { slope: number; intercept: number } {
-  const n = values.length;
-  if (n < 2) return { slope: 0, intercept: values[0] ?? 0 };
-  // NaN guard: if any input is non-finite, treat the trend as flat rather
-  // than poisoning slope + intercept with NaN values downstream.
-  for (let i = 0; i < n; i++) {
-    if (!Number.isFinite(values[i])) return { slope: 0, intercept: 0 };
+function ariaLabelForResult(margin: number): string {
+  if (Math.abs(margin) < NEAR_ZERO_MARGIN) {
+    return '6-month cash result — net flat';
   }
-  const xMean = (n - 1) / 2;
-  const yMean = values.reduce((a, b) => a + b, 0) / n;
-  let num = 0;
-  let den = 0;
-  for (let i = 0; i < n; i++) {
-    num += (i - xMean) * (values[i] - yMean);
-    den += (i - xMean) ** 2;
+  if (margin > 0) {
+    return '6-month cash result — net positive';
   }
-  // den = sum((i - xMean)^2) over [0, n-1] with n >= 2 is always > 0, so
-  // the prior `den === 0 ? 0 : num / den` branch was unreachable.
-  const slope = num / den;
-  const intercept = yMean - slope * xMean;
-  return { slope, intercept };
+  return '6-month cash result — net negative';
 }
 
-function ariaLabelForCumulative(cumulative: number[]): string {
-  const end = cumulative[cumulative.length - 1] ?? 0;
-  // Scale the per-month worsening threshold (-$1,500/mo) to the full
-  // 6-month window so the three-state label tracks the cumulative
-  // end-point at the same magnitude the color rule uses for monthly
-  // slope. Improving threshold mirrors the worsening one (symmetric).
-  const sigThreshold = Math.abs(WORSENING_SLOPE_PER_MONTH) * cumulative.length;
-  if (end <= -sigThreshold) {
-    return 'Cumulative cash over 6 months — direction worsening';
-  }
-  if (end >= sigThreshold) {
-    return 'Cumulative cash over 6 months — direction improving';
-  }
-  return 'Cumulative cash over 6 months — stable';
-}
+function CashTrendSparkline({ margin }: { margin: number }) {
+  // Color tied to the hero result, three-state: positive → brand blue,
+  // negative → error red, near-zero → neutral grey. The slope-based color
+  // rule and the per-month "sharp deterioration" signal were intentionally
+  // dropped along with the cumulative trajectory — the chart's only job
+  // now is to support the hero number's direction. The pill carries the
+  // status nuance (Building / Treading / Pressure / Burning).
+  const isFlat = Math.abs(margin) < NEAR_ZERO_MARGIN;
+  const color = isFlat
+    ? chartTokens.neutral
+    : margin > 0
+      ? chartTokens.brand
+      : chartTokens.error;
 
-function CashTrendSparkline({ bars }: { bars: CashTrendBar[] }) {
-  // Color rule (unchanged) — least-squares slope of the MONTHLY net-cash
-  // values, red below the worsening threshold. Slope is computed on the
-  // monthly series, not the cumulative one, so a positive cumulative with
-  // a sharply deteriorating month-over-month trend still reads red.
-  const monthlyValues = bars.map((b) => b.netCash);
-  const { slope } = leastSquaresSlope(monthlyValues);
-  const isWorsening = slope <= WORSENING_SLOPE_PER_MONTH;
-  const color = isWorsening ? chartTokens.error : chartTokens.brand;
+  // Straight two-point line — [0% baseline, t6mMargin]. Slope direction
+  // and steepness both follow the margin value: positive margin slopes
+  // up, negative slopes down, and a near-zero margin (below the display
+  // rounding cutoff) renders flat at the baseline. Margins beyond
+  // ±VISUAL_HALF_RANGE are clamped so the line hits the domain edge
+  // without overshooting the container.
+  const clampedEnd = Math.max(
+    -VISUAL_HALF_RANGE,
+    Math.min(VISUAL_HALF_RANGE, margin),
+  );
+  const series = [0, isFlat ? 0 : clampedEnd];
 
-  // Cumulative net cash, one running-sum point per month. The 6th value
-  // equals t6mNetCash shown in the hero.
-  let cum = 0;
-  const cumulative = monthlyValues.map((v) => (cum += v));
-
-  // Plotted series prepends an explicit $0 baseline so the line ALWAYS
-  // starts at the visual baseline and finishes at t6mNetCash. Without
-  // this, a front-loaded period (e.g. month 1 is the largest gain, later
-  // months give some back) plots as `[m1_total, ..., t6mNetCash]` — a
-  // peak-then-fade silhouette that can still read as "trending down"
-  // even when t6mNetCash > 0. Anchoring at 0 makes the direction
-  // visually equivalent to `t6mNetCash` direction: above baseline =
-  // positive period, below = negative period.
-  const series = [0, ...cumulative];
-
-  // Y-axis spans the full plotted series (including the 0 baseline)
-  // with 15% padding on both sides so the line stays off the container
-  // edges. 0 is always in range by construction.
-  const rawMin = Math.min(...series);
-  const rawMax = Math.max(...series);
-  const rawRange = rawMax - rawMin;
-  const chartMin = rawRange === 0
-    ? rawMin - DEGENERATE_Y_HALF_WINDOW
-    : rawMin - 0.15 * rawRange;
-  const chartMax = rawRange === 0
-    ? rawMax + DEGENERATE_Y_HALF_WINDOW
-    : rawMax + 0.15 * rawRange;
+  // Y-axis symmetric around 0 with a FIXED domain (±VISUAL_HALF_RANGE),
+  // so the visual baseline is the center line and steepness scales
+  // linearly with margin magnitude across the realistic gym P&L range.
+  // 15% padding on each side keeps the line off the container edges
+  // even at the domain edge.
+  const chartMin = -VISUAL_HALF_RANGE * 1.15;
+  const chartMax = VISUAL_HALF_RANGE * 1.15;
 
   const options: ApexOptions = {
     chart: {
@@ -184,11 +148,10 @@ function CashTrendSparkline({ bars }: { bars: CashTrendBar[] }) {
         fillTo: 'end',
       },
     },
-    // Cumulative trajectory — smoothing softens the month-to-month
-    // shoulders without inventing data points (Apex `smooth` is a
-    // standard spline through the 7 plotted points: the $0 baseline
-    // plus the 6 month-end cumulative totals).
-    stroke: { curve: 'smooth', width: 2, colors: [color] },
+    // Straight stroke between the two points — no smoothing. The chart
+    // is a single result line, not a trajectory, so any curve treatment
+    // would invent shape information the data doesn't carry.
+    stroke: { curve: 'straight', width: 2, colors: [color] },
     fill: {
       type: 'gradient',
       gradient: {
@@ -212,7 +175,7 @@ function CashTrendSparkline({ bars }: { bars: CashTrendBar[] }) {
     <div
       className="cth-trend-sparkline"
       role="img"
-      aria-label={ariaLabelForCumulative(cumulative)}
+      aria-label={ariaLabelForResult(margin)}
     >
       <ReactApexChart options={options} series={[{ data: series }]} type="area" height={70} />
     </div>
@@ -306,7 +269,7 @@ export default function CashTrendHero({ result, negativeMonthsAsSubtitle = false
         </div>
       </div>
       {showTrendLine && (
-        <CashTrendSparkline bars={result.monthlyBars} />
+        <CashTrendSparkline margin={result.t6mMargin} />
       )}
 
       {/* Row 3 — verdict, spans both columns */}
