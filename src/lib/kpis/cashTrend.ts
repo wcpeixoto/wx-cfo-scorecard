@@ -42,7 +42,7 @@ export interface CashTrendResult {
   priorT6mMargin: number;     // decimal — prior window margin (for diagnostics)
   negativeMonthCount: number;
   interpretation: string;       // status-driven plain-English line shown in the card body
-  monthlyBars: CashTrendBar[];  // feeds the compact best-fit trend line in the card header (CashTrendHero)
+  monthlyBars: CashTrendBar[];  // feeds the compact cumulative net-cash sparkline in the card header (CashTrendHero)
   windowLabel: string;          // 'Nov 2025 – Apr 2026'
 }
 

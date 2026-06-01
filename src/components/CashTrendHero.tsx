@@ -135,18 +135,26 @@ function CashTrendSparkline({ bars }: { bars: CashTrendBar[] }) {
   const isWorsening = slope <= WORSENING_SLOPE_PER_MONTH;
   const color = isWorsening ? chartTokens.error : chartTokens.brand;
 
-  // Series — running cumulative net cash. The 6th point equals t6mNetCash
-  // shown in the hero, so the chart's vertical end-position matches the
-  // direction of the headline number.
+  // Cumulative net cash, one running-sum point per month. The 6th value
+  // equals t6mNetCash shown in the hero.
   let cum = 0;
   const cumulative = monthlyValues.map((v) => (cum += v));
 
-  // Y-axis spans the cumulative range and always includes 0, so "ending
-  // net up" vs "ending net down" reads as the line finishing above or
-  // below the visual baseline. 15% padding on both sides keeps the line
-  // off the container edges.
-  const rawMin = Math.min(0, ...cumulative);
-  const rawMax = Math.max(0, ...cumulative);
+  // Plotted series prepends an explicit $0 baseline so the line ALWAYS
+  // starts at the visual baseline and finishes at t6mNetCash. Without
+  // this, a front-loaded period (e.g. month 1 is the largest gain, later
+  // months give some back) plots as `[m1_total, ..., t6mNetCash]` — a
+  // peak-then-fade silhouette that can still read as "trending down"
+  // even when t6mNetCash > 0. Anchoring at 0 makes the direction
+  // visually equivalent to `t6mNetCash` direction: above baseline =
+  // positive period, below = negative period.
+  const series = [0, ...cumulative];
+
+  // Y-axis spans the full plotted series (including the 0 baseline)
+  // with 15% padding on both sides so the line stays off the container
+  // edges. 0 is always in range by construction.
+  const rawMin = Math.min(...series);
+  const rawMax = Math.max(...series);
   const rawRange = rawMax - rawMin;
   const chartMin = rawRange === 0
     ? rawMin - DEGENERATE_Y_HALF_WINDOW
@@ -205,7 +213,7 @@ function CashTrendSparkline({ bars }: { bars: CashTrendBar[] }) {
       role="img"
       aria-label={ariaLabelForCumulative(cumulative)}
     >
-      <ReactApexChart options={options} series={[{ data: cumulative }]} type="area" height={70} />
+      <ReactApexChart options={options} series={[{ data: series }]} type="area" height={70} />
     </div>
   );
 }

@@ -1408,30 +1408,46 @@ class on the card root. Child elements that need status color inherit via
 | `.cth-card--burning`  | `#F04438` | Burning Cash |
 
 ### Compact trend sparkline (right column)
-Bottom-right of the card, a 160×70 ApexCharts area sparkline renders the
-**linear best-fit line** over the last 6 monthly net-cash values — *not*
-the raw month-by-month series. The visual is two endpoints (start and
-end of the best-fit line) drawn as a single straight stroke with a soft
-vertical gradient fill underneath. No bar chart, no full-width chart, no
-axes, gridlines, labels, markers, or tooltip. No visible eyebrow label;
-the chart container carries the accessible name instead.
+Bottom-right of the card, a 160×70 ApexCharts area sparkline plots the
+**running cumulative net cash** over the last 6 months. The series is
+seven points — an explicit `$0` baseline followed by the six month-end
+cumulative totals — drawn as a smooth stroke with a soft vertical
+gradient fill underneath. The final plotted value equals `t6mNetCash`
+shown in the hero. No bar chart, no full-width chart, no axes,
+gridlines, labels, markers, or tooltip. No visible eyebrow label; the
+chart container carries the accessible name instead.
 
-**Why best-fit, not raw values.** This card is *Cash Trend* — the
-visual must communicate direction, not month-to-month movement. The
+**Why cumulative, not the linear best-fit.** This card is *Cash Trend* —
+the visual must reinforce the headline number, not introduce an
+independent slope signal. Plotting the linear best-fit of the monthly
+net-cash values produced cases where the chart trended down (a mildly
+negative monthly slope) while the hero number was positive (+$21.9K),
+which read as a warning even though the period was net positive. The
 neighboring Monthly Net Cash Flow card already shows the raw monthly
-shape with full chrome (axes, labels, tooltips). A chrome-less
-160×70 best-fit sparkline is a different visual category: an inline
-direction summary, not a second monthly chart.
+shape with full chrome — this 160×70 sparkline now answers a different
+question: *did the business finish the 6-month window above or below
+its starting baseline?*
+
+**Anchor at $0.** The plotted series is `[0, cum[0], cum[1], …, cum[5]]`
+(seven points) — not `cumulative` alone (six). Without the leading 0,
+a front-loaded period (most gain in month 1, later months give some
+back) plots as a peak-then-fade silhouette and can still read as
+"trending down" even when `t6mNetCash > 0`. Prepending the baseline
+makes the visual direction equivalent to `sign(t6mNetCash)`: line ends
+above the baseline ↔ positive period, below ↔ negative period.
 
 **Dual-encoding rule.** The pill carries state (Building / Treading /
-Pressure / Burning). The sparkline carries one signal only: *is direction
-worsening?* Pill color and sparkline color are intentionally allowed to
-diverge — they answer different questions. Do not retint the sparkline
-to match the pill.
+Pressure / Burning). The sparkline carries one signal only: *did the
+6-month period finish net up or net down?* Color is independent (see
+the slope rule below) — pill color and sparkline color are intentionally
+allowed to diverge. Do not retint the sparkline to match the pill.
 
-**Two-color slope rule (visual).**
+**Two-color slope rule (visual).** Color is keyed off the
+month-over-month direction, not the cumulative trajectory, so a positive
+period with sharply deteriorating monthly cash flow still reads red as a
+"watch out" signal.
 - Red (`chartTokens.error`, `#F04438` — matches `var(--negative)`) when
-  the 6-month least-squares slope ≤ −$1,500/month.
+  the 6-month least-squares slope of **monthly** net cash ≤ −$1,500/month.
 - Neutral brand blue (`chartTokens.brand`, `#465FFF` — matches
   `var(--accent)`) otherwise — positive, flat, or insufficiently
   negative.
@@ -1441,14 +1457,14 @@ to match the pill.
 
 **Area fill — Apex-native, line-anchored.** Apex draws the area below
 the line and fades it via a gradient (`opacityFrom: 0.6 → opacityTo: 0`,
-same hue as the stroke). Two settings make this work with the raw-
-anchored y-axis:
+same hue as the stroke). Two settings make this work with the padded
+y-axis:
 1. **`plotOptions.area.fillTo: 'end'`** — by default Apex anchors the
-   area's lower edge to zero (`'origin'`), which with our raw-anchored
-   y-axis collapses the fill to a 1px sliver near zero. `'end'` anchors
-   the lower edge to the chart canvas bottom (= sparkline container
-   bottom = the supporting-metric baseline). The fill becomes a proper
-   trapezoid from line down to the baseline.
+   area's lower edge to zero (`'origin'`), which with our padded
+   y-axis collapses the fill to a thin sliver near the baseline.
+   `'end'` anchors the lower edge to the chart canvas bottom (=
+   sparkline container bottom = the supporting-metric baseline). The
+   fill becomes a proper trapezoid from line down to the baseline.
 2. **Apex `fill.gradient`** then fades that trapezoid from line
    (`opacityFrom: 0.6`) to baseline (`opacityTo: 0`).
 
@@ -1457,44 +1473,40 @@ to the container, not the line, so any tint set on it reads as a
 rectangle regardless of stops or opacity. Apex's line-anchored area is
 the only shape that gives the TailAdmin "soft area under a line" feel.
 
+**Stroke curve.** `curve: 'smooth'` — Apex spline through the seven
+cumulative points. With a 6-month series the smooth curve softens the
+month-to-month shoulders without inventing data; a straight curve
+between cumulative points reads as a polyline of seven kinks and
+looks jagged at this size.
+
 **Three-state accessible label (semantic).** The chart container has
-an `aria-label` driven by the same slope:
-- `slope ≤ −$1,500/mo`: "Cash trend over 6 months — direction worsening"
-- `slope ≥ +$1,500/mo`: "Cash trend over 6 months — direction improving"
-- otherwise: "Cash trend over 6 months — stable"
+an `aria-label` driven by the cumulative endpoint (`t6mNetCash`),
+thresholded at the per-month worsening threshold scaled to the 6-month
+window so the semantic granularity matches the magnitude the color rule
+cares about:
+- `t6mNetCash ≤ −$9,000` (= −$1,500/mo × 6):
+  "Cumulative cash over 6 months — direction worsening"
+- `t6mNetCash ≥ +$9,000`:
+  "Cumulative cash over 6 months — direction improving"
+- otherwise: "Cumulative cash over 6 months — stable"
 
 The visual stays two-color (no green); the semantic label gets the
 extra "improving" state so screen-reader and color-blind users hear
 direction explicitly without adding a visible third color.
 
-**Y-axis scaling.** Scaled to the **raw 6 monthly net-cash values**
-(not the best-fit endpoint range) with 15% padding above and below.
-Never forced to zero.
-- `rawMin = min(monthlyValues)`, `rawMax = max(monthlyValues)`,
+**Y-axis scaling.** Scaled to the **plotted series** (= `[0, cum[0],
+…, cum[5]]`) with 15% padding above and below. Because the series
+includes the `$0` baseline, 0 is always within range — "ending net
+up" vs "ending net down" reads as the line finishing above or below
+the baseline crossing.
+- `rawMin = min(series)`, `rawMax = max(series)`,
   `rawRange = rawMax − rawMin`.
 - `chartMin = rawMin − 0.15 × rawRange`,
   `chartMax = rawMax + 0.15 × rawRange`.
-- The displayed line is still the best-fit endpoints `[startY, endY]`
-  — only the canvas/Y-axis scale derives from the raw monthly range.
-- **Why raw-anchored.** Anchoring to the endpoint range made any
-  non-flat slope fill ~77% of the chart by construction; magnitude
-  was set by the slope's own internal range, not by the dollars the
-  business actually moves. Raw-anchored ties visual magnitude to data
-  magnitude — a modest slope on noisy monthly cash now renders as a
-  visibly modest line within a wide window, while a strong slope still
-  reads strong because it spans more of that same window.
-- **Flat fallback:** if `|slope| × 6 < $500` — i.e. the best-fit line
-  moves less than $500 across the 6-month window — render a flat line
-  at the midpoint and widen the y-axis to a fixed ±$1,000 around it
-  instead of using the raw-anchored window. This is a *rendering*
-  concern only; the slope-based color rule still runs independently.
-  (Math: |slope|×6 < $500 implies |slope| < ~$83/mo, well above the
-  −$1,500/mo worsening threshold — flat and red can't co-occur in
-  practice.)
-- **Defensive guard:** if `rawRange === 0` (all 6 values identical),
-  fall back to the flat-rule's midpoint-centered window. The flat
-  branch above already captures this case (slope = 0 → flat); the
-  guard is defense if that invariant ever changes.
+- **Defensive guard:** if `rawRange === 0` (every month is exactly
+  zero net cash, so the cumulative collapses to a flat 0-line), fall
+  back to a fixed ±$1,000 window centered on 0 so the line still
+  renders at the canvas center instead of as a degenerate axis.
 
 **Card layout.** `.cth-card` is a 2-column CSS grid (`minmax(0, 1fr) auto`).
 Row 1: title block (col 1) + pill (col 2). Row 2: metric block (col 1,
