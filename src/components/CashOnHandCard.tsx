@@ -3,7 +3,7 @@
 // component renders in UI Lab and as the Today page's lead card (the
 // promotion is a JSX swap, not a re-wire).
 
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
@@ -77,6 +77,7 @@ interface CashOnHandCardProps {
 }
 
 export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData, negativeCashMonth }: CashOnHandCardProps) {
+  const tooltipId = useId();
   const signals = useMemo(
     () => detectSignals(model, txns, forecastProjection),
     [model, txns, forecastProjection]
@@ -138,7 +139,29 @@ export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData,
     <article className="priority-card-v2">
       <div className="priority-card-v2__header">
         <div className="priority-card-v2__title-block">
-          <h3 className="priority-card-v2__title">Cash on Hand</h3>
+          <div className="priority-card-v2__title-row">
+            <h3 className="priority-card-v2__title">Cash on Hand</h3>
+            <div className="db-tooltip-wrap">
+              <button
+                type="button"
+                className="db-tooltip-btn"
+                aria-label="Cash on Hand explanation"
+                aria-describedby={tooltipId}
+              >
+                &#9432;
+              </button>
+              <div id={tooltipId} role="tooltip" className="db-tooltip-panel priority-card-v2__title-tooltip-panel">
+                <ul className="db-tooltip-list">
+                  <li className="db-tooltip-body">
+                    This compares your average daily cash balance over the last 30 days with the 30 days before that.
+                  </li>
+                  <li className="db-tooltip-body">
+                    It is not the same as monthly profit or today&rsquo;s bank balance.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
         <span className={`card-status-badge is-${hero.severity}`}>
           {severityLabelText(hero.severity)}
@@ -148,13 +171,6 @@ export function CashOnHandCard({ model, txns, forecastProjection, cashTrendData,
       <div className="priority-card-v2__amount-row">
         <div className="priority-card-v2__amount-block">
           <h2 className="priority-card-v2__amount">{formatCashOnHand(model.runway.currentCashBalance)}</h2>
-          {/*
-            Delta semantics: trailing 30-day mean cash balance vs the prior
-            30-day mean, anchored to latestAvailableTxnDate. If a tooltip is
-            ever added, suggested copy:
-              "Compares your average cash balance over the latest 30 days
-               with the average from the 30 days before that."
-          */}
           <div className="priority-card-v2__trend">
             {cashDelta ? (
               <>
