@@ -57,6 +57,17 @@ function marketingRow(revenue: number[], marketing: number[]) {
   return { res, row: res.rows.find((r) => r.category === 'Marketing') };
 }
 
+// Payroll variant — Business Income + a Payroll expense per month. Drives the
+// payroll-specific hero fields consumed by PayrollEfficiencyCard.
+function buildPayrollTxns(revenue: number[], payroll: number[]): Txn[] {
+  const txns: Txn[] = [];
+  MONTHS.forEach((month, i) => {
+    if (revenue[i] > 0) txns.push(mk(month, 'income', 'Business Income', revenue[i]));
+    if (payroll[i] > 0) txns.push(mk(month, 'expense', 'Payroll', payroll[i]));
+  });
+  return txns;
+}
+
 describe('computeEfficiencyOpportunities — revenue-qualified "Your best" benchmark', () => {
   it('qualified happy path: flat revenue, every window qualifies, best is the spend dip', () => {
     // Revenue flat $30k → floor = 0.7 × $30k = $21k; every window (avg $30k)
@@ -137,6 +148,73 @@ describe('computeEfficiencyOpportunities — revenue-qualified "Your best" bench
     expect(res.rows).toHaveLength(0);
     expect(res.windowLabel).toBe('');
     expect(res.benchmarkRevenueQualified).toBe(false);
+  });
+});
+
+describe('computeEfficiencyOpportunities — payroll hero basis (Payroll Efficiency card)', () => {
+  it('hero/best fields equal the Payroll row and footer when there is positive excess', () => {
+    // Revenue flat $30k. Payroll $9k (30%) except a dip to $6k (20%) in Apr–Jun
+    // 2024. Today window (Oct–Dec 2025) = 30%; best stretch = 20%.
+    const revenue = arr(30000);
+    const payroll = set(arr(9000), [3, 4, 5], 6000);
+    const res = computeCore(MODEL, buildPayrollTxns(revenue, payroll), REF_DATE);
+    const row = res.rows.find((r) => r.category === 'Payroll');
+
+    expect(row).toBeDefined();
+    // todayPct drives the hero; bestPct + window drive the "Best stretch" label.
+    expect(res.payrollTodayPct).toBe(30);
+    expect(res.payrollBestPct).toBe(20);
+    expect(res.payrollTodayPct).toBe(row!.todayPct);
+    expect(res.payrollBestPct).toBe(row!.bestPct);
+    expect(res.payrollBestWindowLabel).toBe('Apr – Jun 2024');
+    expect(res.payrollBestWindowLabel).toBe(row!.bestWindow.label);
+    // extraPerMonth still drives the footer figure.
+    expect(res.payrollExtraPerMonth).toBe(row!.extraPerMonth);
+    expect(res.payrollExtraPerMonth).toBeGreaterThan(0);
+  });
+
+  it('still exposes today/best % when payroll is AT its best stretch (no row, null excess)', () => {
+    // Flat payroll → today ratio == best ratio → extraPerMonth 0 → the Payroll row
+    // is skipped and payrollExtraPerMonth is null. The hero must STILL render, so
+    // payrollTodayPct / payrollBestPct stay populated (the regression guard).
+    const revenue = arr(30000);
+    const payroll = arr(9000); // flat 30% everywhere
+    const res = computeCore(MODEL, buildPayrollTxns(revenue, payroll), REF_DATE);
+
+    expect(res.rows.find((r) => r.category === 'Payroll')).toBeUndefined();
+    expect(res.payrollExtraPerMonth).toBeNull();
+    expect(res.payrollTodayPct).toBe(30);
+    expect(res.payrollBestPct).toBe(30);
+    expect(res.payrollBestWindowLabel).not.toBeNull();
+  });
+
+  it('payroll fields are null when there is no Payroll spend', () => {
+    // Marketing-only fixture — no Payroll category present.
+    const res = computeCore(MODEL, buildTxns(arr(30000), arr(3000)), REF_DATE);
+    expect(res.payrollTodayPct).toBeNull();
+    expect(res.payrollBestPct).toBeNull();
+    expect(res.payrollBestWindowLabel).toBeNull();
+  });
+
+  it('hero best-stretch respects the #360 firstActiveMonth gate (stays aligned with the gated Payroll row)', () => {
+    // Payroll tracking starts at idx 17 (Jun 2025); idx 0–16 are pre-tracking $0.
+    // Ungated, an all-$0 pre-tracking window would win as a bogus 0% best; with
+    // the gate (mirroring #360's per-row loop) the best is the genuine Jun–Aug
+    // 2025 dip, and the hero fields equal the gated Money Left Payroll row.
+    const revenue = arr(30000);
+    const payroll = set(set(arr(0), [17, 18, 19], 6000), [20, 21, 22, 23], 9000);
+    const res = computeCore(MODEL, buildPayrollTxns(revenue, payroll), REF_DATE);
+    const row = res.rows.find((r) => r.category === 'Payroll');
+
+    expect(row).toBeDefined();
+    // Gate excludes the pre-tracking $0 windows → best is the real dip, not 0%.
+    expect(res.payrollBestPct).toBe(20);
+    expect(res.payrollBestWindowLabel).toBe('Jun – Aug 2025');
+    expect(res.payrollTodayPct).toBe(30);
+    // The alignment invariant: hero fields equal the gated Money Left Payroll row.
+    expect(res.payrollTodayPct).toBe(row!.todayPct);
+    expect(res.payrollBestPct).toBe(row!.bestPct);
+    expect(res.payrollBestWindowLabel).toBe(row!.bestWindow.label);
   });
 });
 

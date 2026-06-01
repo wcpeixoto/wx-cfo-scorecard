@@ -9715,12 +9715,26 @@ body {
   color: var(--text-secondary);
 }
 
+/* Caption framing the chart as historical context — the hero/footer are the
+   trailing-3-month basis, this chart is the yearly trend. */
+.pe-chart-caption {
+  margin: 18px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
 /* Rounded light-gray chart container holding a clean sparkline/area chart. */
 .pe-chart {
   margin-top: 18px;
   background: var(--bg-muted);
   border-radius: 12px;
   padding: 14px 14px 6px;
+}
+
+/* Caption owns the top gap; collapse the chart's own margin when it follows. */
+.pe-chart-caption + .pe-chart {
+  margin-top: 6px;
 }
 
 .pe-empty {

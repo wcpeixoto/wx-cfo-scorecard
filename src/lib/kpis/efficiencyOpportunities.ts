@@ -62,6 +62,14 @@ export interface EfficiencyOpportunitiesResult {
   // set so it survives display truncation. Same methodology as `rows`; null
   // when Payroll has no positive excess. Never the all-category total.
   payrollExtraPerMonth: number | null;
+  // Payroll-specific 3-month basis for the Payroll Efficiency card hero,
+  // computed independently of the per-row excess/materiality gates so the hero
+  // still renders when payroll is at or better than its best stretch (no row,
+  // payrollExtraPerMonth null). When a Payroll row exists these equal its
+  // todayPct / bestPct. Null when there is no payroll spend / no valid window.
+  payrollTodayPct: number | null;        // payroll % of revenue, last 3 complete months
+  payrollBestPct: number | null;         // lowest payroll % over the candidate 3-month windows
+  payrollBestWindowLabel: string | null; // e.g. "Jan – Mar 2025"
   // True when "best" was chosen from revenue-qualified windows (≥2 windows
   // clearing the dual revenue floor). False when too few qualified and every
   // category fell back to the unfiltered best. Globally uniform per run today
@@ -200,6 +208,9 @@ export function computeCore(
     rows: [],
     totalExtraPerMonth: 0,
     payrollExtraPerMonth: null,
+    payrollTodayPct: null,
+    payrollBestPct: null,
+    payrollBestWindowLabel: null,
     benchmarkRevenueQualified: false,
   };
 
@@ -430,11 +441,56 @@ export function computeCore(
   // PAYROLL_PARENT in payrollSeries.ts) — survives the top-N truncation above.
   const payrollRow = rowsAll.find((r) => r.category === 'Payroll');
 
+  // Payroll 3-month basis for the Payroll Efficiency card hero. Recomputed here
+  // (not read from payrollRow) so the hero renders even when payroll has no
+  // positive excess — in that case payrollRow is undefined but the card still
+  // needs today's % and the best-stretch %. Uses the same currentWindow /
+  // candidateWindows as the row math, so the values coincide whenever a Payroll
+  // row exists.
+  let payrollTodayPct: number | null = null;
+  let payrollBestPct: number | null = null;
+  let payrollBestWindowLabel: string | null = null;
+  const payrollSpendByMonth = expenseByCatMonth.get('Payroll');
+  if (payrollSpendByMonth && currentWindow.avgRevenue > 0) {
+    let sumCurrent = 0;
+    for (let k = currentWindow.startIdx; k <= currentWindow.endIdx; k += 1) {
+      sumCurrent += payrollSpendByMonth[k];
+    }
+    payrollTodayPct = Math.round(((sumCurrent / WINDOW_SIZE_MONTHS) / currentWindow.avgRevenue) * 100);
+
+    // Apply the same firstActiveMonth best-window gate the per-row loop uses
+    // (#360), so the hero's best stretch can't pick a pre-tracking zero-padded
+    // window that the gated Payroll row would reject — keeps payrollBestPct /
+    // payrollBestWindowLabel aligned with the Money Left Payroll row.
+    const payrollFirstActive = firstActiveMonth.get('Payroll') ?? 0;
+    let bestRatio = Number.POSITIVE_INFINITY;
+    let bestWin: Window | null = null;
+    for (const w of candidateWindows) {
+      if (w.startIdx < payrollFirstActive) continue;
+      let sumSpend = 0;
+      for (let k = w.startIdx; k <= w.endIdx; k += 1) {
+        sumSpend += payrollSpendByMonth[k];
+      }
+      const ratio = sumSpend / WINDOW_SIZE_MONTHS / w.avgRevenue;
+      if (ratio < bestRatio) {
+        bestRatio = ratio;
+        bestWin = w;
+      }
+    }
+    if (bestWin && Number.isFinite(bestRatio)) {
+      payrollBestPct = Math.round(bestRatio * 100);
+      payrollBestWindowLabel = formatWindowLabel(months[bestWin.startIdx], months[bestWin.endIdx]);
+    }
+  }
+
   return {
     windowLabel,
     rows,
     totalExtraPerMonth,
     payrollExtraPerMonth: payrollRow ? payrollRow.extraPerMonth : null,
+    payrollTodayPct,
+    payrollBestPct,
+    payrollBestWindowLabel,
     benchmarkRevenueQualified,
   };
 }
