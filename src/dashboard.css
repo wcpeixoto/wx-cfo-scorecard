@@ -9428,9 +9428,9 @@ body {
 }
 
 /* Fixed column widths tuned to the 640px drawer; Vendor takes the slack. */
-.txn-drawer-col-date     { width: 92px; }
+.txn-drawer-col-date     { width: 84px; }
 .txn-drawer-col-vendor   { width: auto; }
-.txn-drawer-col-category { width: 104px; }
+.txn-drawer-col-category { width: 136px; }
 .txn-drawer-col-account  { width: 134px; }
 .txn-drawer-col-amount   { width: 108px; }
 

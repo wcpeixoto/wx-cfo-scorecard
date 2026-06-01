@@ -56,16 +56,14 @@ function formatUsd(value: number): string {
   });
 }
 
-// Quicken dates are 'YYYY-MM-DD'. Build the Date from parts — never
-// `new Date('YYYY-MM-DD')`, which parses as UTC and can shift a day.
+// Quicken dates are 'YYYY-MM-DD'. Render as MM/DD/YY (compact, tabular). Parse
+// the parts directly — never `new Date('YYYY-MM-DD')`, which parses as UTC and
+// can shift a day.
 function formatDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   if (!y || !m || !d) return iso;
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(m)}/${pad(d)}/${pad(y % 100)}`;
 }
 
 // Vendor primary line = payee, falling back to the memo when there's no payee.
@@ -258,7 +256,7 @@ export function TopExpensesTransactionsDrawer({ slice, onClose }: Props) {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search these transactions"
+              placeholder="Search"
               aria-label="Search transactions"
             />
           </div>
