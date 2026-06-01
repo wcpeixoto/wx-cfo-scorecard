@@ -9483,7 +9483,9 @@ body {
      the sparkline's bottom in this same grid row. */
   align-self: end;
   min-width: 0;
-  margin-top: 16px;
+  /* Matches .pe-hero margin-top (Payroll Efficiency card) — canonical
+     title-to-body gap across Big Picture cards. */
+  margin-top: 30px;
 }
 
 /* Primary metric — amount + noun on shared baseline */
