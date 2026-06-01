@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
 import { formatCompact } from '../lib/utils/formatCompact';
 import type { EfficiencyRow } from '../lib/kpis/efficiencyOpportunities';
+import { DrawerShell } from './DrawerShell';
 
 function avg(values: number[]): number {
   if (values.length === 0) return 0;
@@ -21,19 +21,6 @@ interface Props {
 }
 
 export function EfficiencyDrilldownDrawer({ row, onClose }: Props) {
-  // Close on ESC key
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) onClose();
-  };
-
   const { bestWindow, todayWindow } = row;
 
   const bestAvgRevenue = avg(bestWindow.months.map((m) => m.revenue));
@@ -45,13 +32,7 @@ export function EfficiencyDrilldownDrawer({ row, onClose }: Props) {
   const todayAvgPct = Math.round(avg(todayWindow.months.map((m) => m.ratio)) * 100);
 
   return (
-    <div className="eff-drawer-backdrop" onClick={handleBackdropClick}>
-      <div
-        className="eff-drawer-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label={row.category}
-      >
+    <DrawerShell classPrefix="eff-drawer" ariaLabel={row.category} onClose={onClose}>
 
         {/* ── Header area ──────────────────────────────────────────────── */}
         <div className="eff-drawer-header">
@@ -144,7 +125,6 @@ export function EfficiencyDrilldownDrawer({ row, onClose }: Props) {
           </table>
         </div>
 
-      </div>
-    </div>
+    </DrawerShell>
   );
 }
