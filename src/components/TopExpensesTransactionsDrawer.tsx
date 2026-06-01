@@ -233,11 +233,9 @@ export function TopExpensesTransactionsDrawer({ slice, onClose }: Props) {
             </button>
           </div>
           <div className="txn-drawer-summaryrow">
-            {/* Verification line — a quiet count, not a hero. */}
+            {/* Verification total — the slice's sum. The transaction count lives
+                in the footer, so the header carries just the dollar figure. */}
             <p className="txn-drawer-summary">
-              <span className="txn-drawer-sum-num">{visibleRows.length}</span>
-              {visibleRows.length === 1 ? 'transaction' : 'transactions'}
-              <span className="txn-drawer-sum-sep" aria-hidden="true" />
               <span className="txn-drawer-sum-num">{formatUsd(visibleSum)}</span>
             </p>
             <button className="txn-drawer-btn" type="button" onClick={handleExport} disabled={isEmpty}>

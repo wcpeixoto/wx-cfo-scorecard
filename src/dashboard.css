@@ -9298,17 +9298,8 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.txn-drawer-sum-sep {
-  width: 3px;
-  height: 3px;
-  border-radius: 999px;
-  background: #98A2B3;
-  flex: 0 0 auto;
-}
-
 .dark .txn-drawer-summary { color: #9CA3AF; }
 .dark .txn-drawer-sum-num { color: rgba(255, 255, 255, 0.90); }
-.dark .txn-drawer-sum-sep { background: #667085; }
 
 /* ─── Controls ──────────────────────────────────────────────────────────── */
 .txn-drawer-controls {
