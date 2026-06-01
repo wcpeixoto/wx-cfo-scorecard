@@ -3225,7 +3225,11 @@ export default function Dashboard() {
 
             {/* Row 2: Income & Expense (60%) | Top Expense Categories (40%) */}
             <div className="two-col-grid two-col-grid--income-expense">
-              <IncomeExpenseCard monthlyRollups={model.monthlyRollups} />
+              <IncomeExpenseCard
+                monthlyRollups={model.monthlyRollups}
+                txns={filteredTxns}
+                cashFlowMode={profitabilityCashFlowMode}
+              />
               <TopCategoriesCard
                 slices={topCategoriesBreakdown.slices}
                 total={topCategoriesBreakdown.total}
