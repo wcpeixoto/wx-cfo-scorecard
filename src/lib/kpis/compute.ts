@@ -1558,14 +1558,38 @@ function categoryTotalsByGrouping(
   return totals;
 }
 
+/**
+ * Single source of truth for expense-slice membership.
+ *
+ * Returns the parent category and signed contribution for a transaction that
+ * belongs in the expense breakdown, or `null` if it does not. Both
+ * `computeExpenseSlices` (the category totals) and `computeExpenseSlicesWithRows`
+ * (the drawer rows) route every membership decision through this one helper, so
+ * the displayed slice values and the rows behind them can never drift apart.
+ *
+ * Mirrors the rules that previously lived inline:
+ *  - skip transactions whose |expenseContribution| is within EPSILON of 0
+ *    (the old per-txn skip inside `categoryTotals`), and
+ *  - skip capital / owner distributions regardless of cashFlowMode. This guard
+ *    must stay OUTSIDE `expenseContribution`, which only zeroes them in
+ *    operating mode — they must never appear in the breakdown in either mode.
+ */
+function expenseSliceMembership(
+  txn: Txn,
+  cashFlowMode: CashFlowMode
+): { parent: string; contribution: number } | null {
+  const contribution = expenseContribution(txn, cashFlowMode);
+  if (Math.abs(contribution) <= EPSILON) return null;
+  if (isCapitalDistributionCategory(txn.category)) return null;
+  return { parent: parentCategoryName(txn.category), contribution };
+}
+
 export function computeExpenseSlices(txns: Txn[], cashFlowMode: CashFlowMode): { slices: ExpenseSlice[]; total: number } {
-  const subTotals = categoryTotals(txns, cashFlowMode);
   const parentTotals = new Map<string, number>();
-  subTotals.forEach((value, category) => {
-    // Always exclude owner distributions / capital distributions from the expense breakdown
-    if (isCapitalDistributionCategory(category)) return;
-    const parent = parentCategoryName(category);
-    parentTotals.set(parent, (parentTotals.get(parent) ?? 0) + value);
+  txns.forEach((txn) => {
+    const membership = expenseSliceMembership(txn, cashFlowMode);
+    if (!membership) return;
+    parentTotals.set(membership.parent, (parentTotals.get(membership.parent) ?? 0) + membership.contribution);
   });
   // Compute share relative to ALL categories so percentages are accurate even when truncated to top N
   const totalExpense = [...parentTotals.values()].reduce((sum, v) => sum + v, 0);
@@ -1581,6 +1605,69 @@ export function computeExpenseSlices(txns: Txn[], cashFlowMode: CashFlowMode): {
     })),
     total: round2(totalExpense),
   };
+}
+
+/** An expense slice plus the transactions that built it, each carrying the
+ *  signed contribution used in the slice total. Defined here (not in the locked
+ *  contract.ts) so the global `ExpenseSlice` contract stays rows-less. */
+export type ExpenseSliceWithRows = ExpenseSlice & {
+  rows: Array<{ txn: Txn; contribution: number }>;
+};
+
+/**
+ * Top-6 expense slices plus a first-class "Other" slice, each carrying its
+ * contributing transactions.
+ *
+ * The top-6 values, ranking, colors, and `total` are inherited verbatim from
+ * `computeExpenseSlices`, so displayed numbers stay byte-identical and
+ * `Other.value = total - Σ(top-6 values)` is pinned to the displayed slices.
+ * Row membership comes from the SAME `expenseSliceMembership` helper the totals
+ * use. Each row carries the contribution that built the slice; consumers sum it
+ * directly and must never recompute it or call `expenseContribution`.
+ */
+export function computeExpenseSlicesWithRows(
+  txns: Txn[],
+  cashFlowMode: CashFlowMode
+): { slices: ExpenseSliceWithRows[]; total: number } {
+  const { slices, total } = computeExpenseSlices(txns, cashFlowMode);
+  const topNames = new Set(slices.map((slice) => slice.name));
+
+  const rowsByParent = new Map<string, Array<{ txn: Txn; contribution: number }>>();
+  const otherRows: Array<{ txn: Txn; contribution: number }> = [];
+  txns.forEach((txn) => {
+    const membership = expenseSliceMembership(txn, cashFlowMode);
+    if (!membership) return;
+    const row = { txn, contribution: membership.contribution };
+    if (topNames.has(membership.parent)) {
+      const bucket = rowsByParent.get(membership.parent);
+      if (bucket) bucket.push(row);
+      else rowsByParent.set(membership.parent, [row]);
+    } else {
+      otherRows.push(row);
+    }
+  });
+
+  const slicesWithRows: ExpenseSliceWithRows[] = slices.map((slice) => ({
+    ...slice,
+    rows: rowsByParent.get(slice.name) ?? [],
+  }));
+
+  // "Other" = every contributing row whose parent is outside the top 6. Its
+  // value is the displayed top-6 residual, so it cannot drift from the slices
+  // the donut renders.
+  if (otherRows.length > 0) {
+    const topValueSum = slices.reduce((sum, slice) => sum + slice.value, 0);
+    const otherValue = round2(total - topValueSum);
+    slicesWithRows.push({
+      name: 'Other',
+      value: otherValue,
+      share: total > EPSILON ? otherValue / total : 0,
+      color: EXPENSE_COLORS[6 % EXPENSE_COLORS.length],
+      rows: otherRows,
+    });
+  }
+
+  return { slices: slicesWithRows, total };
 }
 
 function buildExpenseSlices(txns: Txn[], cashFlowMode: CashFlowMode): ExpenseSlice[] {

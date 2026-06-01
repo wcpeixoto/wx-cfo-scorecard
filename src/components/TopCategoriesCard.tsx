@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import ReactApexChart from 'react-apexcharts';
-import type { ExpenseSlice } from '../lib/data/contract';
+import type { ExpenseSliceWithRows } from '../lib/kpis/compute';
 import { formatCompact } from '../lib/utils/formatCompact';
+import { TopExpensesTransactionsDrawer } from './TopExpensesTransactionsDrawer';
 
 type TopCategoriesCardProps = {
-  slices: ExpenseSlice[];
+  slices: ExpenseSliceWithRows[];
   total: number;
   periodControl?: ReactNode;
 };
@@ -18,9 +19,13 @@ function formatCurrency(value: number): string {
 }
 
 export default function TopCategoriesCard({ slices, total, periodControl }: TopCategoriesCardProps) {
-  const top = slices.slice(0, 6);
+  // The card owns the drill-down drawer state (same shape as
+  // EfficiencyOpportunitiesCard ↔ EfficiencyDrilldownDrawer). The source
+  // (computeExpenseSlicesWithRows) already attached each slice's contributing
+  // rows, so a click just hands the clicked slice to the drawer.
+  const [selectedSlice, setSelectedSlice] = useState<ExpenseSliceWithRows | null>(null);
 
-  if (top.length === 0) {
+  if (slices.length === 0) {
     return (
       <article className="card top-categories-card">
         <div className="card-head">
@@ -32,9 +37,9 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
     );
   }
 
-  // Share denominator between tooltip and legend so percentages reconcile to
-  // the card total (which is ALL parent categories, not just the visible top 6).
-  const getPct = (slice: ExpenseSlice): number =>
+  // Percentages use the card total as denominator. Slices now include "Other",
+  // so the visible set sums to total and percentages add to 100%.
+  const getPct = (slice: ExpenseSliceWithRows): number =>
     total > 0 ? Math.round((slice.value / total) * 100) : 0;
 
   const chartOptions: ApexCharts.ApexOptions = {
@@ -46,13 +51,31 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
       // class. We don't use Apex's chart-internal keyboard navigation, so
       // disable it explicitly (double-disable documents intent + guards
       // against a future library nuance flipping one but not the other).
+      // The drawer is opened via dataPointSelection (a mouse event) below, and
+      // active-state paint stays off — clicking opens the drawer, not a focus ring.
       accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
       animations: { enabled: false },
       background: 'transparent',
       sparkline: { enabled: false },
+      events: {
+        // ApexCharts reports the clicked donut slice via dataPointIndex;
+        // seriesIndex is always 0 for a single-series donut. (This differs from
+        // the custom tooltip callback below, which receives the slice index as
+        // seriesIndex — the two ApexCharts callbacks use different conventions.)
+        dataPointSelection: (
+          _event: unknown,
+          _chartContext: unknown,
+          config?: { dataPointIndex?: number }
+        ) => {
+          const idx = config?.dataPointIndex;
+          if (typeof idx === 'number' && idx >= 0 && idx < slices.length) {
+            setSelectedSlice(slices[idx]);
+          }
+        },
+      },
     },
-    colors: top.map((s) => s.color),
-    labels: top.map((s) => s.name),
+    colors: slices.map((s) => s.color),
+    labels: slices.map((s) => s.name),
     dataLabels: { enabled: false },
     legend: { show: false },
     stroke: { width: 2, colors: ['#FFFFFF'] },
@@ -68,7 +91,7 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
     },
     tooltip: {
       custom: ({ seriesIndex }: { seriesIndex: number }) => {
-        const slice = top[seriesIndex];
+        const slice = slices[seriesIndex];
         if (!slice) return '';
         const pct = getPct(slice);
         const formatted = formatCompact(slice.value);
@@ -101,22 +124,34 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
         <div className="top-categories-donut-wrap">
           <ReactApexChart
             type="donut"
-            series={top.map((s) => s.value)}
+            series={slices.map((s) => s.value)}
             options={chartOptions}
             height={200}
           />
         </div>
 
         <ul className="top-categories-legend">
-          {top.map((slice) => (
-            <li key={slice.name} className="top-categories-legend-item">
-              <span className="top-categories-legend-dot" style={{ background: slice.color }} aria-hidden="true" />
-              <span className="top-categories-legend-name">{slice.name}</span>
-              <span className="top-categories-legend-pct">{getPct(slice)}%</span>
+          {slices.map((slice, index) => (
+            // Composite key: a real parent category literally named "Other" could
+            // coexist with the synthetic "Other" residual slice; index keeps them distinct.
+            <li key={`${slice.name}-${index}`} className="top-categories-legend-item">
+              <button
+                type="button"
+                className="top-categories-legend-button"
+                onClick={() => setSelectedSlice(slice)}
+              >
+                <span className="top-categories-legend-dot" style={{ background: slice.color }} aria-hidden="true" />
+                <span className="top-categories-legend-name">{slice.name}</span>
+                <span className="top-categories-legend-pct">{getPct(slice)}%</span>
+              </button>
             </li>
           ))}
         </ul>
       </div>
+
+      {selectedSlice && (
+        <TopExpensesTransactionsDrawer slice={selectedSlice} onClose={() => setSelectedSlice(null)} />
+      )}
     </article>
   );
 }
