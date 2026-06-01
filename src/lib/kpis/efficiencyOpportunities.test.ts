@@ -219,6 +219,120 @@ describe('computeEfficiencyOpportunities — payroll hero basis (Payroll Efficie
   });
 });
 
+describe('computeEfficiencyOpportunities — payrollRollingSeries (chart + footer)', () => {
+  // The Payroll Efficiency card's chart and footer must read from the same
+  // 3-month rolling logic as the hero, so the whole card sits on one basis.
+
+  it('current point pct equals payrollTodayPct and isCurrent=true', () => {
+    // Same fixture as the happy-path hero test: payroll 30% today, 20% best.
+    const revenue = arr(30000);
+    const payroll = set(arr(9000), [3, 4, 5], 6000);
+    const res = computeCore(MODEL, buildPayrollTxns(revenue, payroll), REF_DATE);
+
+    const last = res.payrollRollingSeries[res.payrollRollingSeries.length - 1];
+    expect(last).toBeDefined();
+    expect(last.isCurrent).toBe(true);
+    expect(last.payrollPct).toBe(res.payrollTodayPct);
+
+    // Exactly one isCurrent in the series.
+    expect(res.payrollRollingSeries.filter((p) => p.isCurrent)).toHaveLength(1);
+  });
+
+  it('best point pct/label equal payrollBestPct / payrollBestWindowLabel', () => {
+    const revenue = arr(30000);
+    const payroll = set(arr(9000), [3, 4, 5], 6000);
+    const res = computeCore(MODEL, buildPayrollTxns(revenue, payroll), REF_DATE);
+
+    const best = res.payrollRollingSeries.find((p) => p.isBest);
+    expect(best).toBeDefined();
+    expect(best!.payrollPct).toBe(res.payrollBestPct);
+    expect(best!.label).toBe(res.payrollBestWindowLabel);
+
+    // Exactly one isBest.
+    expect(res.payrollRollingSeries.filter((p) => p.isBest)).toHaveLength(1);
+  });
+
+  it('series carries footer values that reconcile with the hero (rev/$payroll)', () => {
+    // Hero 30% should imply $3.33 revenue per $1 payroll (1/0.30) at the
+    // current point. Best 20% → $5.00 at the best point.
+    const revenue = arr(30000);
+    const payroll = set(arr(9000), [3, 4, 5], 6000);
+    const res = computeCore(MODEL, buildPayrollTxns(revenue, payroll), REF_DATE);
+
+    const current = res.payrollRollingSeries.find((p) => p.isCurrent)!;
+    const best = res.payrollRollingSeries.find((p) => p.isBest)!;
+
+    // revenuePerPayrollDollar matches the raw ratio of the carried sums.
+    expect(current.revenuePerPayrollDollar).toBeCloseTo(current.revenue / current.payroll, 6);
+    expect(best.revenuePerPayrollDollar).toBeCloseTo(best.revenue / best.payroll, 6);
+
+    // And reconciles with the hero pct (1 / pct) to two decimals.
+    expect(current.revenuePerPayrollDollar).toBeCloseTo(1 / (res.payrollTodayPct! / 100), 2);
+    expect(best.revenuePerPayrollDollar).toBeCloseTo(1 / (res.payrollBestPct! / 100), 2);
+  });
+
+  it('full-history flat revenue: 22 windows, every point benchmark-eligible', () => {
+    // 24-month lookback with revenue > 0 every month ⇒ up to 22 valid
+    // 3-month windows. Payroll present every month ⇒ firstActiveMonth = 0,
+    // every window passes the revenue-qualification floor (flat revenue),
+    // so every point is benchmark-eligible.
+    const revenue = arr(30000);
+    const payroll = arr(9000);
+    const res = computeCore(MODEL, buildPayrollTxns(revenue, payroll), REF_DATE);
+
+    expect(res.payrollRollingSeries).toHaveLength(22);
+    expect(res.payrollRollingSeries.every((p) => p.isBenchmarkEligible)).toBe(true);
+  });
+
+  it('pre-sustained windows are marked ineligible; best never lands on one', () => {
+    // Payroll tracking starts at idx 17 (Jun 2025) with 7 consecutive months
+    // ⇒ firstActive = 17. Windows starting before idx 17 must be ineligible;
+    // the best marker must land on an eligible window.
+    const revenue = arr(30000);
+    const payroll = set(set(arr(0), [17, 18, 19], 6000), [20, 21, 22, 23], 9000);
+    const res = computeCore(MODEL, buildPayrollTxns(revenue, payroll), REF_DATE);
+
+    // Pre-sustained windows: startIdx < 17. All ineligible.
+    const preSustained = res.payrollRollingSeries.filter((p) => !p.isBenchmarkEligible);
+    expect(preSustained.length).toBeGreaterThan(0);
+
+    // Best is exactly one point AND it's eligible.
+    const best = res.payrollRollingSeries.find((p) => p.isBest);
+    expect(best).toBeDefined();
+    expect(best!.isBenchmarkEligible).toBe(true);
+    expect(best!.label).toBe('Jun – Aug 2025');
+  });
+
+  it('no payroll spend: series is empty', () => {
+    const res = computeCore(MODEL, buildTxns(arr(30000), arr(3000)), REF_DATE);
+    expect(res.payrollRollingSeries).toEqual([]);
+  });
+
+  it('no sustained run: current point still present, no isBest point', () => {
+    // Payroll appears only as scattered single months — no 3-consecutive-month
+    // sustained run ⇒ firstActiveMonth has no Payroll entry ⇒ best fields
+    // stay null. The series still includes the current window so the chart
+    // can render today; no point carries isBest.
+    const revenue = arr(30000);
+    const payroll = arr(0);
+    payroll[3] = 6000; payroll[10] = 6000; payroll[22] = 6000; // scattered, no K=3 run
+    const res = computeCore(MODEL, buildPayrollTxns(revenue, payroll), REF_DATE);
+
+    expect(res.payrollBestPct).toBeNull();
+    expect(res.payrollBestWindowLabel).toBeNull();
+    expect(res.payrollTodayPct).not.toBeNull();
+
+    const current = res.payrollRollingSeries.find((p) => p.isCurrent);
+    expect(current).toBeDefined();
+    expect(current!.payrollPct).toBe(res.payrollTodayPct);
+
+    // No best marker exists.
+    expect(res.payrollRollingSeries.some((p) => p.isBest)).toBe(false);
+    // And every point is ineligible (no firstActive entry for Payroll).
+    expect(res.payrollRollingSeries.every((p) => !p.isBenchmarkEligible)).toBe(true);
+  });
+});
+
 describe('computeEfficiencyOpportunities — sustained-tracking gate', () => {
   // A category is benchmark-ready only after its first run of
   // SUSTAINED_TRACKING_MIN_MONTHS = 3 consecutive months with at least one
