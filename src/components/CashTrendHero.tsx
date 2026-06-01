@@ -186,7 +186,8 @@ function CashTrendSparkline({ bars }: { bars: CashTrendBar[] }) {
     },
     // Cumulative trajectory — smoothing softens the month-to-month
     // shoulders without inventing data points (Apex `smooth` is a
-    // standard spline through the 6 cumulative values).
+    // standard spline through the 7 plotted points: the $0 baseline
+    // plus the 6 month-end cumulative totals).
     stroke: { curve: 'smooth', width: 2, colors: [color] },
     fill: {
       type: 'gradient',
