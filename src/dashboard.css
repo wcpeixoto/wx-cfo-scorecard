@@ -518,6 +518,19 @@ body {
   left: 0;
 }
 
+/* Centered variant — anchors the panel's centre under the trigger. Use when
+   the trigger sits in the HORIZONTAL CENTRE of its container (e.g. the
+   Monthly Net Cash Flow help icon, which lives in the centre group of the
+   chart header inside an `overflow: hidden` card). A left- or right-anchored
+   panel opens toward one card edge and gets clipped at narrow widths where
+   the card's half-width drops below the panel width; centring keeps it
+   symmetric and inside the card across the full responsive range. */
+.cashflow-tooltip-panel.is-centered {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 /* Tooltip content layout — Projected Cash Balance pattern is the standard.
    Each section is a title row (small bullet + bold title) followed by an
    indented body line (no bullet). Body sits tight under its title; the
@@ -1674,6 +1687,21 @@ body {
   left: 0;
   right: auto;
   width: 320px;
+}
+
+/* Net Profit Target is the RIGHTMOST of the three decision cards
+   (`.forecast-decision-grid`, repeat(3, 1fr)). Above 960px the trigger
+   sits in the right third of the viewport, so the panel must open LEFTWARD
+   (toward page centre) — that is the `.cashflow-tooltip-panel` base
+   (`right: 0`), so no override is needed here. At/below 960px the grid
+   collapses to one column (see line ~4177), the card spans full width and
+   the trigger hugs the LEFT edge, so the panel must open rightward. Mirrors
+   the `.bv-card-tooltip-panel` breakpoint logic. */
+@media (max-width: 960px) {
+  .cashflow-tooltip-panel.forecast-target-tooltip-panel {
+    right: auto;
+    left: 0;
+  }
 }
 
 .forecast-decision-value {
@@ -11236,13 +11264,27 @@ body {
    The viewport-based clamp keeps it from overflowing on mobile, where
    the card spans the full viewport minus page padding. */
 .db-tooltip-panel.bv-card-tooltip-panel {
-  /* .is-left modifier on JSX now provides `left: 0; right: auto`. */
+  /* Direction is layout-dependent and must follow the
+     `.forecast-chart-row.has-side` breakpoint (960px):
+     - ABOVE 960px the BV card is the narrow right slot (1/4 of the row),
+       so the trigger sits in the RIGHT portion of the viewport. The panel
+       must open LEFTWARD (toward page centre) or it runs off the right
+       edge — the bug in the screenshot. This is the .db-tooltip-panel
+       base (`right: 0`), so no override needed here.
+     - AT/BELOW 960px the card is full-width and the trigger hugs the LEFT
+       edge, so it must open rightward — handled in the max-width:960 block. */
   min-width: 0;
-  /* 240px (down from 300) fits split-screen / stage-manager arrangements
-     where the browser's visible width is reduced below the full BV card.
-     Viewport clamp guards even narrower devices. */
+  /* 240px (down from 300) keeps the panel inside the visible area on
+     narrow / split-screen widths. Viewport clamp guards even narrower. */
   max-width: min(240px, calc(100vw - 48px));
   width: max-content;
+}
+
+@media (max-width: 960px) {
+  .db-tooltip-panel.bv-card-tooltip-panel {
+    right: auto;
+    left: 0;
+  }
 }
 
 .bv-card-tooltip-paragraph {

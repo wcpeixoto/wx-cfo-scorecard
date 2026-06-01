@@ -723,7 +723,7 @@ export function BusinessValuationCard({
             <span
               id={sdeTooltipId}
               role="tooltip"
-              className="db-tooltip-panel is-wide bv-card-tooltip-panel is-left"
+              className="db-tooltip-panel is-wide bv-card-tooltip-panel"
             >
               {SDE_METHOD_TOOLTIP_PARAGRAPHS.map((para, idx) => (
                 <p
