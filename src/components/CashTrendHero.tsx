@@ -7,11 +7,15 @@
  *
  * Body content: dominant metric line, status-driven interpretation line,
  * and a single proof line. A compact area sparkline sits in the right
- * column of the header rendering the actual 6 monthly net-cash values;
- * it carries one signal only — is the 6-month direction worsening? —
- * leaving the pill to carry state. No visible label above the sparkline;
- * the chart container carries a three-state accessible name instead
- * (worsening / improving / stable).
+ * column of the header rendering the running CUMULATIVE net cash over
+ * the same 6 months — the chart's end-point matches the direction of
+ * the hero number (t6mNetCash) so the visual reinforces the headline
+ * instead of carrying an independent slope signal. Color stays driven
+ * by the monthly best-fit slope (red below the worsening threshold,
+ * brand-blue otherwise) so a positive cumulative with a sharply
+ * deteriorating month-over-month trend still reads as a warning.
+ * No visible label above the sparkline; the chart container carries a
+ * three-state accessible name instead (worsening / improving / stable).
  *
  * Layout is a 2-column CSS grid on .cth-card. Row 1: title block (col 1)
  * + pill (col 2). Row 2: metric block (col 1, bottom-aligned) + sparkline
@@ -49,27 +53,13 @@ import { chartTokens } from '../lib/ui/chartTokens';
 // deferred).
 const WORSENING_SLOPE_PER_MONTH = -1500;
 
-// Mirror of the worsening threshold, used only for the three-state
-// accessible label (worsening / improving / stable). The visual stays
-// two-color (red below the worsening threshold, brand-blue otherwise);
-// the assistive label gets the extra "improving" state so screen-reader
-// and color-blind users hear direction without requiring a visible green.
-const IMPROVING_SLOPE_PER_MONTH = 1500;
-
 const TREND_MIN_MONTHS = 6;
 
-// Flat-fallback threshold (dollars). The sparkline shows the linear
-// best-fit trend over 6 months; "flat" means the trend's total movement
-// across the window — |slope| × 6 — is under $500. That's a trend so
-// shallow it isn't worth amplifying as a visible diagonal: render a
-// centered horizontal line at the trend midpoint instead. Rendering-only
-// — independent of the slope-based color rule above. (Math note:
-// |slope|×6 < $500 implies |slope| < ~$83/mo, well below the worsening
-// threshold of -$1,500/mo. Flat and red cannot co-occur on real data;
-// the independence is a property of the code paths, not an observed
-// combination.)
-const FLAT_RANGE_THRESHOLD = 500;
-const FLAT_VISUAL_HALF_WINDOW = 1000;
+// Defensive y-axis half-window for the degenerate case where every month
+// is exactly zero (cumulative series collapses to a flat 0-line). The
+// real series has natural variance and pads from its own min/max — this
+// constant only kicks in when rawRange === 0.
+const DEGENERATE_Y_HALF_WINDOW = 1000;
 
 type Props = {
   result: CashTrendResult;
@@ -119,66 +109,51 @@ function leastSquaresSlope(values: number[]): { slope: number; intercept: number
   return { slope, intercept };
 }
 
-function ariaLabelForSlope(slope: number): string {
-  if (slope <= WORSENING_SLOPE_PER_MONTH) {
-    return 'Cash trend over 6 months — direction worsening';
+function ariaLabelForCumulative(cumulative: number[]): string {
+  const end = cumulative[cumulative.length - 1] ?? 0;
+  // Scale the per-month worsening threshold (-$1,500/mo) to the full
+  // 6-month window so the three-state label tracks the cumulative
+  // end-point at the same magnitude the color rule uses for monthly
+  // slope. Improving threshold mirrors the worsening one (symmetric).
+  const sigThreshold = Math.abs(WORSENING_SLOPE_PER_MONTH) * cumulative.length;
+  if (end <= -sigThreshold) {
+    return 'Cumulative cash over 6 months — direction worsening';
   }
-  if (slope >= IMPROVING_SLOPE_PER_MONTH) {
-    return 'Cash trend over 6 months — direction improving';
+  if (end >= sigThreshold) {
+    return 'Cumulative cash over 6 months — direction improving';
   }
-  return 'Cash trend over 6 months — stable';
+  return 'Cumulative cash over 6 months — stable';
 }
 
 function CashTrendSparkline({ bars }: { bars: CashTrendBar[] }) {
-  const values = bars.map((b) => b.netCash);
-  const { slope, intercept } = leastSquaresSlope(values);
+  // Color rule (unchanged) — least-squares slope of the MONTHLY net-cash
+  // values, red below the worsening threshold. Slope is computed on the
+  // monthly series, not the cumulative one, so a positive cumulative with
+  // a sharply deteriorating month-over-month trend still reads red.
+  const monthlyValues = bars.map((b) => b.netCash);
+  const { slope } = leastSquaresSlope(monthlyValues);
   const isWorsening = slope <= WORSENING_SLOPE_PER_MONTH;
   const color = isWorsening ? chartTokens.error : chartTokens.brand;
 
-  // Best-fit endpoints — the entire visual is the linear trend, not the
-  // monthly noise. The neighbor "Monthly Net Cash Flow" chart already
-  // carries the month-by-month shape; this card communicates direction.
-  const n = values.length;
-  const startY = intercept;
-  const endY = intercept + (n - 1) * slope;
+  // Series — running cumulative net cash. The 6th point equals t6mNetCash
+  // shown in the hero, so the chart's vertical end-position matches the
+  // direction of the headline number.
+  let cum = 0;
+  const cumulative = monthlyValues.map((v) => (cum += v));
 
-  // Flat-rule: total movement across the 6-month window. Compared against
-  // FLAT_RANGE_THRESHOLD ($500) so a near-zero slope doesn't get amplified
-  // into a visible diagonal by the 15%-padded y-axis.
-  const visualTraversal = Math.abs(slope) * 6;
-  const isFlat = visualTraversal < FLAT_RANGE_THRESHOLD;
-
-  let series: number[];
-  let chartMin: number;
-  let chartMax: number;
-  if (isFlat) {
-    const mid = (startY + endY) / 2;
-    series = [mid, mid];
-    chartMin = mid - FLAT_VISUAL_HALF_WINDOW;
-    chartMax = mid + FLAT_VISUAL_HALF_WINDOW;
-  } else {
-    series = [startY, endY];
-    // Y-axis anchored to the RAW monthly values (not the best-fit
-    // endpoint range), so visual magnitude tracks the dollars the
-    // business actually moves month-to-month — not the slope's own
-    // narrow internal range. A modest slope on noisy data renders as
-    // a near-flat line within a wide window; a strong slope still
-    // looks strong because the endpoints span more of the same window.
-    const rawMin = Math.min(...values);
-    const rawMax = Math.max(...values);
-    const rawRange = rawMax - rawMin;
-    if (rawRange === 0) {
-      // Defensive: all 6 values identical → slope is 0 → the isFlat
-      // branch above already handles this. Guard left in to avoid a
-      // degenerate zero-padding y-axis if that invariant ever shifts.
-      const mid = (startY + endY) / 2;
-      chartMin = mid - FLAT_VISUAL_HALF_WINDOW;
-      chartMax = mid + FLAT_VISUAL_HALF_WINDOW;
-    } else {
-      chartMin = rawMin - 0.15 * rawRange;
-      chartMax = rawMax + 0.15 * rawRange;
-    }
-  }
+  // Y-axis spans the cumulative range and always includes 0, so "ending
+  // net up" vs "ending net down" reads as the line finishing above or
+  // below the visual baseline. 15% padding on both sides keeps the line
+  // off the container edges.
+  const rawMin = Math.min(0, ...cumulative);
+  const rawMax = Math.max(0, ...cumulative);
+  const rawRange = rawMax - rawMin;
+  const chartMin = rawRange === 0
+    ? rawMin - DEGENERATE_Y_HALF_WINDOW
+    : rawMin - 0.15 * rawRange;
+  const chartMax = rawRange === 0
+    ? rawMax + DEGENERATE_Y_HALF_WINDOW
+    : rawMax + 0.15 * rawRange;
 
   const options: ApexOptions = {
     chart: {
@@ -192,18 +167,19 @@ function CashTrendSparkline({ bars }: { bars: CashTrendBar[] }) {
     },
     // Anchor the area's lower edge at the chart canvas bottom (= the
     // sparkline container bottom = the supporting-metric baseline)
-    // instead of the Apex default of zero. With the raw-anchored y-axis
-    // (chartMin well below the line), the default-baseline fill would
-    // collapse to a sliver; `fillTo: 'end'` makes it a proper trapezoid
-    // anchored to the line, fading down via the gradient below.
+    // instead of the Apex default of zero. With the y-axis padded below
+    // the line, the default-baseline fill would collapse to a sliver;
+    // `fillTo: 'end'` makes it a proper trapezoid anchored to the line,
+    // fading down via the gradient below.
     plotOptions: {
       area: {
         fillTo: 'end',
       },
     },
-    // Two-point best-fit line — straight by construction; smoothing has no
-    // effect on a single segment, declared `straight` for clarity.
-    stroke: { curve: 'straight', width: 2, colors: [color] },
+    // Cumulative trajectory — smoothing softens the month-to-month
+    // shoulders without inventing data points (Apex `smooth` is a
+    // standard spline through the 6 cumulative values).
+    stroke: { curve: 'smooth', width: 2, colors: [color] },
     fill: {
       type: 'gradient',
       gradient: {
@@ -227,9 +203,9 @@ function CashTrendSparkline({ bars }: { bars: CashTrendBar[] }) {
     <div
       className="cth-trend-sparkline"
       role="img"
-      aria-label={ariaLabelForSlope(slope)}
+      aria-label={ariaLabelForCumulative(cumulative)}
     >
-      <ReactApexChart options={options} series={[{ data: series }]} type="area" height={70} />
+      <ReactApexChart options={options} series={[{ data: cumulative }]} type="area" height={70} />
     </div>
   );
 }
