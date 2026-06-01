@@ -163,8 +163,8 @@ export default function PayrollEfficiencyCard({
                   </li>
                   <li><strong>More than your best stretch</strong></li>
                   <li className="db-tooltip-body">
-                    Compares this year's average monthly payroll cost against your lowest 3-month
-                    payroll stretch.
+                    Compares your last 3 completed months against your best 3-month
+                    payroll-to-revenue stretch.
                   </li>
                   <li><strong>Change the target</strong></li>
                   <li className="db-tooltip-body">
