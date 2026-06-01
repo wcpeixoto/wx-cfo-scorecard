@@ -470,6 +470,90 @@ function buildSummary(
   };
 }
 
+export type CsvImportValidationReason = 'malformed-header' | 'no-transactions' | 'parse-errors';
+
+export class CsvImportValidationError extends Error {
+  override readonly name = 'CsvImportValidationError';
+  readonly reason: CsvImportValidationReason;
+  readonly issues: TransactionImportIssue[];
+  readonly parseErrorCount: number;
+  readonly candidateCount: number;
+
+  constructor(
+    reason: CsvImportValidationReason,
+    issues: TransactionImportIssue[],
+    parseErrorCount: number,
+    candidateCount: number,
+  ) {
+    super(buildValidationMessage(reason, issues, parseErrorCount));
+    this.reason = reason;
+    this.issues = issues;
+    this.parseErrorCount = parseErrorCount;
+    this.candidateCount = candidateCount;
+  }
+}
+
+const MAX_VALIDATION_ISSUES = 3;
+
+function buildValidationMessage(
+  reason: CsvImportValidationReason,
+  issues: TransactionImportIssue[],
+  parseErrorCount: number,
+): string {
+  const prefix = 'Import stopped — no data was changed.';
+  if (reason === 'malformed-header') {
+    return `${prefix} The file does not look like a Quicken transaction export (missing required columns: Date, Amount). Check that you exported the right report.`;
+  }
+  if (reason === 'no-transactions') {
+    return `${prefix} No transaction rows were found in this file.`;
+  }
+  const rowWord = parseErrorCount === 1 ? 'row' : 'rows';
+  const head = `${prefix} ${parseErrorCount} ${rowWord} failed to parse and the file was rejected.`;
+  const bullets = issues
+    .slice(0, MAX_VALIDATION_ISSUES)
+    .map((issue) => `  • Line ${issue.lineNumber}: ${issue.message}`);
+  const remaining = parseErrorCount - Math.min(parseErrorCount, MAX_VALIDATION_ISSUES);
+  const tail = remaining > 0 ? [`  + ${remaining} more`] : [];
+  return [head, ...bullets, ...tail].join('\n');
+}
+
+function looksLikeMalformedHeaderError(parseErrors: TransactionImportIssue[]): boolean {
+  if (parseErrors.length !== 1) return false;
+  const only = parseErrors[0];
+  return only.kind === 'parse-error' && /could not locate required columns/i.test(only.message);
+}
+
+export function evaluateImportValidation(
+  candidates: ParsedCandidate[],
+  parseErrors: TransactionImportIssue[],
+): CsvImportValidationError | null {
+  if (candidates.length === 0 && looksLikeMalformedHeaderError(parseErrors)) {
+    return new CsvImportValidationError(
+      'malformed-header',
+      parseErrors.slice(0, MAX_VALIDATION_ISSUES),
+      parseErrors.length,
+      0,
+    );
+  }
+  if (candidates.length === 0) {
+    return new CsvImportValidationError(
+      'no-transactions',
+      parseErrors.slice(0, MAX_VALIDATION_ISSUES),
+      parseErrors.length,
+      0,
+    );
+  }
+  if (parseErrors.length > 0) {
+    return new CsvImportValidationError(
+      'parse-errors',
+      parseErrors.slice(0, MAX_VALIDATION_ISSUES),
+      parseErrors.length,
+      candidates.length,
+    );
+  }
+  return null;
+}
+
 export function computeImportOutcome(
   candidates: ParsedCandidate[],
   parseErrors: TransactionImportIssue[],
@@ -626,6 +710,11 @@ export async function importQuickenReportCsv(file: File): Promise<TransactionImp
   const { candidates, parseErrors, skippedStructuralRows } = parseQuickenReportCsv(text, sourceFileName, importId, importedAtIso);
   if (import.meta.env.DEV) {
     console.log(`[IMPORT] ${file.name}: ${candidates.length} transaction candidates, ${parseErrors.length} parse errors, ${skippedStructuralRows} structural rows skipped (Total/header/separator)`);
+  }
+
+  const validationError = evaluateImportValidation(candidates, parseErrors);
+  if (validationError) {
+    throw validationError;
   }
 
   if (isSharedPersistenceConfigured()) {
