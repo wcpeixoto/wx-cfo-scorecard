@@ -84,6 +84,10 @@ type PeriodCopy = {
   cashProofLabel: string;
   /** Reserve proof-line label for the current value. */
   reserveProofLabel: string;
+  /** Empty-state text for the right-column (period) beat. Period-specific so it
+   *  reads "this month" / "last month"; the long-term beat and the both-empty
+   *  collapse keep the generic NOT_ENOUGH. */
+  notEnoughPeriod: string;
 };
 
 const PERIOD_COPY: Record<SustainTimeframe, PeriodCopy> = {
@@ -95,6 +99,7 @@ const PERIOD_COPY: Record<SustainTimeframe, PeriodCopy> = {
       'Current reserve compares cash after the latest transaction update to the same point one year ago.',
     cashProofLabel: 'Month to date',
     reserveProofLabel: 'Current reserve',
+    notEnoughPeriod: 'Not enough history this month yet.',
   },
   lastMonth: {
     flowSuffix: 'last month',
@@ -104,6 +109,7 @@ const PERIOD_COPY: Record<SustainTimeframe, PeriodCopy> = {
       'Last month compares the closing reserve to the same month-end one year ago.',
     cashProofLabel: 'Last month',
     reserveProofLabel: 'Last month reserve',
+    notEnoughPeriod: 'Not enough history last month yet.',
   },
 };
 
@@ -223,7 +229,7 @@ function revenueEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair, p: Peri
         ? `Revenue about even ${p.flowSuffix}.`
         : mo === 'down'
           ? `Revenue down ${x}% ${p.flowSuffix}.`
-          : NOT_ENOUGH;
+          : p.notEnoughPeriod;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
 
@@ -244,7 +250,7 @@ function costEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair, p: PeriodC
         ? `Spending about even ${p.flowSuffix}.`
         : mo === 'down'
           ? `Spending up ${x}% ${p.flowSuffix}.`
-          : NOT_ENOUGH;
+          : p.notEnoughPeriod;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
 
@@ -267,7 +273,7 @@ function cashResultEvidence(lt: Verdict, mo: Verdict, moMetric: MetricPair, smal
         ? `Monthly result about the same ${p.flowSuffix}.`
         : mo === 'down'
           ? `Monthly result down ${diff} ${p.flowSuffix}.`
-          : NOT_ENOUGH;
+          : p.notEnoughPeriod;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
 
@@ -288,7 +294,7 @@ function reserveEvidence(lt: Verdict, mo: Verdict, moPair: MetricPair, p: Period
         ? `Reserve is about the same ${p.reserveBasis}.`
         : mo === 'down'
           ? `Reserve is ${diff} lower ${p.reserveBasis}.`
-          : NOT_ENOUGH;
+          : p.notEnoughPeriod;
   return twoBeat(longTerm, month, lt === 'none', mo === 'none');
 }
 

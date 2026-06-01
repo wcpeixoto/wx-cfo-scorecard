@@ -677,3 +677,45 @@ describe('timeframe toggle', () => {
     expect(def.evidence).toContain('month to date');
   });
 });
+
+// ── Period-aware empty-state copy ──────────────────────────────────────────────
+// When the long-term beat HAS data but the selected period's window is empty,
+// the period beat reads "Not enough history this month/last month yet." (not the
+// generic). The long-term beat and the both-empty collapse stay generic.
+
+describe('period-aware empty-state copy', () => {
+  const ttmUp = comparison('2026-05', '2025-05', { revenue: metric(540_000, 480_000) }); // +12.5% → long-term up
+
+  it('This Month empty + long-term present → "Not enough history this month yet."', () => {
+    // The live June-1 shape: 12-month trend is up, but the current month has no
+    // data yet → the right column reads the period-specific empty text.
+    const thisMonthCmp = comparison('2026-06', '2025-06', { revenue: metric(0, 50_000), currentMonthCount: 0 });
+    const lastMonthCmp = comparison('2026-05', '2025-05', { revenue: metric(54_000, 37_000) });
+    const rev = buildSustainabilityRows(modelWithSplit(thisMonthCmp, lastMonthCmp, ttmUp, []), [], 'thisMonth').find(
+      (r) => r.label === 'Revenue Momentum',
+    )!;
+    expect(rev.longTerm).toBe('up');
+    expect(rev.period).toBe('none');
+    expect(rev.evidence).toBe('Revenue up over the last 12 months. Not enough history this month yet.');
+  });
+
+  it('Last Month period uses "last month yet." when its window is empty', () => {
+    const thisMonthCmp = comparison('2026-06', '2025-06', { revenue: metric(54_000, 37_000) });
+    const lastMonthCmp = comparison('2026-05', '2025-05', { revenue: metric(0, 50_000), currentMonthCount: 0 });
+    const rev = buildSustainabilityRows(modelWithSplit(thisMonthCmp, lastMonthCmp, ttmUp, []), [], 'lastMonth').find(
+      (r) => r.label === 'Revenue Momentum',
+    )!;
+    expect(rev.longTerm).toBe('up');
+    expect(rev.period).toBe('none');
+    expect(rev.evidence).toBe('Revenue up over the last 12 months. Not enough history last month yet.');
+  });
+
+  it('both beats empty still collapse to the generic "Not enough history yet."', () => {
+    const empty = comparison('2026-06', '2025-06', { revenue: metric(0, 0), currentMonthCount: 0, previousMonthCount: 0 });
+    const ttmEmpty = comparison('2026-05', '2025-05', { revenue: metric(0, 0), currentMonthCount: 0, previousMonthCount: 0 });
+    const rev = buildSustainabilityRows(modelWithSplit(empty, empty, ttmEmpty, []), [], 'thisMonth').find(
+      (r) => r.label === 'Revenue Momentum',
+    )!;
+    expect(rev.evidence).toBe('Not enough history yet.'); // generic — NOT "this month"
+  });
+});
