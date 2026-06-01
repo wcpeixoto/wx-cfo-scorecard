@@ -3460,12 +3460,6 @@ export default function Dashboard() {
 
                   const fmtVarPct = (pct: number) => {
                     const sign = pct >= 0 ? '+' : '-';
-                    const abs = Math.abs(pct).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-                    return `${sign}${abs}%`;
-                  };
-
-                  const fmtVarPctWhole = (pct: number) => {
-                    const sign = pct >= 0 ? '+' : '-';
                     const abs = Math.abs(pct).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
                     return `${sign}${abs}%`;
                   };
@@ -3572,7 +3566,7 @@ export default function Dashboard() {
                                 if (!ma1 || ma1.net === 0) return <td className="projection-var-neutral">&mdash;</td>;
                                 const varPct = ((row.netCashFlow - ma1.net) / Math.abs(ma1.net)) * 100;
                                 const colorClass = varPct > 0 ? 'projection-var-positive' : 'projection-var-negative';
-                                return <td className={colorClass}>{fmtVarPctWhole(varPct)}</td>;
+                                return <td className={colorClass}>{fmtVarPct(varPct)}</td>;
                               })()}
                             </tr>
                           );
@@ -3644,7 +3638,7 @@ export default function Dashboard() {
                             if (tot.net === 0) return <td className="proj-actuals-value">&mdash;</td>;
                             const pct = ((totalForecastNet - tot.net) / Math.abs(tot.net)) * 100;
                             const cls = pct > 0 ? 'projection-var-positive' : 'projection-var-negative';
-                            return <td className={cls}>{fmtVarPctWhole(pct)}</td>;
+                            return <td className={cls}>{fmtVarPct(pct)}</td>;
                           })()}
                         </tr>
                       </tfoot>
