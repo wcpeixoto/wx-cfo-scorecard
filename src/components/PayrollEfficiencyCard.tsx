@@ -208,7 +208,7 @@ export default function PayrollEfficiencyCard({
       <div className="pe-footer">
         <div className="pe-kpi">
           <span className="pe-kpi-value">{revCurrent}</span>
-          <span className="pe-kpi-label">Revenue per $1 payroll</span>
+          <span className="pe-kpi-label">Current year revenue per $1 payroll</span>
           <span className="pe-kpi-helper">Yearly trend best: {revBest}</span>
         </div>
         <div className="pe-kpi">
