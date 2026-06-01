@@ -2,15 +2,12 @@
 // dropdown. Renders ProjectionTableV2 in comparison mode for a single past
 // year, with a segmented year toggle in the header.
 //
-// Drawer pattern is COPIED from EfficiencyDrilldownDrawer, not extracted into
-// a shared primitive. With only two drawers in the codebase, an abstraction
-// would lock in the wrong shared surface. When a third drawer appears, do an
-// extraction pass as its own PR. CSS prefix `pcd-*` keeps the two drawers
-// independent in the meantime.
-import { useEffect } from 'react';
+// Shell chrome (backdrop, Escape, dialog ARIA) comes from <DrawerShell>; this
+// file keeps the `pcd-drawer-*` CSS prefix and owns the header + body content.
 import ProjectionTableV2 from './ProjectionTableV2';
 import type { ScenarioPoint } from '../lib/data/contract';
 import type { PriorYearActualsResult } from '../lib/kpis/priorYearActuals';
+import { DrawerShell } from './DrawerShell';
 
 interface Props {
   compareYear: number;
@@ -37,26 +34,12 @@ export function ProjectionCompareDrawer({
   formatCurrency,
   toMonthLabel,
 }: Props) {
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) onClose();
-  };
-
   return (
-    <div className="pcd-drawer-backdrop" onClick={handleBackdropClick}>
-      <div
-        className="pcd-drawer-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Compare ${currentForecastYear} to ${compareYear}`}
-      >
+    <DrawerShell
+      classPrefix="pcd-drawer"
+      ariaLabel={`Compare ${currentForecastYear} to ${compareYear}`}
+      onClose={onClose}
+    >
         <div className="pcd-drawer-header">
           <button className="pcd-drawer-close" onClick={onClose} aria-label="Close">×</button>
           <h2 className="pcd-drawer-title">Compare {currentForecastYear} to {compareYear}</h2>
@@ -89,7 +72,6 @@ export function ProjectionCompareDrawer({
             toMonthLabel={toMonthLabel}
           />
         </div>
-      </div>
-    </div>
+    </DrawerShell>
   );
 }

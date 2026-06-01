@@ -1,12 +1,10 @@
 // Right-side drawer that drills an Income & Expense bar down to the exact
 // transactions behind it.
 //
-// Mirrors TopExpensesTransactionsDrawer's UX (sort, search, account narrow,
-// CSV export, ESC/backdrop close) but keeps its own `ie-drawer-*` prefix and
-// lives in its own file. With Efficiency, Projection-Compare, Top-Expenses,
-// and this drawer, we now have a fourth surface — close enough to revisit
-// extraction, but locked: copy-with-new-prefix stays, no shared <Drawer>
-// primitive yet.
+// Mirrors TopExpensesTransactionsDrawer's body UX (sort, search, account
+// narrow, CSV export) and now shares the chrome via <DrawerShell> — backdrop,
+// Escape, dialog ARIA. CSS prefix `ie-drawer-*` is preserved; the table,
+// header, and footer all stay in this file because they're content-specific.
 //
 // The source (computeIncomeExpenseRows) owns the math: it hands this drawer
 // the contributing rows, each carrying its already-computed `contribution`.
@@ -16,8 +14,9 @@
 // rows — so it reconciles to the bar the user clicked even on yearly windows
 // (where the chart sums rounded monthly rollups). Once the user narrows, the
 // header switches to the visible-row sum.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { IncomeExpenseRow } from '../lib/kpis/compute';
+import { DrawerShell } from './DrawerShell';
 
 interface Props {
   side: 'income' | 'expense';
@@ -96,18 +95,6 @@ export function IncomeExpenseTransactionsDrawer({
   const [accountFilter, setAccountFilter] = useState<string>('');
   const [search, setSearch] = useState<string>('');
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'date', dir: 'desc' });
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) onClose();
-  };
 
   const accountOptions = useMemo(() => {
     const names = new Set<string>();
@@ -209,15 +196,14 @@ export function IncomeExpenseTransactionsDrawer({
   };
 
   return (
-    <div className="ie-drawer-backdrop" onClick={handleBackdropClick}>
-      <aside
-        className="ie-drawer-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-        data-state={isEmpty ? 'empty' : 'populated'}
-      >
-        <header className="ie-drawer-header">
+    <DrawerShell
+      classPrefix="ie-drawer"
+      ariaLabel={ariaLabel}
+      onClose={onClose}
+      panelAs="aside"
+      panelDataState={isEmpty ? 'empty' : 'populated'}
+    >
+      <header className="ie-drawer-header">
           <div className="ie-drawer-titlerow">
             <h2 className="ie-drawer-title" title={title}>{title}</h2>
             <button className="ie-drawer-close" type="button" onClick={onClose} aria-label="Close">
@@ -338,7 +324,6 @@ export function IncomeExpenseTransactionsDrawer({
             </div>
           </>
         )}
-      </aside>
-    </div>
+    </DrawerShell>
   );
 }

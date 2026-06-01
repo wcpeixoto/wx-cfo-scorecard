@@ -5,9 +5,9 @@
 // 640px flex-column shell (fixed header + controls + footer; the table scrolls
 // with a sticky header), a subtle count·sum verification line with Export in
 // the header, sortable columns, and vendor name/memo truncation. The shell
-// still mirrors EfficiencyDrilldownDrawer / ProjectionCompareDrawer and keeps
-// its own `txn-drawer-*` prefix — no shared <Drawer> primitive yet (Phase 1
-// boundary). A third drawer now exists; a future PR can do the extraction pass.
+// chrome (backdrop, Escape, dialog ARIA) lives in <DrawerShell>; this file
+// keeps the `txn-drawer-*` CSS prefix and owns everything inside the panel
+// (header, controls, table, footer).
 //
 // The source (computeExpenseSlicesWithRows) owns the math: it hands this drawer
 // the contributing rows, each carrying its already-computed `contribution`. The
@@ -15,8 +15,9 @@
 // never knows cashFlowMode. It renders, narrows, searches, sorts, exports, and
 // sums what it is given — sorting only reorders the rows, never changes the set
 // (so the reconciling sum holds).
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ExpenseSliceWithRows } from '../lib/kpis/compute';
+import { DrawerShell } from './DrawerShell';
 
 interface Props {
   slice: ExpenseSliceWithRows;
@@ -95,19 +96,6 @@ export function TopExpensesTransactionsDrawer({ slice, onClose }: Props) {
   const [accountFilter, setAccountFilter] = useState<string>('');
   const [search, setSearch] = useState<string>('');
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'date', dir: 'desc' });
-
-  // Close on ESC.
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) onClose();
-  };
 
   // Account dropdown options = accounts actually present in this slice's rows.
   // The slice is a P&L-domain number computed from all accounts, so we narrow
@@ -212,15 +200,14 @@ export function TopExpensesTransactionsDrawer({ slice, onClose }: Props) {
   };
 
   return (
-    <div className="txn-drawer-backdrop" onClick={handleBackdropClick}>
-      <aside
-        className="txn-drawer-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${slice.name} transactions`}
-        data-state={isEmpty ? 'empty' : 'populated'}
-      >
-        {/* ── Header: slice title + close, then the subtle count·sum + Export ── */}
+    <DrawerShell
+      classPrefix="txn-drawer"
+      ariaLabel={`${slice.name} transactions`}
+      onClose={onClose}
+      panelAs="aside"
+      panelDataState={isEmpty ? 'empty' : 'populated'}
+    >
+      {/* ── Header: slice title + close, then the subtle count·sum + Export ── */}
         <header className="txn-drawer-header">
           <div className="txn-drawer-titlerow">
             <h2 className="txn-drawer-title" title={slice.name}>{slice.name}</h2>
@@ -346,7 +333,6 @@ export function TopExpensesTransactionsDrawer({ slice, onClose }: Props) {
             </div>
           </>
         )}
-      </aside>
-    </div>
+    </DrawerShell>
   );
 }
