@@ -29,8 +29,9 @@
  * topPositiveMonths (for "stronger months" copy):
  *   • Up to 2 calendar months with the highest positive avgNetCash.
  *
- * Advice templating uses ONLY the months produced here — no
- * hardcoded month names in the final copy.
+ * The card's owner-facing advice copy is built in
+ * `CashReserveCalendarCard` from these month lists — this module owns
+ * the math and tiers, not the wording.
  */
 
 import type { MonthlyRollup } from '../data/contract';
@@ -66,8 +67,6 @@ export type CashReserveCalendarResult = {
   watchMonths: CashReserveMonth[];
   /** Up to 2 healthy months with the highest positive avgNetCash. */
   topPositiveMonths: CashReserveMonth[];
-  /** Templated advice sentence; empty string when state === 'low-data'. */
-  advice: string;
 };
 
 const MONTH_SHORT_LABELS = [
@@ -86,12 +85,6 @@ const LOW_DATA_THRESHOLD = WINDOW_MONTHS;
 const TOP_POSITIVE_CAP = 2;
 
 /**
- * Healthy-state fallback copy when zero months in the window drain cash.
- */
-const HEALTHY_FALLBACK_COPY =
-  'Your reserve is in good shape across the year. No structural drain months in the last 24 months.';
-
-/**
  * YYYY-MM token from a Date (local time). Mirrors how MonthlyRollup.month
  * is derived from Txn.month.
  */
@@ -107,56 +100,6 @@ function calendarMonthFromToken(token: string): number | null {
   const n = Number.parseInt(match[1], 10);
   if (!Number.isFinite(n) || n < 1 || n > 12) return null;
   return n;
-}
-
-function joinAnd(labels: string[]): string {
-  if (labels.length === 0) return '';
-  if (labels.length === 1) return labels[0];
-  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
-  return `${labels.slice(0, -1).join(', ')}, and ${labels[labels.length - 1]}`;
-}
-
-function joinOr(labels: string[]): string {
-  if (labels.length === 0) return '';
-  if (labels.length === 1) return labels[0];
-  if (labels.length === 2) return `${labels[0]} or ${labels[1]}`;
-  return `${labels.slice(0, -1).join(', ')}, or ${labels[labels.length - 1]}`;
-}
-
-/**
- * Build the templated "What to do" copy from the three computed
- * month lists. Each sentence is omitted when its list is empty. When
- * all three are empty, returns the healthy-fallback copy.
- */
-function buildAdvice(
-  constrainMonths: CashReserveMonth[],
-  watchMonths: CashReserveMonth[],
-  topPositiveMonths: CashReserveMonth[],
-): string {
-  const constrainNames = constrainMonths.map((m) => m.fullLabel);
-  const watchNames = watchMonths.map((m) => m.fullLabel);
-  const positiveNames = topPositiveMonths.map((m) => m.fullLabel);
-
-  const parts: string[] = [];
-
-  if (constrainNames.length > 0) {
-    parts.push(`Protect cash in ${joinAnd(constrainNames)}.`);
-  }
-  if (positiveNames.length > 0) {
-    parts.push(`Move optional spending to stronger months like ${joinOr(positiveNames)}.`);
-  }
-  if (watchNames.length > 0) {
-    parts.push(`Be careful with big one-time purchases before ${joinAnd(watchNames)}.`);
-  }
-
-  if (parts.length === 0) {
-    // No constrain/watch and also no top-positive months. The card has
-    // data (otherwise we'd be in low-data state) but nothing drains:
-    // render the healthy-fallback copy regardless of positives.
-    return HEALTHY_FALLBACK_COPY;
-  }
-
-  return parts.join(' ');
 }
 
 /**
@@ -188,7 +131,6 @@ export function computeCashReserveCalendar(
       constrainMonths: [],
       watchMonths: [],
       topPositiveMonths: [],
-      advice: '',
     };
   }
 
@@ -246,8 +188,6 @@ export function computeCashReserveCalendar(
     .sort((a, b) => b.avgNetCash - a.avgNetCash)
     .slice(0, TOP_POSITIVE_CAP);
 
-  const advice = buildAdvice(constrainMonths, watchMonths, topPositiveMonths);
-
   return {
     state: 'normal',
     windowMonthCount: window.length,
@@ -255,7 +195,6 @@ export function computeCashReserveCalendar(
     constrainMonths,
     watchMonths,
     topPositiveMonths,
-    advice,
   };
 }
 
