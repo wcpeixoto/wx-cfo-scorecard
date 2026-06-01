@@ -131,8 +131,10 @@ export default function TopCategoriesCard({ slices, total, periodControl }: TopC
         </div>
 
         <ul className="top-categories-legend">
-          {slices.map((slice) => (
-            <li key={slice.name} className="top-categories-legend-item">
+          {slices.map((slice, index) => (
+            // Composite key: a real parent category literally named "Other" could
+            // coexist with the synthetic "Other" residual slice; index keeps them distinct.
+            <li key={`${slice.name}-${index}`} className="top-categories-legend-item">
               <button
                 type="button"
                 className="top-categories-legend-button"
