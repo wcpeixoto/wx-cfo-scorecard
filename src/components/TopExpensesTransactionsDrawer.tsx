@@ -35,12 +35,12 @@ const DEFAULT_DIR: Record<SortKey, SortDir> = {
   account: 'asc',
 };
 
-const COLUMNS: { key: SortKey; label: string; num?: boolean }[] = [
+const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'date', label: 'Date' },
   { key: 'vendor', label: 'Vendor / Memo' },
   { key: 'category', label: 'Category' },
   { key: 'account', label: 'Account' },
-  { key: 'amount', label: 'Amount', num: true },
+  { key: 'amount', label: 'Amount' },
 ];
 
 function round2(value: number): number {
@@ -305,7 +305,7 @@ export function TopExpensesTransactionsDrawer({ slice, onClose }: Props) {
                       return (
                         <th
                           key={col.key}
-                          className={`txn-drawer-th${col.num ? ' txn-drawer-th--num' : ''}${active ? ` is-sorted dir-${sort.dir}` : ''}`}
+                          className={`txn-drawer-th${active ? ` is-sorted dir-${sort.dir}` : ''}`}
                           aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
                         >
                           <button className="txn-drawer-th-sort" type="button" onClick={() => handleSort(col.key)}>

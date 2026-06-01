@@ -9444,7 +9444,6 @@ body {
   padding: 0;
   border-bottom: 1px solid #E4E7EC;
 }
-.txn-drawer-table thead th.txn-drawer-th--num { text-align: right; }
 .dark .txn-drawer-table thead th { background: #1D2939; border-bottom-color: #344054; }
 
 /* Sortable header button fills the cell so the whole header is the hit target. */
@@ -9466,7 +9465,6 @@ body {
 }
 .txn-drawer-th-sort:hover { color: #344054; background: #FCFCFD; }
 .txn-drawer-th-sort:focus-visible { outline: none; color: #344054; box-shadow: inset 0 0 0 2px rgba(70, 95, 255, 0.20); }
-.txn-drawer-th--num .txn-drawer-th-sort { flex-direction: row-reverse; }
 .txn-drawer-table thead th:first-child .txn-drawer-th-sort { padding-left: 18px; }
 .txn-drawer-table thead th:last-child .txn-drawer-th-sort { padding-right: 24px; }
 .dark .txn-drawer-th-sort { color: #9CA3AF; }
