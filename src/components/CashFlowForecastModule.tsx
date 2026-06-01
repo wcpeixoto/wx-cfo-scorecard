@@ -1061,7 +1061,7 @@ export default function CashFlowForecastModule({
             Net Profit Target: {Math.round(effectiveTargetNetMargin * 100)}%
             <span className="cashflow-help">
               <button type="button" className="cashflow-tooltip" aria-label="Net Profit Target explanation">&#9432;</button>
-              <div role="tooltip" className="cashflow-tooltip-panel forecast-target-tooltip-panel">
+              <div role="tooltip" className="cashflow-tooltip-panel forecast-target-tooltip-panel is-left">
                 <ul className="cashflow-tooltip-list">
                   <li className="cashflow-tooltip-body">This shows how much additional monthly revenue is needed to reach your net profit target.</li>
                   <li className="cashflow-tooltip-body">The target percentage is set in Settings.</li>
