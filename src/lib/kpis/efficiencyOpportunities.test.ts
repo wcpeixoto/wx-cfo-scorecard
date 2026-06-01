@@ -195,4 +195,90 @@ describe('computeEfficiencyOpportunities — payroll hero basis (Payroll Efficie
     expect(res.payrollBestPct).toBeNull();
     expect(res.payrollBestWindowLabel).toBeNull();
   });
+
+  it('hero best-stretch respects the #360 firstActiveMonth gate (stays aligned with the gated Payroll row)', () => {
+    // Payroll tracking starts at idx 17 (Jun 2025); idx 0–16 are pre-tracking $0.
+    // Ungated, an all-$0 pre-tracking window would win as a bogus 0% best; with
+    // the gate (mirroring #360's per-row loop) the best is the genuine Jun–Aug
+    // 2025 dip, and the hero fields equal the gated Money Left Payroll row.
+    const revenue = arr(30000);
+    const payroll = set(set(arr(0), [17, 18, 19], 6000), [20, 21, 22, 23], 9000);
+    const res = computeCore(MODEL, buildPayrollTxns(revenue, payroll), REF_DATE);
+    const row = res.rows.find((r) => r.category === 'Payroll');
+
+    expect(row).toBeDefined();
+    // Gate excludes the pre-tracking $0 windows → best is the real dip, not 0%.
+    expect(res.payrollBestPct).toBe(20);
+    expect(res.payrollBestWindowLabel).toBe('Jun – Aug 2025');
+    expect(res.payrollTodayPct).toBe(30);
+    // The alignment invariant: hero fields equal the gated Money Left Payroll row.
+    expect(res.payrollTodayPct).toBe(row!.todayPct);
+    expect(res.payrollBestPct).toBe(row!.bestPct);
+    expect(res.payrollBestWindowLabel).toBe(row!.bestWindow.label);
+  });
+});
+
+describe('computeEfficiencyOpportunities — per-category data presence floor', () => {
+  // Customer Refunds is the real-world motivator: its imported history starts
+  // mid-2025, leaving pre-tracking months at $0. Without the floor, the card
+  // picks one of those zero-padded windows as the 0% "best" benchmark.
+  function buildTxnsWithRefunds(revenue: number[], refunds: number[]): Txn[] {
+    const txns: Txn[] = [];
+    MONTHS.forEach((month, i) => {
+      if (revenue[i] > 0) txns.push(mk(month, 'income', 'Business Income', revenue[i]));
+      if (refunds[i] > 0) txns.push(mk(month, 'expense', 'Customer Refunds', refunds[i]));
+    });
+    return txns;
+  }
+
+  function refundsRow(revenue: number[], refunds: number[]) {
+    const res = computeCore(MODEL, buildTxnsWithRefunds(revenue, refunds), REF_DATE);
+    return { res, row: res.rows.find((r) => r.category === 'Customer Refunds') };
+  }
+
+  it('late-arriving category does not choose a pre-tracking zero-padded best window', () => {
+    // Refunds tracking starts at idx 17 (Jun 2025). Pre-fix, every window in
+    // idx 0–14 sums to $0 spend → ratio 0% → "best" lands on a 2024 window the
+    // gym never actually achieved. Post-fix, candidates are gated to
+    // startIdx ≥ 17 and the best is the genuine Jun–Aug 2025 dip.
+    const revenue = arr(30000);
+    const refunds = set(
+      set(set(arr(0), [17, 18, 19], 200), [20, 21, 22], 500),
+      [23], 1000,
+    );
+    const { row } = refundsRow(revenue, refunds);
+
+    expect(row).toBeDefined();
+    expect(row!.bestWindow.label).toBe('Jun – Aug 2025');
+    expect(row!.bestPct).toBe(1);  // 0.67% rounded
+    expect(row!.todayPct).toBe(2); // 2.22% rounded
+  });
+
+  it('zero-spend window after the category started being tracked is still eligible', () => {
+    // Refunds tracking starts at idx 17 with one $500 txn, then idx 18–20
+    // (Jul–Sep 2025) are genuinely $0 — refunds happen, but not every month.
+    // That window must REMAIN eligible: a $0 month inside an active period is
+    // real efficiency signal, not pre-tracking padding.
+    const revenue = arr(30000);
+    const refunds = set(set(arr(0), [17], 500), [21, 22, 23], 500);
+    const { row } = refundsRow(revenue, refunds);
+
+    expect(row).toBeDefined();
+    expect(row!.bestWindow.label).toBe('Jul – Sep 2025');
+    expect(row!.bestPct).toBe(0);
+  });
+
+  it('full-history category is unaffected: firstActiveMonth = 0 leaves every window eligible', () => {
+    // When a category has txns in every lookback month, firstActiveMonth = 0
+    // and the gate is a no-op. The existing best-window selection runs
+    // unchanged — Apr–Jun 2024 wins as the genuine dip.
+    const revenue = arr(30000);
+    const refunds = set(arr(3000), [3, 4, 5], 1500);
+    const { row } = refundsRow(revenue, refunds);
+
+    expect(row).toBeDefined();
+    expect(row!.bestWindow.label).toBe('Apr – Jun 2024');
+    expect(row!.bestPct).toBe(5);
+    expect(row!.todayPct).toBe(10);
+  });
 });
