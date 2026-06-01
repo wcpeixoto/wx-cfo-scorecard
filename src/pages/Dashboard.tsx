@@ -2627,20 +2627,35 @@ export default function Dashboard() {
     return computeExpenseSlices(periodTxns, profitabilityCashFlowMode);
   }, [model.kpiYoYComparisonByTimeframe, topCategoriesTimeframe, filteredTxns, profitabilityCashFlowMode]);
 
-  const kpiVsLabel = useMemo<string>(() => {
+  // Period phrase naming ONLY the prior comparison window. The literal
+  // "vs <prior value>" prefix is composed in the KPI footer (KpiCards.tsx),
+  // so this no longer carries a leading "vs ". Monthly frames resolve the
+  // actual prior month ("in May 2025"); custom names the prior range directly
+  // (never the current range); multi-month frames keep their existing wording.
+  const comparisonPeriodLabel = useMemo<string>(() => {
+    if (kpiTimeframe === 'thisMonth' || kpiTimeframe === 'lastMonth') {
+      const prevStart = model.kpiYoYComparisonByTimeframe[kpiTimeframe]?.previousStartMonth;
+      if (prevStart) return `in ${toMonthLabel(prevStart)}`;
+    }
+    if (kpiTimeframe === 'custom' && customPreviousDateRange) {
+      return formatDateRangeLabel(
+        customPreviousDateRange.startDate,
+        customPreviousDateRange.endDate,
+      );
+    }
     const labels: Record<BigPictureFrameValue, string> = {
-      thisMonth:    'vs same month last year',
-      lastMonth:    'vs same month last year',
-      last3Months:  'vs same 3 months last year',
-      ytd:          'vs prior YTD',
-      ttm:          'vs prior 12 months',
-      last24Months: 'vs prior 24 months',
-      last36Months: 'vs prior 36 months',
-      allDates:     'vs prior period',
-      custom:       'vs prior period',
+      thisMonth:    'same month last year',
+      lastMonth:    'same month last year',
+      last3Months:  'same 3 months last year',
+      ytd:          'prior YTD',
+      ttm:          'prior 12 months',
+      last24Months: 'prior 24 months',
+      last36Months: 'prior 36 months',
+      allDates:     'prior period',
+      custom:       'prior period',
     };
     return labels[kpiTimeframe];
-  }, [kpiTimeframe]);
+  }, [kpiTimeframe, model.kpiYoYComparisonByTimeframe, customPreviousDateRange]);
 
 
   const sustainability = useMemo<SustainabilityRow[]>(
@@ -3185,7 +3200,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="bp-overview-tray">
-                <KpiCards cards={selectedKpiCards} vsLabel={kpiVsLabel} sparklinesById={kpiSparklinesById} />
+                <KpiCards cards={selectedKpiCards} comparisonPeriodLabel={comparisonPeriodLabel} sparklinesById={kpiSparklinesById} />
               </div>
             </header>
 
