@@ -54,6 +54,22 @@ const COLOR_BY_TIER: Record<CashReserveTier, string> = {
   healthy: 'transparent',
 };
 
+/** "April", "April and August", "April, August, and December". */
+function joinAnd(labels: string[]): string {
+  if (labels.length === 0) return '';
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(', ')}, and ${labels[labels.length - 1]}`;
+}
+
+/** "July", "July or March", "July, March, or November". */
+function joinOr(labels: string[]): string {
+  if (labels.length === 0) return '';
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} or ${labels[1]}`;
+  return `${labels.slice(0, -1).join(', ')}, or ${labels[labels.length - 1]}`;
+}
+
 export default function CashReserveCalendarCard({ monthlyRollups, referenceDate }: Props) {
   const tooltipId = useId();
   const result = useMemo(
@@ -217,6 +233,24 @@ export default function CashReserveCalendarCard({ monthlyRollups, referenceDate 
 
   const series = [{ name: 'Cash drain', data: drainData }];
 
+  // Owner-facing advice copy. Built here (not in the selector) from the
+  // month lists the selector produces:
+  //   • weak     = constrain + watch, re-sorted to calendar order so the
+  //                merged list reads naturally ("April and August").
+  //   • critical = constrain only.
+  //   • stronger = topPositive.
+  const weakMonths = [...result.constrainMonths, ...result.watchMonths].sort(
+    (a, b) => a.monthNumber - b.monthNumber,
+  );
+  const weakLabel = joinAnd(weakMonths.map((m) => m.fullLabel));
+  const criticalLabel = joinAnd(result.constrainMonths.map((m) => m.fullLabel));
+  const strongerLabel = joinOr(result.topPositiveMonths.map((m) => m.fullLabel));
+
+  const delaySpendingSentence =
+    result.topPositiveMonths.length > 0
+      ? `Move optional purchases or large non-urgent payments away from weak months and into stronger months like ${strongerLabel} when possible.`
+      : 'Move optional purchases or large non-urgent payments away from weak months when possible.';
+
   return (
     <article className="crc-card">
       {header}
@@ -226,8 +260,38 @@ export default function CashReserveCalendarCard({ monthlyRollups, referenceDate 
       </div>
 
       <div className="crc-advice">
-        <div className="crc-advice-label">What to do</div>
-        <p className="crc-advice-body">{result.advice}</p>
+        {weakMonths.length === 0 ? (
+          <p className="crc-advice-body">
+            Your reserve is in good shape across the year, with no structural
+            drain months in the last 24 months.
+          </p>
+        ) : (
+          <>
+            <div className="crc-advice-block">
+              <div className="crc-advice-label">Protect cash around weak months</div>
+              <p className="crc-advice-body">
+                Build reserve before {weakLabel}; those months usually put the
+                most pressure on cash.
+              </p>
+            </div>
+
+            {result.constrainMonths.length > 0 && (
+              <div className="crc-advice-block">
+                <div className="crc-advice-label">Create cash around critical months</div>
+                <p className="crc-advice-body">
+                  Use campaigns, renewals, prepaid offers, or events around{' '}
+                  {criticalLabel} to bring cash in when the business needs it
+                  most.
+                </p>
+              </div>
+            )}
+
+            <div className="crc-advice-block">
+              <div className="crc-advice-label">Delay flexible spending</div>
+              <p className="crc-advice-body">{delaySpendingSentence}</p>
+            </div>
+          </>
+        )}
       </div>
     </article>
   );

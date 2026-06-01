@@ -66,7 +66,6 @@ describe('computeCashReserveCalendar — low-data state', () => {
     expect(result.constrainMonths).toEqual([]);
     expect(result.watchMonths).toEqual([]);
     expect(result.topPositiveMonths).toEqual([]);
-    expect(result.advice).toBe('');
   });
 
   it('returns low-data state for an empty dataset', () => {
@@ -220,8 +219,8 @@ describe('computeCashReserveCalendar — topPositiveMonths', () => {
   });
 });
 
-describe('computeCashReserveCalendar — advice templating', () => {
-  it('renders all three clauses when constrain, watch, and topPositive all populate', () => {
+describe('computeCashReserveCalendar — month lists consumed by the card', () => {
+  it('surfaces constrain, watch, and topPositive months from one window', () => {
     // Apr constrain (always negative), Aug watch (mixed but negative avg),
     // Jul = sole positive month. Baseline at $0 so only the explicitly
     // positive months can enter topPositiveMonths.
@@ -242,43 +241,33 @@ describe('computeCashReserveCalendar — advice templating', () => {
     rollups.find((r) => r.month === '2025-07')!.netCashFlow = 30000;
 
     const result = computeCashReserveCalendar(rollups, REF_DATE);
-    expect(result.advice).toBe(
-      'Protect cash in April. Move optional spending to stronger months like July. Be careful with big one-time purchases before August.',
-    );
+    expect(result.constrainMonths.map((m) => m.shortLabel)).toEqual(['Apr']);
+    expect(result.watchMonths.map((m) => m.shortLabel)).toEqual(['Aug']);
+    expect(result.topPositiveMonths.map((m) => m.shortLabel)).toEqual(['Jul']);
   });
 
-  it('joins two constrain months with "and"', () => {
+  it('returns two constrain months in calendar order', () => {
     const flat = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [i + 1, 1000]));
     const rollups = buildSeries(2026, 5, 24, flat);
     rollups.filter((r) => r.month.endsWith('-04')).forEach((r) => { r.netCashFlow = -5000; });
     rollups.filter((r) => r.month.endsWith('-08')).forEach((r) => { r.netCashFlow = -5000; });
     const result = computeCashReserveCalendar(rollups, REF_DATE);
     expect(result.constrainMonths.map((m) => m.shortLabel)).toEqual(['Apr', 'Aug']);
-    expect(result.advice).toMatch(/^Protect cash in April and August\./);
   });
 
-  it('joins three+ constrain months with commas and "and"', () => {
+  it('returns three+ constrain months in calendar order', () => {
     const flat = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [i + 1, 1000]));
     const rollups = buildSeries(2026, 5, 24, flat);
     for (const m of ['02', '06', '10']) {
       rollups.filter((r) => r.month.endsWith(`-${m}`)).forEach((r) => { r.netCashFlow = -5000; });
     }
     const result = computeCashReserveCalendar(rollups, REF_DATE);
-    expect(result.advice).toMatch(/^Protect cash in February, June, and October\./);
+    expect(result.constrainMonths.map((m) => m.shortLabel)).toEqual(['Feb', 'Jun', 'Oct']);
   });
 
-  it('joins topPositiveMonths with "or"', () => {
-    const netCash: Record<number, number> = {
-      1: 0, 2: 0, 3: 10000, 4: 0, 5: 0, 6: 0,
-      7: 20000, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0,
-    };
-    const rollups = buildSeries(2026, 5, 24, netCash);
-    const result = computeCashReserveCalendar(rollups, REF_DATE);
-    expect(result.advice).toBe('Move optional spending to stronger months like July or March.');
-  });
-
-  it('omits the constrain sentence when there are no constrain months', () => {
-    // Only a watch month (Aug) and a positive month (Jul).
+  it('returns watch months with no constrain months when history is mixed', () => {
+    // Only a watch month (Aug) and a positive month (Jul); no constrain.
+    // This is the case where the card omits the "critical months" block.
     const flat = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [i + 1, 1000]));
     const rollups = buildSeries(2026, 5, 24, flat);
     rollups.find((r) => r.month === '2024-08')!.netCashFlow = 2000;
@@ -286,19 +275,19 @@ describe('computeCashReserveCalendar — advice templating', () => {
     rollups.find((r) => r.month === '2024-07')!.netCashFlow = 20000;
     rollups.find((r) => r.month === '2025-07')!.netCashFlow = 20000;
     const result = computeCashReserveCalendar(rollups, REF_DATE);
-    expect(result.advice).not.toMatch(/Protect cash/);
-    expect(result.advice).toMatch(/Move optional spending/);
-    expect(result.advice).toMatch(/Be careful with big one-time purchases before August/);
+    expect(result.constrainMonths).toEqual([]);
+    expect(result.watchMonths.map((m) => m.shortLabel)).toEqual(['Aug']);
   });
 
-  it('renders the healthy fallback when every month is healthy and none is positive', () => {
+  it('returns no drain or positive months when every month is flat at zero', () => {
     // Every month exactly zero — healthy everywhere, no positive months,
-    // no constrain, no watch. Must render the locked fallback copy.
+    // no constrain, no watch. The card renders its calm healthy-fallback
+    // sentence in this state.
     const flat = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [i + 1, 0]));
     const rollups = buildSeries(2026, 5, 24, flat);
     const result = computeCashReserveCalendar(rollups, REF_DATE);
-    expect(result.advice).toBe(
-      'Your reserve is in good shape across the year. No structural drain months in the last 24 months.',
-    );
+    expect(result.constrainMonths).toEqual([]);
+    expect(result.watchMonths).toEqual([]);
+    expect(result.topPositiveMonths).toEqual([]);
   });
 });

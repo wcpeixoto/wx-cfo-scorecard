@@ -9878,6 +9878,10 @@ body {
   color: var(--text-primary);
 }
 
+.crc-advice-block + .crc-advice-block {
+  margin-top: 12px;
+}
+
 .dark .crc-card {
   background: #1D2939;
   border-color: #344054;
