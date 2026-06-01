@@ -9348,7 +9348,12 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: 16px;
-  /* Stretch to match the chart neighbor's height (parent uses align-items: stretch). */
+  /* Stretch to match the chart neighbor's height (parent uses align-items: stretch).
+     Pin rows to content height so the extra stretched height collects below
+     the last row instead of inflating row 1 / row 2 — otherwise the body
+     drifts ~100px below the title and the pill centres against an inflated
+     row 1 instead of the title baseline. */
+  align-content: start;
   /* Container query scope for the sparkline (hidden on narrow cards). */
   container-type: inline-size;
 }
@@ -9392,7 +9397,12 @@ body {
   grid-row: 1;
   display: flex;
   flex-direction: row-reverse;
-  align-items: center;
+  /* Pill top-aligns with the title (canonical pattern — see
+     .priority-card-v2__header). With align-content: start on .cth-card,
+     row 1 collapses to title-row + subtitle height; align-items: flex-start
+     puts the pill on the title's line, not centred against the title +
+     subtitle block. */
+  align-items: flex-start;
   gap: 8px;
   flex-shrink: 0;
 }
