@@ -1079,9 +1079,39 @@ body {
 }
 
 .top-categories-legend-item {
+  display: block;
+}
+
+/* The whole legend row is a click target into the transactions drawer (same
+   action as clicking the matching donut arc). Reset native button styling and
+   keep the dot/name/pct layout the item previously held. */
+.top-categories-legend-button {
   display: flex;
   align-items: center;
   gap: 7px;
+  width: 100%;
+  margin: 0;
+  padding: 3px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  border-radius: 6px;
+  transition: background-color 0.15s;
+}
+
+.top-categories-legend-button:hover {
+  background: #F2F4F7;
+}
+
+.top-categories-legend-button:focus-visible {
+  outline: 2px solid #465FFF;
+  outline-offset: 1px;
+}
+
+.dark .top-categories-legend-button:hover {
+  background: rgba(242, 244, 247, 0.08);
 }
 
 .top-categories-legend-dot {
@@ -9135,6 +9165,316 @@ body {
     border-top: 1px solid #E4E7EC;
     border-radius: 20px 20px 0 0;
     transform: translateY(0);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Top Expense Categories — transactions drawer
+   Drills a clicked donut slice (incl. "Other") down to its contributing
+   transactions. Shell pattern mirrors .eff-drawer-* / .pcd-drawer-* (right
+   slide-in on desktop, bottom sheet at 85vh on mobile). CSS prefix `txn-drawer-*`
+   keeps it independent — no shared <Drawer> primitive yet (Phase 1 boundary).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.txn-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(16, 24, 40, 0.25);
+}
+
+.dark .txn-drawer-backdrop {
+  background: rgba(0, 0, 0, 0.40);
+}
+
+.txn-drawer-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: clamp(480px, 52vw, 720px);
+  max-width: 100vw;
+  background: #FFFFFF;
+  border-left: 1px solid #E4E7EC;
+  overflow-y: auto;
+  padding: 24px;
+  pointer-events: auto;
+  transform: translateX(0);
+  animation: txn-drawer-slide-in 0.22s ease-out;
+}
+
+.dark .txn-drawer-panel {
+  background: #1D2939;
+  border-left-color: #344054;
+}
+
+@keyframes txn-drawer-slide-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+/* ─── Header ────────────────────────────────────────────────────────────── */
+.txn-drawer-header {
+  position: relative;
+  margin-bottom: 20px;
+  padding-right: 40px;
+}
+
+.txn-drawer-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  color: #98A2B3;
+  padding: 0;
+  border-radius: 50%;
+  transition: color 0.15s;
+  font-family: inherit;
+}
+
+.txn-drawer-close:hover { color: #667085; }
+.dark .txn-drawer-close { color: #667085; }
+.dark .txn-drawer-close:hover { color: #9CA3AF; }
+
+.txn-drawer-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #101828;
+  line-height: 1.3;
+}
+
+.dark .txn-drawer-title {
+  color: rgba(255, 255, 255, 0.90);
+}
+
+/* Reconciling stat line: count · sum. The sum is the contribution total over
+   visible rows — on first open it equals the clicked slice value. */
+.txn-drawer-stat {
+  margin: 4px 0 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 14px;
+  color: #667085;
+}
+
+.txn-drawer-stat-sum {
+  font-weight: 600;
+  color: #1D2939;
+}
+
+.dark .txn-drawer-stat { color: #9CA3AF; }
+.dark .txn-drawer-stat-sum { color: rgba(255, 255, 255, 0.90); }
+
+/* ─── Controls ──────────────────────────────────────────────────────────── */
+.txn-drawer-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* Inputs/selects: 44px (UI_RULES Control Sizing). */
+.txn-drawer-select,
+.txn-drawer-search {
+  height: 44px;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: 14px;
+  color: #344054;
+  background: #FFFFFF;
+}
+
+.txn-drawer-search {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.txn-drawer-select:focus,
+.txn-drawer-search:focus {
+  outline: none;
+  border-color: #465FFF;
+}
+
+.dark .txn-drawer-select,
+.dark .txn-drawer-search {
+  background: #1D2939;
+  border-color: #344054;
+  color: rgba(255, 255, 255, 0.90);
+}
+
+/* Buttons: 40px secondary card-level (UI_RULES button taxonomy). */
+.txn-drawer-btn {
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.txn-drawer-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.txn-drawer-btn--ghost {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #667085;
+}
+
+.txn-drawer-btn--ghost:not(:disabled):hover {
+  background: #F2F4F7;
+  color: #344054;
+}
+
+.txn-drawer-btn--outline {
+  background: #FFFFFF;
+  border: 1px solid #D0D5DD;
+  color: #344054;
+}
+
+.txn-drawer-btn--outline:not(:disabled):hover {
+  background: #F9FAFB;
+}
+
+.dark .txn-drawer-btn--ghost { color: #9CA3AF; }
+.dark .txn-drawer-btn--ghost:not(:disabled):hover {
+  background: rgba(242, 244, 247, 0.08);
+  color: rgba(255, 255, 255, 0.90);
+}
+.dark .txn-drawer-btn--outline {
+  background: #1D2939;
+  border-color: #344054;
+  color: rgba(255, 255, 255, 0.90);
+}
+.dark .txn-drawer-btn--outline:not(:disabled):hover {
+  background: rgba(242, 244, 247, 0.06);
+}
+
+/* ─── Table ─────────────────────────────────────────────────────────────── */
+.txn-drawer-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.txn-drawer-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  min-width: 520px;
+}
+
+.txn-drawer-col-date     { width: 16%; }
+.txn-drawer-col-vendor   { width: 30%; }
+.txn-drawer-col-category { width: 22%; }
+.txn-drawer-col-account  { width: 18%; }
+.txn-drawer-col-amount   { width: 14%; }
+
+.txn-drawer-th {
+  padding: 6px 8px 6px 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #667085;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+
+.txn-drawer-th--right { text-align: right; }
+
+.dark .txn-drawer-th {
+  color: #9CA3AF;
+  border-bottom-color: #344054;
+}
+
+.txn-drawer-td {
+  padding: 8px 8px 8px 0;
+  font-size: 14px;
+  color: #1D2939;
+  border-bottom: 1px solid #F2F4F7;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+/* Date stays on one line; amount stays on one line and tabular. */
+.txn-drawer-row .txn-drawer-td:first-child { white-space: nowrap; }
+
+.dark .txn-drawer-td {
+  color: rgba(255, 255, 255, 0.80);
+  border-bottom-color: #344054;
+}
+
+.txn-drawer-td--muted { color: #667085; }
+.dark .txn-drawer-td--muted { color: #9CA3AF; }
+
+.txn-drawer-td--right {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Refunds/credits (positive raw amount) read as money returning — honest
+   coloring, not a signal the row is excluded from the slice. */
+.txn-drawer-amount--credit { color: #039855; }
+.dark .txn-drawer-amount--credit { color: #32D583; }
+
+.txn-drawer-row:hover { background: #F9FAFB; }
+.dark .txn-drawer-row:hover { background: rgba(242, 244, 247, 0.04); }
+
+.txn-drawer-empty {
+  padding: 32px 0;
+  text-align: center;
+  font-size: 14px;
+  color: #667085;
+}
+
+.dark .txn-drawer-empty { color: #9CA3AF; }
+
+/* ─── Mobile — bottom sheet ─────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .txn-drawer-panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 85vh;
+    border-left: none;
+    border-top: 1px solid #E4E7EC;
+    border-radius: 20px 20px 0 0;
+    animation: txn-drawer-slide-up 0.22s ease-out;
+  }
+
+  .dark .txn-drawer-panel {
+    border-top-color: #344054;
+  }
+
+  @keyframes txn-drawer-slide-up {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
   }
 }
 

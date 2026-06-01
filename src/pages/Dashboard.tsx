@@ -83,7 +83,7 @@ import {
   buildPrePhase4DebugReport,
   computeDashboardModel,
   computeForecastDecisionSignals,
-  computeExpenseSlices,
+  computeExpenseSlicesWithRows,
   computeKpiComparisons,
   computeMonthlyRollups,
   computeReserveCoverageDelta,
@@ -2627,10 +2627,10 @@ export default function Dashboard() {
     const startMonth = comparison?.currentStartMonth;
     const endMonth = comparison?.currentEndMonth;
     if (!startMonth || !endMonth) {
-      return computeExpenseSlices([], profitabilityCashFlowMode);
+      return computeExpenseSlicesWithRows([], profitabilityCashFlowMode);
     }
     const periodTxns = filteredTxns.filter((txn) => txn.month >= startMonth && txn.month <= endMonth);
-    return computeExpenseSlices(periodTxns, profitabilityCashFlowMode);
+    return computeExpenseSlicesWithRows(periodTxns, profitabilityCashFlowMode);
   }, [model.kpiYoYComparisonByTimeframe, topCategoriesTimeframe, filteredTxns, profitabilityCashFlowMode]);
 
   // Period phrase naming ONLY the prior comparison window. The literal
