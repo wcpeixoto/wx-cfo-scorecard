@@ -2839,7 +2839,7 @@ body {
      'flat' → muted rounded dash .thumb.flat
      'none' → "N/A" muted text   .na
 
-   Pill tone classes (driven by row.thisMonthTone, not row.thisMonth):
+   Pill tone classes (driven by row.periodTone, not row.period):
      'up'/is-up   → green pill   .sustain-pill.is-up
      'down'/is-down → red pill   .sustain-pill.is-down
      'flat'/'none' → gray pill   .sustain-pill.is-flat / .is-none */
@@ -2884,6 +2884,50 @@ body {
   font-weight: 500;
   color: var(--text-primary);
   text-align: center;
+}
+
+/* Right-column period selector. A native <select> styled to read like the
+   column header until hover/focus — keeps keyboard nav, Escape-to-close,
+   outside-click dismissal, and the mobile picker for free. 36px hit target
+   (canonical compact selector height per UI_RULES.md). */
+.sustain-health-head .sustain-h-control {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+}
+.sustain-period-select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 36px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 26px 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23667085' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--text-primary);
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+.sustain-period-select:hover {
+  border-color: var(--border-default, var(--line));
+  background-color: var(--bg-muted, #f6f9ff);
+}
+.sustain-period-select:focus-visible {
+  outline: none;
+  border-color: #A4BCFF;
+  box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.20);
 }
 
 /* Data rows. */
