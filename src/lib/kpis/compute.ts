@@ -1670,6 +1670,66 @@ export function computeExpenseSlicesWithRows(
   return { slices: slicesWithRows, total };
 }
 
+/** A drill-down row: the transaction plus the signed contribution it added to
+ *  the income or expense bar for the window. Consumers display this directly
+ *  and must never recompute the contribution. */
+export type IncomeExpenseRow = { txn: Txn; contribution: number };
+
+export type IncomeExpenseRowsBundle = {
+  income: { value: number; rows: IncomeExpenseRow[] };
+  expense: { value: number; rows: IncomeExpenseRow[] };
+};
+
+/**
+ * Drill-down rows for the Income & Expense card across [startMonth, endMonth].
+ *
+ * Routes membership through the SAME contribution helpers as
+ * `computeMonthlyRollups` — `revenueContribution` + `expenseContribution`. No
+ * donut-style `isCapitalDistributionCategory` re-guard: in operating mode the
+ * contribution helpers already zero capital distributions; in total mode they
+ * appear as expense rows by design, matching the rollup's effective expenses.
+ *
+ * Each row carries the signed contribution that built the bar. Consumers
+ * display it directly — never recompute by calling the contribution helpers.
+ *
+ * Header note: the helper's `value` round2s the contribution sum once at the
+ * end. For yearly windows that can drift sub-cent from the chart's displayed
+ * value (which sums round2'd monthly rollups). Drawer headers should use the
+ * chart's `series[seriesIndex][dataPointIndex]`, not `value` — they're
+ * guaranteed to match the bar the user clicked.
+ */
+export function computeIncomeExpenseRows(
+  txns: Txn[],
+  startMonth: string,
+  endMonth: string,
+  cashFlowMode: CashFlowMode,
+): IncomeExpenseRowsBundle {
+  const incomeRows: IncomeExpenseRow[] = [];
+  const expenseRows: IncomeExpenseRow[] = [];
+
+  txns.forEach((txn) => {
+    if (txn.month < startMonth || txn.month > endMonth) return;
+
+    const rev = revenueContribution(txn);
+    if (Math.abs(rev) > EPSILON) {
+      incomeRows.push({ txn, contribution: rev });
+    }
+
+    const exp = expenseContribution(txn, cashFlowMode);
+    if (Math.abs(exp) > EPSILON) {
+      expenseRows.push({ txn, contribution: exp });
+    }
+  });
+
+  const incomeValue = round2(incomeRows.reduce((sum, r) => sum + r.contribution, 0));
+  const expenseValue = round2(expenseRows.reduce((sum, r) => sum + r.contribution, 0));
+
+  return {
+    income: { value: incomeValue, rows: incomeRows },
+    expense: { value: expenseValue, rows: expenseRows },
+  };
+}
+
 function buildExpenseSlices(txns: Txn[], cashFlowMode: CashFlowMode): ExpenseSlice[] {
   return computeExpenseSlices(txns, cashFlowMode).slices;
 }
