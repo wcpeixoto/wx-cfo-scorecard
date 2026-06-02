@@ -7627,8 +7627,8 @@ body {
 }
 
 /* Three-step blue ramp by confidence: brand700 (real) → brand400 (canonical
-   forecast) → brandSecondary (slider simulation). Mirrors the chart series
-   colors set in OwnerDistributionsChart options. */
+   forecast) → brandSecondary (slider simulation delta). Mirrors the chart
+   series colors set in OwnerDistributionsChart options. */
 .owner-dist-legend-dot.actual {
   background: #2A31D8;
 }
@@ -7637,23 +7637,8 @@ body {
   background: #637AEA;
 }
 
-.owner-dist-legend-dot.forecast.is-simulated {
+.owner-dist-legend-dot.simulated {
   background: #9CB9FF;
-}
-
-/* Informational chip — flags the chart as a slider-driven what-if scenario.
-   Subtle brand tint; NOT a status outcome, so it does not use card-status-badge. */
-.owner-dist-simulated-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-family: Outfit, sans-serif;
-  font-size: 11px;
-  font-weight: 500;
-  color: #3641BB;
-  background: #ECEFFF;
-  white-space: nowrap;
 }
 
 /* Card-level secondary button (40px) — TailAdmin "Secondary" outline style:

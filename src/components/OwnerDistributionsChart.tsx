@@ -23,21 +23,57 @@ type OwnerDistSeries = {
   years: number[];
   actual: number[];
   forecast: number[];
+  /** Positive delta above the canonical forecast, per year. Non-zero only when
+   *  a simulatedProjection is supplied and it produces MORE distributable
+   *  surplus than the canonical projection. Stacks on top of the Forecast bar. */
+  simulated: number[];
   /** Projected full-year distributable capacity for the current year:
-   *  historical YTD actual + current-year forecast surplus. Used by the
-   *  signal pill and target badge. */
+   *  historical YTD actual + current-year forecast + simulated delta. Used by
+   *  the signal pill and target badge — reflects simulation when active. */
   projectedFullYearCapacity: number;
 };
 
+/** Walk one projection and compute year-keyed incremental surplus above the
+ *  reserve floor. Current year = end-of-year cash − reserve floor (matches the
+ *  slider card's payout basis). Future years = YoY end-of-year delta, assuming
+ *  the prior year's surplus was distributed so each year resets to the floor. */
+function surplusByYear(
+  projection: ScenarioPoint[],
+  currentYear: number,
+  reserveTarget: number,
+): { surplus: Map<number, number>; monthsInHorizon: Set<string> } {
+  const endOfYearBalance = new Map<number, number>();
+  const monthsInHorizon = new Set<string>();
+  for (const p of projection) {
+    const y = Number(p.month.slice(0, 4));
+    if (!Number.isFinite(y)) continue;
+    endOfYearBalance.set(y, p.endingCashBalance);
+    monthsInHorizon.add(p.month);
+  }
+  const surplus = new Map<number, number>();
+  for (const [year, endThis] of endOfYearBalance) {
+    if (year === currentYear) {
+      surplus.set(year, Math.max(0, endThis - reserveTarget));
+    } else if (year > currentYear) {
+      const endPrev = endOfYearBalance.get(year - 1);
+      if (endPrev !== undefined) {
+        surplus.set(year, Math.max(0, endThis - endPrev));
+      }
+    }
+  }
+  return { surplus, monthsInHorizon };
+}
+
 /** Historical = actual owner-distribution transactions, by year.
- *  Forecast = incremental distributable surplus above the safety/reserve line,
- *  derived from the shared operating-cash forecast (ScenarioPoint[]). Owner
- *  distributions stay out of the operating forecast itself; their projection
- *  is reconstructed here from "what cash the forecast leaves above reserve." */
+ *  Forecast = canonical distributable surplus above the reserve line.
+ *  Simulated = positive delta from the slider's reprojection above the
+ *  canonical forecast (stacks on top; zero when no simulatedProjection or when
+ *  the slider reduces surplus). */
 function buildOwnerDistSeries(
   transactions: Txn[],
   today: Date,
   forecastProjection: ScenarioPoint[],
+  simulatedProjection: ScenarioPoint[] | undefined,
   reserveTarget: number
 ): OwnerDistSeries {
   const ownerDist = transactions.filter((t) => classifyTxn(t) === 'owner-distribution');
@@ -50,20 +86,19 @@ function buildOwnerDistSeries(
     byYear.set(year, (byYear.get(year) ?? 0) + Math.abs(t.amount));
   }
 
-  // Last forecasted end-of-year cash balance per year inside the horizon.
-  const endOfYearBalance = new Map<number, number>();
-  const monthsInHorizon = new Set<string>();
-  for (const p of forecastProjection) {
-    const y = Number(p.month.slice(0, 4));
-    if (!Number.isFinite(y)) continue;
-    endOfYearBalance.set(y, p.endingCashBalance);
-    monthsInHorizon.add(p.month);
-  }
+  const { surplus: canonicalSurplus, monthsInHorizon } = surplusByYear(
+    forecastProjection,
+    currentYear,
+    reserveTarget,
+  );
+  const simulatedSurplus = simulatedProjection
+    ? surplusByYear(simulatedProjection, currentYear, reserveTarget).surplus
+    : null;
 
   // Show the current year and the next year (next year's forecast is partial —
   // the horizon ends mid-year — but it's still plotted). Beyond next year, only
   // plot a forecast year when the horizon covers its full calendar year (Dec).
-  const forecastYears = [...endOfYearBalance.keys()].filter(
+  const forecastYears = [...canonicalSurplus.keys()].filter(
     (y) =>
       y === currentYear ||
       y === currentYear + 1 ||
@@ -73,42 +108,35 @@ function buildOwnerDistSeries(
   const years = [...yearSet].sort((a, b) => a - b);
 
   const currentYearActual = byYear.get(currentYear) ?? 0;
-  // Current-year forecast surplus uses the SAME basis as the slider card:
-  // end-of-year cash above the Settings-aware reserve floor only. Does NOT
-  // additionally clamp to current cash — that would re-create the "card says
-  // payout, chart shows $0" divergence whenever current cash sits above
-  // reserve.
-  const endOfCurrentYear = endOfYearBalance.get(currentYear);
-  const currentYearForecastSurplus =
-    endOfCurrentYear !== undefined ? Math.max(0, endOfCurrentYear - reserveTarget) : 0;
 
   const actual: number[] = [];
   const forecast: number[] = [];
+  const simulated: number[] = [];
 
   for (const year of years) {
     if (year < currentYear) {
       actual.push(byYear.get(year) ?? 0);
       forecast.push(0);
-    } else if (year === currentYear) {
-      actual.push(currentYearActual);
-      forecast.push(currentYearForecastSurplus);
+      simulated.push(0);
     } else {
-      const endThis = endOfYearBalance.get(year);
-      const endPrev = endOfYearBalance.get(year - 1);
-      if (endThis === undefined || endPrev === undefined) {
-        actual.push(0);
-        forecast.push(0);
-      } else {
-        // Incremental surplus assumes prior-year surplus was distributed,
-        // so the year starts at the reserve line. Floor negative years at 0.
-        actual.push(0);
-        forecast.push(Math.max(0, endThis - endPrev));
-      }
+      const canonical = canonicalSurplus.get(year) ?? 0;
+      const sim = simulatedSurplus?.get(year) ?? canonical;
+      // Simulated bar = positive delta above canonical. If the slider REDUCES
+      // surplus, the canonical Forecast bar still shows; the chart doesn't
+      // currently express below-canonical scenarios (acceptable v1 — the slider
+      // card's hero copy already states when a what-if blocks the payout).
+      actual.push(year === currentYear ? currentYearActual : 0);
+      forecast.push(canonical);
+      simulated.push(Math.max(0, sim - canonical));
     }
   }
 
-  const projectedFullYearCapacity = currentYearActual + currentYearForecastSurplus;
-  return { years, actual, forecast, projectedFullYearCapacity };
+  const currentYearIdx = years.indexOf(currentYear);
+  const currentYearForecast = currentYearIdx >= 0 ? forecast[currentYearIdx] : 0;
+  const currentYearSimulated = currentYearIdx >= 0 ? simulated[currentYearIdx] : 0;
+  const projectedFullYearCapacity =
+    currentYearActual + currentYearForecast + currentYearSimulated;
+  return { years, actual, forecast, simulated, projectedFullYearCapacity };
 }
 
 /** Annual income by calendar year = NET Business Income (Sales + Other Income,
@@ -175,12 +203,13 @@ type Props = {
   distributionTargetAmount?: number;
   distributionActualAmount?: number;
   targetNetMargin?: number;
+  /** Canonical projection — feeds the Forecast bar. */
   forecastProjection: ScenarioPoint[];
+  /** Slider-driven projection (when active). When present and producing more
+   *  distributable surplus than the canonical, the positive delta stacks on
+   *  top as the Simulated bar. */
+  simulatedProjection?: ScenarioPoint[];
   reserveTarget: number;
-  /** True when the forecast projection is a slider-driven what-if rather than
-   *  the canonical projection. Drives a hatched forecast bar + "Simulated" pill
-   *  so the user can tell at a glance they're looking at a scenario. */
-  isSimulated?: boolean;
   onCompareYear?: (year: number) => void;
 };
 
@@ -205,13 +234,15 @@ function getTargetBadgeLabel(
   return TARGET_BADGE_CONFIG[status].label;
 }
 
-export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, distributionActualAmount, targetNetMargin, forecastProjection, reserveTarget, isSimulated = false, onCompareYear }: Props) {
-  const { years, actual, forecast, projectedFullYearCapacity } = buildOwnerDistSeries(
+export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, distributionActualAmount, targetNetMargin, forecastProjection, simulatedProjection, reserveTarget, onCompareYear }: Props) {
+  const { years, actual, forecast, simulated, projectedFullYearCapacity } = buildOwnerDistSeries(
     transactions,
     today,
     forecastProjection,
+    simulatedProjection,
     reserveTarget
   );
+  const hasSimulated = simulated.some((v) => v > 0);
 
   const currentYear = today.getFullYear();
   const titleTooltipId = useId();
@@ -267,13 +298,10 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       background: 'transparent',
     },
     // Three-step blue ramp by confidence: deepest = real (Distribution),
-    // mid = canonical Forecast, softest = slider-driven Simulation.
-    // Simulated state swaps the Forecast color down one rung; bar geometry
-    // and labels are otherwise identical to canonical.
-    colors: [
-      chartTokens.brand700,
-      isSimulated ? chartTokens.brandSecondary : chartTokens.brand400,
-    ],
+    // mid = canonical Forecast, softest = slider-driven Simulation delta.
+    // When no simulation is active, the Simulated series is all zeros so no
+    // third bar segment renders.
+    colors: [chartTokens.brand700, chartTokens.brand400, chartTokens.brandSecondary],
     plotOptions: {
       bar: {
         horizontal: false,
@@ -344,9 +372,10 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         };
         const actualVal = valueByName('Distribution');
         const forecastVal = valueByName('Forecast');
+        const simulatedVal = valueByName('Simulated');
         // Revenue isn't a plotted series — read it from the closure by point index.
         const revenueVal = revenueData[dataPointIndex] ?? 0;
-        const total = actualVal + forecastVal;
+        const total = actualVal + forecastVal + simulatedVal;
         const year = w.globals.labels?.[dataPointIndex] ?? '';
 
         // A future year with no projected surplus to distribute.
@@ -387,17 +416,26 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
           </div>`;
         }
         if (forecastVal > 0) {
-          const forecastDotColor = isSimulated ? chartTokens.brandSecondary : chartTokens.brand400;
           rows += `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
-            ${dot(forecastDotColor)}
+            ${dot(chartTokens.brand400)}
             <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
               <span class="apexcharts-tooltip-text-y-label">Forecast</span>
               <span class="apexcharts-tooltip-text-y-value">${marginPct(forecastVal)}</span>
             </div>
           </div>`;
         }
+        if (simulatedVal > 0) {
+          rows += `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
+            ${dot(chartTokens.brandSecondary)}
+            <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
+              <span class="apexcharts-tooltip-text-y-label">Simulated</span>
+              <span class="apexcharts-tooltip-text-y-value">${marginPct(simulatedVal)}</span>
+            </div>
+          </div>`;
+        }
 
-        const totalRow = (actualVal > 0 && forecastVal > 0)
+        const nonZeroCount = (actualVal > 0 ? 1 : 0) + (forecastVal > 0 ? 1 : 0) + (simulatedVal > 0 ? 1 : 0);
+        const totalRow = nonZeroCount >= 2
           ? `<div class="owl-tooltip-total">
               <span class="owl-tooltip-total-label">Total</span>
               <span class="owl-tooltip-total-value">${marginPct(total)}</span>
@@ -414,11 +452,13 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
     },
   };
 
-  // Stacked bars: Distribution + Forecast. Revenue is not plotted — it
-  // appears only in the bar tooltip.
+  // Stacked bars: Distribution + Forecast + Simulated. Simulated is the
+  // positive delta above canonical, all-zero when no slider what-if is active.
+  // Revenue is not plotted — it appears only in the bar tooltip.
   const series = [
     { name: 'Distribution', data: actual },
     { name: 'Forecast', data: forecast },
+    { name: 'Simulated', data: simulated },
   ];
 
   return (
@@ -462,15 +502,16 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
               Distribution
             </span>
             <span className="owner-dist-legend-item">
-              <span className={`owner-dist-legend-dot forecast${isSimulated ? ' is-simulated' : ''}`}></span>
-              {isSimulated ? 'Forecast (simulated)' : 'Forecast'}
+              <span className="owner-dist-legend-dot forecast"></span>
+              Forecast
             </span>
+            {hasSimulated && (
+              <span className="owner-dist-legend-item">
+                <span className="owner-dist-legend-dot simulated"></span>
+                Simulated
+              </span>
+            )}
           </div>
-          {isSimulated && (
-            <span className="owner-dist-simulated-pill" aria-label="Simulated scenario">
-              Simulated
-            </span>
-          )}
         </div>
         <div className="owner-dist-chart">
           <Chart options={options} series={series} type="bar" height={210} />
