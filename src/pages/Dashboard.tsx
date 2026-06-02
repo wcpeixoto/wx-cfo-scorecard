@@ -24,6 +24,7 @@ import { NextOwnerDistributionCardLab } from '../components/NextOwnerDistributio
 import { SecondaryPrioritiesLab } from '../components/SecondaryPrioritiesLab';
 import { CfoAssistantCard } from '../components/CfoAssistantCard';
 import { ProjectionCompareDrawer } from '../components/ProjectionCompareDrawer';
+import { TransactionSearchDrawer } from '../components/TransactionSearchDrawer';
 import { EfficiencyOpportunitiesCard } from '../components/EfficiencyOpportunitiesCard';
 import { BusinessValuationCard } from '../components/BusinessValuationCard';
 import {
@@ -784,7 +785,7 @@ export default function Dashboard() {
   const location = useLocation();
   const activeTab: TabId = pathToTab(location.pathname);
   const { setMobileOpen } = useSidebar();
-  const [query, setQuery] = useState('');
+  const [searchDrawerInitial, setSearchDrawerInitial] = useState<string | null>(null);
   const [netChartTimeframe, setNetChartTimeframe] = useState<TrendTimeframeOption>(12);
   const bigPictureFilterMenuRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
@@ -1238,10 +1239,8 @@ export default function Dashboard() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const cashFlow = parseCashFlowMode(params.get('cf'));
-    const nextQuery = params.get('q');
 
     setNetCashFlowChartMode(cashFlow ?? 'operating');
-    setQuery(nextQuery ?? '');
   }, [location.search]);
 
   const activeDataSet = importedDataSet;
@@ -1313,19 +1312,6 @@ export default function Dashboard() {
         });
     }
   }, [accountRecords, sharedAccountSettingsHasRemoteData, sharedAccountSettingsReady, sharedPersistenceEnabled]);
-
-  const filteredTxns = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return baseTxns;
-
-    return baseTxns.filter((txn) => {
-      const joined = [txn.payee, txn.category, txn.memo, txn.account]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return joined.includes(needle);
-    });
-  }, [baseTxns, query]);
 
   const availableMonths = useMemo(
     () =>
@@ -1455,23 +1441,23 @@ export default function Dashboard() {
   const model = useMemo(
     () => {
       const kpiT0 = performance.now();
-      const result = computeDashboardModel(filteredTxns, {
+      const result = computeDashboardModel(baseTxns, {
         cashFlowMode: profitabilityCashFlowMode,
         anchorMonth: previousCalendarMonth ?? undefined,
         thisMonthAnchor: currentCalendarMonth,
         currentCashBalance,
       });
-      if (import.meta.env.DEV && !bootPhaseLoggedRef.current.kpi && filteredTxns.length > 0) {
+      if (import.meta.env.DEV && !bootPhaseLoggedRef.current.kpi && baseTxns.length > 0) {
         bootPhaseLoggedRef.current.kpi = true;
         console.log('[BOOT] KPI compute:', Math.round(performance.now() - kpiT0), 'ms');
       }
       return result;
     },
-    [currentCalendarMonth, currentCashBalance, filteredTxns, previousCalendarMonth, profitabilityCashFlowMode]
+    [currentCalendarMonth, currentCashBalance, baseTxns, previousCalendarMonth, profitabilityCashFlowMode]
   );
   const efficiencyResult = useMemo(
-    () => computeEfficiencyOpportunities(model, filteredTxns),
-    [model, filteredTxns]
+    () => computeEfficiencyOpportunities(model, baseTxns),
+    [model, baseTxns]
   );
 
   // Business Valuation — SDE-method composer. Pure selector over
@@ -1591,13 +1577,13 @@ export default function Dashboard() {
   }, [cashTrendData, currentCashBalance, model.monthlyRollups, model.runway.reserveTarget]);
   const netCashFlowChartModel = useMemo(
     () =>
-      computeDashboardModel(filteredTxns, {
+      computeDashboardModel(baseTxns, {
         cashFlowMode: netCashFlowChartMode,
         anchorMonth: previousCalendarMonth ?? undefined,
         thisMonthAnchor: currentCalendarMonth,
         currentCashBalance,
       }),
-    [currentCalendarMonth, currentCashBalance, filteredTxns, netCashFlowChartMode, previousCalendarMonth]
+    [currentCalendarMonth, currentCashBalance, baseTxns, netCashFlowChartMode, previousCalendarMonth]
   );
   const customPreviousDateRange = useMemo(
     () => previousEquivalentDateRange(parseDateToken(customStartDate), parseDateToken(customEndDate)),
@@ -1608,14 +1594,14 @@ export default function Dashboard() {
     const startDate = parseDateToken(customStartDate);
     const endDate = parseDateToken(customEndDate);
     if (!startDate || !endDate || startDate > endDate) return [];
-    return filteredTxns.filter((txn) => txn.date >= startDate && txn.date <= endDate);
-  }, [customEndDate, customStartDate, filteredTxns, kpiTimeframe]);
+    return baseTxns.filter((txn) => txn.date >= startDate && txn.date <= endDate);
+  }, [customEndDate, customStartDate, baseTxns, kpiTimeframe]);
   const customPreviousTxns = useMemo(() => {
     if (kpiTimeframe !== 'custom' || !customPreviousDateRange) return [];
-    return filteredTxns.filter(
+    return baseTxns.filter(
       (txn) => txn.date >= customPreviousDateRange.startDate && txn.date <= customPreviousDateRange.endDate
     );
-  }, [customPreviousDateRange, filteredTxns, kpiTimeframe]);
+  }, [customPreviousDateRange, baseTxns, kpiTimeframe]);
   const customCurrentModel = useMemo(
     () =>
       kpiTimeframe === 'custom'
@@ -1728,7 +1714,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
-    const debug = buildPrePhase4DebugReport(model.monthlyRollups, filteredTxns);
+    const debug = buildPrePhase4DebugReport(model.monthlyRollups, baseTxns);
 
     const trendValidationRows = TREND_TIMEFRAMES.flatMap((timeframe) => {
       const scopedTrend = timeframe === 'all' ? model.trend : model.trend.slice(-timeframe);
@@ -1771,7 +1757,7 @@ export default function Dashboard() {
       });
     });
 
-    const runEdgeCase = (label: string, txnsForCase: typeof filteredTxns, caseCashFlowMode: CashFlowMode) => {
+    const runEdgeCase = (label: string, txnsForCase: typeof baseTxns, caseCashFlowMode: CashFlowMode) => {
       try {
         const caseModel = computeDashboardModel(txnsForCase, {
           cashFlowMode: caseCashFlowMode,
@@ -1798,19 +1784,18 @@ export default function Dashboard() {
 
     const oppositeCashFlowMode: CashFlowMode = netCashFlowChartMode === 'operating' ? 'total' : 'operating';
     const edgeCaseRows = [
-      runEdgeCase('Short history (1 month)', filteredTxns.slice(-1), profitabilityCashFlowMode),
-      runEdgeCase('Short history (2 months)', filteredTxns.slice(-2), profitabilityCashFlowMode),
-      runEdgeCase('All dates window', filteredTxns, profitabilityCashFlowMode),
+      runEdgeCase('Short history (1 month)', baseTxns.slice(-1), profitabilityCashFlowMode),
+      runEdgeCase('Short history (2 months)', baseTxns.slice(-2), profitabilityCashFlowMode),
+      runEdgeCase('All dates window', baseTxns, profitabilityCashFlowMode),
       {
         case: 'Rapid timeframe switch simulation',
         status: 'ok',
         simulatedTimeframes: TREND_TIMEFRAMES.map((item) => `${item}m`).join(', '),
       },
-      runEdgeCase('Search filter applied (live state)', filteredTxns, profitabilityCashFlowMode),
-      runEdgeCase(`Chart Cash Flow toggled (${oppositeCashFlowMode})`, filteredTxns, oppositeCashFlowMode),
+      runEdgeCase(`Chart Cash Flow toggled (${oppositeCashFlowMode})`, baseTxns, oppositeCashFlowMode),
     ];
 
-    const matchedCapitalDistribution = filteredTxns.filter(
+    const matchedCapitalDistribution = baseTxns.filter(
       (txn) => txn.type === 'expense' && isCapitalDistributionCategory(txn.category)
     );
     const matchedExpenseTotal = matchedCapitalDistribution.reduce((sum, txn) => sum + txn.amount, 0);
@@ -1905,8 +1890,7 @@ export default function Dashboard() {
     console.info('Context', {
       profitabilityCashFlowMode,
       netCashFlowChartMode,
-      searchQuery: query,
-      rowCount: filteredTxns.length,
+      rowCount: baseTxns.length,
       latestMonthFromRollups: debug.latestMonthFromRollups || 'n/a',
       maxMonthFromTxns: debug.maxMonthFromTxns || 'n/a',
       latestMonthUsesMaxDate: debug.latestMonthUsesMaxDate,
@@ -1934,7 +1918,7 @@ export default function Dashboard() {
       matchedExpenseTotal,
     });
 
-    const sanity = runDataSanityChecks(filteredTxns, model.monthlyRollups, profitabilityCashFlowMode);
+    const sanity = runDataSanityChecks(baseTxns, model.monthlyRollups, profitabilityCashFlowMode);
     const sanityLog = sanity.verdict === 'OK' ? console.info : console.error;
     sanityLog(`[Data Sanity] ${sanity.verdict} — ${sanity.passCount} passed, ${sanity.failCount} failed`);
     console.table(sanity.checks.map((c) => ({
@@ -1950,14 +1934,13 @@ export default function Dashboard() {
     }
     console.groupEnd();
   }, [
-    filteredTxns,
+    baseTxns,
     model.cashFlowForecastModelNotes,
     model.cashFlowForecastSeries,
     model.monthlyRollups,
     model.trend,
     netCashFlowChartMode,
     profitabilityCashFlowMode,
-    query,
   ]);
 
   useEffect(() => {
@@ -2095,7 +2078,7 @@ export default function Dashboard() {
       const cadenceProj = projectCategoryCadenceScenario(
         model,
         composerInput,
-        filteredTxns,
+        baseTxns,
         currentCashBalance,
         []
       );
@@ -2111,7 +2094,7 @@ export default function Dashboard() {
       }
       return composed;
     },
-    [filteredTxns, currentCashBalance, businessRules.forecastPosture, businessRules.scenarioBaseRevenueGrowthPct, businessRules.scenarioBaseExpenseChangePct, forecastRangeMonths, model, scenarioInput]
+    [baseTxns, currentCashBalance, businessRules.forecastPosture, businessRules.scenarioBaseRevenueGrowthPct, businessRules.scenarioBaseExpenseChangePct, forecastRangeMonths, model, scenarioInput]
   );
 
   // Active forecast at the user-selected horizon. 2Y/3Y horizons extend the
@@ -2174,7 +2157,7 @@ export default function Dashboard() {
     const cadenceProj = projectCategoryCadenceScenario(
       model,
       composerInput,
-      filteredTxns,
+      baseTxns,
       currentCashBalance,
       []
     );
@@ -2228,7 +2211,7 @@ export default function Dashboard() {
     businessRules.scenarioBaseRevenueGrowthPct,
     businessRules.scenarioBaseExpenseChangePct,
     expandedForecastEvents,
-    filteredTxns,
+    baseTxns,
     currentCashBalance,
     model,
   ]);
@@ -2347,7 +2330,7 @@ export default function Dashboard() {
     const cadenceProj = projectCategoryCadenceScenario(
       model,
       composerInput,
-      filteredTxns,
+      baseTxns,
       currentCashBalance,
       []
     );
@@ -2400,7 +2383,7 @@ export default function Dashboard() {
     // >= 15 months (ownerPayExpandedEvents). Empty events → input unchanged.
     return applyEventsOverlay(result.points, ownerPayExpandedEvents);
   }, [
-    filteredTxns,
+    baseTxns,
     currentCashBalance,
     forecastScenarioPresets,
     businessRules.scenarioBaseRevenueGrowthPct,
@@ -2446,7 +2429,7 @@ export default function Dashboard() {
       const cadenceProj = projectCategoryCadenceScenario(
         model,
         composerInput,
-        filteredTxns,
+        baseTxns,
         currentCashBalance,
         []
       );
@@ -2496,7 +2479,7 @@ export default function Dashboard() {
       return applyEventsOverlay(result.points, ownerPayExpandedEvents);
     },
     [
-      filteredTxns,
+      baseTxns,
       currentCashBalance,
       forecastScenarioPresets,
       businessRules.scenarioBaseRevenueGrowthPct,
@@ -2567,8 +2550,8 @@ export default function Dashboard() {
   }, [model.kpiHeaderLabelByTimeframe, selectedHeaderComparisonLabel, selectedKpiFrameLabel]);
 
   const whatNeedsAttention = useMemo(
-    () => computeWhatNeedsAttention(filteredTxns),
-    [filteredTxns]
+    () => computeWhatNeedsAttention(baseTxns),
+    [baseTxns]
   );
   const cashTrendResult = useMemo(
     () => computeCashTrend(model.monthlyRollups),
@@ -2629,9 +2612,9 @@ export default function Dashboard() {
     if (!startMonth || !endMonth) {
       return computeExpenseSlicesWithRows([], profitabilityCashFlowMode);
     }
-    const periodTxns = filteredTxns.filter((txn) => txn.month >= startMonth && txn.month <= endMonth);
+    const periodTxns = baseTxns.filter((txn) => txn.month >= startMonth && txn.month <= endMonth);
     return computeExpenseSlicesWithRows(periodTxns, profitabilityCashFlowMode);
-  }, [model.kpiYoYComparisonByTimeframe, topCategoriesTimeframe, filteredTxns, profitabilityCashFlowMode]);
+  }, [model.kpiYoYComparisonByTimeframe, topCategoriesTimeframe, baseTxns, profitabilityCashFlowMode]);
 
   // Period phrase naming ONLY the prior comparison window. The literal
   // "vs <prior value>" prefix is composed in the KPI footer (KpiCards.tsx),
@@ -2709,13 +2692,11 @@ export default function Dashboard() {
       next: {
         tab: TabId;
         cashFlow: CashFlowMode;
-        queryText?: string;
       },
       mode: 'push' | 'replace' = 'push'
     ) => {
       const params = new URLSearchParams();
       if (next.cashFlow !== 'operating') params.set('cf', next.cashFlow);
-      if (next.queryText?.trim()) params.set('q', next.queryText.trim());
 
       const path = TAB_TO_PATH[next.tab] ?? '/';
       const searchString = params.toString();
@@ -2732,10 +2713,9 @@ export default function Dashboard() {
       writeDashboardUrlState({
         tab: nextTab,
         cashFlow: netCashFlowChartMode,
-        queryText: query,
       });
     },
-    [netCashFlowChartMode, query, writeDashboardUrlState]
+    [netCashFlowChartMode, writeDashboardUrlState]
   );
 
   const handleImportCsvSelection = useCallback(
@@ -2894,11 +2874,17 @@ export default function Dashboard() {
       <AppSidebar />
       <div className="app-main-column">
         <AppHeader
-          query={query}
-          onQueryChange={setQuery}
+          onSubmit={(value) => setSearchDrawerInitial(value)}
           updatedLabel={lastUpdatedLabel}
           onUpdatedClick={() => navigateToTab('settings')}
         />
+        {searchDrawerInitial !== null && (
+          <TransactionSearchDrawer
+            txns={baseTxns}
+            initialSearch={searchDrawerInitial}
+            onClose={() => setSearchDrawerInitial(null)}
+          />
+        )}
       <section className="main-zone">
         {bootLoadError && (
           <div className="dashboard-load-error" role="alert">
@@ -3069,7 +3055,7 @@ export default function Dashboard() {
         {hasImportedData && activeTab === 'today' && (
           <TodayPage
             model={model}
-            txns={filteredTxns}
+            txns={baseTxns}
             forecastProjection={scenarioProjection}
             negativeCashMonth={todayRunOutNegativeCashMonth}
             ownerPayProjection={ownerPayProjection}
@@ -3227,7 +3213,7 @@ export default function Dashboard() {
             <div className="two-col-grid two-col-grid--income-expense">
               <IncomeExpenseCard
                 monthlyRollups={model.monthlyRollups}
-                txns={filteredTxns}
+                txns={baseTxns}
                 cashFlowMode={profitabilityCashFlowMode}
               />
               <TopCategoriesCard
@@ -5040,7 +5026,7 @@ export default function Dashboard() {
               <p className="ui-lab-section-subtitle">Ranked secondary-priority cards (Cash Flow / Revenue / etc.). Moved off the Today page; rendered here live from the same signal → rank pipeline.</p>
               <SecondaryPrioritiesLab
                 model={model}
-                txns={filteredTxns}
+                txns={baseTxns}
                 forecastProjection={scenarioProjection}
               />
             </div>
@@ -5051,7 +5037,7 @@ export default function Dashboard() {
               <div className="ui-lab-preview-width--medium">
                 <CfoAssistantCard
                   model={model}
-                  txns={filteredTxns}
+                  txns={baseTxns}
                   forecastProjection={scenarioProjection}
                 />
               </div>

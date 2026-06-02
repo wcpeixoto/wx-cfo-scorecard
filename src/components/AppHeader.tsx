@@ -1,16 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { FiRefreshCw, FiSearch } from 'react-icons/fi';
 import { useSidebar } from '../context/SidebarContext';
 
 type AppHeaderProps = {
-  query: string;
-  onQueryChange: (value: string) => void;
+  onSubmit: (value: string) => void;
   updatedLabel?: string | null;
   onUpdatedClick?: () => void;
 };
 
-export function AppHeader({ query, onQueryChange, updatedLabel, onUpdatedClick }: AppHeaderProps) {
+export function AppHeader({ onSubmit, updatedLabel, onUpdatedClick }: AppHeaderProps) {
   const { toggleMobile, isMobileOpen, toggleCollapsed, isCollapsed } = useSidebar();
+  const [value, setValue] = useState('');
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -25,9 +25,17 @@ export function AppHeader({ query, onQueryChange, updatedLabel, onUpdatedClick }
   };
 
   const handleSearchBlur = () => {
-    if (!query) {
+    if (!value) {
       setIsMobileSearchOpen(false);
     }
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    event.preventDefault();
+    onSubmit(trimmed);
   };
 
   return (
@@ -80,8 +88,9 @@ export function AppHeader({ query, onQueryChange, updatedLabel, onUpdatedClick }
           <input
             ref={searchInputRef}
             type="search"
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={handleKeyDown}
             onBlur={handleSearchBlur}
             placeholder="Search payee, category, memo..."
             aria-label="Search transactions"
@@ -106,8 +115,9 @@ export function AppHeader({ query, onQueryChange, updatedLabel, onUpdatedClick }
           <FiSearch className="app-header-search-icon" aria-hidden="true" />
           <input
             type="search"
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Search payee, category, memo..."
             aria-label="Search transactions"
           />
