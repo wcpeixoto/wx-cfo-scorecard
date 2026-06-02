@@ -1007,7 +1007,7 @@ body {
 
 .kpi-vs-label {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--text-secondary);
   white-space: nowrap;
 }
@@ -12045,7 +12045,7 @@ body {
   align-items: flex-end;
   justify-content: space-between;
   gap: 8px;
-  min-height: 44px;
+  min-height: 70px;
 }
 
 .bp-overview-tray .kpi-value-row .kpi-value {
