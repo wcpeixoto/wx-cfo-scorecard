@@ -5,23 +5,18 @@
 // the effective reserve floor (Settings-fixed-aware, identical to the
 // Forecast safety-line rule). All decision logic lives in the pure helper.
 //
-// The slider is session-only: useState resets to 0 on reload. It re-feeds
-// computeNextOwnerDistribution with a fresh projection at the chosen growth
-// rate — the helper itself is never modified.
+// The slider is controlled by TodayPage so the OwnerDistributions chart can
+// react to the same simulation. Session-only: parent resets to 0 on reload.
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useId } from 'react';
 import type { ScenarioPoint } from '../lib/data/contract';
 import { formatCompact } from '../lib/utils/formatCompact';
-import {
-  computeNextOwnerDistribution,
-  REQUIRED_SERIES_LENGTH,
-} from '../lib/data/nextOwnerDistribution';
+import { computeNextOwnerDistribution } from '../lib/data/nextOwnerDistribution';
 
 // Slider range constants (revenueGrowthPct, percent units).
 const SLIDER_MIN = -10;
 const SLIDER_MAX = 25;
-const SLIDER_NEUTRAL = 0;
 
 // Track tick marks — mirrors the Projected Cash Balance slider
 // (.forecast-slider-tick*). Major ticks at the ends + zero (emphasized);
@@ -86,23 +81,33 @@ function buildResultSentence(
 }
 
 interface NextOwnerDistributionCardProps {
+  /** Canonical base projection; baselineMonthlyRevenue is derived from this
+   *  so the $/mo slider label always reflects the unmodified revenue. */
   ownerPayProjection: ScenarioPoint[];
+  /** Slider-aware projection (may equal ownerPayProjection at neutral).
+   *  Lifted to TodayPage so the OwnerDistributions chart can share it. */
+  activeOwnerPayProjection: ScenarioPoint[];
   reserveFloor: number;
-  reprojectOwnerPay?: (revenueGrowthPct: number) => ScenarioPoint[];
+  sliderValue: number;
+  /** Provided only when reprojection is wired upstream; absent → slider hides. */
+  onSliderValueChange?: (value: number) => void;
 }
 
 export function NextOwnerDistributionCard({
   ownerPayProjection,
+  activeOwnerPayProjection,
   reserveFloor,
-  reprojectOwnerPay,
+  sliderValue,
+  onSliderValueChange,
 }: NextOwnerDistributionCardProps) {
   const tooltipId = useId();
-  const [sliderValue, setSliderValue] = useState<number>(SLIDER_NEUTRAL);
 
-  // Baseline (0% growth) result — the unmodified projection.
-  const baseResult = useMemo(
-    () => computeNextOwnerDistribution(ownerPayProjection, reserveFloor),
-    [ownerPayProjection, reserveFloor]
+  // Display result is computed from whichever projection is active —
+  // TodayPage already guarantees activeOwnerPayProjection satisfies
+  // REQUIRED_SERIES_LENGTH (falls back to base otherwise).
+  const displayResult = useMemo(
+    () => computeNextOwnerDistribution(activeOwnerPayProjection, reserveFloor),
+    [activeOwnerPayProjection, reserveFloor]
   );
 
   // Baseline $/mo: average operatingCashIn across the unmodified projection.
@@ -114,25 +119,6 @@ export function NextOwnerDistributionCard({
     const total = ownerPayProjection.reduce((sum, p) => sum + (p.operatingCashIn ?? 0), 0);
     return total / ownerPayProjection.length;
   }, [ownerPayProjection]);
-
-  // Slider re-projection — only when reprojectOwnerPay is available and
-  // slider is non-zero. Falls back to base projection at neutral.
-  const slidedProjection = useMemo((): ScenarioPoint[] | null => {
-    if (sliderValue === 0 || !reprojectOwnerPay) return null;
-    const proj = reprojectOwnerPay(sliderValue);
-    // Guard: if the pipeline returns < REQUIRED_SERIES_LENGTH for any reason,
-    // fall back to base rather than tripping the throw.
-    if (!proj || proj.length < REQUIRED_SERIES_LENGTH) return null;
-    return proj;
-  }, [sliderValue, reprojectOwnerPay]);
-
-  const slidedResult = useMemo(() => {
-    if (!slidedProjection) return null;
-    return computeNextOwnerDistribution(slidedProjection, reserveFloor);
-  }, [slidedProjection, reserveFloor]);
-
-  // Active display result: slided if available, else base.
-  const displayResult = slidedResult ?? baseResult;
 
   const dollarLabel = formatSliderDollarLabel(sliderValue, baselineMonthlyRevenue);
 
@@ -154,7 +140,7 @@ export function NextOwnerDistributionCard({
         ? 'translateX(-100%)'
         : 'translateX(-50%)';
 
-  const hasSlider = reprojectOwnerPay != null;
+  const hasSlider = onSliderValueChange != null;
 
   return (
     <article className="card nod-card" aria-label="Owner Distribution Forecast">
@@ -232,7 +218,7 @@ export function NextOwnerDistributionCard({
                 max={SLIDER_MAX}
                 step={1}
                 value={sliderValue}
-                onChange={(e) => setSliderValue(Number(e.target.value))}
+                onChange={(e) => onSliderValueChange?.(Number(e.target.value))}
                 className="nod-slider-input"
                 aria-label="Revenue growth adjustment"
               />

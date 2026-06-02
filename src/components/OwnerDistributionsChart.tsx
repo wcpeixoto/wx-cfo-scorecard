@@ -38,8 +38,7 @@ function buildOwnerDistSeries(
   transactions: Txn[],
   today: Date,
   forecastProjection: ScenarioPoint[],
-  reserveTarget: number,
-  currentCashBalance: number
+  reserveTarget: number
 ): OwnerDistSeries {
   const ownerDist = transactions.filter((t) => classifyTxn(t) === 'owner-distribution');
 
@@ -74,10 +73,14 @@ function buildOwnerDistSeries(
   const years = [...yearSet].sort((a, b) => a - b);
 
   const currentYearActual = byYear.get(currentYear) ?? 0;
-  const reserveFloor = Math.max(reserveTarget, currentCashBalance);
+  // Current-year forecast surplus uses the SAME basis as the slider card:
+  // end-of-year cash above the Settings-aware reserve floor only. Does NOT
+  // additionally clamp to current cash — that would re-create the "card says
+  // payout, chart shows $0" divergence whenever current cash sits above
+  // reserve.
   const endOfCurrentYear = endOfYearBalance.get(currentYear);
   const currentYearForecastSurplus =
-    endOfCurrentYear !== undefined ? Math.max(0, endOfCurrentYear - reserveFloor) : 0;
+    endOfCurrentYear !== undefined ? Math.max(0, endOfCurrentYear - reserveTarget) : 0;
 
   const actual: number[] = [];
   const forecast: number[] = [];
@@ -174,7 +177,10 @@ type Props = {
   targetNetMargin?: number;
   forecastProjection: ScenarioPoint[];
   reserveTarget: number;
-  currentCashBalance: number;
+  /** True when the forecast projection is a slider-driven what-if rather than
+   *  the canonical projection. Drives a hatched forecast bar + "Simulated" pill
+   *  so the user can tell at a glance they're looking at a scenario. */
+  isSimulated?: boolean;
   onCompareYear?: (year: number) => void;
 };
 
@@ -199,13 +205,12 @@ function getTargetBadgeLabel(
   return TARGET_BADGE_CONFIG[status].label;
 }
 
-export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, distributionActualAmount, targetNetMargin, forecastProjection, reserveTarget, currentCashBalance, onCompareYear }: Props) {
+export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, distributionActualAmount, targetNetMargin, forecastProjection, reserveTarget, isSimulated = false, onCompareYear }: Props) {
   const { years, actual, forecast, projectedFullYearCapacity } = buildOwnerDistSeries(
     transactions,
     today,
     forecastProjection,
-    reserveTarget,
-    currentCashBalance
+    reserveTarget
   );
 
   const currentYear = today.getFullYear();
@@ -262,6 +267,20 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       background: 'transparent',
     },
     colors: [chartTokens.brand, chartTokens.brandSecondary],
+    // When simulated, render the Forecast series (index 1) with a slanted-line
+    // pattern fill so the what-if reads at a glance. Distribution stays solid.
+    fill: isSimulated
+      ? {
+          type: ['solid', 'pattern'],
+          pattern: {
+            style: 'slantedLines',
+            width: 6,
+            height: 6,
+            strokeWidth: 2,
+          },
+          opacity: 1,
+        }
+      : { type: 'solid', opacity: 1 },
     plotOptions: {
       bar: {
         horizontal: false,
@@ -449,10 +468,15 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
               Distribution
             </span>
             <span className="owner-dist-legend-item">
-              <span className="owner-dist-legend-dot forecast"></span>
-              Forecast
+              <span className={`owner-dist-legend-dot forecast${isSimulated ? ' is-simulated' : ''}`}></span>
+              {isSimulated ? 'Forecast (simulated)' : 'Forecast'}
             </span>
           </div>
+          {isSimulated && (
+            <span className="owner-dist-simulated-pill" aria-label="Simulated scenario">
+              Simulated
+            </span>
+          )}
         </div>
         <div className="owner-dist-chart">
           <Chart options={options} series={series} type="bar" height={210} />
