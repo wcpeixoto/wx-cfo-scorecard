@@ -175,6 +175,10 @@ type Props = {
   forecastProjection: ScenarioPoint[];
   reserveTarget: number;
   currentCashBalance: number;
+  /** True when the forecast projection is a slider-driven what-if rather than
+   *  the canonical projection. Drives a hatched forecast bar + "Simulated" pill
+   *  so the user can tell at a glance they're looking at a scenario. */
+  isSimulated?: boolean;
   onCompareYear?: (year: number) => void;
 };
 
@@ -199,7 +203,7 @@ function getTargetBadgeLabel(
   return TARGET_BADGE_CONFIG[status].label;
 }
 
-export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, distributionActualAmount, targetNetMargin, forecastProjection, reserveTarget, currentCashBalance, onCompareYear }: Props) {
+export default function OwnerDistributionsChart({ transactions, today = new Date(), distributionStatus, distributionTargetAmount, distributionActualAmount, targetNetMargin, forecastProjection, reserveTarget, currentCashBalance, isSimulated = false, onCompareYear }: Props) {
   const { years, actual, forecast, projectedFullYearCapacity } = buildOwnerDistSeries(
     transactions,
     today,
@@ -262,6 +266,20 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       background: 'transparent',
     },
     colors: [chartTokens.brand, chartTokens.brandSecondary],
+    // When simulated, render the Forecast series (index 1) with a slanted-line
+    // pattern fill so the what-if reads at a glance. Distribution stays solid.
+    fill: isSimulated
+      ? {
+          type: ['solid', 'pattern'],
+          pattern: {
+            style: 'slantedLines',
+            width: 6,
+            height: 6,
+            strokeWidth: 2,
+          },
+          opacity: 1,
+        }
+      : { type: 'solid', opacity: 1 },
     plotOptions: {
       bar: {
         horizontal: false,
@@ -449,10 +467,15 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
               Distribution
             </span>
             <span className="owner-dist-legend-item">
-              <span className="owner-dist-legend-dot forecast"></span>
-              Forecast
+              <span className={`owner-dist-legend-dot forecast${isSimulated ? ' is-simulated' : ''}`}></span>
+              {isSimulated ? 'Forecast (simulated)' : 'Forecast'}
             </span>
           </div>
+          {isSimulated && (
+            <span className="owner-dist-simulated-pill" aria-label="Simulated scenario">
+              Simulated
+            </span>
+          )}
         </div>
         <div className="owner-dist-chart">
           <Chart options={options} series={series} type="bar" height={210} />

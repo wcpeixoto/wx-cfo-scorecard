@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
 import type { CashTrendDeltaResult } from '../lib/data/cashTrendDelta';
 import type { ReserveCoverageDelta } from '../lib/kpis/compute';
@@ -7,6 +7,7 @@ import { CashOnHandCard } from './CashOnHandCard';
 import { OperatingReserveCard } from './OperatingReserveCard';
 import { OwnerDistributionsCard } from './OwnerDistributionsCard';
 import { NextOwnerDistributionCard } from './NextOwnerDistributionCard';
+import { REQUIRED_SERIES_LENGTH } from '../lib/data/nextOwnerDistribution';
 
 type ReprojectOwnerPay = (revenueGrowthPct: number) => ScenarioPoint[];
 
@@ -29,6 +30,26 @@ interface TodayPageProps {
 }
 
 export function TodayPage({ model, txns, forecastProjection, negativeCashMonth, ownerPayProjection, ownerPayReserveFloor, targetNetMargin, onCompareYear, reprojectOwnerPay, cashTrendData, reserveCoverageDelta }: TodayPageProps) {
+  // Owner-pay slider state — session-only, lifted from NextOwnerDistributionCard
+  // so the OwnerDistributions chart can react to the same simulation. Refresh
+  // wipes it back to neutral by design.
+  const [ownerPaySliderValue, setOwnerPaySliderValue] = useState<number>(0);
+
+  // Active owner-pay projection: base at neutral OR when reproject yields too
+  // few points to satisfy the helper's invariant; otherwise the simulated one.
+  // The neutral fallback is the same shape (ScenarioPoint[]) so downstream
+  // consumers never branch on "simulated vs not."
+  const activeOwnerPayProjection = useMemo<ScenarioPoint[]>(() => {
+    if (ownerPaySliderValue === 0 || !reprojectOwnerPay) return ownerPayProjection;
+    const proj = reprojectOwnerPay(ownerPaySliderValue);
+    if (!proj || proj.length < REQUIRED_SERIES_LENGTH) return ownerPayProjection;
+    return proj;
+  }, [ownerPaySliderValue, reprojectOwnerPay, ownerPayProjection]);
+
+  // True only when the user is actively simulating AND the reproject succeeded.
+  const isOwnerPaySimulated =
+    ownerPaySliderValue !== 0 && activeOwnerPayProjection !== ownerPayProjection;
+
   const distributionStatus = useMemo(() => {
     if (
       !model.monthlyRollups ||
@@ -85,8 +106,10 @@ export function TodayPage({ model, txns, forecastProjection, negativeCashMonth, 
         <div className="today-context-grid">
           <NextOwnerDistributionCard
             ownerPayProjection={ownerPayProjection}
+            activeOwnerPayProjection={activeOwnerPayProjection}
             reserveFloor={ownerPayReserveFloor}
-            reprojectOwnerPay={reprojectOwnerPay}
+            sliderValue={ownerPaySliderValue}
+            onSliderValueChange={reprojectOwnerPay ? setOwnerPaySliderValue : undefined}
           />
           <OwnerDistributionsCard
             transactions={txns}
@@ -94,9 +117,10 @@ export function TodayPage({ model, txns, forecastProjection, negativeCashMonth, 
             distributionTargetAmount={distributionStatus.targetAmount}
             distributionActualAmount={distributionStatus.actualAmount}
             targetNetMargin={targetNetMargin}
-            forecastProjection={forecastProjection}
-            reserveTarget={model.runway.reserveTarget}
+            forecastProjection={activeOwnerPayProjection}
+            reserveTarget={ownerPayReserveFloor}
             currentCashBalance={model.runway.currentCashBalance}
+            isSimulated={isOwnerPaySimulated}
             onCompareYear={onCompareYear}
           />
         </div>
