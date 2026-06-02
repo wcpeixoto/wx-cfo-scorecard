@@ -12045,7 +12045,7 @@ body {
   align-items: flex-end;
   justify-content: space-between;
   gap: 8px;
-  min-height: 70px;
+  min-height: 52px;
 }
 
 .bp-overview-tray .kpi-value-row .kpi-value {
@@ -12055,7 +12055,7 @@ body {
 }
 
 .bp-overview-tray .kpi-card-spark {
-  flex: 0 0 50%;
+  flex: 0 0 37.5%;
   min-width: 0;
 }
 
