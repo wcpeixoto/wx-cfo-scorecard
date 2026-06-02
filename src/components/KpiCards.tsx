@@ -231,7 +231,7 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
                     series={[{ data: spark.data }]}
                     options={buildSparkOptions(spark.color)}
                     width="100%"
-                    height={52}
+                    height={44}
                   />
                 </div>
               )}
