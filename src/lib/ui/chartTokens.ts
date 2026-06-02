@@ -17,6 +17,7 @@ export const chartTokens = {
   brand:           '#465FFF',
   brandSecondary:  '#9CB9FF',
   brand400:        '#637AEA',
+  brand700:        '#2A31D8',
 
   // Semantic
   info:                 '#0BA5EC',

@@ -7626,25 +7626,19 @@ body {
   flex-shrink: 0;
 }
 
+/* Three-step blue ramp by confidence: brand700 (real) → brand400 (canonical
+   forecast) → brandSecondary (slider simulation). Mirrors the chart series
+   colors set in OwnerDistributionsChart options. */
 .owner-dist-legend-dot.actual {
-  background: #465FFF;
+  background: #2A31D8;
 }
 
 .owner-dist-legend-dot.forecast {
-  background: #9CB9FF;
+  background: #637AEA;
 }
 
-/* Simulated forecast: striped variant of the forecast dot — mirrors the
-   slanted-line pattern fill applied to the forecast bars when the slider is
-   active. */
 .owner-dist-legend-dot.forecast.is-simulated {
-  background: repeating-linear-gradient(
-    -45deg,
-    #9CB9FF 0,
-    #9CB9FF 2px,
-    #FFFFFF 2px,
-    #FFFFFF 4px
-  );
+  background: #9CB9FF;
 }
 
 /* Informational chip — flags the chart as a slider-driven what-if scenario.

@@ -266,21 +266,14 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       fontFamily: 'Outfit, sans-serif',
       background: 'transparent',
     },
-    colors: [chartTokens.brand, chartTokens.brandSecondary],
-    // When simulated, render the Forecast series (index 1) with a slanted-line
-    // pattern fill so the what-if reads at a glance. Distribution stays solid.
-    fill: isSimulated
-      ? {
-          type: ['solid', 'pattern'],
-          pattern: {
-            style: 'slantedLines',
-            width: 6,
-            height: 6,
-            strokeWidth: 2,
-          },
-          opacity: 1,
-        }
-      : { type: 'solid', opacity: 1 },
+    // Three-step blue ramp by confidence: deepest = real (Distribution),
+    // mid = canonical Forecast, softest = slider-driven Simulation.
+    // Simulated state swaps the Forecast color down one rung; bar geometry
+    // and labels are otherwise identical to canonical.
+    colors: [
+      chartTokens.brand700,
+      isSimulated ? chartTokens.brandSecondary : chartTokens.brand400,
+    ],
     plotOptions: {
       bar: {
         horizontal: false,
@@ -386,7 +379,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         let rows = '';
         if (actualVal > 0) {
           rows += `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
-            ${dot(chartTokens.brand)}
+            ${dot(chartTokens.brand700)}
             <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
               <span class="apexcharts-tooltip-text-y-label">Distribution</span>
               <span class="apexcharts-tooltip-text-y-value">${marginPct(actualVal)}</span>
@@ -394,8 +387,9 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
           </div>`;
         }
         if (forecastVal > 0) {
+          const forecastDotColor = isSimulated ? chartTokens.brandSecondary : chartTokens.brand400;
           rows += `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
-            ${dot(chartTokens.brandSecondary)}
+            ${dot(forecastDotColor)}
             <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
               <span class="apexcharts-tooltip-text-y-label">Forecast</span>
               <span class="apexcharts-tooltip-text-y-value">${marginPct(forecastVal)}</span>
