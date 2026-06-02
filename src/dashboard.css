@@ -930,7 +930,6 @@ body {
 
 .kpi-card {
   background: var(--bg-panel);
-  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 20px;
   display: flex;
@@ -938,12 +937,12 @@ body {
 }
 
 .kpi-card-header {
-  margin-bottom: 20px;
+  margin-bottom: 28px;
 }
 
 .kpi-label {
   margin: 0 0 6px;
-  color: var(--text-primary);
+  color: #344054;
   font-size: 16px;
   font-weight: 600;
   display: flex;
@@ -962,7 +961,7 @@ body {
   margin: 0;
   font-weight: 600;
   font-size: 30px;
-  line-height: 1.15;
+  line-height: 1;
   color: var(--text-primary);
 }
 
@@ -12056,7 +12055,7 @@ body {
 }
 
 .bp-overview-tray .kpi-card-spark {
-  flex: 0 0 45%;
+  flex: 0 0 50%;
   min-width: 0;
 }
 
