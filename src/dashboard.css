@@ -583,6 +583,13 @@ body {
   margin-top: 8px;
 }
 
+/* Two consecutive body lines (a prose stack with no title between them) get
+   the same section gap so paragraphs don't collide — title→body stays tight
+   at 1px. Matches the `.db-tooltip-list` body→body rule. */
+.cashflow-tooltip-list li.cashflow-tooltip-body + li.cashflow-tooltip-body {
+  margin-top: 8px;
+}
+
 /* Single-section tooltips that don't use the body class still wrap. */
 .cashflow-tooltip-list li:not(.cashflow-tooltip-body) {
   white-space: normal;
@@ -726,6 +733,14 @@ body {
 .db-tooltip-list li.db-tooltip-body + li:not(.db-tooltip-body) {
   margin-top: 8px;
 }
+/* Two consecutive body lines (a prose stack with no title between them) get
+   the same section gap so paragraphs don't collide — while a title→body pair
+   stays tight at 1px (the base `li + li` rule). This is the canonical
+   replacement for the per-panel `li + li { margin-top: 8px }` overrides that
+   also (wrongly) blew out the tight title→body gap. */
+.db-tooltip-list li.db-tooltip-body + li.db-tooltip-body {
+  margin-top: 8px;
+}
 
 /* Show on hover or keyboard focus */
 .db-tooltip-wrap:hover .db-tooltip-panel,
@@ -742,18 +757,13 @@ body {
 }
 
 /* Operating Reserve title tooltip — left-anchored so the panel opens
-   rightward and stays within the narrow reserve card. Two prose
-   paragraphs, so give consecutive body lines real separation. */
+   rightward and stays within the narrow reserve card. */
 .reserve-tooltip-panel {
   right: auto;
   left: 0;
   min-width: 260px;
   max-width: 320px;
   white-space: normal;
-}
-
-.reserve-tooltip-panel .db-tooltip-list li + li {
-  margin-top: 8px;
 }
 
 /* Payroll Efficiency title tooltip — left-anchored so the panel opens
@@ -769,8 +779,7 @@ body {
 }
 
 /* Money Left on the Table title tooltip — left-anchored so the panel opens
-   rightward from the ⓘ (the icon sits near the card's left edge). Four prose
-   lines, so give consecutive lines real separation. */
+   rightward from the ⓘ (the icon sits near the card's left edge). */
 .eff-tooltip-panel {
   right: auto;
   left: 0;
@@ -779,23 +788,14 @@ body {
   white-space: normal;
 }
 
-.eff-tooltip-panel .db-tooltip-list li + li {
-  margin-top: 8px;
-}
-
 /* Cost Spikes to Investigate title tooltip — left-anchored so the panel opens
-   rightward from the ⓘ (the icon sits near the card's left edge). Three prose
-   paragraphs, so give consecutive lines real separation. */
+   rightward from the ⓘ (the icon sits near the card's left edge). */
 .wna-tooltip-panel {
   right: auto;
   left: 0;
   min-width: 260px;
   max-width: 320px;
   white-space: normal;
-}
-
-.wna-tooltip-panel .db-tooltip-list li + li {
-  margin-top: 8px;
 }
 
 /* Sustainability title tooltip — left-anchored so the panel opens rightward
@@ -3083,14 +3083,6 @@ body {
 .sustain-label-tip .db-tooltip-panel {
   right: auto;
   left: 0;
-}
-
-/* Cash / Reserve rows append a proof line as a second .db-tooltip-body <li>.
-   The global rule sets `li + li { margin-top: 1px }` which is too tight for
-   consecutive prose lines — scope a real gap to this panel only so the basis
-   sentence and proof sentence don't collide. */
-.sustain-label-tip .db-tooltip-panel .db-tooltip-list li + li {
-  margin-top: 8px;
 }
 
 .tab-grid,
@@ -6123,10 +6115,6 @@ body {
   min-width: 260px;
   max-width: 320px;
   white-space: normal;
-}
-
-.priority-card-v2__title-tooltip-panel .db-tooltip-list li + li {
-  margin-top: 8px;
 }
 
 .priority-card-v2__amount-row {
@@ -11285,10 +11273,6 @@ body {
   min-width: 260px;
   max-width: 300px;
   white-space: normal;
-}
-
-.crc-tooltip-panel .db-tooltip-list li + li {
-  margin-top: 8px;
 }
 
 .crc-chart {
