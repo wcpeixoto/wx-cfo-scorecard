@@ -9980,13 +9980,13 @@ body {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Transaction Search Drawer (`txn-search-drawer-*`)
-   Opens from the header search input (Enter). Mirrors the I&E drawer's
+   Opens from the header "See Transactions" button. Mirrors the I&E drawer's
    visual chrome — same 640px panel, header, controls row, table, footer,
    and bottom-sheet on narrow viewports. Owns its own period dropdown
-   (Latest Month / Last 3 Months / Year to Date) instead of inheriting
-   the bar's anchored window. CSS is intentionally cloned per the
-   per-surface-prefix convention (the JSX shell + table are already
-   extracted via DrawerShell + TransactionTable).
+   (literal wall-clock windows from Last 7 Days through Custom Range)
+   instead of inheriting the bar's anchored window. CSS is intentionally
+   cloned per the per-surface-prefix convention (the JSX shell + table are
+   already extracted via DrawerShell + TransactionTable).
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .txn-search-drawer-backdrop {
@@ -10117,7 +10117,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   padding: 16px 24px;
   border-bottom: 1px solid #E4E7EC;
 }
@@ -10160,14 +10160,20 @@ body {
 .txn-search-drawer-search::placeholder { color: #98A2B3; }
 
 .txn-search-drawer-select {
-  flex: 0 0 auto;
-  width: 120px;
+  flex: 1 1 110px;
+  min-width: 0;
   appearance: none;
   cursor: pointer;
   padding-right: 30px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
+  text-overflow: ellipsis;
+}
+
+.txn-search-drawer-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .txn-search-drawer-select:focus,
@@ -10217,6 +10223,50 @@ body {
   color: rgba(255, 255, 255, 0.90);
 }
 .dark .txn-search-drawer-btn:not(:disabled):hover { background: rgba(242, 244, 247, 0.06); }
+
+/* Custom date-range row — appears only when the Custom Range period is active */
+.txn-search-drawer-custom-range {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px 16px;
+  border-bottom: 1px solid #E4E7EC;
+}
+.dark .txn-search-drawer-custom-range { border-bottom-color: #344054; }
+
+.txn-search-drawer-date {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 40px;
+  border: 1px solid #E4E7EC;
+  border-radius: 8px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: 14px;
+  color: #1D2939;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.txn-search-drawer-date:focus {
+  outline: none;
+  border-color: #A4BCFF;
+  box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.20);
+}
+.dark .txn-search-drawer-date {
+  background: #1D2939;
+  border-color: #344054;
+  color: rgba(255, 255, 255, 0.90);
+}
+
+.txn-search-drawer-custom-sep {
+  flex: 0 0 auto;
+  color: #98A2B3;
+  font-size: 13px;
+  font-weight: 500;
+}
+.dark .txn-search-drawer-custom-sep { color: #667085; }
 
 .txn-search-drawer-body {
   flex: 1 1 auto;
@@ -10359,9 +10409,24 @@ body {
 .txn-search-drawer-empty-icon svg { width: 26px; height: 26px; }
 .txn-search-drawer-empty-primary { margin: 0; font-size: 16px; font-weight: 600; color: #1D2939; }
 .txn-search-drawer-empty-secondary { margin: 0; max-width: 30ch; font-size: 14px; color: #667085; }
+.txn-search-drawer-empty-meta {
+  margin: 0;
+  font-size: 14px;
+  color: #667085;
+}
+.txn-search-drawer-empty-meta-date {
+  color: #344054;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.txn-search-drawer-empty-cta {
+  margin-top: 14px;
+}
 .dark .txn-search-drawer-empty-icon { background: #344054; color: #9CA3AF; }
 .dark .txn-search-drawer-empty-primary { color: rgba(255, 255, 255, 0.90); }
 .dark .txn-search-drawer-empty-secondary { color: #9CA3AF; }
+.dark .txn-search-drawer-empty-meta { color: #9CA3AF; }
+.dark .txn-search-drawer-empty-meta-date { color: rgba(255, 255, 255, 0.90); }
 
 @media (max-width: 767px) {
   .txn-search-drawer-panel {
