@@ -165,6 +165,11 @@ interface Props {
   sort: SortState;
   /** Fired when a header is clicked; drawer should use `nextSort(prev, key)`. */
   onSort: (key: SortKey) => void;
+  /** Optional override for the empty-state primary line. Defaults to the
+   *  account/search wording used by the slice-derived drawers. */
+  emptyPrimary?: string;
+  /** Optional override for the empty-state secondary line. */
+  emptySecondary?: string;
 }
 
 export function TransactionTable({
@@ -174,6 +179,8 @@ export function TransactionTable({
   isNarrowed,
   sort,
   onSort,
+  emptyPrimary = 'No transactions found for this filter.',
+  emptySecondary = 'Try changing the account or clearing the search.',
 }: Props) {
   const isEmpty = rows.length === 0;
 
@@ -185,8 +192,8 @@ export function TransactionTable({
             <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="8" y1="11" x2="14" y2="11" />
           </svg>
         </div>
-        <p className={`${classPrefix}-empty-primary`}>No transactions found for this filter.</p>
-        <p className={`${classPrefix}-empty-secondary`}>Try changing the account or clearing the search.</p>
+        <p className={`${classPrefix}-empty-primary`}>{emptyPrimary}</p>
+        <p className={`${classPrefix}-empty-secondary`}>{emptySecondary}</p>
       </div>
     );
   }
