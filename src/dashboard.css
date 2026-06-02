@@ -12045,7 +12045,7 @@ body {
   align-items: flex-end;
   justify-content: space-between;
   gap: 8px;
-  min-height: 52px;
+  min-height: 44px;
 }
 
 .bp-overview-tray .kpi-value-row .kpi-value {
