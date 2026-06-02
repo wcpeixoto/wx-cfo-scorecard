@@ -119,7 +119,6 @@ export function TodayPage({ model, txns, forecastProjection, negativeCashMonth, 
             targetNetMargin={targetNetMargin}
             forecastProjection={activeOwnerPayProjection}
             reserveTarget={ownerPayReserveFloor}
-            currentCashBalance={model.runway.currentCashBalance}
             isSimulated={isOwnerPaySimulated}
             onCompareYear={onCompareYear}
           />
