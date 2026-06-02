@@ -12757,3 +12757,112 @@ body {
 }
 
 .dark .bv-teaching-line--strong { color: #12B76A; }
+
+/* ============================================================
+   Gym section — phase-one scaffold (structure only).
+   Reuses .card, .ta-page*, and .settings-subnav* conventions.
+   .gym-* adds only the Churn page layout (sections + card grid).
+   No card internals are styled here — shells only.
+   ============================================================ */
+
+/* Breadcrumb — Gym › Churn */
+.gym-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.gym-breadcrumb-item { color: var(--text-secondary); }
+.gym-breadcrumb-item.is-current { color: var(--text-primary); font-weight: 500; }
+.gym-breadcrumb-sep { color: var(--fg-disabled); }
+
+/* Watch / Patterns section headers (uppercase eyebrow + helper line) */
+.gym-section { margin-bottom: 24px; }
+.gym-section:last-child { margin-bottom: 0; }
+.gym-section-header { margin-bottom: 16px; }
+.gym-section-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+.gym-section-helper {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Card grid — two columns on desktop. Source order is the mobile stack order:
+   full-width cards span both columns, half-width cards pair on one row. */
+.gym-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.gym-card--hero,
+.gym-card--full { grid-column: 1 / -1; }
+.gym-card--half { grid-column: span 1; }
+
+/* Empty card shell — title + subtitle + single placeholder body */
+.gym-card {
+  display: flex;
+  flex-direction: column;
+}
+.gym-card-head { margin-bottom: 16px; }
+.gym-card-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.gym-card-subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.gym-card-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: var(--bg-main);
+}
+.gym-card-placeholder {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg-disabled);
+}
+
+/* Silent Churn — dominant hero shell (taller placeholder body) */
+.gym-card--hero .gym-card-body { min-height: 200px; }
+
+/* Churn by Belt — recessed/lighter; data not connected yet. Stays on the
+   standard white .card surface (UI_CARDS lock); recession is conveyed with
+   reduced opacity + muted text, not a card-outer background change. */
+.gym-card--recessed { opacity: 0.72; }
+.gym-card--recessed .gym-card-title,
+.gym-card--recessed .gym-card-subtitle { color: var(--text-secondary); }
+
+/* Coming-soon stubs — Overview / Membership / Classes */
+.gym-stub-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+.gym-stub-copy {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 767px) {
+  .gym-card-grid { grid-template-columns: minmax(0, 1fr); }
+  .gym-card--half { grid-column: 1 / -1; }
+}

@@ -20,6 +20,7 @@ import TopCategoriesCard from '../components/TopCategoriesCard';
 import PeriodDropdown from '../components/PeriodDropdown';
 import NetCashFlowChart from '../components/NetCashFlowChart';
 import { TodayPage } from '../components/TodayPage';
+import { GymPage } from '../components/GymPage';
 import { NextOwnerDistributionCardLab } from '../components/NextOwnerDistributionCardLab';
 import { SecondaryPrioritiesLab } from '../components/SecondaryPrioritiesLab';
 import { CfoAssistantCard } from '../components/CfoAssistantCard';
@@ -126,6 +127,7 @@ import { chartTokens } from '../lib/ui/chartTokens';
 type TabId =
   | 'today'
   | 'big-picture'
+  | 'gym'
   | 'what-if'
   | 'settings'
   | 'ui-lab';
@@ -144,6 +146,7 @@ type BigPictureFilterFrameValue = Exclude<BigPictureFrameValue, BigPictureVisibl
 const TAB_TO_PATH: Record<TabId, string> = {
   today: '/',
   'big-picture': '/big-picture',
+  gym: '/gym',
   'what-if': '/forecast',
   settings: '/settings',
   'ui-lab': '/ui-lab',
@@ -158,6 +161,8 @@ function pathToTab(pathname: string): TabId {
       return 'today';
     case '/big-picture':
       return 'big-picture';
+    case '/gym':
+      return 'gym';
     case '/forecast':
     case '/what-if':
       return 'what-if';
@@ -3691,6 +3696,8 @@ export default function Dashboard() {
             </article>
           </div>
         )}
+
+        {activeTab === 'gym' && <GymPage />}
 
         {activeTab === 'settings' && (
           <div className="stack-grid">
