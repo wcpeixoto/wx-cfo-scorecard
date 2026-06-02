@@ -785,7 +785,7 @@ export default function Dashboard() {
   const location = useLocation();
   const activeTab: TabId = pathToTab(location.pathname);
   const { setMobileOpen } = useSidebar();
-  const [searchDrawerInitial, setSearchDrawerInitial] = useState<string | null>(null);
+  const [isTxnDrawerOpen, setIsTxnDrawerOpen] = useState(false);
   const [netChartTimeframe, setNetChartTimeframe] = useState<TrendTimeframeOption>(12);
   const bigPictureFilterMenuRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
@@ -2874,15 +2874,14 @@ export default function Dashboard() {
       <AppSidebar />
       <div className="app-main-column">
         <AppHeader
-          onSubmit={(value) => setSearchDrawerInitial(value)}
+          onOpenTransactions={() => setIsTxnDrawerOpen(true)}
           updatedLabel={lastUpdatedLabel}
           onUpdatedClick={() => navigateToTab('settings')}
         />
-        {searchDrawerInitial !== null && (
+        {isTxnDrawerOpen && (
           <TransactionSearchDrawer
             txns={baseTxns}
-            initialSearch={searchDrawerInitial}
-            onClose={() => setSearchDrawerInitial(null)}
+            onClose={() => setIsTxnDrawerOpen(false)}
           />
         )}
       <section className="main-zone">

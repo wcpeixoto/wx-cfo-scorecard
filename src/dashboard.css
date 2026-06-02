@@ -6936,37 +6936,38 @@ body {
   }
 }
 
-.app-header-search {
-  position: relative;
-  flex: 1;
-  max-width: 520px;
-}
-
-.app-header-search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #98A2B3;
-  width: 16px;
-  height: 16px;
-}
-
-.app-header-search input {
-  width: 100%;
-  padding: 10px 12px 10px 36px;
+.app-header-see-txns {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
   border-radius: 8px;
   border: 1px solid #E4E7EC;
   background: #F9FAFB;
-  font-size: 14px;
-  color: #101828;
+  color: #344054;
   font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s, color 0.12s;
 }
-
-.app-header-search input:focus {
-  outline: none;
-  border-color: #465FFF;
+.app-header-see-txns:hover {
   background: #FFFFFF;
+  border-color: #D0D5DD;
+}
+.app-header-see-txns-icon-svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+.dark .app-header-see-txns {
+  background: #1D2939;
+  border-color: #344054;
+  color: rgba(255, 255, 255, 0.90);
+}
+.dark .app-header-see-txns:hover {
+  background: rgba(242, 244, 247, 0.06);
 }
 
 @media (max-width: 1023px) {
@@ -7084,8 +7085,8 @@ body {
   }
 }
 
-/* Search icon button (right cell) */
-.app-header-search-icon-btn {
+/* See-transactions icon button (right cell, mobile) */
+.app-header-see-txns-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7097,37 +7098,11 @@ body {
   cursor: pointer;
   color: #344054;
 }
-.app-header-search-icon-btn:hover {
+.app-header-see-txns-icon:hover {
   background: #F2F4F7;
 }
-
-/* Row 2: search expand (shown when search icon tapped) */
-.app-header-search-row {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  border-bottom: 1px solid #E4E7EC;
-  background: #FFFFFF;
-}
-@media (min-width: 1024px) {
-  .app-header-search-row { display: none; }
-}
-
-.app-header-search-row input {
-  width: 100%;
-  height: 40px;
-  border: 1px solid #E4E7EC;
-  border-radius: 8px;
-  padding: 0 12px;
-  font-size: 14px;
-  color: #101828;
-  background: #FFFFFF;
-  outline: none;
-  font-family: inherit;
-}
-.app-header-search-row input:focus {
-  border-color: #465FFF;
-}
+.dark .app-header-see-txns-icon { color: rgba(255, 255, 255, 0.90); }
+.dark .app-header-see-txns-icon:hover { background: rgba(242, 244, 247, 0.08); }
 
 /* Desktop search bar (hidden on mobile) */
 .app-header-desktop-search {
@@ -10127,21 +10102,17 @@ body {
 .dark .txn-search-drawer-close { color: #9CA3AF; }
 .dark .txn-search-drawer-close:hover { background: rgba(242, 244, 247, 0.08); color: rgba(255, 255, 255, 0.90); }
 
-.txn-search-drawer-summaryrow {
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
 .txn-search-drawer-summary {
-  margin: 0;
+  margin: 8px 0 0;
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 14px;
   color: #667085;
+}
+
+.txn-search-drawer-sum-sep {
+  color: #D0D5DD;
 }
 
 .txn-search-drawer-sum-num {
@@ -10151,7 +10122,16 @@ body {
 }
 
 .dark .txn-search-drawer-summary { color: #9CA3AF; }
+.dark .txn-search-drawer-sum-sep { color: #475467; }
 .dark .txn-search-drawer-sum-num { color: rgba(255, 255, 255, 0.90); }
+
+/* Header actions row — search field (grows) + Export button */
+.txn-search-drawer-headeractions {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
 .txn-search-drawer-controls {
   flex: 0 0 auto;

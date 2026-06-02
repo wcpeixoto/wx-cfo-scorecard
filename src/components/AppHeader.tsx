@@ -1,46 +1,18 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { FiRefreshCw, FiSearch } from 'react-icons/fi';
+import { FiList, FiRefreshCw } from 'react-icons/fi';
 import { useSidebar } from '../context/SidebarContext';
 
 type AppHeaderProps = {
-  onSubmit: (value: string) => void;
+  onOpenTransactions: () => void;
   updatedLabel?: string | null;
   onUpdatedClick?: () => void;
 };
 
-export function AppHeader({ onSubmit, updatedLabel, onUpdatedClick }: AppHeaderProps) {
+export function AppHeader({ onOpenTransactions, updatedLabel, onUpdatedClick }: AppHeaderProps) {
   const { toggleMobile, isMobileOpen, toggleCollapsed, isCollapsed } = useSidebar();
-  const [value, setValue] = useState('');
-  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isMobileSearchOpen) {
-      searchInputRef.current?.focus();
-    }
-  }, [isMobileSearchOpen]);
-
-  const handleSearchIconClick = () => {
-    setIsMobileSearchOpen((prev) => !prev);
-  };
-
-  const handleSearchBlur = () => {
-    if (!value) {
-      setIsMobileSearchOpen(false);
-    }
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== 'Enter') return;
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    event.preventDefault();
-    onSubmit(trimmed);
-  };
 
   return (
     <header className="app-header">
-      {/* Mobile row — hamburger / brand / search icon */}
+      {/* Mobile row — hamburger / brand / see-transactions */}
       <div className="app-header-mobile-row">
         <button
           type="button"
@@ -73,32 +45,15 @@ export function AppHeader({ onSubmit, updatedLabel, onUpdatedClick }: AppHeaderP
         )}
         <button
           type="button"
-          className="app-header-search-icon-btn"
-          aria-label={isMobileSearchOpen ? 'Close search' : 'Open search'}
-          aria-expanded={isMobileSearchOpen}
-          onClick={handleSearchIconClick}
+          className="app-header-see-txns-icon"
+          aria-label="See transactions"
+          onClick={onOpenTransactions}
         >
-          <FiSearch size={20} aria-hidden="true" />
+          <FiList size={20} aria-hidden="true" />
         </button>
       </div>
 
-      {/* Mobile search expand row */}
-      {isMobileSearchOpen && (
-        <div className="app-header-search-row">
-          <input
-            ref={searchInputRef}
-            type="search"
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            onKeyDown={handleKeyDown}
-            onBlur={handleSearchBlur}
-            placeholder="Search payee, category, memo..."
-            aria-label="Search transactions"
-          />
-        </div>
-      )}
-
-      {/* Desktop search — always rendered, hidden below 1024px via CSS */}
+      {/* Desktop row — collapse toggle / See Transactions / updated */}
       <div className="app-header-desktop-search">
         <button
           type="button"
@@ -111,17 +66,14 @@ export function AppHeader({ onSubmit, updatedLabel, onUpdatedClick }: AppHeaderP
             <path fillRule="evenodd" clipRule="evenodd" d="M0.583252 1C0.583252 0.585788 0.919038 0.25 1.33325 0.25H14.6666C15.0808 0.25 15.4166 0.585786 15.4166 1C15.4166 1.41421 15.0808 1.75 14.6666 1.75L1.33325 1.75C0.919038 1.75 0.583252 1.41422 0.583252 1ZM0.583252 11C0.583252 10.5858 0.919038 10.25 1.33325 10.25L14.6666 10.25C15.0808 10.25 15.4166 10.5858 15.4166 11C15.4166 11.4142 15.0808 11.75 14.6666 11.75L1.33325 11.75C0.919038 11.75 0.583252 11.4142 0.583252 11ZM1.33325 5.25C0.919038 5.25 0.583252 5.58579 0.583252 6C0.583252 6.41421 0.919038 6.75 1.33325 6.75L7.99992 6.75C8.41413 6.75 8.74992 6.41421 8.74992 6C8.74992 5.58579 8.41413 5.25 7.99992 5.25L1.33325 5.25Z" fill="currentColor" />
           </svg>
         </button>
-        <div className="app-header-search">
-          <FiSearch className="app-header-search-icon" aria-hidden="true" />
-          <input
-            type="search"
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Search payee, category, memo..."
-            aria-label="Search transactions"
-          />
-        </div>
+        <button
+          type="button"
+          className="app-header-see-txns"
+          onClick={onOpenTransactions}
+        >
+          <FiList className="app-header-see-txns-icon-svg" aria-hidden="true" />
+          See Transactions
+        </button>
         {updatedLabel ? (
           <button
             type="button"
