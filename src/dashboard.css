@@ -10931,7 +10931,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .ie-title {
@@ -10943,14 +10943,14 @@ body {
 
 /* Summary row — three metric blocks on the left, custom legend on the right.
    Replaces the prior footer placement so the chart can own the bottom of the
-   card. The 24px bottom margin sets the gap to the chart. */
+   card. The 16px bottom margin sets the gap to the chart. */
 .ie-summary {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px 24px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .ie-summary-metrics {
@@ -10984,14 +10984,14 @@ body {
 .ie-legend-dot--expense { background: #9CB9FF; }
 
 .ie-chart {
-  min-height: 310px;
+  min-height: 250px;
 }
 
 .ie-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 310px;
+  min-height: 250px;
   font-size: 14px;
   color: var(--text-secondary);
 }

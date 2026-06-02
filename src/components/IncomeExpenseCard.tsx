@@ -234,7 +234,7 @@ export default function IncomeExpenseCard({ monthlyRollups, txns, cashFlowMode }
 
       <div className="ie-chart">
         {hasData ? (
-          <Chart options={options} series={chartSeries} type="bar" height={310} />
+          <Chart options={options} series={chartSeries} type="bar" height={250} />
         ) : (
           <div className="ie-empty">No income or expense data for this period.</div>
         )}
