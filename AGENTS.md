@@ -212,6 +212,13 @@ npm run preview
 Visual tokens and styling rules live in `UI_RULES.md`. No Tailwind
 utility classes in JSX, no inline styles, no invented hex values.
 
+**Card outer surfaces are locked by `UI_CARDS.md`.** Every card outer
+element uses `border-radius: 16px`, `box-shadow: none`, the standard
+border + white background. The doc lists the few pre-approved
+exceptions (borderless tile, modal, side drawer). Any new deviation
+needs explicit Wesley sign-off before the PR lands; Reviewer flags
+unsigned-off deviations in card-outer CSS.
+
 **Button heights are restricted to three canonical sizes:** 44px
 (primary action), 40px (secondary card-level), 36px (compact
 selector/dropdown). See `UI_RULES.md` Part 1 — "Button height
