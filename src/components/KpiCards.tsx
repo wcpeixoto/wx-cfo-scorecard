@@ -171,9 +171,44 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
             </div>
             <div className="kpi-footer">
               <span className={`kpi-badge ${trendClass}`}>
-                <span aria-hidden="true" className="kpi-change-arrow">
-                  {trendClass === 'is-up' ? '▲' : trendClass === 'is-down' ? '▼' : '●'}
-                </span>
+                {trendClass === 'is-up' && (
+                  <svg
+                    aria-hidden="true"
+                    className="kpi-change-arrow"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M7.9974 2.66602L7.9974 13.3336M4 6.66334L7.99987 2.66602L12 6.66334"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+                {trendClass === 'is-down' && (
+                  <svg
+                    aria-hidden="true"
+                    className="kpi-change-arrow"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M7.9974 13.3336L7.9974 2.66602M4 9.33619L7.99987 13.3335L12 9.33619"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
                 <span className="kpi-change-percent">{percentDelta}</span>
               </span>
               <span className="kpi-vs-label">vs {formatPriorValue(card.previousValue, card.format)} {comparisonPeriodLabel}</span>

@@ -21,6 +21,7 @@ export const chartTokens = {
 
   // Semantic
   info:                 '#0BA5EC',
+  skyLight:        '#38BDF8',  // TailAdmin Sales "Total Sales" sparkline accent (sky-400)
   success:              '#12B76A',
   successGradientEnd:   '#89DBB5',
   successText:          '#039855',

@@ -968,28 +968,15 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
-  line-height: 1.5;
+  line-height: 1.25;
 }
 
-.kpi-badge.is-up {
-  background: #ECFDF3;
-  color: #12B76A;
-}
-
-.kpi-badge.is-down {
-  background: #FEF3F2;
-  color: #F04438;
-}
-
-.kpi-badge.is-flat {
-  background: var(--bg-muted);
-  color: var(--text-secondary);
-}
+.kpi-badge.is-up { color: #039855; }
+.kpi-badge.is-down { color: #F04438; }
+.kpi-badge.is-flat { color: var(--text-secondary); }
 
 
 .forecast-decision-value--md {
@@ -1006,8 +993,8 @@ body {
 }
 
 .kpi-change-arrow {
-  font-size: 10px;
-  line-height: 1;
+  display: inline-block;
+  flex-shrink: 0;
 }
 
 .kpi-change-percent {
@@ -1015,7 +1002,8 @@ body {
 }
 
 .kpi-vs-label {
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--text-secondary);
   white-space: nowrap;
 }
