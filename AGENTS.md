@@ -214,10 +214,11 @@ utility classes in JSX, no inline styles, no invented hex values.
 
 **Card outer surfaces are locked by `UI_CARDS.md`.** Every card outer
 element uses `border-radius: 16px`, `box-shadow: none`, the standard
-border + white background. The doc lists the few pre-approved
-exceptions (borderless tile, modal, side drawer). Any new deviation
-needs explicit Wesley sign-off before the PR lands; Reviewer flags
-unsigned-off deviations in card-outer CSS.
+border + white background. The doc lists the one pre-approved card
+variant (borderless tile) and points to adjacent surface rules for
+modals and side drawers (which are NOT card exceptions). Any new
+card-outer deviation needs explicit Wesley sign-off before the PR
+lands; Reviewer flags unsigned-off deviations in card-outer CSS.
 
 **Button heights are restricted to three canonical sizes:** 44px
 (primary action), 40px (secondary card-level), 36px (compact
