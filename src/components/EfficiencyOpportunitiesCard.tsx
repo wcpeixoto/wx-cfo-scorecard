@@ -91,7 +91,7 @@ export function EfficiencyOpportunitiesCard({ result }: Props) {
 
       {/* Column headers */}
       <div className="eff-col-headers">
-        <span className="eff-col-cat">Category</span>
+        <span className="eff-col-cat">Top Categories</span>
         {/* Desktop: two separate columns. Mobile: single combined column */}
         <span className="eff-col-today">Today</span>
         <span className="eff-col-best">

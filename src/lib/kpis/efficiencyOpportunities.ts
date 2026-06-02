@@ -84,7 +84,7 @@ export interface PayrollRollingPoint {
 export interface EfficiencyOpportunitiesResult {
   windowLabel: string;        // "Jan – Mar 2026"
   rows: EfficiencyRow[];      // top N by extraPerMonth
-  totalExtraPerMonth: number; // sum across ALL qualifying categories
+  totalExtraPerMonth: number; // sum across the visible top-N rows (matches the table)
   // Payroll-specific excess ($/mo), taken from the full (pre-top-N) category
   // set so it survives display truncation. Same methodology as `rows`; null
   // when Payroll has no positive excess. Never the all-category total.
@@ -209,7 +209,7 @@ function median(sortedAsc: number[]): number {
  *    bestRatio = min ratio across all valid windows.
  *    extraPerMonth = (todayRatio - bestRatio) * currentAvgRevenue.
  *    Skip if extraPerMonth ≤ 0.
- *  - Sort desc by extraPerMonth. Top N rows returned; totalExtraPerMonth sums all.
+ *  - Sort desc by extraPerMonth. Top N rows returned; totalExtraPerMonth sums those visible rows only.
  */
 export function computeEfficiencyOpportunities(
   model: DashboardModel,
@@ -493,8 +493,8 @@ export function computeCore(
 
   rowsAll.sort((a, b) => b.extraPerMonth - a.extraPerMonth);
 
-  const totalExtraPerMonth = rowsAll.reduce((acc, r) => acc + r.extraPerMonth, 0);
   const rows = rowsAll.slice(0, MAX_ROWS);
+  const totalExtraPerMonth = rows.reduce((acc, r) => acc + r.extraPerMonth, 0);
 
   // Payroll-specific excess from the FULL set — survives the top-N truncation above.
   const payrollRow = rowsAll.find((r) => r.category === 'Payroll');

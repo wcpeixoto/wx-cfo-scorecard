@@ -151,6 +151,41 @@ describe('computeEfficiencyOpportunities — revenue-qualified "Your best" bench
   });
 });
 
+describe('computeEfficiencyOpportunities — top-N cap (Money Left card)', () => {
+  it('hero total equals the sum of the visible rows only, never the hidden tail', () => {
+    // Flat revenue $30k → all windows qualify. Five expense categories each
+    // dip in Apr–Jun 2024 (idx 3–5); extraPerMonth = baseline − dip.
+    // Ordered desc: $5000, $4000, $3000, $2000, $1000. Top 4 visible (= $14k);
+    // the $1000 5th category sits in rowsAll but must NOT inflate the hero.
+    const revenue = arr(30000);
+    const cats: Array<{ name: string; base: number }> = [
+      { name: 'Marketing', base: 5500 },
+      { name: 'Payroll', base: 4500 },
+      { name: 'COGS', base: 3500 },
+      { name: 'Customer Refunds', base: 2500 },
+      { name: 'Utilities', base: 1500 },
+    ];
+    const txns: Txn[] = [];
+    MONTHS.forEach((month, i) => {
+      txns.push(mk(month, 'income', 'Business Income', revenue[i]));
+      for (const c of cats) {
+        const amount = i >= 3 && i <= 5 ? 500 : c.base;
+        txns.push(mk(month, 'expense', c.name, amount));
+      }
+    });
+
+    const res = computeCore(MODEL, txns, REF_DATE);
+
+    expect(res.rows).toHaveLength(4);
+    expect(res.rows.map((r) => r.category)).toEqual([
+      'Marketing', 'Payroll', 'COGS', 'Customer Refunds',
+    ]);
+    expect(res.rows.find((r) => r.category === 'Utilities')).toBeUndefined();
+    // Hero must equal sum of visible rows ($14k), not the full set sum ($15k).
+    expect(Math.round(res.totalExtraPerMonth)).toBe(14000);
+  });
+});
+
 describe('computeEfficiencyOpportunities — payroll hero basis (Payroll Efficiency card)', () => {
   it('hero/best fields equal the Payroll row and footer when there is positive excess', () => {
     // Revenue flat $30k. Payroll $9k (30%) except a dip to $6k (20%) in Apr–Jun
