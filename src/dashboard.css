@@ -933,20 +933,33 @@ body {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.kpi-card-header {
+  margin-bottom: 20px;
 }
 
 .kpi-label {
-  margin: 0;
-  color: #667085;
-  font-size: 14px;
-  font-weight: 500;
+  margin: 0 0 6px;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
+.kpi-trend-marker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .kpi-value {
-  margin: 6px 0 0;
+  margin: 0;
   font-weight: 600;
   font-size: 30px;
   line-height: 1.15;
@@ -955,14 +968,6 @@ body {
 
 .kpi-value.is-negative { color: #F04438; }
 .kpi-value.is-positive { color: #12B76A; }
-
-.kpi-footer {
-  margin-top: 10px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
 
 .kpi-badge {
   display: inline-flex;
@@ -12039,9 +12044,9 @@ body {
 .bp-overview-tray .kpi-value-row {
   display: flex;
   align-items: flex-end;
+  justify-content: space-between;
   gap: 8px;
-  margin-top: 6px;
-  min-height: 40px;
+  min-height: 44px;
 }
 
 .bp-overview-tray .kpi-value-row .kpi-value {
@@ -12051,7 +12056,7 @@ body {
 }
 
 .bp-overview-tray .kpi-card-spark {
-  flex: 0 0 72px;
+  flex: 0 0 45%;
   min-width: 0;
 }
 

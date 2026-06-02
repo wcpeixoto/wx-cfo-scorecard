@@ -137,23 +137,69 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
 
         return (
           <article className="kpi-card" key={card.id}>
-            <div className="kpi-label">
-              {card.label}
-              {card.id === 'net' && (
-                <span className="db-tooltip-wrap">
-                  <button
-                    type="button"
-                    className="db-tooltip-btn"
-                    aria-label="Profit explanation"
-                    aria-describedby={netTooltipId}
-                  >
-                    &#9432;
-                  </button>
-                  <div id={netTooltipId} role="tooltip" className="db-tooltip-panel is-wide">
-                    We call this Profit to keep things simple. Technically, it&rsquo;s net cash flow: revenue minus expenses for this period, excluding transfers and financing.
-                  </div>
+            <div className="kpi-card-header">
+              <div className="kpi-label">
+                {card.label}
+                {card.id === 'net' && (
+                  <span className="db-tooltip-wrap">
+                    <button
+                      type="button"
+                      className="db-tooltip-btn"
+                      aria-label="Profit explanation"
+                      aria-describedby={netTooltipId}
+                    >
+                      &#9432;
+                    </button>
+                    <div id={netTooltipId} role="tooltip" className="db-tooltip-panel is-wide">
+                      We call this Profit to keep things simple. Technically, it&rsquo;s net cash flow: revenue minus expenses for this period, excluding transfers and financing.
+                    </div>
+                  </span>
+                )}
+              </div>
+              <div className="kpi-trend-marker">
+                <span className={`kpi-badge ${trendClass}`}>
+                  {trendClass === 'is-up' && (
+                    <svg
+                      aria-hidden="true"
+                      className="kpi-change-arrow"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M7.9974 2.66602L7.9974 13.3336M4 6.66334L7.99987 2.66602L12 6.66334"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                  {trendClass === 'is-down' && (
+                    <svg
+                      aria-hidden="true"
+                      className="kpi-change-arrow"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M7.9974 13.3336L7.9974 2.66602M4 9.33619L7.99987 13.3335L12 9.33619"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                  <span className="kpi-change-percent">{percentDelta}</span>
                 </span>
-              )}
+                <span className="kpi-vs-label">vs {formatPriorValue(card.previousValue, card.format)} {comparisonPeriodLabel}</span>
+              </div>
             </div>
             <div className="kpi-value-row">
               <p className={`kpi-value${valueColorClass}`}>{formatValue(card.value, card.format)}</p>
@@ -164,54 +210,10 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
                     series={[{ data: spark.data }]}
                     options={buildSparkOptions(spark.color)}
                     width="100%"
-                    height={40}
+                    height={44}
                   />
                 </div>
               )}
-            </div>
-            <div className="kpi-footer">
-              <span className={`kpi-badge ${trendClass}`}>
-                {trendClass === 'is-up' && (
-                  <svg
-                    aria-hidden="true"
-                    className="kpi-change-arrow"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M7.9974 2.66602L7.9974 13.3336M4 6.66334L7.99987 2.66602L12 6.66334"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-                {trendClass === 'is-down' && (
-                  <svg
-                    aria-hidden="true"
-                    className="kpi-change-arrow"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M7.9974 13.3336L7.9974 2.66602M4 9.33619L7.99987 13.3335L12 9.33619"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-                <span className="kpi-change-percent">{percentDelta}</span>
-              </span>
-              <span className="kpi-vs-label">vs {formatPriorValue(card.previousValue, card.format)} {comparisonPeriodLabel}</span>
             </div>
           </article>
         );
