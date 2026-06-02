@@ -297,11 +297,12 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
       fontFamily: 'Outfit, sans-serif',
       background: 'transparent',
     },
-    // Three-step blue ramp by confidence: deepest = real (Distribution),
-    // mid = canonical Forecast, softest = slider-driven Simulation delta.
-    // When no simulation is active, the Simulated series is all zeros so no
-    // third bar segment renders.
-    colors: [chartTokens.brand700, chartTokens.brand400, chartTokens.brandSecondary],
+    // Color hierarchy: brand (Distribution = real) → brandSecondary (canonical
+    // Forecast = softer brand tint) → info (Simulated = cyan hue-shift so the
+    // what-if reads as a different category, not just a paler forecast). When
+    // no simulation is active, the Simulated series is all zeros so no third
+    // bar segment renders.
+    colors: [chartTokens.brand, chartTokens.brandSecondary, chartTokens.info],
     plotOptions: {
       bar: {
         horizontal: false,
@@ -397,7 +398,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
 
         const revenueRow = revenueVal > 0
           ? `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
-            ${dot(chartTokens.info)}
+            ${dot(chartTokens.brand700)}
             <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
               <span class="apexcharts-tooltip-text-y-label">Revenue</span>
               <span class="apexcharts-tooltip-text-y-value">${formatCompact(revenueVal)}</span>
@@ -408,7 +409,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         let rows = '';
         if (actualVal > 0) {
           rows += `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
-            ${dot(chartTokens.brand700)}
+            ${dot(chartTokens.brand)}
             <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
               <span class="apexcharts-tooltip-text-y-label">Distribution</span>
               <span class="apexcharts-tooltip-text-y-value">${marginPct(actualVal)}</span>
@@ -417,7 +418,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         }
         if (forecastVal > 0) {
           rows += `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
-            ${dot(chartTokens.brand400)}
+            ${dot(chartTokens.brandSecondary)}
             <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
               <span class="apexcharts-tooltip-text-y-label">Forecast</span>
               <span class="apexcharts-tooltip-text-y-value">${marginPct(forecastVal)}</span>
@@ -426,7 +427,7 @@ export default function OwnerDistributionsChart({ transactions, today = new Date
         }
         if (simulatedVal > 0) {
           rows += `<div class="apexcharts-tooltip-series-group" style="display:flex;align-items:center;padding:2px 0;">
-            ${dot(chartTokens.brandSecondary)}
+            ${dot(chartTokens.info)}
             <div class="apexcharts-tooltip-text" style="display:flex;justify-content:space-between;width:100%;gap:12px;">
               <span class="apexcharts-tooltip-text-y-label">Simulated</span>
               <span class="apexcharts-tooltip-text-y-value">${marginPct(simulatedVal)}</span>
