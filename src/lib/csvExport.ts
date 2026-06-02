@@ -13,11 +13,26 @@
 // `csvCell` is exported separately for callers that want to format a single
 // cell ahead of time. `exportCsv` is the typical path.
 
-/** Escape a single CSV cell: quote if it contains a comma, quote, or newline;
- *  embedded quotes are doubled. */
+// Cells that begin with one of these chars are evaluated as a formula by Excel,
+// Numbers, and Sheets — even when the row arrived via CSV. A vendor name like
+// `=cmd|'/c calc'!A1` is the canonical exploit; OWASP's mitigation is to prepend
+// an apostrophe so the spreadsheet treats the cell as text.
+const FORMULA_TRIGGER = /^[=+\-@]/;
+// Pure signed/unsigned decimals are not exploitable on their own. We bypass the
+// guard for them so the Amount column (exported as `String(rawAmount)`, often
+// negative) still parses as a number in Excel and SUM/pivot keep working.
+const NUMERIC_LITERAL = /^[+-]?\d+(\.\d+)?$/;
+
+/** Escape a single CSV cell: prepend an apostrophe if it would be parsed as a
+ *  spreadsheet formula, then quote if it contains a comma, quote, or newline
+ *  (embedded quotes are doubled). The formula check ignores surrounding
+ *  whitespace because spreadsheet parsers do too. */
 export function csvCell(value: string): string {
-  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
+  const trimmed = value.trim();
+  const isDangerous = FORMULA_TRIGGER.test(trimmed) && !NUMERIC_LITERAL.test(trimmed);
+  const safe = isDangerous ? `'${value}` : value;
+  if (/[",\n]/.test(safe)) return `"${safe.replace(/"/g, '""')}"`;
+  return safe;
 }
 
 interface ExportCsvOptions {
