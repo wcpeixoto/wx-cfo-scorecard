@@ -12903,7 +12903,20 @@ body {
   color: #465FFF;
   font-weight: 600;
 }
+/* Collapsed 72px rail: hide chevron + submenu (no horizontal room). */
 .app-sidebar.is-collapsed .app-sidebar-chevron,
 .app-sidebar.is-collapsed .app-sidebar-submenu {
   display: none;
+}
+/* ...but restore them wherever the sidebar is actually full-width, or the
+   Retention child would be unreachable from the nav while collapsed:
+   (1) desktop hover-expand (>=1024px widens the rail to 260px), and
+   (2) the mobile drawer (<=1023px renders .is-collapsed at 260px). */
+@media (min-width: 1024px) {
+  .app-sidebar.is-collapsed:hover .app-sidebar-chevron { display: block; }
+  .app-sidebar.is-collapsed:hover .app-sidebar-submenu { display: flex; }
+}
+@media (max-width: 1023px) {
+  .app-sidebar.is-collapsed .app-sidebar-chevron { display: block; }
+  .app-sidebar.is-collapsed .app-sidebar-submenu { display: flex; }
 }
