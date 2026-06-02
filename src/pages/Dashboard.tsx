@@ -2598,11 +2598,15 @@ export default function Dashboard() {
       : model.monthlyRollups;
     const last12 = completed.slice(-12);
     if (last12.length < 2) return {};
-    const sparks: Record<string, { data: number[]; color: string }> = {
-      income: { data: last12.map((rollup) => rollup.revenue), color: chartTokens.brand },
-      expense: { data: last12.map((rollup) => rollup.expenses), color: chartTokens.costSpike },
-      net: { data: last12.map((rollup) => rollup.netCashFlow), color: chartTokens.skyLight },
-      savingsRate: { data: last12.map((rollup) => rollup.savingsRate), color: chartTokens.skyLight },
+    const categories = last12.map((rollup) => {
+      const [y, m] = rollup.month.split('-').map(Number);
+      return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    });
+    const sparks: Record<string, { data: number[]; color: string; categories: string[] }> = {
+      income: { data: last12.map((rollup) => rollup.revenue), color: chartTokens.brand, categories },
+      expense: { data: last12.map((rollup) => rollup.expenses), color: chartTokens.costSpike, categories },
+      net: { data: last12.map((rollup) => rollup.netCashFlow), color: chartTokens.skyLight, categories },
+      savingsRate: { data: last12.map((rollup) => rollup.savingsRate), color: chartTokens.skyLight, categories },
     };
     return sparks;
   }, [model.monthlyRollups, previousCalendarMonth]);
