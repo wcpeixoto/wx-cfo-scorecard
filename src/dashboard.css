@@ -931,13 +931,13 @@ body {
 .kpi-card {
   background: var(--bg-panel);
   border-radius: 12px;
-  padding: 20px;
+  padding: 14px 20px;
   display: flex;
   flex-direction: column;
 }
 
 .kpi-card-header {
-  margin-bottom: 28px;
+  margin-bottom: 16px;
 }
 
 .kpi-label {
