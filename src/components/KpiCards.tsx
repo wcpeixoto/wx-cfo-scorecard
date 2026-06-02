@@ -15,6 +15,22 @@ const EPSILON = 0.00001;
 
 // Ambient 12-month trailing sparkline. Color is supplied by the caller
 // (brand blue for Revenue, cost-spike coral for Expenses).
+//
+// Mix `hex` toward white by `amount` (0 = same color, 1 = pure white).
+// Used to derive a tinted end-stop for the area gradient so it fades into
+// a lighter version of the stroke color, not white — produces the soft
+// color-cloud fill from the TailAdmin Sales reference.
+function lighten(hex: string, amount: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const lr = Math.round(r + (255 - r) * amount);
+  const lg = Math.round(g + (255 - g) * amount);
+  const lb = Math.round(b + (255 - b) * amount);
+  const h = (n: number) => n.toString(16).padStart(2, '0');
+  return `#${h(lr)}${h(lg)}${h(lb)}`;
+}
+
 function buildSparkOptions(color: string): ApexOptions {
   return {
     chart: {
@@ -25,10 +41,15 @@ function buildSparkOptions(color: string): ApexOptions {
       animations: { enabled: false },
       fontFamily: 'Outfit, sans-serif',
     },
-    stroke: { curve: 'smooth', width: 1.5, colors: [color] },
+    stroke: { curve: 'smooth', width: 1, colors: [color] },
     fill: {
       type: 'gradient',
-      gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0, stops: [0, 100] },
+      gradient: {
+        opacityFrom: 0.55,
+        opacityTo: 0,
+        gradientToColors: [lighten(color, 0.6)],
+        stops: [0, 100],
+      },
     },
     colors: [color],
     dataLabels: { enabled: false },
