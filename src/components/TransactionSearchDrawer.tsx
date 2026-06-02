@@ -140,14 +140,12 @@ function formatRangeLabel(period: Period, anchorMonth: string): string {
 interface Props {
   /** The full transaction set. The drawer narrows by period in-component. */
   txns: Txn[];
-  /** Header search term that opened the drawer; seeds the search field. */
-  initialSearch: string;
   onClose: () => void;
 }
 
-export function TransactionSearchDrawer({ txns, initialSearch, onClose }: Props) {
+export function TransactionSearchDrawer({ txns, onClose }: Props) {
   const [period, setPeriod] = useState<Period>('latestMonth');
-  const [search, setSearch] = useState<string>(initialSearch);
+  const [search, setSearch] = useState<string>('');
   const [accountFilter, setAccountFilter] = useState<string>('');
   const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' });
 
@@ -200,8 +198,10 @@ export function TransactionSearchDrawer({ txns, initialSearch, onClose }: Props)
     [visibleRows],
   );
 
-  const title = `Transactions — ${rangeLabel}`;
-  const ariaLabel = `Transactions for ${rangeLabel}`;
+  // Title is always the plain noun — the active window is conveyed by the
+  // timeframe dropdown, not the title. `rangeLabel` still drives the CSV slug.
+  const title = 'Transactions';
+  const ariaLabel = 'Transactions';
 
   const handleClear = () => {
     setAccountFilter('');
@@ -235,17 +235,32 @@ export function TransactionSearchDrawer({ txns, initialSearch, onClose }: Props)
     >
       <header className="txn-search-drawer-header">
         <div className="txn-search-drawer-titlerow">
-          <h2 className="txn-search-drawer-title" title={title}>{title}</h2>
+          <h2 className="txn-search-drawer-title">{title}</h2>
           <button className="txn-search-drawer-close" type="button" onClick={onClose} aria-label="Close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
-        <div className="txn-search-drawer-summaryrow">
-          <p className="txn-search-drawer-summary">
-            <span className="txn-search-drawer-sum-num">{formatUsd(visibleSum)}</span>
-          </p>
+        <p className="txn-search-drawer-summary">
+          {visibleRows.length} transaction{visibleRows.length === 1 ? '' : 's'}
+          <span className="txn-search-drawer-sum-sep" aria-hidden="true">·</span>
+          <span className="txn-search-drawer-sum-num">{formatUsd(visibleSum)}</span>
+        </p>
+        <div className="txn-search-drawer-headeractions">
+          <div className="txn-search-drawer-search-field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              className="txn-search-drawer-search"
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search"
+              aria-label="Search transactions"
+            />
+          </div>
           <button className="txn-search-drawer-btn" type="button" onClick={handleExport} disabled={isEmpty}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
@@ -256,19 +271,6 @@ export function TransactionSearchDrawer({ txns, initialSearch, onClose }: Props)
       </header>
 
       <div className="txn-search-drawer-controls">
-        <div className="txn-search-drawer-search-field">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            className="txn-search-drawer-search"
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search"
-            aria-label="Search transactions"
-          />
-        </div>
         <select
           className="txn-search-drawer-select"
           value={period}
