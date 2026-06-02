@@ -7601,19 +7601,19 @@ body {
   flex-shrink: 0;
 }
 
-/* Three-step blue ramp by confidence: brand700 (real) → brand400 (canonical
-   forecast) → brandSecondary (slider simulation delta). Mirrors the chart
-   series colors set in OwnerDistributionsChart options. */
+/* Color hierarchy mirrors the chart series in OwnerDistributionsChart:
+   brand (Distribution = real) → brandSecondary (canonical Forecast = softer
+   brand tint) → info (Simulated = cyan hue-shift). */
 .owner-dist-legend-dot.actual {
-  background: #2A31D8;
+  background: #465FFF;
 }
 
 .owner-dist-legend-dot.forecast {
-  background: #637AEA;
+  background: #9CB9FF;
 }
 
 .owner-dist-legend-dot.simulated {
-  background: #9CB9FF;
+  background: #0BA5EC;
 }
 
 /* Card-level secondary button (40px) — TailAdmin "Secondary" outline style:
