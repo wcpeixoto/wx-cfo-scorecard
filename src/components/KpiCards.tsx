@@ -202,7 +202,7 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
               </div>
             </div>
             <div className="kpi-value-row">
-              <p className={`kpi-value${valueColorClass}`}>{formatValue(card.value, card.format)}</p>
+              <h2 className={`kpi-value${valueColorClass}`}>{formatValue(card.value, card.format)}</h2>
               {spark && spark.data.length > 1 && (
                 <div className="kpi-card-spark" aria-hidden="true">
                   <ReactApexChart
