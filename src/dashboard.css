@@ -1957,6 +1957,7 @@ body {
   min-height: auto;
   padding: 20px 24px 24px;
   border-radius: 16px;
+  box-shadow: none;
 }
 
 .reserve-header {
@@ -6087,7 +6088,7 @@ body {
   /* Bordered shell matching Operating Reserve's .card frame. */
   border: 1px solid var(--line);
   border-radius: 16px;
-  box-shadow: var(--shadow-card);
+  box-shadow: none;
   font-family: 'Outfit', sans-serif;
 }
 
