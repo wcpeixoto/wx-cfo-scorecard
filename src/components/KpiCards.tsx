@@ -3,7 +3,20 @@ import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import type { KpiCard } from '../lib/data/contract';
 
-type KpiCardSparkline = { data: number[]; color: string };
+type KpiCardSparkline = { data: number[]; color: string; categories?: string[] };
+
+function formatSparkY(val: number, format: KpiCard['format']): string {
+  if (format === 'percent') return `${val.toFixed(1)}%`;
+  if (format === 'currency') {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(val);
+  }
+  return val.toLocaleString();
+}
 
 type KpiCardsProps = {
   cards: KpiCard[];
@@ -31,7 +44,11 @@ function lighten(hex: string, amount: number): string {
   return `#${h(lr)}${h(lg)}${h(lb)}`;
 }
 
-function buildSparkOptions(color: string): ApexOptions {
+function buildSparkOptions(
+  color: string,
+  format: KpiCard['format'],
+  categories: string[],
+): ApexOptions {
   return {
     chart: {
       type: 'area',
@@ -53,11 +70,23 @@ function buildSparkOptions(color: string): ApexOptions {
     },
     colors: [color],
     dataLabels: { enabled: false },
-    markers: { size: 0 },
+    markers: { size: 0, hover: { size: 3 } },
     grid: { show: false },
-    xaxis: { labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
+    xaxis: { categories, labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
     yaxis: { labels: { show: false } },
-    tooltip: { enabled: false },
+    tooltip: {
+      enabled: true,
+      theme: 'light',
+      x: {
+        formatter: (_v: number, opts?: { dataPointIndex: number }) =>
+          opts ? categories[opts.dataPointIndex] ?? '' : '',
+      },
+      y: {
+        formatter: (val: number) => formatSparkY(val, format),
+        title: { formatter: () => '' },
+      },
+      marker: { show: false },
+    },
     legend: { show: false },
   };
 }
@@ -229,7 +258,7 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
                   <ReactApexChart
                     type="area"
                     series={[{ data: spark.data }]}
-                    options={buildSparkOptions(spark.color)}
+                    options={buildSparkOptions(spark.color, card.format, spark.categories ?? [])}
                     width="100%"
                     height={44}
                   />
