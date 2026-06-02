@@ -146,7 +146,7 @@ type BigPictureFilterFrameValue = Exclude<BigPictureFrameValue, BigPictureVisibl
 const TAB_TO_PATH: Record<TabId, string> = {
   today: '/',
   'big-picture': '/big-picture',
-  gym: '/gym',
+  gym: '/gym/retention',
   'what-if': '/forecast',
   settings: '/settings',
   'ui-lab': '/ui-lab',
@@ -162,6 +162,7 @@ function pathToTab(pathname: string): TabId {
     case '/big-picture':
       return 'big-picture';
     case '/gym':
+    case '/gym/retention':
       return 'gym';
     case '/forecast':
     case '/what-if':

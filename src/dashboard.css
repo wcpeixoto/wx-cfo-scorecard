@@ -12849,20 +12849,61 @@ body {
 .gym-card--recessed .gym-card-title,
 .gym-card--recessed .gym-card-subtitle { color: var(--text-secondary); }
 
-/* Coming-soon stubs — Overview / Membership / Classes */
-.gym-stub-card {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 200px;
-}
-.gym-stub-copy {
-  margin: 0;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
 @media (max-width: 767px) {
   .gym-card-grid { grid-template-columns: minmax(0, 1fr); }
   .gym-card--half { grid-column: 1 / -1; }
+}
+
+/* ============================================================
+   Expandable sidebar nav group (TailAdmin submenu pattern).
+   Gym is a toggle button (reuses .app-sidebar-link) that reveals an
+   indented submenu of child links (Retention). Hex values match the
+   adjacent .app-sidebar-link rules. Appended per the append-only
+   dashboard.css convention.
+   ============================================================ */
+.app-sidebar-group {
+  display: flex;
+  flex-direction: column;
+}
+.app-sidebar-group-toggle .app-sidebar-chevron {
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.app-sidebar-chevron.is-open {
+  transform: rotate(180deg);
+}
+.app-sidebar-submenu {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0 0 0 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.app-sidebar-sublink {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: #667085;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+.app-sidebar-sublink:hover {
+  background: #F2F4F7;
+  color: #101828;
+}
+.app-sidebar-sublink.is-active {
+  background: #ECF3FF;
+  color: #465FFF;
+  font-weight: 600;
+}
+.app-sidebar.is-collapsed .app-sidebar-chevron,
+.app-sidebar.is-collapsed .app-sidebar-submenu {
+  display: none;
 }
