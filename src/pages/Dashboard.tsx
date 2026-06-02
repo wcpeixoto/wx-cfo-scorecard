@@ -2601,8 +2601,8 @@ export default function Dashboard() {
     const sparks: Record<string, { data: number[]; color: string }> = {
       income: { data: last12.map((rollup) => rollup.revenue), color: chartTokens.brand },
       expense: { data: last12.map((rollup) => rollup.expenses), color: chartTokens.costSpike },
-      net: { data: last12.map((rollup) => rollup.netCashFlow), color: chartTokens.neutral },
-      savingsRate: { data: last12.map((rollup) => rollup.savingsRate), color: chartTokens.neutral },
+      net: { data: last12.map((rollup) => rollup.netCashFlow), color: chartTokens.skyLight },
+      savingsRate: { data: last12.map((rollup) => rollup.savingsRate), color: chartTokens.skyLight },
     };
     return sparks;
   }, [model.monthlyRollups, previousCalendarMonth]);
