@@ -144,15 +144,9 @@ export default function IncomeExpenseCard({ monthlyRollups, txns, cashFlowMode }
       },
       dataLabels: { enabled: false },
       stroke: { show: true, width: 2, colors: ['transparent'] },
-      legend: {
-        show: true,
-        position: 'top',
-        horizontalAlign: 'left',
-        fontFamily: 'Outfit, sans-serif',
-        fontSize: '12px',
-        labels: { colors: chartTokens.axisText },
-        markers: { shape: 'circle' },
-      },
+      // Legend rendered above the chart by the card (see .ie-legend); the
+      // Apex legend is hidden so the chart owns its full height.
+      legend: { show: false },
       xaxis: {
         categories,
         axisBorder: { show: false },
@@ -209,29 +203,41 @@ export default function IncomeExpenseCard({ monthlyRollups, txns, cashFlowMode }
         />
       </div>
 
+      <div className="ie-summary">
+        <div className="ie-summary-metrics">
+          <div className="ie-total">
+            <span className="ie-total-label">Total Income</span>
+            <span className="ie-total-value">{formatCompact(series.totalIncome)}</span>
+          </div>
+          <div className="ie-total">
+            <span className="ie-total-label">Total Expense</span>
+            <span className="ie-total-value">{formatCompact(-series.totalExpense)}</span>
+          </div>
+          <div className="ie-total">
+            <span className="ie-total-label">Net Income</span>
+            <span className={`ie-total-value ${netPositive ? 'is-positive' : 'is-negative'}`}>
+              {formatCompact(series.netIncome)}
+            </span>
+          </div>
+        </div>
+        <div className="ie-legend" aria-hidden="true">
+          <span className="ie-legend-item">
+            <span className="ie-legend-dot ie-legend-dot--income" />
+            Income
+          </span>
+          <span className="ie-legend-item">
+            <span className="ie-legend-dot ie-legend-dot--expense" />
+            Expense
+          </span>
+        </div>
+      </div>
+
       <div className="ie-chart">
         {hasData ? (
-          <Chart options={options} series={chartSeries} type="bar" height={200} />
+          <Chart options={options} series={chartSeries} type="bar" height={310} />
         ) : (
           <div className="ie-empty">No income or expense data for this period.</div>
         )}
-      </div>
-
-      <div className="ie-footer">
-        <div className="ie-total">
-          <span className="ie-total-label">Total Income</span>
-          <span className="ie-total-value">{formatCompact(series.totalIncome)}</span>
-        </div>
-        <div className="ie-total">
-          <span className="ie-total-label">Total Expense</span>
-          <span className="ie-total-value">{formatCompact(-series.totalExpense)}</span>
-        </div>
-        <div className="ie-total">
-          <span className="ie-total-label">Net Income</span>
-          <span className={`ie-total-value ${netPositive ? 'is-positive' : 'is-negative'}`}>
-            {formatCompact(series.netIncome)}
-          </span>
-        </div>
       </div>
 
       {drawerState && drawerBundle && (

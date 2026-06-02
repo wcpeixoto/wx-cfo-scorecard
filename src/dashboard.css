@@ -10931,7 +10931,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 20px;
 }
 
 .ie-title {
@@ -10941,26 +10941,59 @@ body {
   color: var(--text-primary);
 }
 
+/* Summary row — three metric blocks on the left, custom legend on the right.
+   Replaces the prior footer placement so the chart can own the bottom of the
+   card. The 24px bottom margin sets the gap to the chart. */
+.ie-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin-bottom: 24px;
+}
+
+.ie-summary-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+}
+
+.ie-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ie-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ie-legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.ie-legend-dot--income { background: #465FFF; }
+.ie-legend-dot--expense { background: #9CB9FF; }
+
 .ie-chart {
-  min-height: 200px;
+  min-height: 310px;
 }
 
 .ie-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 200px;
+  min-height: 310px;
   font-size: 14px;
   color: var(--text-secondary);
-}
-
-.ie-footer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 32px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
 }
 
 .ie-total {
@@ -10992,8 +11025,8 @@ body {
 .dark .ie-title,
 .dark .ie-total-value { color: rgba(255, 255, 255, 0.9); }
 .dark .ie-total-label,
-.dark .ie-empty { color: #98A2B3; }
-.dark .ie-footer { border-color: #344054; }
+.dark .ie-empty,
+.dark .ie-legend { color: #98A2B3; }
 
 /* === Payroll Efficiency card (Big Picture Row 6) — Active Users-style === */
 .pe-card {
