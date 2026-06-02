@@ -10061,6 +10061,16 @@ body {
   color: rgba(255, 255, 255, 0.90);
 }
 
+/* Concrete-dates subtitle — the literal window the active timeframe resolves to */
+.txn-search-drawer-subtitle {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #475467;
+  font-variant-numeric: tabular-nums;
+}
+.dark .txn-search-drawer-subtitle { color: #98A2B3; }
+
 .txn-search-drawer-close {
   width: 40px;
   height: 40px;

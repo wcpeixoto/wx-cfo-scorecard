@@ -5,6 +5,8 @@ import {
   categoryFilterMatches,
   decodeCategory,
   encodeCategory,
+  formatWindowLabel,
+  rangeSubtitle,
   resolvePeriodRange,
   type CategoryFilter,
 } from './TransactionSearchDrawer';
@@ -76,6 +78,101 @@ describe('resolvePeriodRange — wall-clock windows', () => {
       start: '2024-02-01',
       end: '2024-02-29',
     });
+  });
+
+  // A custom range with one side blank is opened on that side, so a single
+  // date entered behaves consistently ("from X onward" / "up to Y") instead of
+  // the asymmetric all-vs-nothing a bare lexical compare produced pre-fix.
+  it('opens the start bound when the custom start is blank', () => {
+    expect(resolvePeriodRange('custom', today, { start: '', end: '2026-04-30' })).toEqual({
+      start: '0000-01-01',
+      end: '2026-04-30',
+    });
+  });
+
+  it('opens the end bound when the custom end is blank', () => {
+    expect(resolvePeriodRange('custom', today, { start: '2026-04-01', end: '' })).toEqual({
+      start: '2026-04-01',
+      end: '9999-12-31',
+    });
+  });
+
+  it('opens both bounds when the custom range is empty', () => {
+    expect(resolvePeriodRange('custom', today, { start: '', end: '' })).toEqual({
+      start: '0000-01-01',
+      end: '9999-12-31',
+    });
+  });
+});
+
+// ─── Concrete-dates window label + subtitle ─────────────────────────────────
+
+describe('formatWindowLabel', () => {
+  it('collapses a full calendar month to "Mon YYYY"', () => {
+    expect(formatWindowLabel('2026-04-01', '2026-04-30')).toBe('Apr 2026');
+  });
+
+  it('collapses a leap-year February (29 days) to the month label', () => {
+    expect(formatWindowLabel('2024-02-01', '2024-02-29')).toBe('Feb 2024');
+  });
+
+  it('does NOT collapse a near-full month that stops short of the last day', () => {
+    expect(formatWindowLabel('2026-04-01', '2026-04-29')).toBe('Apr 1 – 29, 2026');
+  });
+
+  it('renders a single day', () => {
+    expect(formatWindowLabel('2026-06-01', '2026-06-01')).toBe('Jun 1, 2026');
+  });
+
+  it('renders a same-year cross-month range', () => {
+    expect(formatWindowLabel('2026-05-26', '2026-06-01')).toBe('May 26 – Jun 1, 2026');
+  });
+
+  it('renders a cross-year range with both years', () => {
+    expect(formatWindowLabel('2025-07-01', '2026-06-01')).toBe('Jul 1, 2025 – Jun 1, 2026');
+  });
+
+  it('reads an open end bound as "From … onward"', () => {
+    expect(formatWindowLabel('2026-04-01', '9999-12-31')).toBe('From Apr 1, 2026 onward');
+  });
+
+  it('reads an open start bound as "Through …"', () => {
+    expect(formatWindowLabel('0000-01-01', '2026-04-30')).toBe('Through Apr 30, 2026');
+  });
+
+  it('reads both bounds open as "All dates"', () => {
+    expect(formatWindowLabel('0000-01-01', '9999-12-31')).toBe('All dates');
+  });
+});
+
+describe('rangeSubtitle', () => {
+  it('names the month for This Month even when the window is only month-to-date', () => {
+    expect(rangeSubtitle('thisMonth', { start: '2026-06-01', end: '2026-06-01' })).toBe('Jun 2026');
+    expect(rangeSubtitle('thisMonth', { start: '2026-06-01', end: '2026-06-15' })).toBe('Jun 2026');
+  });
+
+  it('names the month for Last Month', () => {
+    expect(rangeSubtitle('lastMonth', { start: '2026-05-01', end: '2026-05-31' })).toBe('May 2026');
+  });
+
+  it('shows concrete dates for Last 7 Days', () => {
+    expect(rangeSubtitle('last7Days', { start: '2026-05-26', end: '2026-06-01' })).toBe('May 26 – Jun 1, 2026');
+  });
+
+  it('shows concrete dates for YTD', () => {
+    expect(rangeSubtitle('ytd', { start: '2026-01-01', end: '2026-06-01' })).toBe('Jan 1 – Jun 1, 2026');
+  });
+
+  it('shows concrete dates for Last 12 Months', () => {
+    expect(rangeSubtitle('last12Months', { start: '2025-07-01', end: '2026-06-01' })).toBe('Jul 1, 2025 – Jun 1, 2026');
+  });
+
+  it('collapses a Jump-to-Latest custom month window to "Mon YYYY"', () => {
+    expect(rangeSubtitle('custom', { start: '2026-04-01', end: '2026-04-30' })).toBe('Apr 2026');
+  });
+
+  it('shows a compact range for a non-month custom window', () => {
+    expect(rangeSubtitle('custom', { start: '2026-04-01', end: '2026-04-29' })).toBe('Apr 1 – 29, 2026');
   });
 });
 

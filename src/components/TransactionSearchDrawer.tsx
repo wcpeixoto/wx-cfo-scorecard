@@ -70,6 +70,16 @@ const MONTH_NAMES = [
 
 // ─── Date helpers ────────────────────────────────────────────────────────────
 
+// Open-bound sentinels for a custom range with one side left blank. They sort
+// outside any real `YYYY-MM-DD` so a lexical compare keeps that side open.
+const OPEN_START = '0000-01-01';
+const OPEN_END = '9999-12-31';
+
+const MONTH_ABBR = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
 function isoDate(year: number, month1: number, day: number): string {
@@ -150,7 +160,14 @@ export function resolvePeriodRange(period: Period, today: string, custom: Custom
       return { start: isoDate(sy, sm, 1), end: today };
     }
     case 'custom':
-      return { start: custom.start, end: custom.end };
+      // An empty bound is treated as open on that side, so entering a single
+      // date reads consistently as "from X onward" / "up to Y" instead of the
+      // asymmetric all-vs-nothing a bare lexical compare would produce. The
+      // sentinels sit safely outside any real `YYYY-MM-DD`.
+      return {
+        start: custom.start || OPEN_START,
+        end: custom.end || OPEN_END,
+      };
   }
 }
 
@@ -173,6 +190,65 @@ function formatRangeLabel(period: Period, range: PeriodRange): string {
     case 'custom':
       return `${range.start} to ${range.end}`;
   }
+}
+
+// "YYYY-MM-DD" → { y, m, d } numbers, or null if malformed / an open sentinel.
+function parseDayParts(iso: string): { y: number; m: number; d: number } | null {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d || m < 1 || m > 12) return null;
+  return { y, m, d };
+}
+
+// Concrete, owner-facing label for a resolved [start, end] window. Collapses a
+// full calendar month to "Apr 2026"; otherwise renders a compact range that
+// drops the repeated month/year ("May 26 – Jun 1, 2026", "Apr 1 – 30, 2026").
+// Open-bounded customs read as "Through …" / "From … onward".
+export function formatWindowLabel(startIso: string, endIso: string): string {
+  const hasStart = startIso && startIso !== OPEN_START;
+  const hasEnd = endIso && endIso !== OPEN_END;
+  const s = hasStart ? parseDayParts(startIso) : null;
+  const e = hasEnd ? parseDayParts(endIso) : null;
+
+  // Open-bounded (one side blank in a custom range).
+  if (!s && e) return `Through ${MONTH_ABBR[e.m - 1]} ${e.d}, ${e.y}`;
+  if (s && !e) return `From ${MONTH_ABBR[s.m - 1]} ${s.d}, ${s.y} onward`;
+  if (!s || !e) return 'All dates';
+
+  // Full calendar month → "Apr 2026".
+  if (
+    s.y === e.y && s.m === e.m &&
+    s.d === 1 && e.d === lastDayOfMonth(e.y, e.m)
+  ) {
+    return `${MONTH_ABBR[s.m - 1]} ${s.y}`;
+  }
+
+  // Single day.
+  if (s.y === e.y && s.m === e.m && s.d === e.d) {
+    return `${MONTH_ABBR[s.m - 1]} ${s.d}, ${s.y}`;
+  }
+
+  // Same month: "Apr 1 – 30, 2026".
+  if (s.y === e.y && s.m === e.m) {
+    return `${MONTH_ABBR[s.m - 1]} ${s.d} – ${e.d}, ${s.y}`;
+  }
+  // Same year: "May 26 – Jun 1, 2026".
+  if (s.y === e.y) {
+    return `${MONTH_ABBR[s.m - 1]} ${s.d} – ${MONTH_ABBR[e.m - 1]} ${e.d}, ${s.y}`;
+  }
+  // Crosses years: "Jul 1, 2025 – Jun 1, 2026".
+  return `${MONTH_ABBR[s.m - 1]} ${s.d}, ${s.y} – ${MONTH_ABBR[e.m - 1]} ${e.d}, ${e.y}`;
+}
+
+// The subtitle under the drawer title — the one place that reveals the literal
+// wall-clock dates a window resolves to. This/Last Month always name the month
+// (even mid-month, when the window is only month-to-date) since they're
+// conceptually month-scoped; every other period shows its concrete dates.
+export function rangeSubtitle(period: Period, range: PeriodRange): string {
+  if (period === 'thisMonth' || period === 'lastMonth') {
+    const parts = parseDayParts(range.start);
+    if (parts) return `${MONTH_ABBR[parts.m - 1]} ${parts.y}`;
+  }
+  return formatWindowLabel(range.start, range.end);
 }
 
 // ─── Category filter ─────────────────────────────────────────────────────────
@@ -275,6 +351,9 @@ export function TransactionSearchDrawer({ txns, onClose }: Props) {
     [period, today, customRange],
   );
   const rangeLabel = useMemo(() => formatRangeLabel(period, range), [period, range]);
+  // Concrete-dates subtitle under the title — disambiguates the wall-clock
+  // window the dropdown selected (and names the month after Jump to Latest).
+  const subtitle = useMemo(() => rangeSubtitle(period, range), [period, range]);
 
   // Pool to narrow over — every txn within the active period window.
   const periodTxns = useMemo(
@@ -430,6 +509,7 @@ export function TransactionSearchDrawer({ txns, onClose }: Props) {
             </svg>
           </button>
         </div>
+        <p className="txn-search-drawer-subtitle">{subtitle}</p>
         <p className="txn-search-drawer-summary">
           {visibleRows.length} transaction{visibleRows.length === 1 ? '' : 's'}
           <span className="txn-search-drawer-sum-sep" aria-hidden="true">·</span>
