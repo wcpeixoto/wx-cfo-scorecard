@@ -172,6 +172,34 @@ which layer.
 - Supabase (PostgREST HTTP via hand-rolled `sharedPersistence.ts`)
 - GitHub Pages deploy via GitHub Actions on push to `main`
 
+## Routing & navigation model
+
+No react-router nested `<Route>` routes, despite the dependency. `App.tsx` is a
+single catch-all `<Route path="/*" element={<Dashboard />}>`; all page selection
+lives in `Dashboard.tsx` via a flat `TabId` -> `TAB_TO_PATH` -> `pathToTab`
+switch, with unknown paths falling back to `today`. A path may have more than one
+segment (e.g. `/gym/retention`) as long as `pathToTab` maps it explicitly to a
+single `TabId`; it still resolves through the flat switch, not a nested route.
+
+Sidebar navigation is the `NAV_ITEMS` array in `AppSidebar.tsx` — a discriminated
+union of `NavLeaf` (a single `/x` link) and `NavGroup` (an expandable parent with
+`basePath` + `children`). The **Gym** group is the reference example
+(`basePath: '/gym'`, child `{ to: '/gym/retention', label: 'Retention' }`,
+treated as active when `location.pathname.startsWith(basePath)`); it is
+deliberately scaffolded to gain sibling children (Overview / Membership /
+Classes) as those pages become real.
+
+For a new surface, pick the simplest tier that fits:
+1. **Top-level page** — add a `NavLeaf` + a `TabId`/`TAB_TO_PATH` entry, and
+   handle its `/x` explicitly in `pathToTab` so it cannot fall through to Today.
+2. **In-page sub-tabs** — for sections within one page, use in-page state tabs
+   (the Settings `activeSection` pattern).
+3. **Expandable group with child pages** — only when a section genuinely needs
+   sibling subpages (the Gym pattern): add a `NavGroup` with `basePath` +
+   `children`, give each child a multi-segment path under `basePath`, and map
+   every child path explicitly in `pathToTab`. Don't reach for this tier for a
+   single flat page.
+
 ## Commands
 
 ```bash
