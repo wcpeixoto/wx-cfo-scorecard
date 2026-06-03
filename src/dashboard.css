@@ -13017,6 +13017,85 @@ body {
 .attendance-health-stat--silent .attendance-health-stat-value { color: var(--negative); }
 .attendance-health-stat--unknown .attendance-health-stat-value { color: var(--text-secondary); }
 
+/* ── Churn Risk by Tenure — live (sample-data) tenure-band risk table ─────
+   Full-width Patterns card. Card outer stays the locked white .card surface
+   (UI_CARDS); only inner content is styled here, reusing the .silent-churn-*
+   table idiom and the .attendance-health-* hero scale. No new hex values. */
+.churn-tenure-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.churn-tenure-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.churn-tenure-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.churn-tenure-hero-value {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.churn-tenure-hero-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.churn-tenure-helper,
+.churn-tenure-empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.churn-tenure-head,
+.churn-tenure-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 72px 88px;
+  gap: 12px;
+  align-items: center;
+}
+.churn-tenure-head {
+  padding: 0 0 8px;
+}
+.churn-tenure-head .churn-tenure-col {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+.churn-tenure-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.churn-tenure-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.churn-tenure-col--band {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.churn-tenure-col--num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.churn-tenure-row--hero { background: var(--bg-main); }
+.churn-tenure-row--hero .churn-tenure-col--band { font-weight: 600; }
+.churn-tenure-row--hero .churn-tenure-col--num:last-child { color: var(--warning); }
+
 /* ============================================================
    Expandable sidebar nav group (TailAdmin submenu pattern).
    Gym is a toggle button (reuses .app-sidebar-link) that reveals an
