@@ -40,3 +40,46 @@ parked. Fixtures only. Code computes truth; AI only rephrases.
   other Settings panes, so it freezes with them when Settings is locked (unlock
   to edit). It's local/non-financial, but kept under the lock for consistency so
   a stray click can't move the Gym card's headline figure during a walkthrough.
+
+---
+
+## Attendance Health — Gym › Retention (2nd Watch card)
+
+- **Status:** Done (PR pending review)
+- **Priority:** P2
+
+**Result.** The full-width `gym-card--full` Attendance Health card below the
+Silent Churn hero buckets active members by recency at the live threshold T —
+Healthy 0–7d · Watch 8…(T−1)d · Silent ≥T. The Watch count is the hero ("members
+on watch"); a Healthy/Watch/Silent breakdown sits below (+ an Unknown tile only
+when an active member has a bad/missing check-in date). The Silent count always
+equals the Silent Churn card's at-risk count, and all buckets react when the
+Settings threshold changes.
+
+**Why.** Silent Churn shows who has already crossed the line; Attendance Health
+shows who is *drifting toward* it — the early-warning cohort an owner can still
+save. It reuses the threshold the owner already tuned, so the two cards tell one
+coherent story instead of two disconnected ones.
+
+**Premise.** Same as Silent Churn: no real member data (`contract.ts` is
+financial-only, Wodify parked), sample fixture only. Code computes truth; copy
+only rephrases. v1 is a recency snapshot — no trend and no per-member call-list
+(lastCheckIn alone can't honestly show a trend; the call-list is Silent Churn's
+job).
+
+### Implementation notes
+
+- Both cards read ONE `classifyMember(member, resolvedT, asOf)` in
+  `src/lib/gym/silentChurn.ts` — the shared active-filter + bad-date skip + `>= T`
+  predicate, so they can't disagree. `computeSilentChurn` was refactored onto it
+  (proven byte-identical across a threshold sweep) and `computeAttendanceHealth`
+  tallies the buckets. `unknown` (active + unparseable date) is never folded into
+  Healthy; `healthy + watch + silent + unknown === activeTotal` holds by
+  construction.
+- `WATCH_FLOOR_DAYS = 8` is the named Watch floor. When the resolved threshold is
+  ≤ 8 the Watch band is empty by construction and the helper copy is guarded so it
+  never renders an inverted "8–7" range.
+- Card content is in `AttendanceHealthCard` (`GymPage.tsx`); `.attendance-health-*`
+  styling mirrors `.silent-churn-*` and keeps the locked white `.card` outer
+  (UI_CARDS). Verified live at T=21 (9/5/6), T=14 (9/2/9), and T=8 (Watch=0 empty
+  state); buckets react to the Settings threshold.

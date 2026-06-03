@@ -10,6 +10,14 @@ export const DEFAULT_SILENT_CHURN_THRESHOLD_DAYS = 21;
 const MIN_THRESHOLD_DAYS = 1;
 const MAX_THRESHOLD_DAYS = 365;
 
+// Lower edge of the "Watch" recency band (Attendance Health). A member is on
+// Watch when they are below the Silent Churn threshold but have been absent at
+// least this many whole days. Named so the band math and the helper copy share
+// one definition and the floor never silently drifts from the copy. When the
+// resolved threshold is <= this floor the Watch band is empty by construction
+// (every active member is either Healthy < T or Silent >= T).
+export const WATCH_FLOOR_DAYS = 8;
+
 // Single resolver for the threshold — used by both the local settings store and
 // any consumer, so the rule has exactly one definition. Clamps to a positive
 // integer in [1, 365]; missing / invalid / unset / <= 0 all fall back to the
@@ -64,11 +72,45 @@ function wholeDaysBetween(from: Date, to: Date): number {
   return Math.round((b.getTime() - a.getTime()) / MS_PER_DAY);
 }
 
+// Recency bucket for a single ACTIVE member. `unknown` means active but with an
+// unparseable/missing lastCheckIn — it is NEVER folded into Healthy.
+export type AttendanceBucket = 'healthy' | 'watch' | 'silent' | 'unknown';
+
+// Classification of one member against a resolved threshold. The discriminated
+// shape ties daysAbsent to the bucket: a Healthy/Watch/Silent member always has
+// a real day count, an `unknown` member has none (its date didn't parse).
+export type MemberClassification =
+  | { bucket: Exclude<AttendanceBucket, 'unknown'>; daysAbsent: number }
+  | { bucket: 'unknown'; daysAbsent: null };
+
+// The ONE place the active-member recency rule lives. Both computeSilentChurn
+// (silent rows) and computeAttendanceHealth (the H/W/S/unknown tally) build on
+// this, so the active-filter + bad-date skip + >= threshold predicate have
+// exactly one definition and the two cards can never disagree.
+//
+// `thresholdDays` MUST already be resolved (see resolveSilentChurnThresholdDays);
+// the caller resolves once and passes the resolved value in. Returns null for a
+// non-active member (excluded from every bucket — not counted at all).
+export function classifyMember(
+  member: GymMember,
+  thresholdDays: number,
+  asOf: Date,
+): MemberClassification | null {
+  if (member.status !== 'active') return null;
+  const lastCheckIn = parseYmdLocal(member.lastCheckIn);
+  if (!lastCheckIn) return { bucket: 'unknown', daysAbsent: null };
+  const daysAbsent = wholeDaysBetween(lastCheckIn, asOf);
+  if (daysAbsent >= thresholdDays) return { bucket: 'silent', daysAbsent };
+  if (daysAbsent >= WATCH_FLOOR_DAYS) return { bucket: 'watch', daysAbsent };
+  return { bucket: 'healthy', daysAbsent };
+}
+
 // The Silent Churn rule (deterministic): a member counts when
 //   status === 'active'  AND  daysSinceLastCheckIn >= thresholdDays.
 // Returns the count, total monthly dues at risk, and a call-list sorted by days
 // absent (most absent first). The threshold is resolved here too, so callers
-// can pass a raw stored value safely.
+// can pass a raw stored value safely. The at-risk set is exactly the members
+// classifyMember puts in the `silent` bucket.
 export function computeSilentChurn(
   members: GymMember[],
   thresholdDays: number,
@@ -78,18 +120,14 @@ export function computeSilentChurn(
 
   const rows: SilentChurnRow[] = [];
   for (const member of members) {
-    if (member.status !== 'active') continue;
-    const lastCheckIn = parseYmdLocal(member.lastCheckIn);
-    if (!lastCheckIn) continue;
-    const daysAbsent = wholeDaysBetween(lastCheckIn, asOf);
-    if (daysAbsent >= resolvedThreshold) {
-      rows.push({
-        id: member.id,
-        displayName: member.displayName,
-        daysAbsent,
-        monthlyDues: member.monthlyDues,
-      });
-    }
+    const classification = classifyMember(member, resolvedThreshold, asOf);
+    if (classification?.bucket !== 'silent') continue;
+    rows.push({
+      id: member.id,
+      displayName: member.displayName,
+      daysAbsent: classification.daysAbsent,
+      monthlyDues: member.monthlyDues,
+    });
   }
 
   rows.sort((a, b) => b.daysAbsent - a.daysAbsent);
@@ -101,5 +139,61 @@ export function computeSilentChurn(
     count: rows.length,
     monthlyDuesAtRisk,
     rows,
+  };
+}
+
+export type AttendanceHealthResult = {
+  thresholdDays: number; // resolved threshold the buckets were cut at
+  activeTotal: number; // healthy + watch + silent + unknown (integrity sum)
+  healthy: number; // active, 0..WATCH_FLOOR_DAYS-1 days absent
+  watch: number; // active, WATCH_FLOOR_DAYS..thresholdDays-1 days absent
+  silent: number; // active, >= thresholdDays days absent (== computeSilentChurn count)
+  unknown: number; // active but unparseable/missing lastCheckIn (NOT Healthy)
+};
+
+// Attendance Health (deterministic): tally ACTIVE members into recency buckets
+// at the resolved threshold. Built on the same classifyMember as Silent Churn,
+// so `silent` here equals computeSilentChurn's count by construction. The
+// returned activeTotal is the sum of the four buckets, so the integrity
+// invariant healthy + watch + silent + unknown === activeTotal holds by
+// construction — there is no path that drops or double-counts an active member.
+export function computeAttendanceHealth(
+  members: GymMember[],
+  thresholdDays: number,
+  asOf: Date,
+): AttendanceHealthResult {
+  const resolvedThreshold = resolveSilentChurnThresholdDays(thresholdDays);
+
+  let healthy = 0;
+  let watch = 0;
+  let silent = 0;
+  let unknown = 0;
+
+  for (const member of members) {
+    const classification = classifyMember(member, resolvedThreshold, asOf);
+    if (!classification) continue; // not active — excluded from every bucket
+    switch (classification.bucket) {
+      case 'healthy':
+        healthy += 1;
+        break;
+      case 'watch':
+        watch += 1;
+        break;
+      case 'silent':
+        silent += 1;
+        break;
+      case 'unknown':
+        unknown += 1;
+        break;
+    }
+  }
+
+  return {
+    thresholdDays: resolvedThreshold,
+    activeTotal: healthy + watch + silent + unknown,
+    healthy,
+    watch,
+    silent,
+    unknown,
   };
 }

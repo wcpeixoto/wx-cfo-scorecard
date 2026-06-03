@@ -12940,6 +12940,83 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Attendance Health — live (sample-data) recency buckets ──────────────
+   Full-width secondary below the Silent Churn hero. Card outer stays the
+   locked white .card surface (UI_CARDS); only inner content is styled here,
+   mirroring the .silent-churn-* inner scale. The breakdown tiles are inner
+   sub-elements (UI_CARDS out of scope), matching the .gym-card-body inset
+   (12px radius, --bg-main, 1px --line). */
+.attendance-health-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.attendance-health-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.attendance-health-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.attendance-health-hero-value {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.attendance-health-hero-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.attendance-health-helper,
+.attendance-health-empty,
+.attendance-health-takeaway {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.attendance-health-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+}
+.attendance-health-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 0;
+  min-width: 96px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-main);
+}
+.attendance-health-stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+.attendance-health-stat-value {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.attendance-health-stat--healthy .attendance-health-stat-value { color: var(--positive); }
+.attendance-health-stat--watch .attendance-health-stat-value { color: var(--warning); }
+.attendance-health-stat--silent .attendance-health-stat-value { color: var(--negative); }
+.attendance-health-stat--unknown .attendance-health-stat-value { color: var(--text-secondary); }
+
 /* ============================================================
    Expandable sidebar nav group (TailAdmin submenu pattern).
    Gym is a toggle button (reuses .app-sidebar-link) that reveals an

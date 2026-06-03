@@ -7,7 +7,11 @@
 import { useMemo } from 'react';
 import { useRetentionSettings } from '../context/RetentionSettingsContext';
 import { FIXTURE_TODAY, SAMPLE_GYM_MEMBERS } from '../lib/gym/memberFixture';
-import { computeSilentChurn } from '../lib/gym/silentChurn';
+import {
+  WATCH_FLOOR_DAYS,
+  computeAttendanceHealth,
+  computeSilentChurn,
+} from '../lib/gym/silentChurn';
 
 export function GymPage() {
   return (
@@ -36,11 +40,7 @@ export function GymPage() {
             </div>
             <div className="gym-card-grid">
               <SilentChurnCard />
-              <GymCardShell
-                modifier="gym-card--full"
-                title="Attendance Health"
-                subtitle="Early warning before silent churn."
-              />
+              <AttendanceHealthCard />
             </div>
           </section>
 
@@ -153,6 +153,94 @@ function SilentChurnCard() {
               ))}
             </ul>
           </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+// Attendance Health — full-width secondary signal below the Silent Churn hero.
+// Buckets ACTIVE members by recency at the LIVE resolved threshold (Healthy
+// 0–7d · Watch 8…T−1d · Silent ≥T) using the same classifyMember the Silent
+// Churn card uses, so the Silent count here always equals that card's at-risk
+// count. The Watch count is the hero: members drifting but not yet churned.
+// Deterministic — the copy only rephrases code-computed counts. No trend and no
+// per-member call-list in v1: lastCheckIn alone can't honestly show a trend,
+// and the call-list is the Silent Churn card's job.
+function AttendanceHealthCard() {
+  const { silentChurnThresholdDays } = useRetentionSettings();
+
+  const result = useMemo(
+    () => computeAttendanceHealth(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
+    [silentChurnThresholdDays],
+  );
+
+  const { thresholdDays, healthy, watch, silent, unknown } = result;
+
+  // Copy reads the RESOLVED threshold (result.thresholdDays), never the raw
+  // setting. The Watch band is [WATCH_FLOOR_DAYS, thresholdDays − 1]. When the
+  // threshold is at/below the watch floor the band is empty by construction
+  // (watch is always 0), so guard the helper to never render an inverted "8–7".
+  const watchUpper = thresholdDays - 1;
+  const helper =
+    thresholdDays <= WATCH_FLOOR_DAYS
+      ? `Active members nearing the ${thresholdDays}-day Silent Churn threshold.`
+      : watchUpper === WATCH_FLOOR_DAYS
+        ? `Active members at ${WATCH_FLOOR_DAYS} days since last check-in.`
+        : `Active members ${WATCH_FLOOR_DAYS}–${watchUpper} days since last check-in.`;
+
+  return (
+    <article className="card gym-card gym-card--full attendance-health-card">
+      <header className="gym-card-head">
+        <div className="attendance-health-titlerow">
+          <h3 className="gym-card-title">Attendance Health</h3>
+          <span className="gym-sample-badge">Sample data</span>
+        </div>
+        <p className="gym-card-subtitle">Early warning before silent churn.</p>
+      </header>
+
+      <div className="attendance-health-body">
+        {watch === 0 ? (
+          <p className="attendance-health-empty">
+            No active members are drifting toward the {thresholdDays}-day threshold right now.
+          </p>
+        ) : (
+          <>
+            <div className="attendance-health-hero">
+              <span className="attendance-health-hero-value">{watch}</span>
+              <span className="attendance-health-hero-label">
+                {watch === 1 ? 'member on watch' : 'members on watch'}
+              </span>
+            </div>
+            <p className="attendance-health-helper">{helper}</p>
+          </>
+        )}
+
+        <dl className="attendance-health-breakdown">
+          <div className="attendance-health-stat attendance-health-stat--healthy">
+            <dt className="attendance-health-stat-label">Healthy</dt>
+            <dd className="attendance-health-stat-value">{healthy}</dd>
+          </div>
+          <div className="attendance-health-stat attendance-health-stat--watch">
+            <dt className="attendance-health-stat-label">Watch</dt>
+            <dd className="attendance-health-stat-value">{watch}</dd>
+          </div>
+          <div className="attendance-health-stat attendance-health-stat--silent">
+            <dt className="attendance-health-stat-label">Silent</dt>
+            <dd className="attendance-health-stat-value">{silent}</dd>
+          </div>
+          {unknown > 0 && (
+            <div className="attendance-health-stat attendance-health-stat--unknown">
+              <dt className="attendance-health-stat-label">Unknown</dt>
+              <dd className="attendance-health-stat-value">{unknown}</dd>
+            </div>
+          )}
+        </dl>
+
+        {watch > 0 && (
+          <p className="attendance-health-takeaway">
+            Drifting, but haven&rsquo;t crossed the Silent Churn threshold yet.
+          </p>
         )}
       </div>
     </article>
