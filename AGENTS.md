@@ -7,8 +7,8 @@ quick verification over heavy process.
 
 ## Agent roles
 
-Four AI surfaces work on this repo, with **disconnected memory** — which is
-why these repo docs are canonical: they're the one place all four reconcile.
+Five AI surfaces work on this repo, with **disconnected memory** — which is
+why these repo docs are canonical: they're the one place all five reconcile.
 Use the **handle** in day-to-day reference. Never call the Anthropic CLI
 "Codex" or the OpenAI agent "Claude Code."
 
