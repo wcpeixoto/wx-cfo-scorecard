@@ -53,7 +53,9 @@ export type SilentChurnResult = {
 // Parse a YYYY-MM-DD string into a LOCAL-midnight Date. Returns null on a
 // malformed string. new Date(y, m, d) is used deliberately — never
 // new Date('YYYY-MM-DD') (parses as UTC, shifts a day in US zones). AGENTS.md.
-function parseYmdLocal(ymd: string): Date | null {
+// Exported so sibling Retention rule modules (e.g. churnRiskByTenure) reuse this
+// single definition rather than re-implementing local-date parsing.
+export function parseYmdLocal(ymd: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
   if (!match) return null;
   const year = Number(match[1]);
@@ -64,8 +66,9 @@ function parseYmdLocal(ymd: string): Date | null {
 }
 
 // Whole calendar days between two dates, normalized to local midnight so DST
-// transitions can't produce a fractional/off-by-one day.
-function wholeDaysBetween(from: Date, to: Date): number {
+// transitions can't produce a fractional/off-by-one day. Exported alongside
+// parseYmdLocal so tenure math reuses the same day-diff rule as recency math.
+export function wholeDaysBetween(from: Date, to: Date): number {
   const MS_PER_DAY = 24 * 60 * 60 * 1000;
   const a = new Date(from.getFullYear(), from.getMonth(), from.getDate());
   const b = new Date(to.getFullYear(), to.getMonth(), to.getDate());

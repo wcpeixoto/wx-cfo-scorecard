@@ -12,6 +12,7 @@ import {
   computeAttendanceHealth,
   computeSilentChurn,
 } from '../lib/gym/silentChurn';
+import { computeChurnRiskByTenure } from '../lib/gym/churnRiskByTenure';
 
 export function GymPage() {
   return (
@@ -58,11 +59,7 @@ export function GymPage() {
                 title="Member Movement"
                 subtitle="Is acquisition beating churn, or is churn eating growth?"
               />
-              <GymCardShell
-                modifier="gym-card--half"
-                title="Churn by Tenure"
-                subtitle="At what point in the membership do people leave?"
-              />
+              <ChurnRiskByTenureCard />
               <GymCardShell
                 modifier="gym-card--half"
                 title="Churn by Age"
@@ -88,6 +85,11 @@ export function GymPage() {
 
 // Whole dollars, no cents — these are monthly-dues figures, not reconciled cash.
 const usd = (amount: number) => `$${Math.round(amount).toLocaleString('en-US')}`;
+
+// Whole-percent risk rate. A null rate means the band has no active members, so
+// there is no denominator to take a rate over — render an em dash, never "0%"
+// (which would imply low risk where there is simply no data).
+const formatRate = (rate: number | null) => (rate === null ? '—' : `${Math.round(rate * 100)}%`);
 
 // Silent Churn hero — the Retention page's dominant live signal. Reads the
 // owner-tuned threshold from the local Retention settings store and renders a
@@ -242,6 +244,78 @@ function AttendanceHealthCard() {
             Drifting, but haven&rsquo;t crossed the Silent Churn threshold yet.
           </p>
         )}
+      </div>
+    </article>
+  );
+}
+
+// Churn Risk by Tenure — the first Patterns card to turn the member layer into a
+// segment insight. Buckets ACTIVE members by tenure (days since membershipStart)
+// and, within each band, shows what share are at risk (on watch OR silent) at the
+// LIVE resolved threshold, using the same classifyMember the Watch cards use — so
+// the silent slices here re-partition the Silent Churn set rather than redefining
+// it. The hero is the band with the highest risk rate. Deterministic: the copy
+// only rephrases code-computed counts and rates; it never authors the at-risk call.
+function ChurnRiskByTenureCard() {
+  const { silentChurnThresholdDays } = useRetentionSettings();
+
+  const result = useMemo(
+    () => computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
+    [silentChurnThresholdDays],
+  );
+
+  const { thresholdDays, activeTotal, bands, heroBandId } = result;
+  const heroBand = bands.find((b) => b.id === heroBandId) ?? null;
+
+  return (
+    <article className="card gym-card gym-card--full churn-tenure-card">
+      <header className="gym-card-head">
+        <div className="churn-tenure-titlerow">
+          <h3 className="gym-card-title">Churn Risk by Tenure</h3>
+          <span className="gym-sample-badge">Sample data</span>
+        </div>
+        <p className="gym-card-subtitle">Which tenure cohort is drifting most.</p>
+      </header>
+
+      <div className="churn-tenure-body">
+        {activeTotal === 0 || !heroBand ? (
+          <p className="churn-tenure-empty">No active members to analyze right now.</p>
+        ) : (
+          <>
+            <div className="churn-tenure-hero">
+              <span className="churn-tenure-hero-value">{formatRate(heroBand.riskRate)}</span>
+              <span className="churn-tenure-hero-label">
+                at risk in the {heroBand.label} cohort — the highest by tenure
+              </span>
+            </div>
+            <p className="churn-tenure-helper">
+              At-risk = active members on watch or silent at the {thresholdDays}-day threshold
+              ({heroBand.atRisk} of {heroBand.activeTotal} active in this band).
+            </p>
+          </>
+        )}
+
+        <div className="churn-tenure-table">
+          <div className="churn-tenure-head">
+            <span className="churn-tenure-col churn-tenure-col--band">Tenure</span>
+            <span className="churn-tenure-col churn-tenure-col--num">Active</span>
+            <span className="churn-tenure-col churn-tenure-col--num">At risk</span>
+            <span className="churn-tenure-col churn-tenure-col--num">Risk rate</span>
+          </div>
+          <ul className="churn-tenure-rows">
+            {bands.map((b) => (
+              <li
+                key={b.id}
+                className={`churn-tenure-row${b.id === heroBandId ? ' churn-tenure-row--hero' : ''}`}
+              >
+                <span className="churn-tenure-col churn-tenure-col--band">{b.label}</span>
+                <span className="churn-tenure-col churn-tenure-col--num">{b.activeTotal}</span>
+                <span className="churn-tenure-col churn-tenure-col--num">{b.atRisk}</span>
+                <span className="churn-tenure-col churn-tenure-col--num">{formatRate(b.riskRate)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </article>
   );
