@@ -238,6 +238,13 @@ npm run preview
 - `src/lib/data/contract.ts` — TypeScript schema
 - `src/lib/data/sharedPersistence.ts` — Supabase layer
 - `.github/workflows/` — deploy pipeline
+- `src/lib/gym/silentChurn.ts` — shared Retention classifier. `classifyMember`
+  (active filter + bad-date skip + `>= threshold` predicate) and the date
+  helpers `parseYmdLocal` / `wholeDaysBetween` are the single source of truth
+  for Silent Churn, Attendance Health, and Churn Risk by Tenure. The cross-card
+  tests guard against drift *between* cards, but not against a wrong-but-
+  consistent edit to the shared rule itself — change it deliberately, with a
+  clear reason, and re-verify every consumer.
 
 ---
 
