@@ -57,7 +57,7 @@ Status: **built and merged in #411** (verified live on `main`, byte-identical to
 
 **Card name is `Churn Risk by Tenure`** — this is what shipped in #411 (module, test, and title) and what #412 locks in `AGENTS.md`. Do not introduce "Member Risk Timeline" or "Risk by Time as Member" in any new title, file, test, or copy. Code and plan now agree; no rename is owed.
 
-- **Subtitle:** "When do members start slipping away?"
+- **Subtitle:** "Which tenure cohort is drifting most."
 - **Purpose:** show which membership-duration group holds the most risk.
 - **Section:** Patterns.
 
