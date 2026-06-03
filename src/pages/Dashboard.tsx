@@ -870,8 +870,9 @@ export default function Dashboard() {
   const [activeSection, setActiveSection] = useState<'data' | 'accounts' | 'rules' | 'contracts' | 'retention'>('data');
 
   // Local Retention settings (Silent Churn threshold) — browser-local store,
-  // separate from the CFO financial settings. The pane lives outside the
-  // financial edit-lock fieldset, so this stays editable.
+  // separate from the CFO financial settings (NOT WorkspaceSettings/Supabase).
+  // The Settings control sits inside the edit-lock fieldset with the other
+  // panes, so it freezes alongside them when Settings is locked.
   const { silentChurnThresholdDays, setSilentChurnThresholdDays } = useRetentionSettings();
 
   // Settings edit lock — partner-walkthrough protection.
@@ -4748,15 +4749,14 @@ export default function Dashboard() {
                 />
               </div>
 
-              </fieldset>{/* end settings-content-shell */}
-
               {/* ── Section 5: RETENTION ──────────────────────────────────
-                  Gym/Retention operating settings. Local, non-financial, and
-                  browser-only — intentionally OUTSIDE the financial edit-lock
-                  fieldset above (like Forecast, the lock guards the CFO
-                  financial settings, not this). Stays editable so the owner can
-                  tune the threshold and watch the Gym › Retention card recompute. */}
-              <div className={`settings-content-shell settings-section-pane${activeSection === 'retention' ? '' : ' is-hidden'}`}>
+                  Gym/Retention operating settings (Silent Churn threshold).
+                  Local, browser-only, non-financial — but kept INSIDE the
+                  edit-lock fieldset with the other Settings panes, so it freezes
+                  with the rest of Settings during a partner walkthrough (a stray
+                  tab-click can't move the Gym card's headline number while
+                  locked). Unlock to edit. */}
+              <div className={`settings-section-pane${activeSection === 'retention' ? '' : ' is-hidden'}`}>
                 <div className="ta-section">
                   <div className="ta-section-header">
                     <h2 className="ta-section-title sr-only">Retention</h2>
@@ -4802,6 +4802,8 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
+
+              </fieldset>{/* end settings-content-shell */}
             </div>
 
             {isUnlockModalOpen && (

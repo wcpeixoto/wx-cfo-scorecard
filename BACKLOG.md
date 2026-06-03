@@ -36,5 +36,7 @@ parked. Fixtures only. Code computes truth; AI only rephrases.
 - The threshold persists in a local store (`RetentionSettingsContext`,
   localStorage `wx_retention_settings`) following the `SidebarContext` precedent —
   NOT in `WorkspaceSettings` / `sharedPersistence.ts` (locked), no Supabase column.
-- The Retention Settings section sits outside the financial edit-lock fieldset
-  (like Forecast), so the local threshold stays editable.
+- The Retention Settings section sits inside the edit-lock fieldset with the
+  other Settings panes, so it freezes with them when Settings is locked (unlock
+  to edit). It's local/non-financial, but kept under the lock for consistency so
+  a stray click can't move the Gym card's headline figure during a walkthrough.
