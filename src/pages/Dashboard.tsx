@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { AppSidebar } from '../components/AppSidebar';
 import { AppHeader } from '../components/AppHeader';
 import { useSidebar } from '../context/SidebarContext';
+import { useRetentionSettings } from '../context/RetentionSettingsContext';
 import CashFlowForecastModule from '../components/CashFlowForecastModule';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
@@ -866,7 +867,13 @@ export default function Dashboard() {
   // this pattern — the completed-only guard would no longer be
   // sufficient against re-entrancy.
   const renewalRegenerationCompletedRef = useRef(false);
-  const [activeSection, setActiveSection] = useState<'data' | 'accounts' | 'rules' | 'contracts'>('data');
+  const [activeSection, setActiveSection] = useState<'data' | 'accounts' | 'rules' | 'contracts' | 'retention'>('data');
+
+  // Local Retention settings (Silent Churn threshold) — browser-local store,
+  // separate from the CFO financial settings (NOT WorkspaceSettings/Supabase).
+  // The Settings control sits inside the edit-lock fieldset with the other
+  // panes, so it freezes alongside them when Settings is locked.
+  const { silentChurnThresholdDays, setSilentChurnThresholdDays } = useRetentionSettings();
 
   // Settings edit lock — partner-walkthrough protection.
   // Default LOCKED on mount; React state (no sessionStorage) so refresh re-locks.
@@ -3773,6 +3780,13 @@ export default function Dashboard() {
                   >
                     Contracts &amp; Renewals
                   </button>
+                  <button
+                    type="button"
+                    className={`settings-subnav-btn${activeSection === 'retention' ? ' is-active' : ''}`}
+                    onClick={() => setActiveSection('retention')}
+                  >
+                    Retention
+                  </button>
                 </div>
               </div>
 
@@ -4733,6 +4747,60 @@ export default function Dashboard() {
                   onUpdate={handleUpdateRenewalContract}
                   onDelete={handleDeleteRenewalContract}
                 />
+              </div>
+
+              {/* ── Section 5: RETENTION ──────────────────────────────────
+                  Gym/Retention operating settings (Silent Churn threshold).
+                  Local, browser-only, non-financial — but kept INSIDE the
+                  edit-lock fieldset with the other Settings panes, so it freezes
+                  with the rest of Settings during a partner walkthrough (a stray
+                  tab-click can't move the Gym card's headline number while
+                  locked). Unlock to edit. */}
+              <div className={`settings-section-pane${activeSection === 'retention' ? '' : ' is-hidden'}`}>
+                <div className="ta-section">
+                  <div className="ta-section-header">
+                    <h2 className="ta-section-title sr-only">Retention</h2>
+                  </div>
+                  <div className="ta-section-body">
+                    <div className="ta-card">
+                      <div className="ta-card-header">
+                        <h3 className="ta-card-title">Retention</h3>
+                      </div>
+                      <div className="ta-card-body">
+                        <div className="rules-list">
+                          <div className="rules-row">
+                            <div className="rules-row-info">
+                              <span className="rules-row-label">Silent Churn Threshold</span>
+                              <span className="rules-row-sub">
+                                Active members with no check-ins for this many days will be counted as Silent Churn.
+                              </span>
+                            </div>
+                            <div className="rules-row-control">
+                              <div className="rules-pct-input-wrap">
+                                <input
+                                  className="rules-pct-input"
+                                  type="number"
+                                  min="1"
+                                  max="365"
+                                  step="1"
+                                  aria-label="Silent Churn threshold in days"
+                                  value={silentChurnThresholdDays}
+                                  onChange={(event) => {
+                                    const raw = Number.parseInt(event.target.value, 10);
+                                    if (Number.isFinite(raw) && raw >= 1 && raw <= 365) {
+                                      setSilentChurnThresholdDays(raw);
+                                    }
+                                  }}
+                                />
+                                <span className="rules-pct-suffix">days</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               </fieldset>{/* end settings-content-shell */}
