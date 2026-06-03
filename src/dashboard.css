@@ -13096,6 +13096,132 @@ body {
 .churn-tenure-row--hero .churn-tenure-col--band { font-weight: 600; }
 .churn-tenure-row--hero .churn-tenure-col--num:last-child { color: var(--warning); }
 
+/* ── Member Movement — live (sample-data) census + join-cohort intake ─────
+   Full-width Patterns card. Snapshot only: a RAW status census and intake by
+   join half-year — no movement-over-time (the fixture carries no dated status
+   changes). Card outer stays the locked white .card surface (UI_CARDS); only
+   inner content is styled here, reusing the .attendance-health-* tile scale and
+   the .churn-tenure-* table idiom. No new hex values. */
+.member-movement-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.member-movement-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.member-movement-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.member-movement-hero-value {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.member-movement-hero-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.member-movement-helper,
+.member-movement-empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.member-movement-census {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+}
+.member-movement-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 0;
+  min-width: 96px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-main);
+}
+.member-movement-stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+.member-movement-stat-value {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.member-movement-stat--active .member-movement-stat-value { color: var(--positive); }
+.member-movement-stat--paused .member-movement-stat-value { color: var(--warning); }
+.member-movement-stat--ended .member-movement-stat-value { color: var(--text-secondary); }
+.member-movement-intake {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.member-movement-intake-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+.member-movement-head,
+.member-movement-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 12px;
+  align-items: center;
+}
+.member-movement-head {
+  padding: 0 0 8px;
+}
+.member-movement-head .member-movement-col {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+.member-movement-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.member-movement-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.member-movement-col--cohort {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.member-movement-col--num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ============================================================
    Expandable sidebar nav group (TailAdmin submenu pattern).
    Gym is a toggle button (reuses .app-sidebar-link) that reveals an

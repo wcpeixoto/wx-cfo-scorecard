@@ -13,6 +13,7 @@ import {
   computeSilentChurn,
 } from '../lib/gym/silentChurn';
 import { computeChurnRiskByTenure } from '../lib/gym/churnRiskByTenure';
+import { computeMemberMovement } from '../lib/gym/memberMovement';
 
 export function GymPage() {
   return (
@@ -54,11 +55,7 @@ export function GymPage() {
               <p className="gym-section-helper">Monthly trends that explain where churn is happening.</p>
             </div>
             <div className="gym-card-grid">
-              <GymCardShell
-                modifier="gym-card--full"
-                title="Member Movement"
-                subtitle="Is acquisition beating churn, or is churn eating growth?"
-              />
+              <MemberMovementCard />
               <ChurnRiskByTenureCard />
               <GymCardShell
                 modifier="gym-card--half"
@@ -315,6 +312,93 @@ function ChurnRiskByTenureCard() {
               </li>
             ))}
           </ul>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+// Member Movement — the Patterns card that turns the member layer into a
+// snapshot of the base: a current status CENSUS (active / paused / ended) and
+// INTAKE by join half-year. Deliberately NOT a movement-over-time card — the
+// fixture carries only a current status and a membershipStart, with no dated
+// status changes, so any net-flow / cancellation trend would be invented history
+// (RETENTION_FINISH_PLAN items 5–6). This card classifies no risk: it uses no
+// threshold and no classifyMember, so it has no asOf and no anti-drift check.
+// Deterministic — the copy only rephrases code-computed counts.
+function MemberMovementCard() {
+  const { census, cohorts, unknownJoin } = useMemo(
+    () => computeMemberMovement(SAMPLE_GYM_MEMBERS),
+    [],
+  );
+
+  return (
+    <article className="card gym-card gym-card--full member-movement-card">
+      <header className="gym-card-head">
+        <div className="member-movement-titlerow">
+          <h3 className="gym-card-title">Member Movement</h3>
+          <span className="gym-sample-badge">Sample data</span>
+        </div>
+        <p className="gym-card-subtitle">Current member mix and when they joined.</p>
+      </header>
+
+      <div className="member-movement-body">
+        {/* Census — raw current status tally (active / paused / ended). */}
+        <div className="member-movement-hero">
+          <span className="member-movement-hero-value">{census.active}</span>
+          <span className="member-movement-hero-label">
+            {census.active === 1 ? 'active member today' : 'active members today'}
+          </span>
+        </div>
+        <p className="member-movement-helper">
+          Current mix of a {census.total}-member base.
+        </p>
+
+        <dl className="member-movement-census">
+          <div className="member-movement-stat member-movement-stat--active">
+            <dt className="member-movement-stat-label">Active</dt>
+            <dd className="member-movement-stat-value">{census.active}</dd>
+          </div>
+          <div className="member-movement-stat member-movement-stat--paused">
+            <dt className="member-movement-stat-label">Paused</dt>
+            <dd className="member-movement-stat-value">{census.paused}</dd>
+          </div>
+          <div className="member-movement-stat member-movement-stat--ended">
+            <dt className="member-movement-stat-label">Ended</dt>
+            <dd className="member-movement-stat-value">{census.ended}</dd>
+          </div>
+        </dl>
+
+        {/* Intake by join half-year — ALL members by membershipStart. A join
+            timeline (honestly computable from one field), not a status-movement
+            series. */}
+        <div className="member-movement-intake">
+          <p className="member-movement-intake-title">New members by join cohort</p>
+          {cohorts.length === 0 ? (
+            <p className="member-movement-empty">No recorded join dates to chart right now.</p>
+          ) : (
+            <div className="member-movement-table">
+              <div className="member-movement-head">
+                <span className="member-movement-col member-movement-col--cohort">Joined</span>
+                <span className="member-movement-col member-movement-col--num">New members</span>
+              </div>
+              <ul className="member-movement-rows">
+                {cohorts.map((cohort) => (
+                  <li key={cohort.id} className="member-movement-row">
+                    <span className="member-movement-col member-movement-col--cohort">{cohort.label}</span>
+                    <span className="member-movement-col member-movement-col--num">{cohort.count}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {unknownJoin > 0 && (
+            <p className="member-movement-helper">
+              {unknownJoin === 1
+                ? '1 member with no recorded join date.'
+                : `${unknownJoin} members with no recorded join date.`}
+            </p>
+          )}
         </div>
       </div>
     </article>
