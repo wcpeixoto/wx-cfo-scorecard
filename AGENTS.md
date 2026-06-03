@@ -23,6 +23,14 @@ Use the **handle** in day-to-day reference. Never call the Anthropic CLI
   paths, required reading, locked-files list). **Does not commit.**
 - **Advisor** — ChatGPT (OpenAI). External second opinion; no memory, no
   repo; prose in/out.
+- **Claude Advisor** — Claude Code (Anthropic), read-only. Independent
+  second opinion running *outside* this repo — no commits, no edits here.
+  Has full read access to all repo docs and source via local filesystem
+  (desktop app) or `gh` CLI (web). Serves as the two-AI gate validator:
+  Builder drafts → Claude Advisor reviews → Builder applies. Findings
+  logged to `ADVISOR-NOTES.md` in `wcpeixoto/advisor-wx-cfo-scorecard`.
+  Memory is isolated to that workspace; these repo docs are canonical for
+  it too.
 
 **Shared protocols.** Repo docs are canonical, memory is cache (docs win on
 conflict). Two-AI gate for irreversible actions: Builder drafts → Reviewer
