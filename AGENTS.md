@@ -9,8 +9,10 @@ quick verification over heavy process.
 
 Four AI surfaces work on this repo, with **disconnected memory** — which is
 why these repo docs are canonical: they're the one place all four reconcile.
-Use the **handle** in day-to-day reference. Never call the Anthropic CLI
-"Codex" or the OpenAI agent "Claude Code."
+Use the **handle** (role name) in day-to-day reference. Two surfaces are
+both "Claude Code" (Anthropic CLI) — the **Builder** and the **Reviewer** —
+so always disambiguate by role: the Builder commits, the Reviewer never
+does.
 
 - **Strategist** — Claude Chat (Anthropic, claude.ai). Planning, framing,
   product thinking. Anthropic-app memory (its own silo). No repo access;
@@ -18,11 +20,15 @@ Use the **handle** in day-to-day reference. Never call the Anthropic CLI
 - **Builder** — Claude Code (Anthropic, CLI). The **committer**: discovery,
   implements slices, opens PRs, browser-verifies, reads/persists the
   `.claude` repo memory. Drafts the self-contained prompts the Reviewer runs.
-- **Reviewer** — Codex (OpenAI). Cross-vendor **review + read-only/sandbox
-  execution**; **memory-blind** — every prompt must be self-contained (full
-  paths, required reading, locked-files list). **Does not commit.**
-- **Advisor** — ChatGPT (OpenAI). External second opinion; no memory, no
-  repo; prose in/out.
+- **Reviewer** — **Claude Code Advisor** (Anthropic CLI, read-only, run
+  from outside the repo). **Review + read-only/sandbox execution**;
+  independent by being a separate session that didn't write the code (no
+  longer cross-vendor); **memory-blind** — every prompt must be
+  self-contained (full paths, required reading, locked-files list). **Does
+  not commit.** Call it the **Reviewer**, not the "Advisor," to avoid
+  confusion with the ChatGPT Advisor below.
+- **Advisor** — ChatGPT (OpenAI). External, cross-vendor second opinion;
+  no memory, no repo; prose in/out.
 
 **Shared protocols.** Repo docs are canonical, memory is cache (docs win on
 conflict). Two-AI gate for irreversible actions: Builder drafts → Reviewer
@@ -264,7 +270,7 @@ TailAdmin source reference for patterns (replicate, don't reinvent):
 
 The CFO Assistant product loop is governed by
 `docs/CFO_ASSISTANT_PRINCIPLES.md` — the canonical, locked source of truth
-(memory caches in Claude/Codex sessions may drift; that doc wins on
+(memory caches in the Claude sessions may drift; that doc wins on
 conflict). **Read it before any CFO Assistant work.**
 
 ---
