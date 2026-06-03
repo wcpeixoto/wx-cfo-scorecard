@@ -12838,6 +12838,108 @@ body {
   .gym-card--half { grid-column: 1 / -1; }
 }
 
+/* ── Silent Churn — live (sample-data) hero card ─────────────────────────
+   Renders a code-computed at-risk call-list. Card outer stays the locked
+   white .card surface (UI_CARDS); only the inner content is styled here. */
+.silent-churn-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.gym-sample-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--warning);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--warning);
+  background: var(--bg-main);
+  white-space: nowrap;
+}
+.silent-churn-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.silent-churn-helper {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.silent-churn-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+}
+.silent-churn-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.silent-churn-metric-value {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.silent-churn-metric-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.silent-churn-empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.silent-churn-calllist-head,
+.silent-churn-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 84px;
+  gap: 12px;
+  align-items: center;
+}
+.silent-churn-calllist-head {
+  padding: 0 0 8px;
+}
+.silent-churn-calllist-head .silent-churn-col {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+.silent-churn-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.silent-churn-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.silent-churn-col--name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.silent-churn-col--days {
+  text-align: right;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.silent-churn-col--dues {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ============================================================
    Expandable sidebar nav group (TailAdmin submenu pattern).
    Gym is a toggle button (reuses .app-sidebar-link) that reveals an

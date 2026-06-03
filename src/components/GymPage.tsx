@@ -1,8 +1,13 @@
 // Gym › Retention — the Gym section's first real subpage (routed at
 // /gym/retention; reached via the expandable Gym group in AppSidebar).
-// Phase-one structure only: two sections of empty card shells in the
-// wireframe order. No card internals (charts, tables, filters, metrics,
-// data) are built yet. Overview / Membership / Classes are hidden for now.
+// The Silent Churn hero is now a live (sample-data) card; the remaining six
+// cards are still empty shells in the wireframe order. No internals are built
+// for those yet. Overview / Membership / Classes are hidden for now.
+
+import { useMemo } from 'react';
+import { useRetentionSettings } from '../context/RetentionSettingsContext';
+import { FIXTURE_TODAY, SAMPLE_GYM_MEMBERS } from '../lib/gym/memberFixture';
+import { computeSilentChurn } from '../lib/gym/silentChurn';
 
 export function GymPage() {
   return (
@@ -30,11 +35,7 @@ export function GymPage() {
               <p className="gym-section-helper">Live signals to act on this week.</p>
             </div>
             <div className="gym-card-grid">
-              <GymCardShell
-                modifier="gym-card--hero"
-                title="Silent Churn"
-                subtitle="Still paying, not showing up."
-              />
+              <SilentChurnCard />
               <GymCardShell
                 modifier="gym-card--full"
                 title="Attendance Health"
@@ -82,6 +83,79 @@ export function GymPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Whole dollars, no cents — these are monthly-dues figures, not reconciled cash.
+const usd = (amount: number) => `$${Math.round(amount).toLocaleString('en-US')}`;
+
+// Silent Churn hero — the Retention page's dominant live signal. Reads the
+// owner-tuned threshold from the local Retention settings store and renders a
+// code-computed at-risk call-list from the sample member fixture. Deterministic:
+// the copy only rephrases computed numbers (count, $/mo, days absent); it never
+// authors the at-risk call. Re-renders whenever the threshold changes.
+function SilentChurnCard() {
+  const { silentChurnThresholdDays } = useRetentionSettings();
+
+  const result = useMemo(
+    () => computeSilentChurn(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
+    [silentChurnThresholdDays],
+  );
+
+  const { thresholdDays, count, monthlyDuesAtRisk, rows } = result;
+
+  return (
+    <article className="card gym-card gym-card--hero silent-churn-card">
+      <header className="gym-card-head">
+        <div className="silent-churn-titlerow">
+          <h3 className="gym-card-title">Silent Churn</h3>
+          <span className="gym-sample-badge">Sample data</span>
+        </div>
+        <p className="gym-card-subtitle">Still paying, not showing up.</p>
+      </header>
+
+      <div className="silent-churn-body">
+        <p className="silent-churn-helper">
+          Active members with no check-ins for {thresholdDays}+ days.
+        </p>
+
+        <div className="silent-churn-metrics">
+          <div className="silent-churn-metric">
+            <span className="silent-churn-metric-value">{count}</span>
+            <span className="silent-churn-metric-label">
+              {count === 1 ? 'member at risk' : 'members at risk'}
+            </span>
+          </div>
+          <div className="silent-churn-metric">
+            <span className="silent-churn-metric-value">{usd(monthlyDuesAtRisk)}</span>
+            <span className="silent-churn-metric-label">/mo at risk</span>
+          </div>
+        </div>
+
+        {count === 0 ? (
+          <p className="silent-churn-empty">
+            No active members have been away for {thresholdDays}+ days right now.
+          </p>
+        ) : (
+          <div className="silent-churn-calllist">
+            <div className="silent-churn-calllist-head">
+              <span className="silent-churn-col silent-churn-col--name">Member</span>
+              <span className="silent-churn-col silent-churn-col--days">Days absent</span>
+              <span className="silent-churn-col silent-churn-col--dues">$/mo</span>
+            </div>
+            <ul className="silent-churn-rows">
+              {rows.map((row) => (
+                <li key={row.id} className="silent-churn-row">
+                  <span className="silent-churn-col silent-churn-col--name">{row.displayName}</span>
+                  <span className="silent-churn-col silent-churn-col--days">{row.daysAbsent} days</span>
+                  <span className="silent-churn-col silent-churn-col--dues">{usd(row.monthlyDues)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </article>
   );
 }
 
