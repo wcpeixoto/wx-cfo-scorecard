@@ -192,7 +192,20 @@ PII-shaped placeholder rows or emit a call-list — derive the aggregate at the
 until the §5 probe confirms Wodify exposes the required fields (`status`, `lastCheckIn`,
 `monthlyDues`) cleanly at our access tier.
 
-### 5. Wodify data availability probe · `TODO`
+### 5. Wodify data availability probe · `BLOCKED — probed 2026-06-04 (Outcome #1)`
+
+**Probe result (2026-06-04).** Phase 2 §5 probed 2026-06-04 — Outcome #1: no repo Wodify
+integration/docs/credentials or approved safe server-side path; BLOCKED pending external
+Wodify API docs or field-list/schema with fake/redacted sample only, plus future safe
+server-side credential setup. No implementation started.
+
+Probe scope was the **first-slice subset only** (`status`, `lastCheckIn`, `monthlyDues`) —
+not movement/status-change dates, belt/rank, age, segment, or recovery data. Repo evidence:
+the only "Wodify" in code is the finance-layer account name (`dataSanity.ts` Stripe gross-up
+reconciliation) and a belt/rank gate-note string; the sole Edge Function is `ai-proxy`
+(Anthropic), and no `WODIFY_*` secret or env entry exists. **Sharing rule for any sample:**
+field names with fake/redacted values only — no API keys, and no real member rows, names,
+IDs, exact check-in dates, or dues values in chat or committed to the repo.
 
 Confirm what the API can actually provide: current clients · active/paused/ended status ·
 membership start date · last check-in date · monthly dues · **dated check-in history** ·
