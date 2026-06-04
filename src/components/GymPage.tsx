@@ -1,8 +1,10 @@
 // Gym › Retention — the Gym section's first real subpage (routed at
 // /gym/retention; reached via the expandable Gym group in AppSidebar).
-// The Silent Churn hero is now a live (sample-data) card; the remaining six
-// cards are still empty shells in the wireframe order. No internals are built
-// for those yet. Overview / Membership / Classes are hidden for now.
+// Watch (Silent Churn, Attendance Health) and the first Patterns cards
+// (Member Movement, Churn Risk by Tenure) are live sample-data cards. The
+// three remaining Patterns cards stay as shells with an honest parked/blocked
+// gate note — not built, gated on a data policy or API access (see
+// RETENTION_FINISH_PLAN.md). Overview / Membership / Classes are hidden for now.
 
 import { useMemo } from 'react';
 import { useRetentionSettings } from '../context/RetentionSettingsContext';
@@ -61,16 +63,31 @@ export function GymPage() {
                 modifier="gym-card--half"
                 title="Churn by Age"
                 subtitle="Do kids, teens, and adults retain differently?"
+                gate={{
+                  status: 'parked',
+                  reason:
+                    'Needs an age-bucket data policy (age ranges only, never birthdates) before build.',
+                }}
               />
               <GymCardShell
                 modifier="gym-card--full"
                 title="Segment Explorer"
                 subtitle="For any slice of members, what is the churn?"
+                gate={{
+                  status: 'parked',
+                  reason:
+                    'Highest-PII surface on the page — needs a data-minimization policy before build.',
+                }}
               />
               <GymCardShell
                 modifier="gym-card--full gym-card--recessed"
                 title="Churn by Belt"
                 subtitle="Data not connected yet."
+                gate={{
+                  status: 'blocked',
+                  reason:
+                    'Belt/rank data is API-gated at the current Wodify tier (403) — not a sample-data gap.',
+                }}
               />
             </div>
           </section>
@@ -373,14 +390,14 @@ function MemberMovementCard() {
             timeline (honestly computable from one field), not a status-movement
             series. */}
         <div className="member-movement-intake">
-          <p className="member-movement-intake-title">New members by join cohort</p>
+          <p className="member-movement-intake-title">Joins by cohort</p>
           {cohorts.length === 0 ? (
             <p className="member-movement-empty">No recorded join dates to chart right now.</p>
           ) : (
             <div className="member-movement-table">
               <div className="member-movement-head">
                 <span className="member-movement-col member-movement-col--cohort">Joined</span>
-                <span className="member-movement-col member-movement-col--num">New members</span>
+                <span className="member-movement-col member-movement-col--num">Joins</span>
               </div>
               <ul className="member-movement-rows">
                 {cohorts.map((cohort) => (
@@ -405,16 +422,22 @@ function MemberMovementCard() {
   );
 }
 
-// Empty card shell — title + subtitle + a single placeholder. Deliberately
+// Empty card shell — title + subtitle + a single placeholder body. Deliberately
 // has no internals (no charts, tables, filters, metrics, or state logic).
+// An optional `gate` swaps the generic "not built yet" placeholder for an honest
+// parked/blocked note naming why the card isn't built. It stays a shell — still
+// no internals — and the muted note is deliberately NOT the amber "Sample data"
+// badge, because these cards have no fixture data behind them.
 function GymCardShell({
   title,
   subtitle,
   modifier,
+  gate,
 }: {
   title: string;
   subtitle: string;
   modifier?: string;
+  gate?: { status: 'parked' | 'blocked'; reason: string };
 }) {
   return (
     <article className={`card gym-card${modifier ? ` ${modifier}` : ''}`}>
@@ -423,7 +446,16 @@ function GymCardShell({
         <p className="gym-card-subtitle">{subtitle}</p>
       </header>
       <div className="gym-card-body">
-        <p className="gym-card-placeholder">Card content — not built yet</p>
+        {gate ? (
+          <div className="gym-card-gate">
+            <span className={`gym-card-gate-badge gym-card-gate-badge--${gate.status}`}>
+              {gate.status === 'parked' ? 'Parked' : 'Blocked'}
+            </span>
+            <p className="gym-card-gate-reason">{gate.reason}</p>
+          </div>
+        ) : (
+          <p className="gym-card-placeholder">Card content — not built yet</p>
+        )}
       </div>
     </article>
   );
