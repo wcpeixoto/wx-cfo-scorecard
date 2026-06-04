@@ -140,6 +140,9 @@ Hard rules:
   enters the browser bundle.
 - **No raw Wodify member rows in the browser, and none in any browser-readable Supabase
   table.** The client-exposed anon key makes anything it can read effectively public.
+- **Raw member rows are transient, server-side only.** Even inside the server-side fetch,
+  raw Wodify rows are never logged and never persisted server-side; only the derived
+  aggregate row may be stored.
 - **`ai-proxy` is precedent only** for server-side secret storage and third-party calls —
   **not** for the threat model. Its CORS-only boundary (deployed `--no-verify-jwt`) is
   browser-advisory and trivially spoofed; it is **not** sufficient protection for
@@ -184,6 +187,10 @@ PII-shaped placeholder rows or emit a call-list — derive the aggregate at the
 ```
 
 `missingMembershipStart` is intentionally **excluded** from the first slice.
+
+**Build remains gated on §5.** The architecture is decided; implementation does not start
+until the §5 probe confirms Wodify exposes the required fields (`status`, `lastCheckIn`,
+`monthlyDues`) cleanly at our access tier.
 
 ### 5. Wodify data availability probe · `TODO`
 
