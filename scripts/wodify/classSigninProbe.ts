@@ -21,15 +21,19 @@
  *     2026-02-30 instead of rolling them over). Keeping it standalone honours the §5 rule and
  *     avoids coupling a network probe to the locked classifier.
  *
- * Run (LOCAL ONLY — provide the rotated key via your shell; never commit or paste it). See
- * scripts/wodify/README.md for details.
- *   WODIFY_API_KEY='…' npx tsx scripts/wodify/classSigninProbe.ts
+ * Run (LOCAL ONLY — provide the rotated key via a gitignored local env; never commit or paste it).
+ *   PREFERRED — gitignored env file (.env.local is git-ignored here), loaded with --env-file:
+ *     npx tsx --env-file=.env.local scripts/wodify/classSigninProbe.ts
+ *   ALLOWED but NOT preferred — inline (the key lands in shell history, a leak vector):
+ *     WODIFY_API_KEY='…' npx tsx scripts/wodify/classSigninProbe.ts
+ *   See scripts/wodify/README.md for details.
  *
- * Draft status
- *   The exact sign-ins endpoint PATH, response SHAPE, pagination MECHANISM, and FIELD NAMES are
- *   NOT repo-verified (RETENTION_FINISH_PLAN.md §5 records them as "leads to re-confirm"). Confirm
- *   / adjust every value in the CONFIG block below on the first live run before trusting the
- *   output. This file is for review; running it is a separate, explicitly approved task.
+ * Draft status — NOTHING below is repo-verified (RETENTION_FINISH_PLAN.md §5: "leads to
+ * re-confirm"). The endpoint PATH, response SHAPE, pagination MECHANISM, FIELD NAMES, and the
+ * OUTPUT-LABEL SEMANTICS (what each emitted count/boolean actually means) are all PROVISIONAL
+ * until the first real run confirms the field mapping. Confirm / adjust the CONFIG block below
+ * before trusting the output. This file is for review; running it is a separate, explicitly
+ * approved task.
  */
 
 // ─── CONFIG — CONFIRM / ADJUST ON THE LIVE RUN (none of this is repo-verified) ──────────────────
@@ -49,6 +53,9 @@ const SENTINEL_DATE = '1900-01-01'; // §5: Wodify surfaces null dates as this. 
 const RECORD_ARRAY_KEYS = ['data', 'results', 'items', 'records'];
 
 // ─── Safe output contract (RETENTION_FINISH_PLAN.md §5) ─────────────────────────────────────────
+// The FIELD NAMES below are the locked §5 contract; their SEMANTICS are PROVISIONAL until the
+// first real run, since every count/boolean depends on the unverified CONFIG field mapping
+// (e.g. clientRef / checkInDate detection). Treat the output labels as unverified until then.
 type HttpStatusClass = '2xx' | '4xx' | '5xx' | 'network_error';
 
 interface SafeProbeResult {
@@ -142,6 +149,9 @@ interface PageResult {
  * body is NEVER logged or returned; only derived records + a boolean leave this function.
  */
 async function fetchPage(apiKey: string, page: number): Promise<PageResult> {
+  // ASSUMPTION (unverified): pagination is `page`/`pageSize` query params and the last page is the
+  // first returning < PAGE_SIZE records. Confirm the real mechanism (cursor? offset?) on the live
+  // run — §5 only confirms the 100/page cap, not the param names or paging style.
   const url = new URL(BASE_URL + SIGNINS_PATH);
   url.searchParams.set('page', String(page));
   url.searchParams.set('pageSize', String(PAGE_SIZE));

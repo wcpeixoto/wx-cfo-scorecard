@@ -26,17 +26,18 @@ gates Silent Churn Recovery and supplies the `lastCheckIn` the first live slice 
   real date.
 - Does **not** import `silentChurn.ts` / `classifyMember`.
 
-### Run (local only — provide the key via your shell; never commit or paste it)
+### Run (local only — provide the key via a gitignored env path; never commit or paste it)
 
 ```bash
-# Option A — inline (the key touches no file; clear your shell history afterwards)
-WODIFY_API_KEY='<rotated key>' npx tsx scripts/wodify/classSigninProbe.ts
-
-# Option B — from a gitignored env file (Node 20.6+ / recent tsx support --env-file)
+# PREFERRED — gitignored env file (Node 20.6+ / recent tsx support --env-file).
 #   .env.local is gitignored in this repo. A NON-VITE_ var there is NOT exposed to the browser
 #   bundle (Vite only bundles VITE_*). Add the line `WODIFY_API_KEY=<rotated key>` to .env.local
 #   (never to the committed .env.example, never with a VITE_ prefix), then:
 npx tsx --env-file=.env.local scripts/wodify/classSigninProbe.ts
+
+# ALLOWED but NOT preferred — inline. The key lands in your shell history (a leak vector); use
+# only for a one-off, and clear the history afterwards.
+WODIFY_API_KEY='<rotated key>' npx tsx scripts/wodify/classSigninProbe.ts
 ```
 
 Do **not** set the key via `supabase secrets` for this *local* probe — that is the server-side
