@@ -192,7 +192,7 @@ PII-shaped placeholder rows or emit a call-list — derive the aggregate at the
 until the §5 probe confirms Wodify exposes the required fields (`status`, `lastCheckIn`,
 `monthlyDues`) cleanly at our access tier.
 
-### 5. Wodify data availability probe · `Probe DRAFTED & merged 2026-06-04 (#420 · 625bff8) — NOT run; awaits a separately-approved local run`
+### 5. Wodify data availability probe · `Probe run once 2026-06-04 (#420 · 625bff8) — key authenticated for this request; 2xx; 0 records inspected; mapping not proven`
 
 **Probe result (2026-06-04).** Phase 2 §5 probed 2026-06-04 — Outcome #1: no repo Wodify
 integration/docs/credentials or approved safe server-side path; BLOCKED pending external
@@ -250,8 +250,10 @@ for any movement/cancellation trend (needs dated status changes).
 **Next true probe (after the 2026-06-04 key rotation):** the **Class Sign-ins / Client
 Sign-ins** dated check-in history endpoint — it gates Silent Churn Recovery and supplies the
 `lastCheckIn` the first slice needs. A **draft probe for this is now on `main`** (see "Draft probe
-merged" below); the remaining step is to *run* it through the safe server-side path (§4) with the
-rotated key. The agent sandbox can't reach `api.wodify.com`, so live probing stays off-chat.
+merged" below) and has now been **run once locally** (2026-06-04 — see "First probe run" below); the
+remaining step is to **confirm the field mapping** (the run returned a 2xx with 0 records inspected —
+mapping not yet proven). Probing stays local / server-side and only the safe aggregate contract is
+ever shared — never raw data.
 
 Belt/rank: **reportedly unavailable for public use** per Wodify support (chat-reported, not
 repo-verified) — an API-availability limit, not merely a current-tier block.
@@ -312,13 +314,33 @@ also governs the §8 real-data guards (invalid dates).
 the Class / Client Sign-ins dated-check-in-history endpoint is now on `main`:
 `scripts/wodify/classSigninProbe.ts` (+ `scripts/wodify/README.md`). The same PR made `.env.local`
 protection **repo-owned** via `.env*.local` in `.gitignore` (no longer reliant on a machine-global
-gitignore; `.env.example` stays tracked). The probe is **DRAFT and has NOT been run** — its
-endpoint path / response shape / pagination / field names are placeholders to confirm on the live
-run. **Execution remains a separate, explicitly-approved task.** Next step: a local / server-side
-run with the rotated key supplied via the gitignored `.env.local` (`--env-file`) — never `VITE_*`,
-never committed, never pasted to chat. Output must stay limited to the **safe output contract
-above**: counts / booleans / status enums (+ optional calendar years) only — **no raw member rows,
-names, IDs, exact check-in dates, dues values, API responses, or keys.**
+gitignore; `.env.example` stays tracked). The probe's endpoint path / response shape / pagination /
+field names were placeholders to confirm on the first run. Output stays limited to the **safe output
+contract above**: counts / booleans / status enums (+ optional calendar years) only — **no raw member
+rows, names, IDs, exact check-in dates, dues values, API responses, or keys.**
+
+**First probe run (2026-06-04).** The probe was **run once** locally — the exact command
+`npx tsx --env-file=.env.local scripts/wodify/classSigninProbe.ts` from the primary clone. The local
+run used the **repo-ignored `.env.local`** (`.env*.local` is in `.gitignore`) for the rotated key;
+the **key value was never printed**, never committed, and never `VITE_*` / browser-exposed. The
+**key authenticated for this request** (no 401/403, no missing-ID 403). The result was the only
+output and stayed fully within the safe contract — no raw rows, names, IDs, exact dates, timestamps,
+dues values, raw API bodies, auth headers, or secrets:
+
+- `endpointReached: true` · `httpStatusClass: "2xx"` · `pagesFetched: 1`
+- `totalRecordsInspected: 0`; `fieldPresenceCounts` `clientRef: 0` / `checkInDate: 0`
+- `missingDateCount: 0` · `invalidDateCount: 0` · `sentinelDateCount: 0`
+- `datedCheckInHistoryAvailable: false` · `distinctClientsWithAnyCheckIn: 0`; `earliestYear` /
+  `latestYear` omitted
+- no safe diagnostic warnings fired
+
+**Interpretation — mapping not proven.** A 2xx with **0 records inspected** means the field
+**mapping is not yet proven**. This is **not** evidence that Wodify lacks dated check-in history, and
+**not** a finding that the `CONFIG` is wrong. The `CONFIG`, endpoint path, default filters, response
+shape, pagination, or per-client (per-ID) requirements **may need adjustment** before the probe can
+confirm what the endpoint exposes — that mapping confirmation is the next (separate) discovery task.
+The `1900-01-01` null-sentinel rule above still binds: count it separately, never treat it as a real
+`lastCheckIn`.
 
 ### 6. Live wiring spike — 1–2 cards · `TODO` (do this early, before broad live work)
 
