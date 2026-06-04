@@ -30,7 +30,8 @@ gates Silent Churn Recovery and supplies the `lastCheckIn` the first live slice 
 
 ```bash
 # PREFERRED — gitignored env file (Node 20.6+ / recent tsx support --env-file).
-#   .env.local is gitignored in this repo. A NON-VITE_ var there is NOT exposed to the browser
+#   .env.local is ignored by the repo .gitignore (.env*.local), so this holds on any clone — not
+#   just a machine with a global gitignore. A NON-VITE_ var there is NOT exposed to the browser
 #   bundle (Vite only bundles VITE_*). Add the line `WODIFY_API_KEY=<rotated key>` to .env.local
 #   (never to the committed .env.example, never with a VITE_ prefix), then:
 npx tsx --env-file=.env.local scripts/wodify/classSigninProbe.ts

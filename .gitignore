@@ -3,6 +3,9 @@ dist
 .vite
 .DS_Store
 .env
+# local env files (.env.local, .env.<mode>.local) — never commit. Repo-owned so protection does
+# not depend on a machine-global gitignore. .local-suffixed on purpose: keeps .env.example tracked.
+.env*.local
 
 # build/cache artifacts
 *.tsbuildinfo
