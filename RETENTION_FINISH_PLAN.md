@@ -192,7 +192,7 @@ PII-shaped placeholder rows or emit a call-list — derive the aggregate at the
 until the §5 probe confirms Wodify exposes the required fields (`status`, `lastCheckIn`,
 `monthlyDues`) cleanly at our access tier.
 
-### 5. Wodify data availability probe · `BLOCKED (repo) — corrected 2026-06-04: off-repo work reported; key rotated`
+### 5. Wodify data availability probe · `Probe DRAFTED & merged 2026-06-04 (#420 · 625bff8) — NOT run; awaits a separately-approved local run`
 
 **Probe result (2026-06-04).** Phase 2 §5 probed 2026-06-04 — Outcome #1: no repo Wodify
 integration/docs/credentials or approved safe server-side path; BLOCKED pending external
@@ -249,8 +249,9 @@ for any movement/cancellation trend (needs dated status changes).
 
 **Next true probe (after the 2026-06-04 key rotation):** the **Class Sign-ins / Client
 Sign-ins** dated check-in history endpoint — it gates Silent Churn Recovery and supplies the
-`lastCheckIn` the first slice needs. Run it through the safe server-side path (§4) with the
-rotated key; the agent sandbox can't reach `api.wodify.com`, so live probing stays off-chat.
+`lastCheckIn` the first slice needs. A **draft probe for this is now on `main`** (see "Draft probe
+merged" below); the remaining step is to *run* it through the safe server-side path (§4) with the
+rotated key. The agent sandbox can't reach `api.wodify.com`, so live probing stays off-chat.
 
 Belt/rank: **reportedly unavailable for public use** per Wodify support (chat-reported, not
 repo-verified) — an API-availability limit, not merely a current-tier block.
@@ -306,6 +307,18 @@ separately in the probe output (above) and **never** passed into `classifyMember
 `1900-01-01` as a valid date and mis-classify the member as `silent` with a huge `daysAbsent`, so
 this guard must live in the server-side fetch / normalization layer, ahead of the classifier. It
 also governs the §8 real-data guards (invalid dates).
+
+**Draft probe merged (2026-06-04, PR #420 · squash `625bff8`).** A local / server-side probe for
+the Class / Client Sign-ins dated-check-in-history endpoint is now on `main`:
+`scripts/wodify/classSigninProbe.ts` (+ `scripts/wodify/README.md`). The same PR made `.env.local`
+protection **repo-owned** via `.env*.local` in `.gitignore` (no longer reliant on a machine-global
+gitignore; `.env.example` stays tracked). The probe is **DRAFT and has NOT been run** — its
+endpoint path / response shape / pagination / field names are placeholders to confirm on the live
+run. **Execution remains a separate, explicitly-approved task.** Next step: a local / server-side
+run with the rotated key supplied via the gitignored `.env.local` (`--env-file`) — never `VITE_*`,
+never committed, never pasted to chat. Output must stay limited to the **safe output contract
+above**: counts / booleans / status enums (+ optional calendar years) only — **no raw member rows,
+names, IDs, exact check-in dates, dues values, API responses, or keys.**
 
 ### 6. Live wiring spike — 1–2 cards · `TODO` (do this early, before broad live work)
 
