@@ -81,9 +81,10 @@ Tests (`churnRiskByTenure.test.ts`):
 
 Guardrails: no PII, no Wodify/API work, no `contract.ts`, no locked-file edits beyond the item-2 classifier lock (which lands separately).
 
-### 5. Decide Member Movement scope · `TODO`
+### 5. Decide Member Movement scope · `Done`
 
-Status: scope decision required *before* build.
+Status: **decided and shipped** — the card built in item 6 implements exactly this
+locked scope (census + new-by-cohort, no movement time-series).
 
 Fixture **has:** `membershipStart`, current `status`.
 Fixture **lacks:** `endedAt` / `pausedAt` / `statusChangedAt` / any historical status events.
@@ -93,15 +94,43 @@ Honestly computable: current active / paused / ended census; new members by join
 
 **Decision (locked):** ship the smaller honest card. Census + new-by-cohort only. Do **not** show net movement, cancellation trend, flow chart, or any time-series of movement. Do not add dated status fields unless that is separately, intentionally approved.
 
-### 6. Build Member Movement · `TODO`
+### 6. Build Member Movement · `Done`
 
-Status: pending item 5 (already scoped above).
+Status: **built and shipped in this PR.**
 
 Show: current active / paused / ended census; new members by join-date cohort.
 
 **Cohort-window caveat:** the fixture's newest `membershipStart` is `2025-06-02`. A narrow window ("new this month/quarter") will render 0 against `FIXTURE_TODAY` and read as broken. Use a window wide enough to produce a non-empty result on sample data (e.g. by half-year), or state the empty result explicitly.
 
 Sample data only; "Sample data" badge; no PII; no Wodify/API work; no `contract.ts`.
+
+**As shipped:**
+
+- New compute module `src/lib/gym/memberMovement.ts` (`computeMemberMovement`) — kept
+  separate from `silentChurn.ts`. No risk machinery: it does **not** import
+  `classifyMember` / `computeSilentChurn` / the threshold resolver, takes no
+  `asOf`/threshold, and has no anti-drift cross-check (there is no at-risk figure to
+  drift). Reuses only `parseYmdLocal` from `silentChurn.ts` for join-date parsing.
+- **Census** is a RAW `status` tally (active / paused / ended) — not derived through any
+  classifier (which returns null for non-active members and so can't produce
+  paused/ended). **Intake** buckets **all** members (any status) by `membershipStart`
+  into contiguous **half-year** cohorts, earliest join first — active-only would
+  understate past intake by dropping members who later paused/ended. Window spans the
+  earliest→latest join half-year (2021-H1 … 2025-H1 on the fixture: 9 non-empty
+  cohorts), satisfying the caveat.
+- Tests `src/lib/gym/memberMovement.test.ts`: census integrity
+  (`active + paused + ended === total === members.length`), deterministic cohort counts,
+  contiguous-timeline check, all-members intake, and a defensive bad-date → `unknownJoin`
+  case. No anti-drift test by design.
+- UI `MemberMovementCard` in `GymPage.tsx` on the locked `gym-card--full` surface;
+  `.member-movement-*` inner styling mirrors the `.attendance-health-*` tiles and
+  `.churn-tenure-*` table (no new hex, outer `.card` untouched); "Sample data" badge.
+- **Subtitle rewrite (in scope):** the shell's
+  "Is acquisition beating churn, or is churn eating growth?" promised a net-flow-over-time
+  answer this card cannot honestly give. Replaced with **"Current member mix and when they
+  joined."** to match the content.
+- Verified: `npx tsc -b` clean, `npm run build` clean, `vitest` 25/25 (the 19 existing
+  silentChurn/churnRiskByTenure tests still pass — zero classifier drift).
 
 ---
 
@@ -146,7 +175,7 @@ Retention is "done" only when all of these hold:
 - [x] PR #410 (Attendance Health / shared classifier) merged.
 - [x] Shared classifier locked (item 2) — #412 merged.
 - [x] Churn Risk by Tenure built or intentionally parked.
-- [ ] Member Movement built or intentionally parked.
+- [x] Member Movement built or intentionally parked.
 - [ ] Every remaining shell is built, clearly labeled parked/blocked, or intentionally removed from page scope — no ambiguous shells.
 - [ ] "Sample data" badges consistent across all fixture-backed cards.
 - [ ] No fake historical trends anywhere.
