@@ -137,13 +137,45 @@ This also settles the gate for Silent Churn Recovery (needs dated check-in histo
 for any movement/cancellation trend (needs dated status changes).
 Known issue: belt/rank appears **API-blocked** at the current access level.
 
-### 6. Build server-side Wodify Retention adapter · `TODO` (after §4)
+### 6. Live wiring spike — 1–2 cards · `TODO` (do this early, before broad live work)
 
-Only after the safety decision. Map live data into the internal member model: `id` ·
-`displayName` · `status` · `monthlyDues` · `membershipStart` · `lastCheckIn`. Do not add
-PII fields unless approved.
+Wire a **minimal** live-data path for one or two Retention cards before any broader live
+integration — a validation slice, not a rollout. The biggest remaining risk is whether
+Wodify actually provides the fields we need cleanly, reliably, and safely; prove the real
+data path before finishing more roadmap/theory.
 
-### 7. Add real-data guards · `TODO`
+**Recommended cards: Silent Churn + Attendance Health** — they exercise the core fields:
+member `id` · `displayName` · `status` · `monthlyDues` · `membershipStart` · `lastCheckIn` ·
+the silent-churn threshold.
+
+Rules:
+
+- Spike / validation slice only — **not** a full rollout.
+- Wodify API key **must not** be exposed in the browser; prefer server-side access or safe
+  rollups (respect §4).
+- Do not add PII fields beyond those needed for this validation.
+- Do not wire Churn by Age, Segment Explorer, Churn by Belt, or Silent Churn Recovery.
+- **Do not fake missing data.** If Wodify doesn't provide the required fields cleanly,
+  **stop and report**.
+- If the safe architecture is unclear, **stop and report** before building deeper.
+
+Success criteria:
+
+- Confirm whether Wodify can support Silent Churn and Attendance Health with real data.
+- Identify missing / bad fields, and any privacy/security blockers.
+- Confirm whether our sample-data assumptions hold.
+- Decide: continue to full live wiring, or revise the Retention model first.
+
+Everything below (broad adapter, broad source switching, real-data guards, full-card
+validation, and any future card) waits on what this spike finds.
+
+### 7. Build server-side Wodify Retention adapter (broad) · `TODO` (after §4 + §6 spike)
+
+Only after the safety decision and the spike. Generalize the minimal §6 path into the full
+internal member model: `id` · `displayName` · `status` · `monthlyDues` · `membershipStart`
+· `lastCheckIn`. Do not add PII fields unless approved.
+
+### 8. Add real-data guards · `TODO`
 
 Before live data powers the cards, handle: missing `membershipStart` · invalid dates ·
 missing `lastCheckIn` · unknown status · missing monthly dues.
@@ -152,13 +184,13 @@ Important guard: an at-risk member with a bad `membershipStart` must not appear 
 Churn but silently **disappear** from Churn Risk by Tenure — surface an explicit unknown
 bucket rather than dropping them.
 
-### 8. Add sample/live source handling · `TODO`
+### 9. Add sample/live source handling (broad) · `TODO`
 
 Cards keep the **same compute logic**; only the source changes (sample fixture ↔ live
 Wodify). When live: remove/replace the `Sample data` badge and show a clear
 source/freshness status.
 
-### 9. Validate live Retention cards · `TODO`
+### 10. Validate live Retention cards · `TODO`
 
 Validate Silent Churn, Attendance Health, Churn Risk by Tenure, Member Movement on live
 data. No fake recovery, churn trend, cancellation trend, or movement trend unless Wodify
