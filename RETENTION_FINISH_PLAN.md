@@ -192,7 +192,7 @@ PII-shaped placeholder rows or emit a call-list — derive the aggregate at the
 until the §5 probe confirms Wodify exposes the required fields (`status`, `lastCheckIn`,
 `monthlyDues`) cleanly at our access tier.
 
-### 5. Wodify data availability probe · `BLOCKED — probed 2026-06-04 (Outcome #1)`
+### 5. Wodify data availability probe · `BLOCKED (repo) — corrected 2026-06-04: off-repo work reported; key rotated`
 
 **Probe result (2026-06-04).** Phase 2 §5 probed 2026-06-04 — Outcome #1: no repo Wodify
 integration/docs/credentials or approved safe server-side path; BLOCKED pending external
@@ -207,13 +207,53 @@ reconciliation) and a belt/rank gate-note string; the sole Edge Function is `ai-
 field names with fake/redacted values only — no API keys, and no real member rows, names,
 IDs, exact check-in dates, or dues values in chat or committed to the repo.
 
+**Correction (2026-06-04) — reported prior off-repo work.** The repo-only Outcome #1 above
+was procedurally clean but **incomplete**: a May 6, 2026 chat reportedly did real Wodify API
+work outside this repo. These facts are **chat-reported, not repo-verified** — the repo still
+holds no committed Wodify client, endpoint docs, or credentials. Treat the below as **leads to
+re-confirm on the next live probe**, not established repo facts.
+
+- **Local scripts (not committed here):** an endpoint probe, a full audit (reportedly ~912
+  clients + paginated memberships/leads), and a retention analysis over the audit JSON. Run
+  locally because the sandbox blocks `api.wodify.com`.
+- **Reported access:** base URL `https://api.wodify.com/v1`; auth via `x-api-key` header.
+- **Reported API quirks — re-confirm or preserve to avoid rediscovery:**
+  - `status=Active` on `/clients` does **not** filter — use per-record `client_status`.
+  - membership `is_active` must be filtered in the **server-side fetcher**, never the SPA.
+  - max page size is **100 records/page** regardless of requested `pageSize` — always paginate.
+  - null dates may surface as `1900-01-01` — all date logic must treat that as **missing**.
+  - mandatory-ID endpoints can return a misleading `403 - Missing Authentication Token` when
+    the ID param is absent (not a real auth failure).
+- **Reported Wodify support answers:** progressions/belt-rank API is **unavailable for public
+  use** (not merely tier-blocked); financials are blocked at the current API tier but reachable
+  via the Wodify **Admin reports UI**.
+- **Reported sourcing posture (hybrid):** automated API pulls for reachable operational KPIs +
+  **monthly manual Wodify Admin CSV exports** for financial / churn-dollar data the API doesn't
+  expose. This is a sourcing approach **under** §4 — it does **not** replace it. Manual CSV data
+  stays subject to §4: no raw member rows in the browser or in anon-readable Supabase tables; no
+  secrets/PII committed; aggregate-only to the SPA.
+
+**Security — Wodify API key rotated 2026-06-04.** A prior chat reportedly exposed a live Wodify
+API key in message text. Wesley rotated it on 2026-06-04: the exposed key is now
+**invalidated/inert** (it lingers in old chat history but should no longer authenticate). The
+**new key must never be pasted into chat and never committed** — set it only via a safe
+local/server-side mechanism (e.g. `supabase secrets set`). If Wodify exposes API request logs,
+check for unauthorized use since **May 6, 2026**.
+
 Confirm what the API can actually provide: current clients · active/paused/ended status ·
 membership start date · last check-in date · monthly dues · **dated check-in history** ·
 paused/cancelled/status-change dates · belt/rank.
 
 This also settles the gate for Silent Churn Recovery (needs dated check-in history) and
 for any movement/cancellation trend (needs dated status changes).
-Known issue: belt/rank appears **API-blocked** at the current access level.
+
+**Next true probe (after the 2026-06-04 key rotation):** the **Class Sign-ins / Client
+Sign-ins** dated check-in history endpoint — it gates Silent Churn Recovery and supplies the
+`lastCheckIn` the first slice needs. Run it through the safe server-side path (§4) with the
+rotated key; the agent sandbox can't reach `api.wodify.com`, so live probing stays off-chat.
+
+Belt/rank: **reportedly unavailable for public use** per Wodify support (chat-reported, not
+repo-verified) — an API-availability limit, not merely a current-tier block.
 
 ### 6. Live wiring spike — 1–2 cards · `TODO` (do this early, before broad live work)
 
@@ -285,8 +325,9 @@ provides dated history.
   never birthdates**.
 - **Segment Explorer · `Parked`** — PII / data-minimization decision; do not use sex, zip,
   payment type, class time, or similar without policy. Highest-PII surface on the page.
-- **Churn by Belt · `Blocked`** — needs Wodify belt/rank access; currently 403-blocked
-  (support declined).
+- **Churn by Belt · `Blocked`** — Wodify progressions/belt-rank API **reportedly unavailable
+  for public use** per Wodify support (chat-reported, not repo-verified) — an API-availability
+  limit, not merely a current-tier 403.
 
 ---
 
