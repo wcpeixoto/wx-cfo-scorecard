@@ -2,6 +2,16 @@
 
 **Working implementation checklist for finishing the Retention page. Temporary — not a permanent backlog.**
 
+> **Status — 2026-06-03 (this PR): Retention page UI is COMPLETE.** The three
+> remaining shells now carry honest gate notes (Churn by Age + Segment Explorer
+> = `parked`, Churn by Belt = `blocked`), Member Movement is relabeled
+> ("Joins by cohort" / "Joins"), and every Page Complete Check box passes.
+> **This file is intentionally NOT deleted yet.** Per the self-destruct rule
+> (Instructions #5), retirement is blocked on Wesley approving migration of the
+> durable rules into `AGENTS.md` / `UI_RULES.md`. Proposed wording + exact
+> insertion points are in the PR description. Once migrated (or explicitly
+> waived), delete this file.
+
 ## Instructions for Builder
 
 1. **Lives with the code.** Update this file in the *same PR* as the work it describes — not separately, not after the fact.
@@ -138,17 +148,17 @@ Sample data only; "Sample data" badge; no PII; no Wodify/API work; no `contract.
 
 Remain shells or clearly-labeled parked cards until their gate is solved. None are "low-hanging fruit."
 
-### Churn by Age · `Blocked`
+### Churn by Age · `Parked`
 
-Gate: PII / data-minimization decision. Use **age buckets only, never birthdates**. Do not build until the data policy is decided.
+Gate: PII / data-minimization decision. Use **age buckets only, never birthdates**. Do not build until the data policy is decided. **Now rendered as a `parked` gate note in `GymPage.tsx` (this PR)** — still a shell, no internals.
 
-### Segment Explorer · `Blocked`
+### Segment Explorer · `Parked`
 
-Gate: PII / data-minimization decision — highest PII risk on the page. Needs rules before using sex, zip, payment type, class time, or other segmentation fields. Keep as a shell. Do not build until policy is decided.
+Gate: PII / data-minimization decision — highest PII risk on the page. Needs rules before using sex, zip, payment type, class time, or other segmentation fields. Keep as a shell. Do not build until policy is decided. **Now rendered as a `parked` gate note in `GymPage.tsx` (this PR)** — still a shell, no internals.
 
 ### Churn by Belt · `Blocked`
 
-Gate: **API access, not missing sample data.** Belt/rank data is 403-blocked at the current Wodify tier and likely needs higher-tier access or different auth, which support has already declined to help with. Do not build unless access changes.
+Gate: **API access, not missing sample data.** Belt/rank data is 403-blocked at the current Wodify tier and likely needs higher-tier access or different auth, which support has already declined to help with. Do not build unless access changes. **Now rendered as a `blocked` gate note in `GymPage.tsx` (this PR)**, on the recessed surface — still a shell, no internals.
 
 ### Silent Churn Recovery · `Blocked`
 
@@ -176,14 +186,14 @@ Retention is "done" only when all of these hold:
 - [x] Shared classifier locked (item 2) — #412 merged.
 - [x] Churn Risk by Tenure built or intentionally parked.
 - [x] Member Movement built or intentionally parked.
-- [ ] Every remaining shell is built, clearly labeled parked/blocked, or intentionally removed from page scope — no ambiguous shells.
-- [ ] "Sample data" badges consistent across all fixture-backed cards.
-- [ ] No fake historical trends anywhere.
-- [ ] No real member PII added.
-- [ ] No unintended Wodify/API work added.
-- [ ] No financial `contract.ts` files touched.
-- [ ] Shared classifier reused by every relevant card (no forked risk logic).
-- [ ] `$ at risk` figures are active-only.
+- [x] Every remaining shell is built, clearly labeled parked/blocked, or intentionally removed from page scope — no ambiguous shells. *(Age + Segment = `parked`, Belt = `blocked`; gate notes shipped this PR.)*
+- [x] "Sample data" badges consistent across all fixture-backed cards. *(4 live cards badged; the 3 gated shells carry none — verified in-DOM.)*
+- [x] No fake historical trends anywhere.
+- [x] No real member PII added.
+- [x] No unintended Wodify/API work added.
+- [x] No financial `contract.ts` files touched.
+- [x] Shared classifier reused by every relevant card (no forked risk logic).
+- [x] `$ at risk` figures are active-only.
 
 ## Verification
 
@@ -200,4 +210,7 @@ Run deterministic tests for any Retention compute modules. Required:
 
 ---
 
-*When this checklist is fully satisfied: move any durable rules into `AGENTS.md` / `UI_RULES.md`, then delete this file in the same PR. It does not survive the Retention page.*
+*The checklist is now fully satisfied (this PR). Per the rule above, the next
+step is to move the durable rules into `AGENTS.md` / `UI_RULES.md` and then
+delete this file — but that migration needs Wesley's sign-off (proposals in the
+PR description; see the status banner at the top). Until then this file stays.*

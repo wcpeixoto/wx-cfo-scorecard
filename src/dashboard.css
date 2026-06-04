@@ -12823,6 +12823,43 @@ body {
   color: var(--fg-disabled);
 }
 
+/* Gate note — replaces the "not built yet" placeholder on a shell whose build
+   is deliberately deferred: `parked` = a data-policy decision we still owe,
+   `blocked` = an external wall (API access). Sits inside the dashed
+   .gym-card-body inset. Muted/neutral and intentionally NOT the amber
+   "Sample data" badge — these cards carry no fixture, so a data badge would
+   lie. Tokens only, no new hex; outer .card untouched. */
+.gym-card-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  text-align: center;
+}
+.gym-card-gate-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  background: var(--bg-main);
+  white-space: nowrap;
+}
+.gym-card-gate-badge--blocked { color: var(--text-primary); }
+.gym-card-gate-reason {
+  margin: 0;
+  max-width: 48ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
 /* Silent Churn — dominant hero shell (taller placeholder body) */
 .gym-card--hero .gym-card-body { min-height: 200px; }
 
