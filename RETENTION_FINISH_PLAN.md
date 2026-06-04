@@ -71,18 +71,25 @@ as a sample card does. The first three are candidates to migrate into permanent 
 
 ## Remaining Phase 1 — harden the sample-data page
 
-### 1. Add PR test CI · `TODO`
+### 1. Add PR test CI · `Done` (PR pending)
 
-Add a `pull_request` workflow that runs the Retention guards on every PR:
+Added `.github/workflows/ci.yml` — a `pull_request` workflow that runs the Retention
+guards on every PR:
 
-- `npm run test` (= `vitest run`)
-- `npm run build` (already runs `tsc -b`; a separate `tsc -b` step is optional, as an
-  earlier-failing typecheck signal)
+- `npx tsc -b` — typecheck (fast-fail signal before tests/bundle)
+- `npm run test` (= `vitest run`) — the real classifier guard
+- `npm run build` (= `tsc -b && vite build`)
 
-Reason: the tests protect the shared classifier locally but are **not enforced on PRs**
-today. Land this first so later PRs are gated by it.
+Reason: the tests protect the shared classifier locally but were **not enforced on PRs**
+before this. Landed first so later PRs are gated by it.
 
-Note: `.github/workflows/` is a **locked path** — owner approval required before implementation.
+Decided — **no `VITE_SUPABASE_*` env block on the build step.** The app compiles cleanly
+without the secrets (`sharedPersistence` reads them with `?? ''` defaults and disables
+itself via `isConfigured()` when empty), so PR CI builds with shared persistence off. This
+keeps the gate honest (it tests the Retention compute, not the live data layer) and avoids
+a flake on fork/automation PRs, which don't receive secrets. Secrets stay in deploy CI only.
+
+(`.github/workflows/` is a **locked path** — this edit was made with owner approval.)
 
 ### 2. Independent `silentChurn.ts` correctness audit · `TODO`
 
