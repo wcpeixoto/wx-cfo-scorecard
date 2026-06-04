@@ -255,6 +255,58 @@ rotated key; the agent sandbox can't reach `api.wodify.com`, so live probing sta
 Belt/rank: **reportedly unavailable for public use** per Wodify support (chat-reported, not
 repo-verified) — an API-availability limit, not merely a current-tier block.
 
+**Readiness check (2026-06-04) — probe contract recorded; still BLOCKED on a safe key path.**
+A read-only readiness check confirmed: no committed Wodify client/adapter/probe script, no
+`WODIFY_*` secret in any local gitignored env file, and no server-side consumer (no Wodify Edge
+Function, no aggregate table) for a `supabase secrets` value. The §4 transport is decided but
+unbuilt, so **no safe key path is confirmed yet**. Verdict: **do not run the live probe** until
+the rotated key is placed via a safe server-side / local-only mechanism *and* a separate probe
+task is explicitly approved. The contract below is preserved so that task inherits it.
+
+**Safe output contract for the Class / Client Sign-ins probe.** The probe is aggregate /
+diagnostic only — it emits counts, booleans, and status enums, **never member data**.
+
+Allowed output:
+
+- endpoint reached / not reached, plus an HTTP status class (`2xx` / `4xx` / `5xx` /
+  `network_error`) — never a raw response body
+- pages fetched (proves pagination worked) and total records inspected
+- field-presence counts per expected field (client reference, check-in date) — the identifier is
+  *counted, never emitted*
+- missing-date count and invalid-date count (fails a strict `YYYY-MM-DD` parse)
+- `1900-01-01` sentinel count — reported **separately** (see the sentinel guard below)
+- whether dated check-in history is available (multiple dated events per client, not just a
+  single latest value)
+- distinct clients with any check-in (a count only, never IDs)
+- *(optional, year-granularity only if needed: earliest / latest year — default omit)*
+
+Never output (in results, logs, or error text):
+
+- names · client / membership IDs (even hashed) · exact check-in dates or timestamps · dues values
+- raw member rows · raw sign-in rows · raw or echoed API responses · upstream error bodies
+  (report the status class only)
+- API keys, auth headers, or request / response dumps
+
+Operational guards (preserve the reported quirks to avoid rediscovery — re-confirm on the live probe):
+
+- paginate: 100 records/page cap regardless of requested size; report pages fetched
+- `status=Active` does **not** filter server-side — use per-record `client_status`; filter
+  membership `is_active` in the server-side fetcher, never in the SPA
+- distinguish a real `403` from a missing-required-ID `403` (a "Missing Authentication Token"
+  response can mean an absent path param, not an auth failure)
+- never log raw rows or the key (follow the `ai-proxy` precedent: no body / header / secret logging)
+- key handling: server-side (`supabase secrets`) or a gitignored local env consumed by a
+  local-only script — **never `VITE_*`, never pasted to chat, never committed**; the pre-rotation
+  key is inert, so use only the rotated key
+
+**Real-data guard — `1900-01-01` is a null sentinel, not a date.** Wodify surfaces null dates as
+`1900-01-01`. It must be treated as missing **before any date math or classifier reuse**: counted
+separately in the probe output (above) and **never** passed into `classifyMember` as a real
+`lastCheckIn`. The current `parseYmdLocal` (`src/lib/gym/silentChurn.ts`) would otherwise *accept*
+`1900-01-01` as a valid date and mis-classify the member as `silent` with a huge `daysAbsent`, so
+this guard must live in the server-side fetch / normalization layer, ahead of the classifier. It
+also governs the §8 real-data guards (invalid dates).
+
 ### 6. Live wiring spike — 1–2 cards · `TODO` (do this early, before broad live work)
 
 Wire a **minimal** live-data path for one or two Retention cards before any broader live
