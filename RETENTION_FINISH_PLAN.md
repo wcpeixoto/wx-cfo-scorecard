@@ -71,7 +71,7 @@ as a sample card does. The first three are candidates to migrate into permanent 
 
 ## Remaining Phase 1 — harden the sample-data page
 
-### 1. Add PR test CI · `Done` (PR pending)
+### 1. Add PR test CI · `Done (#417)`
 
 Added `.github/workflows/ci.yml` — a `pull_request` workflow that runs the Retention
 guards on every PR:
@@ -91,7 +91,7 @@ a flake on fork/automation PRs, which don't receive secrets. Secrets stay in dep
 
 (`.github/workflows/` is a **locked path** — this edit was made with owner approval.)
 
-### 2. Independent `silentChurn.ts` correctness audit · `TODO`
+### 2. Independent `silentChurn.ts` correctness audit · `Done — audited 2026-06-04; no defect; T consistent end-to-end`
 
 Separate task. Confirm:
 
@@ -115,7 +115,7 @@ live (see Operating rules → Retirement).
 
 ## Remaining Phase 2 — live Wodify readiness
 
-### 4. Live-data safety / architecture decision · `DECISION NEEDED` (gates all Phase 2 build)
+### 4. Live-data safety / architecture decision · `DECIDED (2026-06-04)` (gates all Phase 2 build)
 
 Must happen **before** any Wodify adapter work. Decide:
 
@@ -134,6 +134,57 @@ Hard rules:
 - Display name, status, dues, check-in dates, and risk status are sensitive enough to
   require a data-safety decision.
 
+**Decision (recorded 2026-06-04).** Transport and PII posture for going live:
+
+- **Wodify credentials are server-side only.** No `VITE_*` Wodify secrets; the key never
+  enters the browser bundle.
+- **No raw Wodify member rows in the browser, and none in any browser-readable Supabase
+  table.** The client-exposed anon key makes anything it can read effectively public.
+- **`ai-proxy` is precedent only** for server-side secret storage and third-party calls —
+  **not** for the threat model. Its CORS-only boundary (deployed `--no-verify-jwt`) is
+  browser-advisory and trivially spoofed; it is **not** sufficient protection for
+  member PII.
+- **No real private auth boundary exists** (public SPA, public anon key, cosmetic
+  edit-lock). So the preferred transport is: **server-side Wodify fetch → aggregate-only
+  Supabase table → SPA reads the aggregates.** The browser never calls Wodify and never
+  holds the key; the persisted table holds only non-PII aggregates.
+- **First live Retention slice is aggregate-only.** Silent Churn call-list and member
+  names stay **sample-only** unless real auth is added or PII exposure is explicitly
+  accepted.
+
+**First live aggregate — input scope.** Server-side Wodify inputs needed to derive the
+first aggregate:
+
+- `status`
+- `lastCheckIn`
+- `monthlyDues` — for *monthly dues at risk*, not for classification
+
+Deferred (not fetched for this slice): `membershipStart` (defer until Churn Risk by
+Tenure); `id` and `displayName` (not needed for an aggregate-only slice).
+
+**Implementation constraint — reuse the locked classifier.** Do not fork or re-implement
+the silent / watch / healthy threshold logic. Prefer importing the pure helpers
+(`classifyMember`, `resolveSilentChurnThresholdDays`, and the date helpers) from the locked
+`silentChurn.ts`. Do **not** force `computeSilentChurn` end-to-end if it would require
+PII-shaped placeholder rows or emit a call-list — derive the aggregate at the
+`classifyMember` level (with `computeAttendanceHealth`, which already returns counts only).
+
+**First live payload target** (aggregate-only):
+
+```ts
+{
+  source: "wodify",
+  asOf: "YYYY-MM-DD",
+  fetchedAt: "ISO timestamp",
+  thresholdDays: number,
+  silentChurn: { count: number, monthlyDuesAtRisk: number },
+  attendanceHealth: { activeTotal: number, healthy: number, watch: number, silent: number, unknown: number },
+  dataQuality: { missingLastCheckIn: number, unknownStatus: number, missingMonthlyDues: number }
+}
+```
+
+`missingMembershipStart` is intentionally **excluded** from the first slice.
+
 ### 5. Wodify data availability probe · `TODO`
 
 Confirm what the API can actually provide: current clients · active/paused/ended status ·
@@ -151,9 +202,10 @@ integration — a validation slice, not a rollout. The biggest remaining risk is
 Wodify actually provides the fields we need cleanly, reliably, and safely; prove the real
 data path before finishing more roadmap/theory.
 
-**Recommended cards: Silent Churn + Attendance Health** — they exercise the core fields:
-member `id` · `displayName` · `status` · `monthlyDues` · `membershipStart` · `lastCheckIn` ·
-the silent-churn threshold.
+**Recommended cards: Silent Churn + Attendance Health.** Per the §4 decision, the first
+live slice is **aggregate-only** and fetches just `status` · `lastCheckIn` · `monthlyDues`
+server-side — see §4 for the input scope, classifier-reuse constraint, and payload target.
+`id` / `displayName` / `membershipStart` and the call-list are deferred.
 
 Rules:
 
