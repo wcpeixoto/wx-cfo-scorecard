@@ -192,7 +192,7 @@ PII-shaped placeholder rows or emit a call-list — derive the aggregate at the
 until the §5 probe confirms Wodify exposes the required fields (`status`, `lastCheckIn`,
 `monthlyDues`) cleanly at our access tier.
 
-### 5. Wodify data availability probe · `Probe run once 2026-06-04 (#420 · 625bff8) — key authenticated for this request; 2xx; 0 records inspected; mapping not proven`
+### 5. Wodify data availability probe · `Shape discovery 2026-06-04/05 (#423 · 7da4369) — first probe's transport-2xx + 0 records was a Wodify error envelope, not a true empty dataset; list-style sign-in paths returned no records arrays; bare /signins shows a per-client-ID signal; mapping still not proven (first probe #420 · 625bff8)`
 
 **Probe result (2026-06-04).** Phase 2 §5 probed 2026-06-04 — Outcome #1: no repo Wodify
 integration/docs/credentials or approved safe server-side path; BLOCKED pending external
@@ -341,6 +341,38 @@ shape, pagination, or per-client (per-ID) requirements **may need adjustment** b
 confirm what the endpoint exposes — that mapping confirmation is the next (separate) discovery task.
 The `1900-01-01` null-sentinel rule above still binds: count it separately, never treat it as a real
 `lastCheckIn`.
+
+**Second probe — shape discovery (2026-06-04/05, PR #423 · `7da4369`).** A separate local-only
+discovery probe — `scripts/wodify/signinsShapeDiscovery.ts` (run via the worktree-safe absolute
+`--env-file` path; the rotated key was never copied, printed, or committed) — tested a small allowlist
+of **list-style** Class / Client Sign-ins endpoint candidates to explain the first probe's transport-2xx
++ 0 records. Output stayed fully within the §5 safe contract (endpoint paths, key names, counts,
+booleans, and HTTP status classes only — no values, rows, names, IDs, dates, dues, raw bodies, or
+secrets). Findings:
+
+- `/clients/signins` (the original probe path), `/clients/sign-ins`, and `/classes/signins` returned
+  **transport-2xx bodies that are Wodify error envelopes** — top-level keys `DeveloperMessage` /
+  `ErrorCode` / `HTTPCode` / `UserMessage` only, with **no records array** (`data` / `results` /
+  `items` / `records` all absent). The in-body `HTTPCode` means the real status rides in the payload,
+  so a transport-2xx here is **not** a success signal.
+- `/signins` and `/sign-ins` (bare) returned **4xx** carrying the missing-ID `403 "Missing
+  Authentication Token"` marker — the §5 signal that the sign-ins resource **likely requires a
+  per-client (per-ID) path**.
+- No pagination keys were observed, and the ID-like-key guard fired zero redactions.
+
+**Interpretation (second probe).** The first probe's **2xx + 0 records must not be treated as a true
+empty dataset** — it was an error envelope at the transport-2xx layer, which
+`classSigninProbe.extractRecords` (which only looks for a records array) reported as 0 records. No
+candidate returned a records array, so the **field mapping remains unproven**. The exact embedded
+error code is intentionally **not** captured (it is a field value, outside the safe contract), so we
+know the body is an error envelope but not precisely which error.
+
+**Next steps (each separately approved — NOT started here).**
+
+1. **Harden the probes against embedded error envelopes** — detect the `HTTPCode` / `ErrorCode`
+   envelope and treat an embedded non-2xx as a failure, rather than reading it as "0 records."
+2. **Only then** consider a **separately-approved per-client / per-ID probe** to confirm a
+   `/clients/{id}/signins`-style path and the field mapping. No per-client / per-ID calls have been made.
 
 ### 6. Live wiring spike — 1–2 cards · `TODO` (do this early, before broad live work)
 
