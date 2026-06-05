@@ -24,6 +24,11 @@ gates Silent Churn Recovery and supplies the `lastCheckIn` the first live slice 
   years). Never names, IDs, exact dates/timestamps, dues, raw rows, or raw API responses.
 - Treats `1900-01-01` as a null sentinel — counted separately as `sentinelDateCount`, never a
   real date.
+- Detects a Wodify **error envelope** returned at transport-2xx (`DeveloperMessage` / `ErrorCode` /
+  `HTTPCode` / `UserMessage`, no records array) and reports it as a failure (`errorEnvelopeDetected`
+  + `embeddedHttpStatusClass`) instead of a misleading "0 records". The embedded `HTTPCode` is
+  reduced to a status **class** only — its raw value is never read into output, logs, or errors, and
+  the message / error-code text is never read at all.
 - Does **not** import `silentChurn.ts` / `classifyMember`.
 
 ### Run (local only — provide the key via a gitignored env path; never commit or paste it)
@@ -53,12 +58,21 @@ sign-ins endpoint requires a per-client ID path param, the probe will surface a 
 "Missing Authentication Token" (a missing-ID signal, **not** an auth failure) and must be adapted
 to iterate clients.
 
+The first run's transport-2xx with **0 records** turned out to be a Wodify **error envelope** (shape
+discovery, #423), not an empty dataset. `errorEnvelopeDetected` now surfaces that case instead of
+masking it: a `2xx` `httpStatusClass` **with** `errorEnvelopeDetected: true` means the call failed at
+the application layer (read `embeddedHttpStatusClass` for the in-body status class), and
+`totalRecordsInspected: 0` there is **not** evidence that dated history is unavailable.
+
 ### Output shape (the only thing printed)
 
 ```ts
 {
   endpointReached: boolean,
-  httpStatusClass: "2xx" | "4xx" | "5xx" | "network_error",
+  httpStatusClass: "2xx" | "4xx" | "5xx" | "network_error",     // TRANSPORT status class
+  errorEnvelopeDetected: boolean,        // transport-2xx body was a Wodify error envelope (not data)
+  embeddedHttpStatusClass:               // status CLASS from the in-body HTTPCode; never the raw value
+    "2xx" | "4xx" | "5xx" | "network_error" | null,
   pagesFetched: number,
   totalRecordsInspected: number,
   fieldPresenceCounts: { clientRef: number, checkInDate: number },
