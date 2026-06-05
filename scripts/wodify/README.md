@@ -271,3 +271,63 @@ the real per-client sign-ins path (Wodify API docs or a structure-only path prob
     "working_path_no_records" | "working_path_records_without_checkin_date"
 }
 ```
+
+## `clientsShapeDiscovery.ts` — `/clients` response-shape discovery (§5)
+
+`clientSigninsProbe.ts` (§5 step 2, #427) was blocked at its `/clients` prerequisite: `/clients`
+returned 2xx (**not** an error envelope) but 0 records, so no client ID could be sampled. This script
+settles whether `/clients` is genuinely **empty** or whether the records are nested under a key/shape
+that probe's extractor missed — with **one** `/clients` call, structure only. It reproduces
+`clientSigninsProbe`'s exact request and also reports whether the discovered records-array key + ID
+field would have matched that probe's config (so we know if #427 needs a small patch).
+
+### Safety (enforced by the script — same posture as `signinsShapeDiscovery.ts`, whose helpers it reuses)
+
+- Reads the key only from `process.env.WODIFY_API_KEY`; never `VITE_*`, hardcoded, logged, or echoed;
+  exits without a request if unset. Local / server-side only; never bundled.
+- Emits **only** structural metadata: the endpoint **path** (never the query string / substituted URL),
+  booleans, HTTP status classes, **key names**, array **lengths**, and per-field **type categories**
+  (string / number / boolean / object / array / null). Never values — no names, IDs, dates, dues,
+  pagination values, raw rows, or raw responses.
+- ID-like field **names** are redacted; reads **one** sample record's field names + type categories
+  only; detects the Wodify error envelope (in-body `HTTPCode` → status class only).
+- **One `/clients` call**; makes no per-client calls; does not iterate clients; does not import
+  `silentChurn.ts` / `classifyMember`.
+
+### Run
+
+```bash
+npx tsx scripts/wodify/clientsShapeDiscovery.ts --selftest   # network-free, no key
+npx tsx --env-file=/Users/wesley/Code/wx-cfo-scorecard/.env.local \
+  scripts/wodify/clientsShapeDiscovery.ts
+```
+
+### Result (2026-06-05) — SHAPE MISMATCH, not empty
+
+`/clients` returned `{ clients: [...100...], pagination: {...} }` — a full page of 100 records under
+the key **`clients`**, which is **not** in `clientSigninsProbe.ts`'s `RECORD_ARRAY_KEYS`
+(`recordArrayKeyMatchesClientProbeConfig: false`). That is why #427 read 0 records. The client-ID field
+is **`id`** (already in #427's `CLIENT_ID_FIELDS`). `client_status` carries status; recency is on
+`/clients` directly (`last_attendance`, `last_class_sign_in`, `days_since_last_attendance`); no dues
+field is present. Next: add `clients` to #427's `RECORD_ARRAY_KEYS` and re-run the per-client probe.
+
+### Output shape (the only thing printed — structure only)
+
+```ts
+{
+  probe: "clientsShapeDiscovery",
+  path: "/clients",
+  endpointReached, httpStatusClass, errorEnvelopeDetected, embeddedHttpStatusClass,
+  perClientIdLikelyRequired, jsonParseable, contentTypeIsJson,
+  topLevelType, topLevelKeyNames, topLevelKeyCount, looksLikeIdKeyedMap, redactedKeyNameCount,
+  arraysFound: Array<{ keyPath, length, elementsAreObjects }>,
+  paginationKeyNamesFound,
+  recordArrayKeyGuess, recordCountInGuessedArray,
+  sampleRecordFieldNames, sampleRecordFieldTypes,   // field NAMES + TYPE CATEGORIES (never values)
+  redactedSampleFieldNameCount,
+  clientIdFieldGuess, checkInDateFieldGuess, duesFieldGuess, statusFieldGuess,
+  recordArrayKeyMatchesClientProbeConfig, clientIdFieldMatchesClientProbeConfig,
+  conclusion: "empty" | "shape_mismatch" | "records_under_known_key" | "error_envelope" |
+              "non_2xx" | "non_json" | "inconclusive"
+}
+```

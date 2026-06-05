@@ -398,6 +398,36 @@ SAFE field names only; no values, rows, names, IDs, dates, dues, URLs, raw bodie
   §6 work was started, and the probe artifact (per-client machinery + safe-output contract, reviewed)
   is ready to re-run once the `/clients` shape is known.
 
+**`/clients` shape discovery (2026-06-05) — `/clients` is shape-mismatched, NOT empty.** The §5 step-2
+per-client probe (`clientSigninsProbe.ts`, #427) was blocked at its `/clients` prerequisite (2xx, not an
+error envelope, but 0 records / 0 sampled IDs). A new local-only structure-only probe,
+`scripts/wodify/clientsShapeDiscovery.ts` (+ README) — built on `signinsShapeDiscovery.ts`'s reviewed
+helpers, network-free `--selftest` PASS, run once with the worktree-safe absolute `--env-file` (key never
+printed/committed) — reproduced that exact `/clients` request and reported its structure. Output stayed
+fully within the §5 safe contract: endpoint path, key names, array lengths, per-field TYPE CATEGORIES,
+booleans, and status classes only — no values, names, IDs, dates, dues, pagination values, raw rows, or
+raw bodies. One `/clients` call only.
+
+- **Finding — `/clients` returns `{ clients: [ …100… ], pagination: {…} }`** — a full page of 100 record
+  objects under the key **`clients`**, with a nested `pagination` object (`pagination.page` /
+  `pagination.page_size` / `pagination.has_more`). It is **NOT empty** (`conclusion: "shape_mismatch"`).
+- **Root cause of #427's 0 records:** `clientSigninsProbe.ts`'s `RECORD_ARRAY_KEYS`
+  (`data`/`results`/`result`/`items`/`records`/`value`/`signins`/`SignIns`/`rows`, exact-case) does
+  **not** include `clients`, so its `extractRecords` found no array and returned `[]`
+  (`recordArrayKeyMatchesClientProbeConfig: false`).
+- **Confirmed mapping (names + type categories only):** client-ID = **`id`** (number; already in #427's
+  `CLIENT_ID_FIELDS`, so `clientIdFieldMatchesClientProbeConfig: true`), status = **`client_status`**
+  (matches the §5 reported quirk). Recency is **on `/clients` directly**: `last_attendance`,
+  `last_class_sign_in`, `last_booking_sign_in`, `days_since_last_attendance` (number), plus Wodify's own
+  `is_at_risk` (boolean) and `total_class_sign_ins`. **No dues field** on `/clients` (consistent with §5's
+  financials being API-tier-blocked) — `monthlyDues` must come from another source. `/clients` is
+  PII-dense (name / email / phone / DOB / address / etc.) — reinforces the §4 aggregate-only posture; the
+  probe emitted field NAMES + type categories only, never values.
+- **Note on `lastCheckIn`:** `/clients` exposes a LATEST attendance/sign-in (recency), which likely
+  supplies the first slice's `lastCheckIn` **without** the per-client sign-ins endpoint. Dated check-in
+  HISTORY (multiple events, for Silent Churn Recovery) still needs that endpoint. Values were not
+  inspected; the `1900-01-01` null-sentinel rule still binds when these fields are read live.
+
 **Re-run (2026-06-05, after the #428 `clients`-key patch).** Per #428's `/clients` shape discovery
 (records under the key `clients`, client-ID field `id`), `clientSigninsProbe.ts`'s `RECORD_ARRAY_KEYS`
 was patched with a single entry (`clients`, appended at lowest precedence) and the **bounded** probe was
