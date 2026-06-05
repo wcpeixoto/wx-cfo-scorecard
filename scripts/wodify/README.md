@@ -71,3 +71,77 @@ to iterate clients.
   latestYear?: number
 }
 ```
+
+## `signinsShapeDiscovery.ts` — response-shape discovery (why `classSigninProbe` saw 0 records)
+
+`classSigninProbe.ts` returned a 2xx but inspected **0 records** on its first run (2026-06-04), so
+its field **mapping is unproven** (`RETENTION_FINISH_PLAN.md` §5). This script discovers *why* by
+reporting the response **structure** for a small allowlist of Class / Client Sign-ins endpoint
+candidates — it does **not** fix the mapping, wire live data, or do §6 work. It is structure
+discovery, not data collection: one page per candidate, structural metadata only out.
+
+### Safety (enforced by the script — same posture as `classSigninProbe.ts`)
+
+- Reads the rotated key **only** from `process.env.WODIFY_API_KEY`. Never `VITE_*`, never hardcoded,
+  never logged, never echoed in errors. If unset, it exits without making any request.
+- Local / server-side only — never imported by the SPA, never bundled.
+- Emits **only** structural metadata: endpoint **paths** (never query strings), booleans, HTTP
+  status classes, **key names**, and array **lengths / counts**. Never values of any kind — no
+  names, IDs (even hashed), dates/timestamps, dues, raw rows, raw/echoed API responses, or upstream
+  error bodies (status class only).
+- **ID-like-key guard.** Any key *name* that looks like an identifier/value (pure digits, UUID, long
+  hex, suspiciously long) is redacted and only **counted** — so even an object keyed by client ID
+  cannot leak an ID through a "key name". A high-cardinality ID-keyed map is reported as a count +
+  boolean, never as a key list.
+- Makes **no per-client / per-ID calls.** If a candidate signals a required ID path param (a 403
+  "Missing Authentication Token"), that is reported as a boolean and the probe moves on — iterating
+  clients needs separate approval.
+- Does **not** import `silentChurn.ts` / `classifyMember`.
+
+### Run (local only — provide the key via a gitignored env path; never commit or paste it)
+
+```bash
+# PREFERRED — gitignored env file, loaded with --env-file. From a git WORKTREE (where .env*.local
+# does not propagate), point --env-file at the primary clone's gitignored env by ABSOLUTE path so
+# the key is never copied or duplicated:
+npx tsx --env-file=/Users/wesley/Code/wx-cfo-scorecard/.env.local \
+  scripts/wodify/signinsShapeDiscovery.ts
+
+# From the primary clone, the relative form works:
+npx tsx --env-file=.env.local scripts/wodify/signinsShapeDiscovery.ts
+```
+
+Never use the inline `WODIFY_API_KEY='…' npx tsx …` form (the key lands in shell history).
+
+### Output shape (the only thing printed — structure only)
+
+```ts
+{
+  probe: "signinsShapeDiscovery",
+  candidatesTested: number,
+  summary: {
+    anyEndpointReturned2xx: boolean,
+    anyEndpointYieldedRecords: boolean,
+    anyEndpointSignalsPerClientIdRequired: boolean
+  },
+  candidates: Array<{
+    label: string,
+    path: string,                       // PATH only — never a query string
+    endpointReached: boolean,
+    httpStatusClass: "2xx" | "4xx" | "5xx" | "network_error",
+    jsonParseable: boolean | null,
+    contentTypeIsJson: boolean | null,
+    topLevelType: "array" | "object" | "other" | null,
+    topLevelKeyNames: string[],         // SAFE names only (ID-like redacted)
+    topLevelKeyCount: number,
+    looksLikeIdKeyedMap: boolean,
+    redactedKeyNameCount: number,
+    arraysFound: Array<{ keyPath: string, length: number, elementsAreObjects: boolean }>,
+    recordArrayKeyGuess: string | null,
+    recordCountInGuessedArray: number,
+    recordFieldNames: string[],         // SAFE field-NAME union (schema, not values)
+    paginationKeyNamesFound: string[],  // pagination key NAMES present
+    perClientIdLikelyRequired: boolean
+  }>
+}
+```
