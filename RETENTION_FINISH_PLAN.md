@@ -527,7 +527,7 @@ the standalone `/clients` shape-discovery; this PR's one-line patch + re-run bui
 first**, then rebase + merge #427, resolving §5 / README to keep both records (the `/clients` shape
 discovery from #428, and the patch + re-run outcome here).
 
-### 6. Live wiring spike — 1–2 cards · `TODO` (do this early, before broad live work)
+### 6. Live wiring spike — 1–2 cards · `Design drafted 2026-06-05 (planning); wiring gated on review` (do this early, before broad live work)
 
 Wire a **minimal** live-data path for one or two Retention cards before any broader live
 integration — a validation slice, not a rollout. The biggest remaining risk is whether
@@ -538,6 +538,86 @@ data path before finishing more roadmap/theory.
 live slice is **aggregate-only** and fetches just `status` · `lastCheckIn` · `monthlyDues`
 server-side — see §4 for the input scope, classifier-reuse constraint, and payload target.
 `id` / `displayName` / `membershipStart` and the call-list are deferred.
+
+**First bounded live slice — design (PLANNING ONLY, 2026-06-05; no wiring until reviewed).** Source =
+`/clients` direct recency (§5 #429 — SUFFICIENT for `lastCheckIn`). Cards = Silent Churn + Attendance
+Health, aggregate-only. This is the design the §6 spike will implement *after* review — no Edge Function,
+table, or SPA change is built yet.
+
+1. **Server-side contract consumed by `silentChurn.ts` (the reuse boundary).** The server imports the
+   locked pure helpers — `classifyMember`, `resolveSilentChurnThresholdDays`, `parseYmdLocal`,
+   `wholeDaysBetween` — and never forks them; it derives the aggregate at the `classifyMember` /
+   `computeAttendanceHealth` level (counts only, §4). `classifyMember` reads ONLY two `GymMember` fields:
+   `status` (acts on `'active'`) and `lastCheckIn` (`YYYY-MM-DD` → `parseYmdLocal`; null/invalid →
+   `unknown` bucket). `monthlyDues` is read only by `computeSilentChurn` (the dollar); `id` / `displayName`
+   only by its call-list (both deferred). So the minimal normalized per-member input is
+   `{ status: 'active'|'paused'|'ended', lastCheckIn: 'YYYY-MM-DD' | '', monthlyDues: number | null }`.
+   `computeSilentChurn` is **not** run end-to-end (it would need PII-shaped rows); the `silent` count comes
+   from `computeAttendanceHealth().silent` (`=== computeSilentChurn().count` by construction).
+
+2. **Wodify `/clients` → internal normalization (server-side, transient).**
+   - **`status`** ← per-record `client_status` (the `status=Active` query does **not** filter — §5). Map
+     `/^active$/i → 'active'`, `paus|frozen|hold → 'paused'`, else `'ended'`; missing/unmappable → excluded
+     **and** counted in `dataQuality.unknownStatus`. Only active-ness is load-bearing for this slice.
+   - **`lastCheckIn`** ← the most-recent **usable** of `last_attendance` and `last_class_sign_in` (both
+     primary). Per field, **in this order**: (a) **slice the leading `YYYY-MM-DD`** off the ISO timestamp
+     (#429: every value carried a time component, `strictYmd 0`); (b) if it equals the **`1900-01-01`
+     sentinel → null**; (c) if it fails a strict `YYYY-MM-DD` calendar check → null. `lastCheckIn` =
+     `max(usable dates)`, or `''` when neither is usable (→ `parseYmdLocal` null → `unknown` bucket, never
+     silently Healthy). **Slice + sentinel-null happen BEFORE the classifier** — `1900-01-01` is never
+     passed to `parseYmdLocal` (it would parse as a real ancient date and mis-flag the member `silent`).
+   - **`monthlyDues`** ← **NOT on `/clients`** (#428: no dues field). Set `null`, never `0` (`0` fakes a
+     real value and understates dues-at-risk). Consequence in §6.4.
+   - **`is_at_risk`** → **secondary context only** — not consumed by the classifier; may be stored as a
+     diagnostic `wodifyAtRiskCount` to compare Wodify's flag (fired 1/100, #429) against our threshold rule.
+   - **`days_since_last_attendance`** → **diagnostic only** — we compute `daysAbsent` ourselves from
+     `lastCheckIn` against **our** `asOf` (today) anchor (§4). Never primary (it is numeric even for
+     sentinel members — #429 — so it has no clean null and would silently mis-flag them).
+
+3. **Anchor + threshold.** `asOf` = the server-side fetch date (today, `YYYY-MM-DD`), recorded with
+   `fetchedAt` (ISO). **OPEN —** the owner-tunable threshold (shipped #408) lives in the **browser**
+   (`RetentionSettingsContext`, localStorage); a single-T precomputed aggregate can't be re-tuned without a
+   re-fetch. Two payload shapes: **(A) single-T** — server computes at the Settings/default T; the live
+   card is fixed at that T. **(B) `daysAbsent` histogram (recommended)** — server emits a non-PII
+   count-by-`daysAbsent` histogram over active members (+ `unknown` count); the SPA re-derives count /
+   Healthy / Watch / Silent at **any** T client-side (same `WATCH_FLOOR_DAYS` + threshold rule), preserving
+   the tunable control with zero PII and one fetch. Recommend **B**; final call at review.
+
+4. **The dues gap — count-complete, dollar-incomplete (honesty guard; §6 "do not fake").** `/clients` has
+   no dues field, so `monthlyDuesAtRisk` **cannot** be sourced from this slice. Ship the live **count** +
+   H/W/S/unknown buckets; emit `monthlyDuesAtRisk: null` + `duesSource: "unavailable"` (**not `0`**); the
+   card shows the dollar as "not available from this source yet." A real dollar waits on a dues source —
+   the §5 hybrid **monthly Wodify Admin CSV** (financials are API-tier-blocked), joined server-side by an
+   internal key — deferred to its own slice.
+
+5. **Transport + PII safety (binds §4 + the member-PII anon-key blocker).**
+   - The Supabase **Edge Function** holds `WODIFY_API_KEY` via `supabase secrets` — **server-side only**;
+     never `VITE_*`, never the browser bundle, never committed. The browser never calls Wodify.
+   - The function **paginates all `/clients` pages** (100/page cap + `has_more` loop; ~10 pages for the
+     ~912-client prior) → the live aggregate is **global**. This is where #429's "sampled-page-only" caveat
+     is closed — at wiring time, by the real fetcher, so no separate multi-page probe is needed first.
+   - Raw `/clients` rows are **transient in memory only** — never logged, never persisted (§4).
+   - The aggregate Supabase table holds **no PII** — only counts / buckets / histogram / `asOf` /
+     `fetchedAt` / threshold(s) / `dataQuality`. The SPA reads it with the public anon key, which is safe
+     **because** the row is non-PII (the anon-key blocker is satisfied by construction, not by trust).
+   - Normalization reuses the probe scripts' slice / sentinel / status-bucket logic + the locked classifier
+     helpers — one definition, no fork.
+
+6. **Payload (refines §4's target; option B shown).**
+   ```ts
+   { source: "wodify", asOf, fetchedAt, thresholdDays?,   // thresholdDays only for option A
+     silentChurn: { count, monthlyDuesAtRisk: null, duesSource: "unavailable" },
+     attendanceHealth: { activeTotal, healthy, watch, silent, unknown },  // option A
+     daysAbsentHistogram?: number[],  // option B — counts by daysAbsent over active members
+     diagnostics: { wodifyAtRiskCount },
+     dataQuality: { missingLastCheckIn, unknownStatus, missingMonthlyDues, pagesFetched, clientsScanned } }
+   ```
+
+7. **OPEN decisions for review (do not wire until resolved).** (a) payload shape — single-T vs `daysAbsent`
+   histogram (recommend histogram); (b) dues — ship count-only now with `monthlyDuesAtRisk: null`, or block
+   the live card until the CSV dues source lands (recommend ship count-only, dollar later); (c)
+   `lastCheckIn` source — most-recent-of-two (recommend) vs `last_attendance`-only; (d) Edge Function +
+   table location / naming / refresh cadence (cron vs on-demand).
 
 Rules:
 
