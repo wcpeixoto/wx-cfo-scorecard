@@ -629,7 +629,7 @@ call — the first live invoke needs a Reviewer audit + Wesley's explicit author
      unknown: number,                  // active, missing/sentinel/invalid lastCheckIn (NOT Healthy)
      silentChurn: { monthlyDuesAtRisk: null, missingMonthlyDues: true },  // count derived client-side at T
      diagnostics: { wodifyAtRiskCount },
-     dataQuality: { unknownStatus, futureLastCheckIn, pagesFetched, clientsScanned } }
+     dataQuality: { unknownStatus, futureLastCheckIn, pagesFetched, reachedPageCap, clientsScanned } }
    ```
    The SPA computes `silentChurn.count` and the Healthy / Watch / Silent split from `daysAbsentHistogram`
    at the owner's current threshold: `silent` = bins `>= T` plus `overflow365Plus`; `watch` = bins

@@ -24,26 +24,48 @@ server emits a **threshold-free** exact-day histogram and the SPA applies the
 owner's threshold (PR2), so the live aggregate works at any threshold without
 another Wodify fetch.
 
-## Bundle/import proof (Refinement 1 — done first)
+## Bundle/import proof (Refinement 1 — done first) — corrected
 
 The one architectural risk was whether a Deno Edge Function can import the shared
 `src/` module across the runtime boundary (the repo's only other function,
-`ai-proxy`, is self-contained). Proven before any other work, with **no network
-and no live Wodify call**:
+`ai-proxy`, is self-contained). Result, with **no network and no live Wodify
+call** — and **nuanced**, not a clean pass:
 
-```bash
-# Deno type resolution across the boundary:
-deno check supabase/functions/sync-wodify-retention/index.ts      # → Check … (no errors)
+- **esbuild bundle — PASSES.**
 
-# esbuild bundle (mirrors the deploy bundler) — the shared module inlines:
-npx esbuild supabase/functions/sync-wodify-retention/index.ts \
-  --bundle --format=esm --platform=neutral --outfile=/tmp/idx.mjs # → 7.0kb, exit 0
-```
+  ```bash
+  npx esbuild supabase/functions/sync-wodify-retention/index.ts \
+    --bundle --format=esm --platform=neutral --outfile=/tmp/idx.mjs   # exit 0, ~7kb
+  ```
 
-Both pass: Deno's runtime resolves the repo-style extensionless `./silentChurn`
-value import, esbuild strips the type-only `./memberFixture` import, and the
-locked helpers are inlined into the bundle. No `tsconfig` change, no extension
-gymnastics, no fork.
+  esbuild resolves the repo-style extensionless `./silentChurn` value import,
+  strips the type-only `./memberFixture` import, and **inlines** the locked
+  helpers (`parseYmdLocal` / `wholeDaysBetween` / `computeRetentionAggregate`)
+  into the bundle (no fork).
+
+- **Bare / strict `deno check` — FAILS** on the extensionless shared import. The
+  exact bytes copied into a clean tree report:
+
+  ```
+  TS2307 [ERROR]: Cannot find module '…/silentChurn'.
+    Maybe add a '.ts' extension or run with --sloppy-imports
+      at …/wodifyRetentionAggregate.ts  (import { … } from './silentChurn')
+  ```
+
+  An earlier in-repo `deno check` that appeared to pass was a **local-environment
+  artifact** — it does **not** reproduce on a clean copy of the same bytes — and is
+  **not** representative of deploy resolution. Do not rely on it. *(An earlier
+  draft of this README incorrectly claimed bare `deno check` passes; that claim is
+  retracted here.)*
+
+- **Deploy-bundler resolution — UNCONFIRMED (live-gate item).** Whether Supabase's
+  actual `supabase functions deploy` / `supabase functions serve` bundler resolves
+  the extensionless shared import like esbuild (resolves) or like strict Deno
+  (fails) is **not proven offline**. The first live step stays blocked until a real
+  deploy/serve proof confirms the shared `src/` import resolves — **without forking
+  the locked date logic and without changing `tsconfig`**.
+
+No fork of the locked date logic was introduced, and `tsconfig` is unchanged.
 
 ## Behavior
 
@@ -52,9 +74,11 @@ gymnastics, no fork.
   (never reveals which).
 - Paginates `GET https://api.wodify.com/v1/clients?page=N&pageSize=100` with the
   `x-api-key` header, records under `clients`, looping while
-  `pagination.has_more` (hard cap `MAX_PAGES = 50`). Request shape matches the §5
-  probes (`scripts/wodify/clientsRecencyProbe.ts`).
-- Calls `computeRetentionAggregate(rows, { asOf, fetchedAt, pagesFetched })`.
+  `pagination.has_more` (hard cap `MAX_PAGES = 50`). If the cap is hit while
+  `has_more` is still true, `dataQuality.reachedPageCap` flags the partial
+  snapshot — never a silent truncation. Request shape matches the §5 probes
+  (`scripts/wodify/clientsRecencyProbe.ts`).
+- Calls `computeRetentionAggregate(rows, { asOf, fetchedAt, pagesFetched, reachedPageCap })`.
 - Persists the aggregate via the Supabase REST API using the **service-role**
   key (bypasses RLS; never browser-exposed). Append-only snapshot insert.
 - Returns a **counts-only** summary (`activeTotal`, `unknown`, `diagnostics`,
@@ -91,6 +115,11 @@ runtime; they are not set manually.
 
 ## Open items before the live invoke
 
+- **Deploy/serve resolution of the shared `src/` import — BLOCKS the live gate.**
+  Prove `supabase functions deploy` / `supabase functions serve` bundles the
+  function with the shared module resolved, **without a fork or a `tsconfig`
+  change**. esbuild resolves it; strict `deno check` does not; the actual deploy
+  bundler is unconfirmed offline (see "Bundle/import proof").
 - Confirm the live `/clients` response uses snake_case field names
   (`client_status`, `last_attendance`, `last_class_sign_in`, `is_at_risk`) as the
   §5 probe observed. If casing differs, `dataQuality.unknownStatus` / `unknown`

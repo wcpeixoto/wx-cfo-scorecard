@@ -23,7 +23,12 @@ import {
 } from './silentChurn';
 import { SAMPLE_GYM_MEMBERS, FIXTURE_TODAY, type GymMember } from './memberFixture';
 
-const OPTS = { asOf: '2026-06-05', fetchedAt: '2026-06-05T12:00:00Z', pagesFetched: 1 };
+const OPTS = {
+  asOf: '2026-06-05',
+  fetchedAt: '2026-06-05T12:00:00Z',
+  pagesFetched: 1,
+  reachedPageCap: false,
+};
 
 // What the SPA (PR2) will do: re-derive Healthy/Watch/Silent from the
 // threshold-free histogram at a resolved threshold. Mirrors classifyMember's
@@ -224,6 +229,7 @@ describe('parity with the locked classifier (computeAttendanceHealth)', () => {
     asOf: asOfStr,
     fetchedAt: '2026-06-02T12:00:00Z',
     pagesFetched: 1,
+    reachedPageCap: false,
   });
 
   it('reconstructs Healthy/Watch/Silent/unknown for the sample at T = 1, 21, 365', () => {
@@ -256,6 +262,7 @@ describe('parity with the locked classifier (computeAttendanceHealth)', () => {
       asOf: asOfStr,
       fetchedAt: '2026-06-02T12:00:00Z',
       pagesFetched: 1,
+      reachedPageCap: false,
     });
     const classifier = computeAttendanceHealth(mixed, 21, FIXTURE_TODAY);
     const derived = deriveBuckets(mixedAgg, 21);
@@ -293,9 +300,19 @@ describe('payload shape (non-PII contract)', () => {
         unknownStatus: 0,
         futureLastCheckIn: 0,
         pagesFetched: 1,
+        reachedPageCap: false,
         clientsScanned: 1,
       },
     });
+  });
+
+  it('propagates reachedPageCap into dataQuality (partial-snapshot signal, never silent)', () => {
+    expect(agg.dataQuality.reachedPageCap).toBe(false); // default complete-fetch path
+    const partial = computeRetentionAggregate(
+      [{ client_status: 'Active', last_attendance: '2026-06-01' }],
+      { ...OPTS, reachedPageCap: true },
+    );
+    expect(partial.dataQuality.reachedPageCap).toBe(true);
   });
 
   it('dues are never fabricated: null + missing flag, never 0', () => {

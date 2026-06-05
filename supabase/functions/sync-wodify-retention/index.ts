@@ -3,9 +3,11 @@
 // THIN SHELL by design — the only logic here is fetch + persist. All
 // normalization and aggregation lives in the typechecked, vitest-covered
 // src/lib/gym/wodifyRetentionAggregate.ts so the Deno function holds no
-// untypechecked business logic (the bundle/import of that shared module is
-// proven — see README "Bundle/import proof"). Mirrors ai-proxy: dependency-free
-// raw `fetch`, no SDK, secrets server-side only, never logs bodies or the key.
+// untypechecked business logic. The shared-module bundle/import is nuanced —
+// esbuild resolves + inlines it, but strict `deno check` does not, and the
+// Supabase deploy bundler is UNCONFIRMED (a live-gate item; see README
+// "Bundle/import proof"). Mirrors ai-proxy: dependency-free raw `fetch`, no SDK,
+// secrets server-side only, never logs bodies or the key.
 //
 // Flow: read server-side secrets → paginate Wodify /clients → computeRetentionAggregate
 // → persist the NON-PII aggregate row via the Supabase REST API (service role).
@@ -46,13 +48,16 @@ function todayYmd(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Paginate all /clients pages. Returns raw rows (transient) + the page count.
-// Throws with an HTTP status only — never the response body (it could echo PII).
+// Paginate all /clients pages. Returns raw rows (transient) + the page count +
+// reachedPageCap (true if we stopped at MAX_PAGES with has_more still true, so the
+// snapshot is partial — surfaced, never silently truncated). Throws with an HTTP
+// status only — never the response body (it could echo PII).
 async function fetchAllClients(
   apiKey: string,
-): Promise<{ rows: RawWodifyClient[]; pagesFetched: number }> {
+): Promise<{ rows: RawWodifyClient[]; pagesFetched: number; reachedPageCap: boolean }> {
   const rows: RawWodifyClient[] = [];
   let pagesFetched = 0;
+  let reachedPageCap = false;
 
   for (let page = 1; page <= MAX_PAGES; page++) {
     const url = new URL(WODIFY_BASE_URL + CLIENTS_PATH);
@@ -72,9 +77,11 @@ async function fetchAllClients(
 
     const hasMore = body?.pagination?.has_more === true;
     if (!hasMore || pageRows.length === 0) break;
+    // More pages remain but this was the last allowed page — flag the partial snapshot.
+    if (page === MAX_PAGES) reachedPageCap = true;
   }
 
-  return { rows, pagesFetched };
+  return { rows, pagesFetched, reachedPageCap };
 }
 
 // Persist the NON-PII aggregate via the Supabase REST API using the service-role
@@ -97,6 +104,7 @@ async function persistAggregate(
     unknown_status: agg.dataQuality.unknownStatus,
     future_last_check_in: agg.dataQuality.futureLastCheckIn,
     pages_fetched: agg.dataQuality.pagesFetched,
+    reached_page_cap: agg.dataQuality.reachedPageCap,
     clients_scanned: agg.dataQuality.clientsScanned,
   };
 
@@ -130,11 +138,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const asOf = todayYmd();
     const fetchedAt = new Date().toISOString();
 
-    const { rows, pagesFetched } = await fetchAllClients(apiKey);
+    const { rows, pagesFetched, reachedPageCap } = await fetchAllClients(apiKey);
     const aggregate = computeRetentionAggregate(rows, {
       asOf,
       fetchedAt,
       pagesFetched,
+      reachedPageCap,
     });
     await persistAggregate(supabaseUrl, serviceKey, aggregate);
 

@@ -23,6 +23,13 @@
 -- existing 2026-10-30) tables in `public` are not auto-exposed to the Data API,
 -- so the explicit `grant select ... to anon` below is REQUIRED for the SPA to
 -- read this table even with a permissive RLS policy.
+--
+-- Re-application note: `create table if not exists` does NOT backfill columns on
+-- an existing table. If a prior version of this table was already applied to the
+-- project, re-running this file silently skips any newly-added column. Add new
+-- columns explicitly, e.g.:
+--   alter table public.wodify_retention_aggregate
+--     add column if not exists reached_page_cap boolean not null default false;
 
 create table if not exists public.wodify_retention_aggregate (
   id uuid primary key default gen_random_uuid(),
@@ -46,6 +53,7 @@ create table if not exists public.wodify_retention_aggregate (
   unknown_status integer not null default 0,     -- rows with unmappable status (excluded)
   future_last_check_in integer not null default 0, -- lastCheckIn after asOf (binned at day 0)
   pages_fetched integer not null default 0,
+  reached_page_cap boolean not null default false, -- MAX_PAGES hit with has_more still true → partial snapshot
   clients_scanned integer not null default 0
 );
 

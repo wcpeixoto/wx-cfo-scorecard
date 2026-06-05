@@ -80,6 +80,7 @@ export type RetentionAggregate = {
     unknownStatus: number;
     futureLastCheckIn: number;
     pagesFetched: number;
+    reachedPageCap: boolean; // MAX_PAGES hit while Wodify still reported has_more (snapshot may be partial)
     clientsScanned: number;
   };
 };
@@ -88,6 +89,9 @@ export type AggregateOptions = {
   asOf: string; // YYYY-MM-DD (server fetch date / today)
   fetchedAt: string; // ISO timestamp
   pagesFetched: number;
+  // true when the fetcher stopped at the page cap with more pages still available
+  // (no silent truncation — surfaced so a partial snapshot is never mistaken for complete).
+  reachedPageCap: boolean;
 };
 
 // Map raw `client_status` to our status (§6.2). A PRESENT but unrecognized
@@ -224,6 +228,7 @@ export function computeRetentionAggregate(
       unknownStatus,
       futureLastCheckIn,
       pagesFetched: opts.pagesFetched,
+      reachedPageCap: opts.reachedPageCap,
       clientsScanned: rawRows.length,
     },
   };
