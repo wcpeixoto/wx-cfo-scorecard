@@ -192,7 +192,7 @@ PII-shaped placeholder rows or emit a call-list — derive the aggregate at the
 until the §5 probe confirms Wodify exposes the required fields (`status`, `lastCheckIn`,
 `monthlyDues`) cleanly at our access tier.
 
-### 5. Wodify data availability probe · `/clients shape discovery DONE (2026-06-05) — /clients is NOT empty: returns 100 records/page under key clients with nested pagination; client-ID field = id; status = client_status; recency (last_attendance / last_class_sign_in / days_since_last_attendance) is ON /clients; no dues field. Explains why the §5-step-2 per-client probe (#427) read 0 records — its RECORD_ARRAY_KEYS lacks clients. Next: patch #427 (add clients) + re-run. Prior: error-envelope hardening DONE (#425); shape discovery (#423); per-client probe RUN but blocked at /clients (#427)`
+### 5. Wodify data availability probe · `Per-client probe re-run (2026-06-05, after the #428 clients-key patch) — /clients prerequisite now SOLVED (100 records/page, 3 IDs sampled), but the per-client sign-ins endpoint is NOT found: all 4 candidate path templates (/clients/{id}/signins, /clients/{id}/sign-ins, /signins/{id}, /sign-ins/{id}) returned 4xx (missing-ID signal) → no working path. Dated check-in history UNPROVEN; mapping UNPROVEN (not disproven — the real path is not among the 4 guesses). NOTE: /clients itself exposes recency (last_attendance / last_class_sign_in / days_since_last_attendance) — may supply lastCheckIn for the first slice WITHOUT a sign-ins endpoint. Next = per-client sign-ins PATH discovery (separately approved). Prior: /clients shape discovery #428; error-envelope hardening #425; signins shape discovery #423; first per-client run blocked at /clients (this PR #427)`
 
 **Probe result (2026-06-04).** Phase 2 §5 probed 2026-06-04 — Outcome #1: no repo Wodify
 integration/docs/credentials or approved safe server-side path; BLOCKED pending external
@@ -369,6 +369,35 @@ know the body is an error envelope but not precisely which error. *(The step-1 h
 derives only the coarse status **class** — 2xx/4xx/5xx — from `HTTPCode`, never the exact code, so the
 safe-output contract still holds.)*
 
+**Third probe — per-client / per-ID (2026-06-05, step 2).** A new self-contained local-only script,
+`scripts/wodify/clientSigninsProbe.ts` (+ README) — `classSigninProbe.ts` and `signinsShapeDiscovery.ts`
+left untouched — was built to confirm a `/clients/{id}/signins`-style per-client path and the dated
+check-in field mapping. Because a per-client path needs a real client ID, it fetches one page of
+`/clients`, extracts a **small deterministic sample** of IDs **into memory only** (default 3; hard cap
+`MAX_PER_CLIENT_CALLS = 8`; no broad iteration), and uses them solely to build the per-client URL — the
+**request URL is never emitted; only the `{id}` path template is.** Builder built it; a read-only
+Reviewer audited the safe-output (**APPROVE — no leak paths**, posture byte-identical to the merged
+siblings); a network-free `--selftest` PASSED (synthetic PII never appears in output); then it was run
+once with the worktree-safe absolute `--env-file` (key never copied / printed / committed). Output
+stayed fully within the §5 safe contract — counts, booleans, HTTP status classes, path templates, and
+SAFE field names only; no values, rows, names, IDs, dates, dues, URLs, raw bodies, or secrets.
+
+- **Outcome — BLOCKED at the `/clients` prerequisite; per-client path UNTESTED.** `/clients` returned
+  transport-`2xx` with `errorEnvelopeDetected: false`, but `recordsOnFirstPage: 0` and
+  `clientIdsExtractedForSample: 0` — so no client ID could be sampled, the per-client templates were
+  never tried (`candidatePathTemplatesTried: []`, `perClientCallsMade: 0`), and the result was
+  `conclusion: "unproven"` / `conclusionReasonCode: "could_not_obtain_client_id"`.
+- **Interpretation — mapping UNPROVEN (not disproven).** The 2xx body was **not** a Wodify error
+  envelope, so the failure is upstream: the current `RECORD_ARRAY_KEYS` / `CLIENT_ID_FIELDS` (lowercase)
+  did **not** match the `/clients` response shape (Wodify is PascalCase-heavy). Two possibilities remain
+  — a genuinely empty client list, or (far more likely, given the chat-reported ~912-client audit) a
+  **response-SHAPE mismatch**. The safe output alone cannot distinguish them. The per-client sign-ins
+  endpoint was **never reached**, so its mapping is neither proven nor disproven. The §5 interpretation
+  guard holds: a 2xx is not proof of anything about data availability.
+- **No per-client / per-ID sign-in calls were made** (the prerequisite failed first), no live wiring /
+  §6 work was started, and the probe artifact (per-client machinery + safe-output contract, reviewed)
+  is ready to re-run once the `/clients` shape is known.
+
 **`/clients` shape discovery (2026-06-05) — `/clients` is shape-mismatched, NOT empty.** The §5 step-2
 per-client probe (`clientSigninsProbe.ts`, #427) was blocked at its `/clients` prerequisite (2xx, not an
 error envelope, but 0 records / 0 sampled IDs). A new local-only structure-only probe,
@@ -399,6 +428,27 @@ raw bodies. One `/clients` call only.
   HISTORY (multiple events, for Silent Churn Recovery) still needs that endpoint. Values were not
   inspected; the `1900-01-01` null-sentinel rule still binds when these fields are read live.
 
+**Re-run (2026-06-05, after the #428 `clients`-key patch).** Per #428's `/clients` shape discovery
+(records under the key `clients`, client-ID field `id`), `clientSigninsProbe.ts`'s `RECORD_ARRAY_KEYS`
+was patched with a single entry (`clients`, appended at lowest precedence) and the **bounded** probe was
+re-run (network-free `--selftest` PASS first; worktree-safe absolute `--env-file`; key never printed).
+
+- **`/clients` prerequisite SOLVED.** `recordsOnFirstPage: 100`, `clientIdsExtractedForSample: 3` — the
+  patch worked; client IDs now sample internally (never emitted).
+- **Per-client sign-ins endpoint NOT found.** All four candidate templates — `/clients/{id}/signins`,
+  `/clients/{id}/sign-ins`, `/signins/{id}`, `/sign-ins/{id}` — returned `4xx` (missing-ID signal), no
+  error envelope; `workingPathTemplate: null`, `perClientCallsMade: 4` (client #1 only — bounded, no
+  iteration); `conclusion: "unproven"` / `conclusionReasonCode: "no_working_path_found"`.
+- **Dated check-in history UNPROVEN; mapping UNPROVEN (not disproven).** The four guessed per-client
+  paths are all wrong; the real per-client sign-ins path (if one is exposed at this API tier) is not
+  among them. Finding it needs a separate per-client sign-ins **path** discovery (Wodify API docs or a
+  structure-only path probe) — out of scope for "re-run the bounded probe."
+- **Recency is already on `/clients` (per #428):** `last_attendance` / `last_class_sign_in` /
+  `days_since_last_attendance`. This likely supplies the first slice's `lastCheckIn` **without** any
+  sign-ins endpoint; that endpoint remains needed only for dated **history** (Silent Churn Recovery).
+  Output stayed within the §5 safe contract — schema field NAMES, counts, status classes, path
+  templates only; no values, IDs, dates, dues, URLs, or secrets.
+
 **Next steps.**
 
 1. **Harden the probes against embedded error envelopes · `Done (#425 · 97922cc, 2026-06-05)`.**
@@ -416,17 +466,29 @@ raw bodies. One `/clients` call only.
    - The **Wodify probe was NOT run** for this change (verified with a network-free synthetic check).
      **No per-client / per-ID calls were made.** **Mapping remains unproven** — this hardens the
      *interpretation* of the response; it does not confirm the endpoint path or field mapping.
-2. **Per-client / per-ID probe (#427) — RUN 2026-06-05; blocked at the `/clients` prerequisite** (see
-   the `/clients` shape discovery above). `/clients` is shape-mismatched (records under key `clients`),
-   not empty. The per-client sign-ins endpoint itself was **never reached**, so its mapping stays
-   **unproven**.
-3. **Patch `clientSigninsProbe.ts` (in #427): add `clients` to `RECORD_ARRAY_KEYS`, then re-run** the
-   per-client probe (separately approved). `id` extraction already works, so this should unblock the
-   per-client sign-ins test and confirm whether that endpoint returns dated check-in history.
-4. **Evaluate sourcing `lastCheckIn` from `/clients` directly** (`last_attendance` /
-   `last_class_sign_in` / `days_since_last_attendance`) for the first aggregate slice — it may not need
-   the per-client sign-ins endpoint at all (that endpoint is still required for dated HISTORY /
-   recovery). A §4/§6 planning item; not started.
+2. **Per-client / per-ID probe · `Re-run 2026-06-05 (after the #428 patch) — UNPROVEN`** (see "Re-run"
+   above). With `clients` added to `RECORD_ARRAY_KEYS`, `/clients` now yields IDs (100 records, 3
+   sampled), but all four candidate per-client sign-ins templates returned `4xx` →
+   `workingPathTemplate: null`. **Dated history + mapping remain UNPROVEN (not disproven)**; bounded
+   (4 calls, client #1 only); no live wiring / §6.
+3. **Discover the `/clients` response shape (structure-only) · `Done (#428)`.**
+   `scripts/wodify/clientsShapeDiscovery.ts` proved `/clients` is shape-mismatched (records under
+   `clients`, client-ID `id`), not empty — which is what the one-line `RECORD_ARRAY_KEYS` patch above
+   resolves. *(#428 holds the full `/clients` shape record; not duplicated here — see the merge-order
+   note below.)*
+4. **Discover the per-client sign-ins endpoint PATH · `TODO` (separately approved).** The four guessed
+   templates all returned `4xx`; find the real path (Wodify API docs and/or a structure-only per-client
+   sign-ins path probe), then re-run `clientSigninsProbe.ts` to confirm whether it exposes dated
+   check-in history. Until then, dated-history availability is **UNPROVEN — not disproven**.
+5. **Evaluate sourcing `lastCheckIn` from `/clients` directly** (`last_attendance` /
+   `last_class_sign_in` / `days_since_last_attendance`, surfaced by #428) for the first aggregate slice
+   — it may not need the per-client sign-ins endpoint at all (that endpoint is still required only for
+   dated HISTORY / recovery). A §4/§6 planning item; not started.
+
+**Merge order with #428.** This PR (#427) and #428 both edit §5 + `scripts/wodify/README.md`. #428 is
+the standalone `/clients` shape-discovery; this PR's one-line patch + re-run builds on it. Merge **#428
+first**, then rebase + merge #427, resolving §5 / README to keep both records (the `/clients` shape
+discovery from #428, and the patch + re-run outcome here).
 
 ### 6. Live wiring spike — 1–2 cards · `TODO` (do this early, before broad live work)
 
