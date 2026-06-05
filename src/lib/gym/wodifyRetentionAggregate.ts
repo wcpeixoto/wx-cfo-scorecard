@@ -21,7 +21,14 @@
 // snapshot-level `asOf` / `fetchedAt` and pure counts cross the boundary, so the
 // aggregate table is anon-readable by construction, not by trust.
 
-import { parseYmdLocal, wholeDaysBetween } from './silentChurn';
+// The explicit `.ts` extension is load-bearing for the Supabase Edge deploy: the
+// eszip bundler requires explicit .ts resolution for this shared src/ import (the
+// `sync-wodify-retention` Edge Function imports this module across the SPA/Deno
+// boundary). It is paired with `allowImportingTsExtensions: true` in
+// tsconfig.app.json so the SPA typecheck accepts it. Do NOT strip either half —
+// dropping the extension reproduces the proven deploy failure
+// (Module not found "./silentChurn").
+import { parseYmdLocal, wholeDaysBetween } from './silentChurn.ts';
 
 // Highest exact day-count bin. Days absent 0..364 get an exact bin; >= 365 rolls
 // into `overflow365Plus`. Bounding the histogram means it carries no exact dates
