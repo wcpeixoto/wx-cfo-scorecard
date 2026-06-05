@@ -192,7 +192,7 @@ PII-shaped placeholder rows or emit a call-list — derive the aggregate at the
 until the §5 probe confirms Wodify exposes the required fields (`status`, `lastCheckIn`,
 `monthlyDues`) cleanly at our access tier.
 
-### 5. Wodify data availability probe · `Error-envelope hardening DONE (#425 · 97922cc, 2026-06-05) — classSigninProbe now detects the Wodify error envelope and treats an embedded non-2xx HTTPCode as failure, not "0 records"; probe NOT run; mapping still not proven. Prior: shape discovery (#423 · 7da4369) found the first probe's transport-2xx + 0 records was a Wodify error envelope (not a true empty dataset); bare /signins shows a per-client-ID signal (first probe #420 · 625bff8)`
+### 5. Wodify data availability probe · `/clients shape discovery DONE (2026-06-05) — /clients is NOT empty: returns 100 records/page under key clients with nested pagination; client-ID field = id; status = client_status; recency (last_attendance / last_class_sign_in / days_since_last_attendance) is ON /clients; no dues field. Explains why the §5-step-2 per-client probe (#427) read 0 records — its RECORD_ARRAY_KEYS lacks clients. Next: patch #427 (add clients) + re-run. Prior: error-envelope hardening DONE (#425); shape discovery (#423); per-client probe RUN but blocked at /clients (#427)`
 
 **Probe result (2026-06-04).** Phase 2 §5 probed 2026-06-04 — Outcome #1: no repo Wodify
 integration/docs/credentials or approved safe server-side path; BLOCKED pending external
@@ -369,6 +369,36 @@ know the body is an error envelope but not precisely which error. *(The step-1 h
 derives only the coarse status **class** — 2xx/4xx/5xx — from `HTTPCode`, never the exact code, so the
 safe-output contract still holds.)*
 
+**`/clients` shape discovery (2026-06-05) — `/clients` is shape-mismatched, NOT empty.** The §5 step-2
+per-client probe (`clientSigninsProbe.ts`, #427) was blocked at its `/clients` prerequisite (2xx, not an
+error envelope, but 0 records / 0 sampled IDs). A new local-only structure-only probe,
+`scripts/wodify/clientsShapeDiscovery.ts` (+ README) — built on `signinsShapeDiscovery.ts`'s reviewed
+helpers, network-free `--selftest` PASS, run once with the worktree-safe absolute `--env-file` (key never
+printed/committed) — reproduced that exact `/clients` request and reported its structure. Output stayed
+fully within the §5 safe contract: endpoint path, key names, array lengths, per-field TYPE CATEGORIES,
+booleans, and status classes only — no values, names, IDs, dates, dues, pagination values, raw rows, or
+raw bodies. One `/clients` call only.
+
+- **Finding — `/clients` returns `{ clients: [ …100… ], pagination: {…} }`** — a full page of 100 record
+  objects under the key **`clients`**, with a nested `pagination` object (`pagination.page` /
+  `pagination.page_size` / `pagination.has_more`). It is **NOT empty** (`conclusion: "shape_mismatch"`).
+- **Root cause of #427's 0 records:** `clientSigninsProbe.ts`'s `RECORD_ARRAY_KEYS`
+  (`data`/`results`/`result`/`items`/`records`/`value`/`signins`/`SignIns`/`rows`, exact-case) does
+  **not** include `clients`, so its `extractRecords` found no array and returned `[]`
+  (`recordArrayKeyMatchesClientProbeConfig: false`).
+- **Confirmed mapping (names + type categories only):** client-ID = **`id`** (number; already in #427's
+  `CLIENT_ID_FIELDS`, so `clientIdFieldMatchesClientProbeConfig: true`), status = **`client_status`**
+  (matches the §5 reported quirk). Recency is **on `/clients` directly**: `last_attendance`,
+  `last_class_sign_in`, `last_booking_sign_in`, `days_since_last_attendance` (number), plus Wodify's own
+  `is_at_risk` (boolean) and `total_class_sign_ins`. **No dues field** on `/clients` (consistent with §5's
+  financials being API-tier-blocked) — `monthlyDues` must come from another source. `/clients` is
+  PII-dense (name / email / phone / DOB / address / etc.) — reinforces the §4 aggregate-only posture; the
+  probe emitted field NAMES + type categories only, never values.
+- **Note on `lastCheckIn`:** `/clients` exposes a LATEST attendance/sign-in (recency), which likely
+  supplies the first slice's `lastCheckIn` **without** the per-client sign-ins endpoint. Dated check-in
+  HISTORY (multiple events, for Silent Churn Recovery) still needs that endpoint. Values were not
+  inspected; the `1900-01-01` null-sentinel rule still binds when these fields are read live.
+
 **Next steps.**
 
 1. **Harden the probes against embedded error envelopes · `Done (#425 · 97922cc, 2026-06-05)`.**
@@ -386,9 +416,17 @@ safe-output contract still holds.)*
    - The **Wodify probe was NOT run** for this change (verified with a network-free synthetic check).
      **No per-client / per-ID calls were made.** **Mapping remains unproven** — this hardens the
      *interpretation* of the response; it does not confirm the endpoint path or field mapping.
-2. **Only then** consider a **separately-approved per-client / per-ID probe** to confirm a
-   `/clients/{id}/signins`-style path and the field mapping. **Still requires separate approval; not
-   started** — no per-client / per-ID calls have been made.
+2. **Per-client / per-ID probe (#427) — RUN 2026-06-05; blocked at the `/clients` prerequisite** (see
+   the `/clients` shape discovery above). `/clients` is shape-mismatched (records under key `clients`),
+   not empty. The per-client sign-ins endpoint itself was **never reached**, so its mapping stays
+   **unproven**.
+3. **Patch `clientSigninsProbe.ts` (in #427): add `clients` to `RECORD_ARRAY_KEYS`, then re-run** the
+   per-client probe (separately approved). `id` extraction already works, so this should unblock the
+   per-client sign-ins test and confirm whether that endpoint returns dated check-in history.
+4. **Evaluate sourcing `lastCheckIn` from `/clients` directly** (`last_attendance` /
+   `last_class_sign_in` / `days_since_last_attendance`) for the first aggregate slice — it may not need
+   the per-client sign-ins endpoint at all (that endpoint is still required for dated HISTORY /
+   recovery). A §4/§6 planning item; not started.
 
 ### 6. Live wiring spike — 1–2 cards · `TODO` (do this early, before broad live work)
 
