@@ -449,6 +449,38 @@ re-run (network-free `--selftest` PASS first; worktree-safe absolute `--env-file
   Output stayed within the §5 safe contract — schema field NAMES, counts, status classes, path
   templates only; no values, IDs, dates, dues, URLs, or secrets.
 
+**`/clients` direct-recency evaluation (2026-06-05) — SUFFICIENT on the sampled page; a date-slice is
+needed.** A new local-only probe, `scripts/wodify/clientsRecencyProbe.ts` (+ README) — built on the
+sibling probes' reviewed posture; read-only Reviewer **APPROVE (no leak paths)**; network-free
+`--selftest` PASS (synthetic PII + a raw status value never reach output); run once with the
+worktree-safe absolute `--env-file` (key never printed/committed) — evaluated whether `/clients`'s
+direct recency fields can source the first-slice `lastCheckIn` **without** the per-client sign-ins
+endpoint. ONE `/clients` page (100 records; `morePagesAvailable: true`, so **page-1-only, not global**).
+Output stayed fully within the §5 safe contract: counts, booleans, status classes, an allowlisted
+status-category breakdown, the records-array key name, and verdict enums only — no values, names, IDs,
+dates, dues, pagination values, URLs, raw rows/bodies, or secrets.
+
+- **Verdict — `suitability: "sufficient"` (`firstSliceLastCheckInDerivable: "yes"`).** Of the **26
+  active** records on the page (the cohort `classifyMember` keeps; the other 74 bucketed `inactive`),
+  **23 (≈88%) carry a usable, non-sentinel recency date** on both `last_attendance` and
+  `last_class_sign_in`. The ~3 active members with only the `1900-01-01` sentinel correctly fall into the
+  classifier's **`unknown`** bucket — never silently Healthy. So the first slice's `lastCheckIn` **can be
+  sourced from `/clients` directly** for this sample.
+- **A date-slice IS required (`lastCheckInNormalizationNeeded: "date_slice"`).** Every usable value was
+  an ISO timestamp (`datedWithTimeCount` 44/44 per field; `strictYmdCount: 0`), not bare `YYYY-MM-DD`.
+  `parseYmdLocal` rejects a timestamp, so the §4 server-side normalizer must **slice the leading
+  `YYYY-MM-DD`** before reusing the locked parser. The `1900-01-01` sentinel (56/100 overall;
+  concentrated in inactive members) must be stripped to `null` **before** the classifier (§5/§8 guard).
+- **`days_since_last_attendance` is NOT a clean substitute** — `numeric` for 100/100 *including* the 56
+  sentinel records (a meaningless ~46k-day count off `1900-01-01`, no null signal). Source `lastCheckIn`
+  from `last_attendance` (sentinel detectable) and let `classifyMember` compute `daysAbsent` from **our**
+  today-anchor (preserves the §4 anchor); do not trust Wodify's precomputed count. `is_at_risk` fires for
+  only **1/100** — a useful *secondary* cross-check, not a replacement for the deterministic rule.
+- **Still blocked without the per-client sign-ins endpoint:** dated check-in **history** (multiple events
+  per member) for Silent Churn **Recovery**. `/clients` gives only the *latest* recency value — exactly
+  what the first-slice `lastCheckIn` needs, but not the multi-event history (#427/#428: endpoint still
+  unfound; separate path-discovery task). No live wiring / §6 work was started.
+
 **Next steps.**
 
 1. **Harden the probes against embedded error envelopes · `Done (#425 · 97922cc, 2026-06-05)`.**
@@ -480,10 +512,15 @@ re-run (network-free `--selftest` PASS first; worktree-safe absolute `--env-file
    templates all returned `4xx`; find the real path (Wodify API docs and/or a structure-only per-client
    sign-ins path probe), then re-run `clientSigninsProbe.ts` to confirm whether it exposes dated
    check-in history. Until then, dated-history availability is **UNPROVEN — not disproven**.
-5. **Evaluate sourcing `lastCheckIn` from `/clients` directly** (`last_attendance` /
-   `last_class_sign_in` / `days_since_last_attendance`, surfaced by #428) for the first aggregate slice
-   — it may not need the per-client sign-ins endpoint at all (that endpoint is still required only for
-   dated HISTORY / recovery). A §4/§6 planning item; not started.
+5. **Evaluate sourcing `lastCheckIn` from `/clients` directly · `Done — SUFFICIENT on the sampled page`**
+   (see the "`/clients` direct-recency evaluation" record above). `clientsRecencyProbe.ts` confirms the
+   first slice's `lastCheckIn` **can** come from `/clients` recency without the per-client sign-ins
+   endpoint (≈88% of active members on the page have a usable date; sentinel-only ones → `unknown`
+   bucket). Two §6 implementation constraints fall out: (a) the server-side normalizer must **slice the
+   `YYYY-MM-DD`** off the ISO timestamp before `parseYmdLocal`, and (b) the `1900-01-01` sentinel must be
+   nulled **before** the classifier. Coverage is **page-1-only** (a global confirmation needs a
+   separately-approved broader run); dated **history** (recovery) still needs the unfound per-client
+   sign-ins endpoint (item 4).
 
 **Merge order with #428.** This PR (#427) and #428 both edit §5 + `scripts/wodify/README.md`. #428 is
 the standalone `/clients` shape-discovery; this PR's one-line patch + re-run builds on it. Merge **#428
