@@ -16,6 +16,12 @@
  *     member/sign-in rows, or raw API responses.
  *   - Treats `1900-01-01` as a NULL SENTINEL — counted separately as `sentinelDateCount`, never
  *     treated as a real check-in date.
+ *   - Detects a Wodify ERROR ENVELOPE returned at transport-2xx (top-level `DeveloperMessage` /
+ *     `ErrorCode` / `HTTPCode` / `UserMessage` — observed by the §5 shape discovery, #423) and
+ *     reports it as a FAILURE, not as "0 records". The embedded `HTTPCode` is authoritative (the
+ *     real status) and is reduced to a status CLASS only — its raw value is never read into output,
+ *     logs, or errors. Real rows always win: a non-empty records array is read, and a 2xx embedded
+ *     code with an empty array is a real empty dataset, not an error.
  *   - Does NOT import `silentChurn.ts` / `classifyMember`. Date validation here is a small,
  *     self-contained, STRICTER reimplementation (it rejects impossible calendar dates such as
  *     2026-02-30 instead of rolling them over). Keeping it standalone honours the §5 rule and
@@ -51,6 +57,12 @@ const CHECKIN_DATE_FIELDS = ['checkin_date', 'checkInDate', 'date', 'signin_date
 const SENTINEL_DATE = '1900-01-01'; // §5: Wodify surfaces null dates as this. Treat as MISSING.
 // Candidate array keys for the records payload (a bare top-level array is also handled).
 const RECORD_ARRAY_KEYS = ['data', 'results', 'items', 'records'];
+// §5 shape discovery (#423): Wodify returns errors as a transport-2xx body shaped like an error
+// ENVELOPE — top-level keys DeveloperMessage / ErrorCode / HTTPCode / UserMessage and NO records
+// array. The in-body HTTPCode carries the REAL status, so a transport-2xx here is not success.
+// Matched case-insensitively (lowercased). Values are NEVER emitted: the HTTPCode value is reduced
+// to a status CLASS only (per the §5 safe contract), and the message/code text is never read.
+const ERROR_ENVELOPE_MARKER_KEYS = ['developermessage', 'errorcode', 'httpcode', 'usermessage'];
 
 // ─── Safe output contract (RETENTION_FINISH_PLAN.md §5) ─────────────────────────────────────────
 // The FIELD NAMES below are the locked §5 contract; their SEMANTICS are PROVISIONAL until the
@@ -61,6 +73,12 @@ type HttpStatusClass = '2xx' | '4xx' | '5xx' | 'network_error';
 interface SafeProbeResult {
   endpointReached: boolean;
   httpStatusClass: HttpStatusClass;
+  // §5 error-envelope guard: true when a transport-2xx body is actually a Wodify error envelope
+  // (DeveloperMessage / ErrorCode / HTTPCode / UserMessage, no records array). Distinguishes a real
+  // failure from an empty dataset, so `totalRecordsInspected: 0` is never misread as "no history".
+  errorEnvelopeDetected: boolean;
+  // Status CLASS derived from the in-body HTTPCode (never the raw value); null if absent/unparseable.
+  embeddedHttpStatusClass: HttpStatusClass | null;
   pagesFetched: number;
   totalRecordsInspected: number;
   fieldPresenceCounts: {
@@ -138,15 +156,53 @@ function extractRecords(parsed: unknown): Record<string, unknown>[] {
   return [];
 }
 
+interface ErrorEnvelopeInfo {
+  detected: boolean;
+  embeddedStatusClass: HttpStatusClass | null;
+}
+
+/**
+ * Detect a Wodify ERROR ENVELOPE returned at transport-2xx (§5 / shape discovery #423): a plain
+ * object carrying DeveloperMessage / ErrorCode / HTTPCode / UserMessage. Such a body means the real
+ * status rides in the payload, so it must be treated as a failure — not read as "0 records". Returns
+ * whether the envelope was seen and the status CLASS of the embedded HTTPCode. The raw HTTPCode value
+ * is reduced to a class and is otherwise NEVER read into output, logs, or errors (safe contract); the
+ * message / error-code TEXT is never read at all.
+ */
+function detectErrorEnvelope(parsed: unknown): ErrorEnvelopeInfo {
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { detected: false, embeddedStatusClass: null };
+  }
+  const obj = parsed as Record<string, unknown>;
+  const actualByLower = new Map<string, string>(); // lowercased key -> actual key (case-insensitive)
+  for (const k of Object.keys(obj)) actualByLower.set(k.toLowerCase(), k);
+  const markerHits = ERROR_ENVELOPE_MARKER_KEYS.filter((m) => actualByLower.has(m));
+  const httpCodeKey = actualByLower.get('httpcode');
+  // The authoritative HTTPCode marker, or a quorum (>= 2 markers), identifies the envelope — avoids a
+  // false positive on a real payload that merely happens to carry one similarly named key.
+  const detected = httpCodeKey !== undefined || markerHits.length >= 2;
+  if (!detected) return { detected: false, embeddedStatusClass: null };
+
+  let embeddedStatusClass: HttpStatusClass | null = null;
+  if (httpCodeKey !== undefined) {
+    const code = Number(obj[httpCodeKey]); // reduced to a class below; the raw value is never emitted
+    if (Number.isFinite(code) && code >= 100 && code < 600) embeddedStatusClass = statusClassOf(code);
+  }
+  return { detected, embeddedStatusClass };
+}
+
 interface PageResult {
   status: number;
   records: Record<string, unknown>[];
   missingIdHint: boolean;
+  // §5: set when a transport-2xx body is actually a Wodify error envelope (see detectErrorEnvelope).
+  errorEnvelope: ErrorEnvelopeInfo;
 }
 
 /**
- * Fetch one page. Reads the body to extract records and to detect the §5 missing-ID 403 — the
- * body is NEVER logged or returned; only derived records + a boolean leave this function.
+ * Fetch one page. Reads the body to extract records, to detect the §5 missing-ID 403, and to detect
+ * a §5 error envelope — the body is NEVER logged or returned; only derived records, booleans, and a
+ * status CLASS leave this function.
  */
 async function fetchPage(apiKey: string, page: number): Promise<PageResult> {
   // ASSUMPTION (unverified): pagination is `page`/`pageSize` query params and the last page is the
@@ -173,14 +229,28 @@ async function fetchPage(apiKey: string, page: number): Promise<PageResult> {
   const missingIdHint = res.status === 403 && /Missing Authentication Token/i.test(bodyText);
 
   let records: Record<string, unknown>[] = [];
+  let errorEnvelope: ErrorEnvelopeInfo = { detected: false, embeddedStatusClass: null };
   if (res.status >= 200 && res.status < 300) {
     try {
-      records = extractRecords(JSON.parse(bodyText));
+      const parsed = JSON.parse(bodyText);
+      const extracted = extractRecords(parsed);
+      const envelope = detectErrorEnvelope(parsed);
+      // Classify as an error envelope only when markers are present, no real rows were extracted, AND
+      // the embedded HTTPCode is not a 2xx success. The empty-rows test alone can't tell a MISSING
+      // records array (the §5 envelope) from a real-but-empty one like `{ data: [] }`; the embedded
+      // status breaks the tie — a 2xx envelope with an empty array is a real empty dataset, not an
+      // error. `extracted.length > 0` always wins, so real rows are never discarded for envelope keys.
+      if (envelope.detected && extracted.length === 0 && envelope.embeddedStatusClass !== '2xx') {
+        errorEnvelope = envelope;
+        records = [];
+      } else {
+        records = extracted;
+      }
     } catch {
       records = []; // 2xx but non-JSON — caller sees 0 records and can re-check the shape.
     }
   }
-  return { status: res.status, records, missingIdHint };
+  return { status: res.status, records, missingIdHint, errorEnvelope };
 }
 
 async function main(): Promise<void> {
@@ -214,6 +284,8 @@ async function main(): Promise<void> {
 
   let endpointReached = false;
   let httpStatusClass: HttpStatusClass = 'network_error';
+  let errorEnvelopeDetected = false;
+  let embeddedHttpStatusClass: HttpStatusClass | null = null;
 
   for (let page = 1; page <= MAX_PAGES; page++) {
     let pageResult: PageResult;
@@ -241,6 +313,21 @@ async function main(): Promise<void> {
             : '403 received: likely a real authorization failure (verify the rotated key / tier).',
         );
       }
+      break;
+    }
+
+    if (pageResult.errorEnvelope.detected) {
+      // Transport said 2xx, but the body is a Wodify error envelope — the embedded HTTPCode is the
+      // REAL status. Record it as a failure (NOT an empty dataset) and stop. Safe diagnostic only:
+      // the status CLASS, never the raw HTTPCode value or any body / message text.
+      errorEnvelopeDetected = true;
+      embeddedHttpStatusClass = pageResult.errorEnvelope.embeddedStatusClass;
+      console.warn(
+        'Transport 2xx but the body is a Wodify error envelope (DeveloperMessage / ErrorCode / ' +
+          'HTTPCode / UserMessage, no records array). The embedded HTTPCode is the real status' +
+          (embeddedHttpStatusClass ? ` (class: ${embeddedHttpStatusClass})` : '') +
+          ' — treating as a failure, NOT 0 records. Re-confirm the endpoint path / per-client-ID need.',
+      );
       break;
     }
 
@@ -299,6 +386,8 @@ async function main(): Promise<void> {
   const result: SafeProbeResult = {
     endpointReached,
     httpStatusClass,
+    errorEnvelopeDetected,
+    embeddedHttpStatusClass,
     pagesFetched,
     totalRecordsInspected,
     fieldPresenceCounts: { clientRef: clientRefPresent, checkInDate: checkInDatePresent },
