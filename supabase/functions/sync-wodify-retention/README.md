@@ -58,12 +58,23 @@ call** — and **nuanced**, not a clean pass:
   draft of this README incorrectly claimed bare `deno check` passes; that claim is
   retracted here.)*
 
+- **Function-local `deno.json` mitigation — landed (#432, `b618d02`).** A minimal
+  `supabase/functions/sync-wodify-retention/deno.json` = `{"unstable":["sloppy-imports"]}`
+  now ships alongside the function — **no fork, no `tsconfig` change, `silentChurn.ts`
+  untouched, no `.ts` added to the shared import**. On a clean copy of the exact bytes,
+  strict `deno check` **PASSES with this config** (and still fails without it), so
+  sloppy-imports resolves the transitive extensionless `./silentChurn` import at the
+  Deno level. This does **not** close the live gate — see the next bullet.
+
 - **Deploy-bundler resolution — UNCONFIRMED (live-gate item).** Whether Supabase's
   actual `supabase functions deploy` / `supabase functions serve` bundler resolves
-  the extensionless shared import like esbuild (resolves) or like strict Deno
-  (fails) is **not proven offline**. The first live step stays blocked until a real
-  deploy/serve proof confirms the shared `src/` import resolves — **without forking
-  the locked date logic and without changing `tsconfig`**.
+  the extensionless shared import like esbuild / sloppy-imports Deno (resolves) or
+  like bare strict Deno (fails) is **not proven offline**. Three things stay unproven
+  at deploy / eszip time: (1) deploy **discovers** the function-local `deno.json`
+  (#432); (2) deploy **honors** `unstable:["sloppy-imports"]`; (3) **eszip** resolves
+  the shared `src/` graph like the offline proof. The first live step stays blocked
+  until a real deploy/serve proof confirms the shared `src/` import resolves —
+  **without forking the locked date logic and without changing `tsconfig`**.
 
 No fork of the locked date logic was introduced, and `tsconfig` is unchanged.
 
@@ -118,8 +129,11 @@ runtime; they are not set manually.
 - **Deploy/serve resolution of the shared `src/` import — BLOCKS the live gate.**
   Prove `supabase functions deploy` / `supabase functions serve` bundles the
   function with the shared module resolved, **without a fork or a `tsconfig`
-  change**. esbuild resolves it; strict `deno check` does not; the actual deploy
-  bundler is unconfirmed offline (see "Bundle/import proof").
+  change**. esbuild resolves it; strict `deno check` resolves it **with** the
+  function-local `deno.json` (#432) and fails without it; the actual deploy bundler
+  is unconfirmed offline — specifically, whether deploy discovers the `deno.json`,
+  honors `unstable:["sloppy-imports"]`, and resolves the graph through eszip (see
+  "Bundle/import proof").
 - Confirm the live `/clients` response uses snake_case field names
   (`client_status`, `last_attendance`, `last_class_sign_in`, `is_at_risk`) as the
   §5 probe observed. If casing differs, `dataQuality.unknownStatus` / `unknown`
