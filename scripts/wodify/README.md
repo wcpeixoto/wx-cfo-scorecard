@@ -25,10 +25,12 @@ gates Silent Churn Recovery and supplies the `lastCheckIn` the first live slice 
 - Treats `1900-01-01` as a null sentinel — counted separately as `sentinelDateCount`, never a
   real date.
 - Detects a Wodify **error envelope** returned at transport-2xx (`DeveloperMessage` / `ErrorCode` /
-  `HTTPCode` / `UserMessage`, no records array) and reports it as a failure (`errorEnvelopeDetected`
-  + `embeddedHttpStatusClass`) instead of a misleading "0 records". The embedded `HTTPCode` is
-  reduced to a status **class** only — its raw value is never read into output, logs, or errors, and
-  the message / error-code text is never read at all.
+  `HTTPCode` / `UserMessage`) and reports it as a failure (`errorEnvelopeDetected` +
+  `embeddedHttpStatusClass`) instead of a misleading "0 records". The embedded `HTTPCode` is
+  authoritative and is reduced to a status **class** only — its raw value is never read into output,
+  logs, or errors, and the message / error-code text is never read at all. Real rows are never
+  discarded: a non-empty records array is always read, and a 2xx embedded code with an empty array
+  is treated as a real empty dataset, not an error.
 - Does **not** import `silentChurn.ts` / `classifyMember`.
 
 ### Run (local only — provide the key via a gitignored env path; never commit or paste it)

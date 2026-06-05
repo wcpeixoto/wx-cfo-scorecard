@@ -17,10 +17,11 @@
  *   - Treats `1900-01-01` as a NULL SENTINEL — counted separately as `sentinelDateCount`, never
  *     treated as a real check-in date.
  *   - Detects a Wodify ERROR ENVELOPE returned at transport-2xx (top-level `DeveloperMessage` /
- *     `ErrorCode` / `HTTPCode` / `UserMessage` with no records array — observed by the §5 shape
- *     discovery, #423) and reports it as a FAILURE, not as "0 records". The embedded `HTTPCode` is
- *     the real status; it is reduced to a status CLASS only — its raw value is never read into
- *     output, logs, or errors.
+ *     `ErrorCode` / `HTTPCode` / `UserMessage` — observed by the §5 shape discovery, #423) and
+ *     reports it as a FAILURE, not as "0 records". The embedded `HTTPCode` is authoritative (the
+ *     real status) and is reduced to a status CLASS only — its raw value is never read into output,
+ *     logs, or errors. Real rows always win: a non-empty records array is read, and a 2xx embedded
+ *     code with an empty array is a real empty dataset, not an error.
  *   - Does NOT import `silentChurn.ts` / `classifyMember`. Date validation here is a small,
  *     self-contained, STRICTER reimplementation (it rejects impossible calendar dates such as
  *     2026-02-30 instead of rolling them over). Keeping it standalone honours the §5 rule and
@@ -234,9 +235,12 @@ async function fetchPage(apiKey: string, page: number): Promise<PageResult> {
       const parsed = JSON.parse(bodyText);
       const extracted = extractRecords(parsed);
       const envelope = detectErrorEnvelope(parsed);
-      // Treat it as an error envelope ONLY when there is no usable records array — never discard real
-      // data that happens to sit alongside envelope-like keys. The §5-observed envelope has no array.
-      if (envelope.detected && extracted.length === 0) {
+      // Classify as an error envelope only when markers are present, no real rows were extracted, AND
+      // the embedded HTTPCode is not a 2xx success. The empty-rows test alone can't tell a MISSING
+      // records array (the §5 envelope) from a real-but-empty one like `{ data: [] }`; the embedded
+      // status breaks the tie — a 2xx envelope with an empty array is a real empty dataset, not an
+      // error. `extracted.length > 0` always wins, so real rows are never discarded for envelope keys.
+      if (envelope.detected && extracted.length === 0 && envelope.embeddedStatusClass !== '2xx') {
         errorEnvelope = envelope;
         records = [];
       } else {
