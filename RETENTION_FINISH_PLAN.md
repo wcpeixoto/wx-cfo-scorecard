@@ -527,7 +527,7 @@ the standalone `/clients` shape-discovery; this PR's one-line patch + re-run bui
 first**, then rebase + merge #427, resolving §5 / README to keep both records (the `/clients` shape
 discovery from #428, and the patch + re-run outcome here).
 
-### 6. Live wiring spike — 1–2 cards · `Design drafted 2026-06-05 (planning); wiring gated on review` (do this early, before broad live work)
+### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1) IMPLEMENTED; SPA wiring (PR2) + live invoke gated on review` (do this early, before broad live work)
 
 Wire a **minimal** live-data path for one or two Retention cards before any broader live
 integration — a validation slice, not a rollout. The biggest remaining risk is whether
@@ -539,21 +539,30 @@ live slice is **aggregate-only** and fetches just `status` · `lastCheckIn` · `
 server-side — see §4 for the input scope, classifier-reuse constraint, and payload target.
 `id` / `displayName` / `membershipStart` and the call-list are deferred.
 
-**First bounded live slice — design (PLANNING ONLY; decisions locked 2026-06-05 by owner; no wiring yet).**
+**First bounded live slice — server-side half IMPLEMENTED (PR1, 2026-06-05); SPA wiring + live invoke gated.**
 Source = `/clients` direct recency (§5 #429 — SUFFICIENT for `lastCheckIn`). Cards = Silent Churn +
-Attendance Health, aggregate-only. The four open items are now decided (see §6.7); this is the design the
-§6 spike will implement once greenlit to build — no Edge Function, table, or SPA change exists yet.
+Attendance Health, aggregate-only. The four open items are decided (see §6.7). PR1 shipped the server-side
+half — the pure aggregate module `src/lib/gym/wodifyRetentionAggregate.ts` (reuses the locked date
+primitives, threshold-free histogram, parity-tested vs `computeAttendanceHealth`), the thin Edge Function
+`supabase/functions/sync-wodify-retention/`, and the non-PII aggregate table
+`supabase/wodify_retention_schema.sql`. **Still gated:** no SPA wiring (PR2), no secret set, no live Wodify
+call — the first live invoke needs a Reviewer audit + Wesley's explicit authorization.
 
-1. **Server-side contract consumed by `silentChurn.ts` (the reuse boundary).** The server imports the
-   locked pure helpers — `classifyMember`, `resolveSilentChurnThresholdDays`, `parseYmdLocal`,
-   `wholeDaysBetween` — and never forks them; it derives the aggregate at the `classifyMember` /
-   `computeAttendanceHealth` level (counts only, §4). `classifyMember` reads ONLY two `GymMember` fields:
-   `status` (acts on `'active'`) and `lastCheckIn` (`YYYY-MM-DD` → `parseYmdLocal`; null/invalid →
-   `unknown` bucket). `monthlyDues` is read only by `computeSilentChurn` (the dollar); `id` / `displayName`
-   only by its call-list (both deferred). So the minimal normalized per-member input is
-   `{ status: 'active'|'paused'|'ended', lastCheckIn: 'YYYY-MM-DD' | '', monthlyDues: number | null }`.
-   `computeSilentChurn` is **not** run end-to-end (it would need PII-shaped rows); the `silent` count comes
-   from `computeAttendanceHealth().silent` (`=== computeSilentChurn().count` by construction).
+1. **Server-side reuse boundary (refined in PR1).** The server imports ONLY the locked, threshold-FREE
+   date primitives — `parseYmdLocal` and `wholeDaysBetween` — from `silentChurn.ts`, and never forks them
+   (`src/lib/gym/wodifyRetentionAggregate.ts`). It does NOT call `classifyMember` /
+   `computeAttendanceHealth` server-side: those are threshold-coupled, and the aggregate is a
+   **threshold-free** exact-day histogram (§6.6) so the owner-tunable threshold is applied entirely in the
+   SPA (PR2), reusing the same `WATCH_FLOOR_DAYS` + threshold rule. *(This refines the original §6.1, which
+   said the server derives "at the `classifyMember` / `computeAttendanceHealth` level" — that path can't
+   yield a threshold-free histogram.)* The server reads only the raw `/clients` fields that matter:
+   `client_status` (→ `'active'` is load-bearing) and the recency dates `last_attendance` /
+   `last_class_sign_in` (→ `parseYmdLocal`; null/invalid → `unknown`). `monthlyDues` is unavailable (§6.4);
+   `id` / `displayName` are never read. So the minimal normalized per-member input is
+   `{ status, lastCheckIn: 'YYYY-MM-DD' | '' }`. Parity with the locked classifier is PROVEN BY TEST
+   (`wodifyRetentionAggregate.test.ts`): reconstructing Healthy / Watch / Silent from the histogram equals
+   `computeAttendanceHealth` at every threshold (so `silent === computeAttendanceHealth().silent ===
+   computeSilentChurn().count` by construction).
 
 2. **Wodify `/clients` → internal normalization (server-side, transient).**
    - **`status`** ← per-record `client_status` (the `status=Active` query does **not** filter — §5). Map
@@ -608,19 +617,31 @@ Attendance Health, aggregate-only. The four open items are now decided (see §6.
      first live slice. A **scheduled refresh comes later, only after the first slice proves stable** — not
      part of this slice.
 
-6. **Payload (DECIDED shape — `daysAbsent` histogram; refines §4's single-T target).**
+6. **Payload (IMPLEMENTED shape — exact-day `daysAbsent` histogram OBJECT; PR1 server-side slice).**
    ```ts
    { source: "wodify", asOf, fetchedAt,
      activeTotal: number,
-     daysAbsentHistogram: number[],   // counts by daysAbsent over ACTIVE members; final bin = >= 365d
+     daysAbsentHistogram: {            // threshold-free, exact-day, over ACTIVE members
+       maxExactDays: 364,              // bins "0".."364" are exact whole-day counts
+       countsByDaysAbsent: Record<string, number>,  // sparse: { "<days>": <count> }
+       overflow365Plus: number,        // active members >= 365 days absent
+     },
      unknown: number,                  // active, missing/sentinel/invalid lastCheckIn (NOT Healthy)
      silentChurn: { monthlyDuesAtRisk: null, missingMonthlyDues: true },  // count derived client-side at T
      diagnostics: { wodifyAtRiskCount },
-     dataQuality: { unknownStatus, pagesFetched, clientsScanned } }
+     dataQuality: { unknownStatus, futureLastCheckIn, pagesFetched, clientsScanned } }
    ```
    The SPA computes `silentChurn.count` and the Healthy / Watch / Silent split from `daysAbsentHistogram`
-   at the owner's current threshold (`missingLastCheckIn` == `unknown`). No member rows, names, IDs, exact
-   dates, or dues ever enter the payload.
+   at the owner's current threshold: `silent` = bins `>= T` plus `overflow365Plus`; `watch` = bins
+   `[WATCH_FLOOR_DAYS, T)`; `healthy` = bins `< WATCH_FLOOR_DAYS`; `unknown` carried separately. No member
+   rows, names, IDs, exact dates, or dues ever enter the payload.
+
+   **Shape change vs the original §6.6 (PR1, per "Facts override this file").** The histogram is an OBJECT,
+   not `number[]`. A bare array has no defined slot for a future-dated `lastCheckIn` (negative `daysAbsent`)
+   and conflates the `>= 365` overflow with a positional index. The object bins exact days `0..364` in
+   `countsByDaysAbsent`, rolls `>= 365` into `overflow365Plus`, bins a future date at day 0
+   (Healthy-compatible — §6.7) and counts it in the new `dataQuality.futureLastCheckIn` diagnostic.
+   Conservation holds by construction: `activeTotal === sum(countsByDaysAbsent) + overflow365Plus + unknown`.
 
 7. **Decisions (locked 2026-06-05 by owner).** (a) **payload = `daysAbsent` histogram**, not single-T, so
    the owner-tunable threshold works without another Wodify fetch (§6.3); (b) **dues = ship count-only

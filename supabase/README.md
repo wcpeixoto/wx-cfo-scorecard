@@ -14,6 +14,7 @@ Schema:
 
 - apply `/Users/wesley/Code/wx-cfo-scorecard/supabase/shared_persistence_schema.sql`
 - for the first local/staging test, apply `/Users/wesley/Code/wx-cfo-scorecard/supabase/first_test_policies.sql`
+- for the Retention live slice (§6), apply `/Users/wesley/Code/wx-cfo-scorecard/supabase/wodify_retention_schema.sql` — self-contained (DDL + grants + RLS in one file) because it is the repo's first **service-role write** table (anon SELECT only; non-PII aggregate written by the `sync-wodify-retention` Edge Function). Order-independent; references no other table.
 
 Shared tables:
 
