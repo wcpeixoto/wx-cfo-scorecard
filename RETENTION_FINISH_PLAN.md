@@ -192,7 +192,7 @@ PII-shaped placeholder rows or emit a call-list — derive the aggregate at the
 until the §5 probe confirms Wodify exposes the required fields (`status`, `lastCheckIn`,
 `monthlyDues`) cleanly at our access tier.
 
-### 5. Wodify data availability probe · `Error-envelope hardening DONE (#425 · 97922cc, 2026-06-05) — classSigninProbe now detects the Wodify error envelope and treats an embedded non-2xx HTTPCode as failure, not "0 records"; probe NOT run; mapping still not proven. Prior: shape discovery (#423 · 7da4369) found the first probe's transport-2xx + 0 records was a Wodify error envelope (not a true empty dataset); bare /signins shows a per-client-ID signal (first probe #420 · 625bff8)`
+### 5. Wodify data availability probe · `Per-client/per-ID probe RUN (2026-06-05) — BLOCKED at the /clients prerequisite: /clients returned transport-2xx (NOT an error envelope) but 0 records under the probe's extraction config, so no client ID could be sampled and the per-client sign-ins path was never tested; mapping still UNPROVEN (likely a /clients response-SHAPE mismatch — Wodify PascalCase keys — not a genuinely empty list, per the ~912-client prior). Next = a structure-only /clients shape-discovery, then re-run. Prior: error-envelope hardening DONE (#425 · 97922cc); shape discovery (#423 · 7da4369) found the first probe's 2xx + 0 records was a Wodify error envelope; bare /signins shows a per-client-ID signal (first probe #420 · 625bff8)`
 
 **Probe result (2026-06-04).** Phase 2 §5 probed 2026-06-04 — Outcome #1: no repo Wodify
 integration/docs/credentials or approved safe server-side path; BLOCKED pending external
@@ -369,6 +369,35 @@ know the body is an error envelope but not precisely which error. *(The step-1 h
 derives only the coarse status **class** — 2xx/4xx/5xx — from `HTTPCode`, never the exact code, so the
 safe-output contract still holds.)*
 
+**Third probe — per-client / per-ID (2026-06-05, step 2).** A new self-contained local-only script,
+`scripts/wodify/clientSigninsProbe.ts` (+ README) — `classSigninProbe.ts` and `signinsShapeDiscovery.ts`
+left untouched — was built to confirm a `/clients/{id}/signins`-style per-client path and the dated
+check-in field mapping. Because a per-client path needs a real client ID, it fetches one page of
+`/clients`, extracts a **small deterministic sample** of IDs **into memory only** (default 3; hard cap
+`MAX_PER_CLIENT_CALLS = 8`; no broad iteration), and uses them solely to build the per-client URL — the
+**request URL is never emitted; only the `{id}` path template is.** Builder built it; a read-only
+Reviewer audited the safe-output (**APPROVE — no leak paths**, posture byte-identical to the merged
+siblings); a network-free `--selftest` PASSED (synthetic PII never appears in output); then it was run
+once with the worktree-safe absolute `--env-file` (key never copied / printed / committed). Output
+stayed fully within the §5 safe contract — counts, booleans, HTTP status classes, path templates, and
+SAFE field names only; no values, rows, names, IDs, dates, dues, URLs, raw bodies, or secrets.
+
+- **Outcome — BLOCKED at the `/clients` prerequisite; per-client path UNTESTED.** `/clients` returned
+  transport-`2xx` with `errorEnvelopeDetected: false`, but `recordsOnFirstPage: 0` and
+  `clientIdsExtractedForSample: 0` — so no client ID could be sampled, the per-client templates were
+  never tried (`candidatePathTemplatesTried: []`, `perClientCallsMade: 0`), and the result was
+  `conclusion: "unproven"` / `conclusionReasonCode: "could_not_obtain_client_id"`.
+- **Interpretation — mapping UNPROVEN (not disproven).** The 2xx body was **not** a Wodify error
+  envelope, so the failure is upstream: the current `RECORD_ARRAY_KEYS` / `CLIENT_ID_FIELDS` (lowercase)
+  did **not** match the `/clients` response shape (Wodify is PascalCase-heavy). Two possibilities remain
+  — a genuinely empty client list, or (far more likely, given the chat-reported ~912-client audit) a
+  **response-SHAPE mismatch**. The safe output alone cannot distinguish them. The per-client sign-ins
+  endpoint was **never reached**, so its mapping is neither proven nor disproven. The §5 interpretation
+  guard holds: a 2xx is not proof of anything about data availability.
+- **No per-client / per-ID sign-in calls were made** (the prerequisite failed first), no live wiring /
+  §6 work was started, and the probe artifact (per-client machinery + safe-output contract, reviewed)
+  is ready to re-run once the `/clients` shape is known.
+
 **Next steps.**
 
 1. **Harden the probes against embedded error envelopes · `Done (#425 · 97922cc, 2026-06-05)`.**
@@ -386,9 +415,18 @@ safe-output contract still holds.)*
    - The **Wodify probe was NOT run** for this change (verified with a network-free synthetic check).
      **No per-client / per-ID calls were made.** **Mapping remains unproven** — this hardens the
      *interpretation* of the response; it does not confirm the endpoint path or field mapping.
-2. **Only then** consider a **separately-approved per-client / per-ID probe** to confirm a
-   `/clients/{id}/signins`-style path and the field mapping. **Still requires separate approval; not
-   started** — no per-client / per-ID calls have been made.
+2. **Per-client / per-ID probe · `Run 2026-06-05 — UNPROVEN; blocked at the /clients prerequisite`**
+   (see "Third probe" above). `scripts/wodify/clientSigninsProbe.ts` was built (Reviewer APPROVE,
+   network-free selftest PASS) and run once: `/clients` returned a 2xx that was **not** an error
+   envelope but yielded 0 records, so no client ID could be sampled and the per-client sign-ins path
+   was **never reached**. Mapping remains **UNPROVEN (not disproven)**; no per-client / per-ID sign-in
+   calls were made; no live wiring / §6 work started.
+3. **Discover the `/clients` response shape (structure-only) · `TODO` (separately approved).** Before
+   the per-client probe can sample a client ID, confirm the real `/clients` records-array key +
+   client-ID field via a structure-only shape pass (mirror `signinsShapeDiscovery.ts` — emit top-level
+   type / safe key names / array key + length / record field NAMES, never values), then re-run
+   `clientSigninsProbe.ts` (its per-client machinery is built + reviewed). This also settles whether
+   `/clients` is genuinely empty vs. a response-shape mismatch.
 
 ### 6. Live wiring spike — 1–2 cards · `TODO` (do this early, before broad live work)
 

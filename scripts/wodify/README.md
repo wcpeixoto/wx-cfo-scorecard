@@ -161,3 +161,99 @@ Never use the inline `WODIFY_API_KEY='…' npx tsx …` form (the key lands in s
   }>
 }
 ```
+
+## `clientSigninsProbe.ts` — per-client / per-ID sign-ins probe (§5 step 2)
+
+Confirms (or fails to confirm) a `/clients/{id}/signins`-style **per-client** path and the dated
+check-in **field mapping** — the step that follows the shape discovery's finding that the list-style
+sign-ins paths return error envelopes and the bare paths return a missing-ID `403`. A per-client path
+can't be probed without a real client ID, so this script fetches **one page of `/clients`**, extracts
+a **small deterministic sample** of IDs **into memory only**, and uses them solely to build the
+per-client request URL.
+
+### Safety (enforced by the script — same posture as the sibling probes)
+
+- Reads the rotated key **only** from `process.env.WODIFY_API_KEY`. Never `VITE_*`, never hardcoded,
+  never logged, never echoed in errors. If unset, it exits without making any request.
+- Local / server-side only — never imported by the SPA, never bundled.
+- Emits **only** the aggregate contract: counts, booleans, HTTP status classes, path **templates**
+  (with a literal `{id}`), and SAFE field **names** (schema). Never names, IDs, exact dates,
+  timestamps, dues, raw rows, raw API responses, or — critically — the **request URL** (which
+  contains a real client ID). Only the `{id}` template is ever emitted.
+- ID-like field **names** are redacted (the shape-discovery guard), `1900-01-01` is a null sentinel
+  counted separately, and the Wodify **error envelope** is detected with the in-body `HTTPCode`
+  reduced to a status **class** only.
+- Does **not** import `silentChurn.ts` / `classifyMember`.
+- **Call budget:** 1 `/clients` page + a small per-client sample (default 3 clients, hard cap
+  `MAX_PER_CLIENT_CALLS = 8`); finds the working path on the first client, stops early once dated
+  history is confirmed, and never broadly iterates all clients.
+
+### Run (local only — worktree-safe absolute `--env-file`; never commit or paste the key)
+
+```bash
+# Network-free safe-output self-test FIRST (makes NO request, needs NO key):
+npx tsx scripts/wodify/clientSigninsProbe.ts --selftest
+
+# Live run (point --env-file at the primary clone's gitignored env by ABSOLUTE path):
+npx tsx --env-file=/Users/wesley/Code/wx-cfo-scorecard/.env.local \
+  scripts/wodify/clientSigninsProbe.ts
+```
+
+### First run outcome (2026-06-05) — UNPROVEN, blocked at the `/clients` prerequisite
+
+The live run returned a clean, contract-safe result but **never reached the per-client endpoint**:
+`/clients` was transport-`2xx` with `errorEnvelopeDetected: false`, yet `recordsOnFirstPage: 0` and
+`clientIdsExtractedForSample: 0`, so no ID could be sampled (`conclusionReasonCode:
+"could_not_obtain_client_id"`). Because the body was **not** an error envelope, the current
+`RECORD_ARRAY_KEYS` / `CLIENT_ID_FIELDS` simply did not match the `/clients` response shape (these are
+lowercase; Wodify is PascalCase-heavy). Given the §5 chat-reported ~912-client audit, a **response-shape
+mismatch** is the likely cause — not a genuinely empty client list — but that is not proven from the
+safe output. **Mapping is UNPROVEN (not disproven): the per-client path was never tested.** Next
+(separately approved): a structure-only `/clients` **shape-discovery** pass to confirm the real
+records-array key + client-ID field, then re-run this probe.
+
+### Output shape (the only thing printed)
+
+```ts
+{
+  probe: "clientSigninsProbe",
+  clientsListEndpoint: {
+    pathTemplate: "/clients",            // PATH only
+    endpointReached: boolean,
+    httpStatusClass: "2xx" | "4xx" | "5xx" | "network_error",
+    errorEnvelopeDetected: boolean,
+    embeddedHttpStatusClass: "2xx" | "4xx" | "5xx" | "network_error" | null,
+    recordsOnFirstPage: number,          // count only
+    clientIdsExtractedForSample: number, // count only — IDs are NEVER emitted
+    clientRecordFieldNames: string[],    // SAFE field-NAME union (schema; ID-like redacted)
+    redactedClientFieldNameCount: number
+  },
+  perClientSignins: {
+    candidatePathTemplatesTried: string[],  // templates (with `{id}`) only
+    workingPathTemplate: string | null,
+    clientsSampled: number,
+    perClientCallsMade: number,
+    anyEndpointReached: boolean,
+    httpStatusClassesSeen: string[],
+    anyErrorEnvelopeDetected: boolean,
+    embeddedHttpStatusClassesSeen: string[],
+    anyMissingIdSignal: boolean,
+    totalRecordsInspected: number,
+    fieldPresenceCounts: { clientRef: number, checkInDate: number },
+    recordFieldNames: string[],             // SAFE field-NAME union of sign-in records
+    redactedRecordFieldNameCount: number,
+    missingDateCount: number,
+    invalidDateCount: number,
+    sentinelDateCount: number,
+    sampledClientsWithAnyCheckIn: number,
+    sampledClientsWithMultipleDistinctDates: number,
+    datedCheckInHistoryAvailable: boolean,  // >= 1 sampled client with >= 2 distinct valid dates
+    earliestYear?: number,                  // optional, calendar-year granularity only
+    latestYear?: number
+  },
+  conclusion: "proven" | "unproven",
+  conclusionReasonCode:
+    "records_with_checkin_date" | "could_not_obtain_client_id" | "no_working_path_found" |
+    "working_path_no_records" | "working_path_records_without_checkin_date"
+}
+```
