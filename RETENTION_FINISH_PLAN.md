@@ -192,7 +192,7 @@ PII-shaped placeholder rows or emit a call-list — derive the aggregate at the
 until the §5 probe confirms Wodify exposes the required fields (`status`, `lastCheckIn`,
 `monthlyDues`) cleanly at our access tier.
 
-### 5. Wodify data availability probe · `Shape discovery 2026-06-04/05 (#423 · 7da4369) — first probe's transport-2xx + 0 records was a Wodify error envelope, not a true empty dataset; list-style sign-in paths returned no records arrays; bare /signins shows a per-client-ID signal; mapping still not proven (first probe #420 · 625bff8)`
+### 5. Wodify data availability probe · `Error-envelope hardening DONE (#425 · 97922cc, 2026-06-05) — classSigninProbe now detects the Wodify error envelope and treats an embedded non-2xx HTTPCode as failure, not "0 records"; probe NOT run; mapping still not proven. Prior: shape discovery (#423 · 7da4369) found the first probe's transport-2xx + 0 records was a Wodify error envelope (not a true empty dataset); bare /signins shows a per-client-ID signal (first probe #420 · 625bff8)`
 
 **Probe result (2026-06-04).** Phase 2 §5 probed 2026-06-04 — Outcome #1: no repo Wodify
 integration/docs/credentials or approved safe server-side path; BLOCKED pending external
@@ -365,14 +365,30 @@ empty dataset** — it was an error envelope at the transport-2xx layer, which
 `classSigninProbe.extractRecords` (which only looks for a records array) reported as 0 records. No
 candidate returned a records array, so the **field mapping remains unproven**. The exact embedded
 error code is intentionally **not** captured (it is a field value, outside the safe contract), so we
-know the body is an error envelope but not precisely which error.
+know the body is an error envelope but not precisely which error. *(The step-1 hardening below (#425)
+derives only the coarse status **class** — 2xx/4xx/5xx — from `HTTPCode`, never the exact code, so the
+safe-output contract still holds.)*
 
-**Next steps (each separately approved — NOT started here).**
+**Next steps.**
 
-1. **Harden the probes against embedded error envelopes** — detect the `HTTPCode` / `ErrorCode`
-   envelope and treat an embedded non-2xx as a failure, rather than reading it as "0 records."
+1. **Harden the probes against embedded error envelopes · `Done (#425 · 97922cc, 2026-06-05)`.**
+   `scripts/wodify/classSigninProbe.ts` now detects the Wodify error envelope (top-level
+   `DeveloperMessage` / `ErrorCode` / `HTTPCode` / `UserMessage`) and treats an embedded non-2xx
+   `HTTPCode` as a failure rather than reading it as "0 records":
+   - New `detectErrorEnvelope()` + `SafeProbeResult` fields `errorEnvelopeDetected` and
+     `embeddedHttpStatusClass`. The embedded `HTTPCode` is reduced to a status **class** only — its
+     raw value, and the `DeveloperMessage` / `ErrorCode` / `UserMessage` text, are never read into
+     output, logs, or errors. The **safe-output contract is preserved** (counts / booleans / status
+     classes only) and the `1900-01-01` sentinel guard is unchanged.
+   - The embedded `HTTPCode` is **authoritative**: a 4xx/5xx envelope is flagged even with an empty
+     records array present; a 2xx with an empty array is treated as a real empty dataset; and a
+     non-empty records array is always read — **real rows are never discarded**.
+   - The **Wodify probe was NOT run** for this change (verified with a network-free synthetic check).
+     **No per-client / per-ID calls were made.** **Mapping remains unproven** — this hardens the
+     *interpretation* of the response; it does not confirm the endpoint path or field mapping.
 2. **Only then** consider a **separately-approved per-client / per-ID probe** to confirm a
-   `/clients/{id}/signins`-style path and the field mapping. No per-client / per-ID calls have been made.
+   `/clients/{id}/signins`-style path and the field mapping. **Still requires separate approval; not
+   started** — no per-client / per-ID calls have been made.
 
 ### 6. Live wiring spike — 1–2 cards · `TODO` (do this early, before broad live work)
 
