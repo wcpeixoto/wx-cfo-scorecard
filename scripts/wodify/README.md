@@ -212,6 +212,20 @@ safe output. **Mapping is UNPROVEN (not disproven): the per-client path was neve
 (separately approved): a structure-only `/clients` **shape-discovery** pass to confirm the real
 records-array key + client-ID field, then re-run this probe.
 
+### Re-run (2026-06-05) — `/clients` prerequisite solved (#428 patch); per-client sign-ins path NOT found
+
+After #428 proved `/clients` records live under the key `clients` (client-ID field `id`), this probe's
+`RECORD_ARRAY_KEYS` was patched with one entry (`clients`, appended) and re-run. `/clients` now yields
+records (`recordsOnFirstPage: 100`, `clientIdsExtractedForSample: 3`) — the prerequisite is solved. But
+all four candidate per-client templates (`/clients/{id}/signins`, `/clients/{id}/sign-ins`,
+`/signins/{id}`, `/sign-ins/{id}`) returned `4xx` (missing-ID signal), so `workingPathTemplate: null`
+and `conclusionReasonCode: "no_working_path_found"`. **Dated check-in history is UNPROVEN and the
+mapping is UNPROVEN (not disproven)** — the real per-client sign-ins path is not among these four
+guesses. Note: `/clients` itself exposes recency (`last_attendance` / `last_class_sign_in` /
+`days_since_last_attendance`), which may supply `lastCheckIn` for the first slice without a sign-ins
+endpoint; that endpoint is still needed only for dated **history**. Next (separately approved): discover
+the real per-client sign-ins path (Wodify API docs or a structure-only path probe), then re-run.
+
 ### Output shape (the only thing printed)
 
 ```ts

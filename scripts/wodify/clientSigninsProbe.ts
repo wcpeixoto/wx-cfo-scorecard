@@ -101,8 +101,10 @@ const CHECKIN_DATE_FIELDS = [
   'signinDate', 'SigninDate', 'SignInDate', 'created_at', 'CreatedOn', 'created_on', 'attendanceDate',
 ];
 const SENTINEL_DATE = '1900-01-01'; // §5: Wodify surfaces null dates as this. Treat as MISSING.
-// Candidate array keys for a records payload (a bare top-level array is also handled).
-const RECORD_ARRAY_KEYS = ['data', 'results', 'result', 'items', 'records', 'value', 'signins', 'SignIns', 'rows'];
+// Candidate array keys for a records payload (a bare top-level array is also handled). `clients` is
+// the /clients records key proven by the #428 shape discovery (appended last = lowest precedence, so
+// it only matches when no sign-in-style key is present — it never shadows a sign-ins records array).
+const RECORD_ARRAY_KEYS = ['data', 'results', 'result', 'items', 'records', 'value', 'signins', 'SignIns', 'rows', 'clients'];
 // §5 / #423: Wodify error envelope markers (matched case-insensitively; values are NEVER emitted).
 const ERROR_ENVELOPE_MARKER_KEYS = ['developermessage', 'errorcode', 'httpcode', 'usermessage'];
 
