@@ -527,7 +527,7 @@ the standalone `/clients` shape-discovery; this PR's one-line patch + re-run bui
 first**, then rebase + merge #427, resolving §5 / README to keep both records (the `/clients` shape
 discovery from #428, and the patch + re-run outcome here).
 
-### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED + import-resolver mitigation (#432); deploy/eszip import-resolution proof RAN 2026-06-05 → FAILED (CLI 2.98.2 / edge-runtime v1.73.13); SPA wiring (PR2) + live invoke gated — live gate still OPEN, fix not selected` (do this early, before broad live work)
+### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — sync-wodify-retention deployed & ACTIVE (verify_jwt=true) but INERT (no key, no invoke); §6 live-data validation goal still OPEN (first authorized invoke pending); optional deno.json cleanup + PR2/SPA wiring still OPEN` (do this early, before broad live work)
 
 Wire a **minimal** live-data path for one or two Retention cards before any broader live
 integration — a validation slice, not a rollout. The biggest remaining risk is whether
@@ -539,44 +539,42 @@ live slice is **aggregate-only** and fetches just `status` · `lastCheckIn` · `
 server-side — see §4 for the input scope, classifier-reuse constraint, and payload target.
 `id` / `displayName` / `membershipStart` and the call-list are deferred.
 
-**First bounded live slice — server-side half IMPLEMENTED (PR1, 2026-06-05); SPA wiring + live invoke gated.**
+**First bounded live slice — server-side half IMPLEMENTED (PR1, #431) and import-resolution sub-gate CLOSED (Option A, #435 @ `b6bd9d6`, 2026-06-05).**
 Source = `/clients` direct recency (§5 #429 — SUFFICIENT for `lastCheckIn`). Cards = Silent Churn +
 Attendance Health, aggregate-only. The four open items are decided (see §6.7). PR1 shipped the server-side
 half — the pure aggregate module `src/lib/gym/wodifyRetentionAggregate.ts` (reuses the locked date
 primitives, threshold-free histogram, parity-tested vs `computeAttendanceHealth`), the thin Edge Function
 `supabase/functions/sync-wodify-retention/`, and the non-PII aggregate table
-`supabase/wodify_retention_schema.sql`. **Still gated:** no SPA wiring (PR2), no secret set, no live Wodify
-call — the first live invoke needs a Reviewer audit + Wesley's explicit authorization.
+`supabase/wodify_retention_schema.sql`.
 
-**Import resolution across the `src/` boundary — MITIGATED (#432, `b618d02`); live gate still OPEN.**
-PR1's bundle/import proof found that the Edge Function's transitive **extensionless** import of the locked
-`./silentChurn` helpers (via `wodifyRetentionAggregate.ts`) resolves under esbuild but **FAILS strict
-`deno check`** (`TS2307`). #432 shipped the minimal, in-scope mitigation: a function-local
-`supabase/functions/sync-wodify-retention/deno.json` = `{"unstable":["sloppy-imports"]}` — **no fork, no
-`tsconfig` change, `silentChurn.ts` untouched, no `.ts` added to the shared import.** Offline Deno-level
-proof on a clean copy of the exact bytes: strict `deno check` FAILS `TS2307` on `./silentChurn` **without**
-the config and **PASSES with it** → sloppy-imports resolves the transitive extensionless import. **This does
-NOT close the live gate.** The remaining blocker was **Supabase deploy / eszip resolution**, with three
-open questions: (1) does deploy **discover** the function-local `deno.json`; (2) does deploy **honor**
-`unstable:["sloppy-imports"]`; (3) does **eszip** resolve the shared `src/` graph like the offline proof.
-Resolution is a **bundle-time event** (deploy bundles before any secret read / Wodify fetch / POST).
+**Deploy/eszip import-resolution — CLOSED on the bundling-proof dimension (Option A).** The Edge Function
+reaches the locked date helpers through a transitive **extensionless** import of `./silentChurn` (via
+`wodifyRetentionAggregate.ts`). That resolved under esbuild but **failed Supabase's deploy/eszip bundler**:
+the proof deploy (2026-06-05, CLI 2.98.2 / edge-runtime v1.73.13) errored `Module not found
+".../src/lib/gym/silentChurn"`. The earlier #432 function-local `deno.json` `sloppy-imports` mitigation was
+**disproven at that deploy path** (present in both the failed and the later passing deploy → not the cause).
+**Option A fixed it:** add the explicit `.ts` extension to the one import (`'./silentChurn'` →
+`'./silentChurn.ts'`), paired with `allowImportingTsExtensions: true` in `tsconfig.app.json` (legal because
+`noEmit` is set). Decisive evidence: the deploy had already resolved the `.ts`-extensioned `index.ts`→aggregate
+hop, so making `./silentChurn` explicit gave it the proven-working form. **Verified end-to-end:** local gates
+green (23/23 targeted, 661/661 full, `tsc -b`+`vite build`); the named-function deploy **succeeded** (bundled
+from the edited tree); landed on `main` via **PR #435 @ `b6bd9d6`** (squash, exactly 2 files; auto Pages SPA
+deploy green → the tsconfig change is SPA-safe). `main` now **reproduces the deployed function**. The locked
+`silentChurn.ts` was **not** touched — its only transitive import is the **type-only** `./memberFixture`,
+which the deploy bundler erases, so the feared lock-bound dead-end did **not** materialize.
 
-**Deploy/eszip proof — RAN 2026-06-05, result FAIL (not BLOCKED).** A named-function-only deploy
-(`supabase functions deploy sync-wodify-retention --project-ref gzgxcvjvoivlwaksnmxy`, Reviewer-validated and
-Wesley-authorized; no `--no-verify-jwt`, no secret, no invoke) reached graph creation and errored:
-`failed to create the graph` → `Module not found ".../src/lib/gym/silentChurn"` at
-`src/lib/gym/wodifyRetentionAggregate.ts:24`. The edge-runtime image (`v1.73.13`) pulled and ran first, so
-this is a genuine bundle-time **module-resolution FAIL**, not a Docker / CLI / network / auth / project-ref
-BLOCK. **Proven fact (narrow):** with **Supabase CLI 2.98.2** and **edge-runtime v1.73.13**, this deploy path
-did **not** resolve the extensionless `./silentChurn` import from the shared `src/` graph despite the
-function-local `deno.json`. **Not claimed:** whether deploy failed to *discover* the `deno.json` or discovered
-it but did not *honor* `sloppy-imports` (this run does not distinguish them), nor that a future CLI /
-edge-runtime version could never resolve it. **Platform stayed clean:** `sync-wodify-retention` remains **not
-deployed** (absent on the platform); `ai-proxy` unchanged (version 2, `verify_jwt:false`,
-`ezbr_sha256 3d392f3e…`); no `WODIFY_API_KEY` secret; no serve / invoke / POST / Wodify call. **The live gate
-stays OPEN and the fix is NOT selected** — forking / mirroring / vendoring the classifier or date logic, a
-`tsconfig` change, adding `.ts` to the shared import, an import map, or a generated bundle are all **out of
-scope here** and must be chosen in a separate scoped strategy session.
+**Deployed but INERT — the live-data gate is still OPEN.** `sync-wodify-retention` is deployed and **ACTIVE**
+with **`verify_jwt: true`**, but it holds **no `WODIFY_API_KEY`**, has never been invoked, makes no POST and
+no Wodify call, and is **not** wired to the SPA. So **what is CLOSED is only the deploy/eszip
+import-resolution bundling sub-gate** — the **§6 live-data validation goal is NOT yet met.** Confirming
+whether Wodify actually supplies `status` / `lastCheckIn` cleanly and globally requires the **first
+authorized live invoke**, which still needs a Reviewer audit + Wesley's explicit authorization (its own
+two-AI gate). Two follow-ups also remain OPEN: (i) **optional `deno.json` cleanup** — the now-dead
+function-local `deno.json` can be dropped, but its `import_map_path` is wired into the deployed function, so
+removal needs a re-deploy **from merged `main`** to prove no regression; (ii) **PR2 / SPA wiring** (apply the
+owner threshold + `WATCH_FLOOR_DAYS` rule client-side to the histogram). **Holds intact:** no secret, no
+invoke/POST/Wodify call, no SPA/PR2 wiring; `ai-proxy` unchanged (v2, `verify_jwt:false`, `ezbr_sha256
+3d392f3e…`).
 
 1. **Server-side reuse boundary (refined in PR1).** The server imports ONLY the locked, threshold-FREE
    date primitives — `parseYmdLocal` and `wholeDaysBetween` — from `silentChurn.ts`, and never forks them
