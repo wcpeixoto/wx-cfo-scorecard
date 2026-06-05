@@ -66,15 +66,32 @@ call** — and **nuanced**, not a clean pass:
   sloppy-imports resolves the transitive extensionless `./silentChurn` import at the
   Deno level. This does **not** close the live gate — see the next bullet.
 
-- **Deploy-bundler resolution — UNCONFIRMED (live-gate item).** Whether Supabase's
-  actual `supabase functions deploy` / `supabase functions serve` bundler resolves
-  the extensionless shared import like esbuild / sloppy-imports Deno (resolves) or
-  like bare strict Deno (fails) is **not proven offline**. Three things stay unproven
-  at deploy / eszip time: (1) deploy **discovers** the function-local `deno.json`
-  (#432); (2) deploy **honors** `unstable:["sloppy-imports"]`; (3) **eszip** resolves
-  the shared `src/` graph like the offline proof. The first live step stays blocked
-  until a real deploy/serve proof confirms the shared `src/` import resolves —
-  **without forking the locked date logic and without changing `tsconfig`**.
+- **Deploy-bundler resolution — RAN 2026-06-05, result FAIL (live gate stays OPEN).**
+  The deploy/eszip proof was actually run:
+  `supabase functions deploy sync-wodify-retention --project-ref gzgxcvjvoivlwaksnmxy`
+  (Reviewer-validated, Wesley-authorized; named-function-only, no `--no-verify-jwt`, no
+  secret, no invoke). The edge-runtime image (`v1.73.13`) pulled and ran, then the deploy
+  errored at **graph creation**:
+
+  ```
+  Error: failed to create the graph
+  Caused by:
+      Module not found ".../src/lib/gym/silentChurn".
+          at .../src/lib/gym/wodifyRetentionAggregate.ts:24
+  ```
+
+  This is a genuine bundle-time **module-resolution FAIL**, not a Docker / CLI / network /
+  auth / project-ref BLOCK. **Proven fact (narrow):** with **Supabase CLI 2.98.2** and
+  **edge-runtime v1.73.13**, this deploy path did **not** resolve the extensionless
+  `./silentChurn` import from the shared `src/` graph despite the function-local
+  `deno.json`. **Not claimed:** whether deploy failed to *discover* the `deno.json` or
+  discovered it but did not *honor* `sloppy-imports` (this run does not distinguish them),
+  nor that a future CLI / edge-runtime version could never resolve it. **Platform stayed
+  clean:** `sync-wodify-retention` remains **not deployed**; `ai-proxy` unchanged (v2,
+  `verify_jwt:false`, `ezbr_sha256 3d392f3e…`); no `WODIFY_API_KEY`; no serve / invoke /
+  POST / Wodify call. **The fix is NOT selected** — forking the locked date logic, a
+  `tsconfig` change, adding `.ts` to the shared import, an import map, or a generated
+  bundle are all out of scope and need a separate scoped strategy session.
 
 No fork of the locked date logic was introduced, and `tsconfig` is unchanged.
 
@@ -126,14 +143,14 @@ runtime; they are not set manually.
 
 ## Open items before the live invoke
 
-- **Deploy/serve resolution of the shared `src/` import — BLOCKS the live gate.**
-  Prove `supabase functions deploy` / `supabase functions serve` bundles the
-  function with the shared module resolved, **without a fork or a `tsconfig`
-  change**. esbuild resolves it; strict `deno check` resolves it **with** the
-  function-local `deno.json` (#432) and fails without it; the actual deploy bundler
-  is unconfirmed offline — specifically, whether deploy discovers the `deno.json`,
-  honors `unstable:["sloppy-imports"]`, and resolves the graph through eszip (see
-  "Bundle/import proof").
+- **Deploy/serve resolution of the shared `src/` import — STILL BLOCKS the live gate
+  (proof RAN 2026-06-05 → FAILED).** The deploy/eszip proof was run and **failed** at
+  graph creation on the extensionless `./silentChurn` import (Supabase CLI 2.98.2 /
+  edge-runtime v1.73.13) — esbuild resolves it and strict `deno check` resolves it **with**
+  the function-local `deno.json` (#432), but the actual Supabase deploy bundler did not (see
+  "Bundle/import proof"). A resolution that does **not** fork the locked date logic or change
+  `tsconfig` is **not yet found**; the fix is unselected and deferred to a separate scoped
+  strategy session.
 - Confirm the live `/clients` response uses snake_case field names
   (`client_status`, `last_attendance`, `last_class_sign_in`, `is_at_risk`) as the
   §5 probe observed. If casing differs, `dataQuality.unknownStatus` / `unknown`
