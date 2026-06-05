@@ -331,3 +331,96 @@ field is present. Next: add `clients` to #427's `RECORD_ARRAY_KEYS` and re-run t
               "non_2xx" | "non_json" | "inconclusive"
 }
 ```
+
+## `clientsRecencyProbe.ts` — `/clients` direct-recency suitability for the first-slice `lastCheckIn` (§5)
+
+Evaluates whether `/clients`'s **direct** recency fields (`last_attendance` / `last_class_sign_in` /
+`days_since_last_attendance`, plus `is_at_risk` / `total_class_sign_ins` — surfaced by #428) are
+**sufficient** to source the first live Silent Churn slice's `lastCheckIn` **without** the per-client
+sign-ins endpoint (#427 confirmed that endpoint is still unfound; it is needed only for dated *history*
+/ recovery, not a single latest value). The target is `silentChurn.ts`'s `classifyMember`, which parses
+`lastCheckIn` as a strict `YYYY-MM-DD` (`parseYmdLocal`) and computes `daysAbsent` against a today
+(`asOf`) anchor — so the question is whether the `/clients` recency dates are date-like and
+well-populated enough (after the `1900-01-01` sentinel guard) to feed `lastCheckIn` and let the **locked
+classifier do the day math itself** (preserving the today-anchor), rather than trusting Wodify's
+precomputed `days_since_last_attendance`.
+
+### Safety (enforced by the script — same posture as the sibling probes; read-only Reviewer APPROVE)
+
+- Reads the key **only** from `process.env.WODIFY_API_KEY`; never `VITE_*`, hardcoded, logged, or
+  echoed; exits without a request if unset. Local / server-side only; never bundled.
+- Reads recency VALUES in memory **only** to derive aggregates. Emits **only** counts, booleans, HTTP
+  status classes, an ALLOWLISTED status-category breakdown (bucket names defined in the script — never a
+  raw `client_status` value), the records-array KEY NAME (ID-like-guarded), the endpoint PATH, and
+  verdict enums. Never values — no names, IDs, exact dates/timestamps, dues, pagination values, raw
+  rows, raw bodies, the substituted URL, or secrets.
+- `1900-01-01` is a null sentinel — counted separately as `sentinelCount`, never folded into
+  `usableDateCount`. Detects the Wodify error envelope (in-body `HTTPCode` → status class only).
+- **ONE `/clients` call** (page 1, the same request the sibling probes make); makes no per-client calls;
+  does not iterate clients; does not import `silentChurn.ts` / `classifyMember`.
+
+### Run
+
+```bash
+npx tsx scripts/wodify/clientsRecencyProbe.ts --selftest   # network-free, no key
+npx tsx --env-file=/Users/wesley/Code/wx-cfo-scorecard/.env.local \
+  scripts/wodify/clientsRecencyProbe.ts
+```
+
+### Result (2026-06-05) — SUFFICIENT on the sampled page; a date-slice is needed before `parseYmdLocal`
+
+Run once (1 `/clients` page = 100 records; `morePagesAvailable: true`, so this is **page-1-only, not
+global** — a broader run needs separate approval). Output stayed fully within the §5 safe contract.
+
+- **Verdict: `suitability: "sufficient"`, `firstSliceLastCheckInDerivable: "yes"`.** Of the **26 active**
+  records on the page (`client_status` → `active`; the rest, 74, bucketed `inactive` and are excluded by
+  `classifyMember`), **23 (≈88%) have a usable, non-sentinel recency date** on `last_attendance` **and**
+  on `last_class_sign_in` (`activeWithUsableEitherDate: 23`). The other ~3 active members have only the
+  `1900-01-01` sentinel → they correctly land in the classifier's **`unknown`** bucket, never silently
+  Healthy.
+- **A date-slice IS required (`lastCheckInNormalizationNeeded: "date_slice"`).** Every usable value was
+  `datedWithTime` (44/44 for each date field; `strictYmdCount: 0`) — i.e. ISO timestamps, **not** bare
+  `YYYY-MM-DD`. `parseYmdLocal` rejects a timestamp, so the **server-side normalizer must slice the
+  leading `YYYY-MM-DD`** before reusing the locked parser.
+- **The `1900-01-01` sentinel is real and common** — 56/100 records overall (concentrated in inactive
+  members; only ~3 of the 26 active). It must be stripped to `null` **before** the classifier, or
+  `parseYmdLocal` would accept it and mis-classify the member as `silent` with a huge `daysAbsent` (the
+  §5/§8 real-data guard).
+- **`days_since_last_attendance` is NOT a clean substitute.** It is `numeric` for **100/100** records —
+  *including* the 56 sentinel ones (where it is a meaningless ~46k-day count off `1900-01-01`, with no
+  clean null signal). Sourcing `lastCheckIn` from `last_attendance` (where the sentinel is detectable)
+  and letting `classifyMember` compute `daysAbsent` from **our** today-anchor is the sentinel-safe path
+  and keeps the §4 anchor; trusting Wodify's precomputed count would inherit the sentinel as live data.
+- **`is_at_risk` is far more conservative than our rule** (`true` for **1/100**) — a useful *secondary*
+  Wodify-provided cross-check, not a replacement for the deterministic threshold classifier.
+- **Still blocked without the per-client sign-ins endpoint:** dated check-in **history** (multiple events
+  per member) for Silent Churn **Recovery**. `/clients` exposes only the *latest* recency value, which is
+  exactly what the first-slice `lastCheckIn` needs — but not the multi-event history (#427/#428: that
+  endpoint remains unfound; separate path-discovery task).
+
+### Output shape (the only thing printed)
+
+```ts
+{
+  probe: "clientsRecencyProbe",
+  path: "/clients",                       // PATH only — never the query string / substituted URL
+  endpointReached, httpStatusClass, errorEnvelopeDetected, embeddedHttpStatusClass,
+  perClientIdLikelyRequired, jsonParseable,
+  recordArrayKey,                         // SAFE key name (ID-like redacted)
+  sampledPageRecordCount,                 // <= 100; PAGE-1 sample, NOT a global total
+  pagesFetched,                           // always 1 (call budget)
+  morePagesAvailable: boolean | null,     // a pagination has_more BOOLEAN (never a count value)
+  statusCategoryCounts,                   // { <allowlisted bucket name>: count } — never raw status values
+  activeRecordCount,
+  lastAttendance:   { presentCount, missingCount, sentinelCount, strictYmdCount, datedWithTimeCount, unparseableCount, usableDateCount },
+  lastClassSignIn:  { /* same DateFieldStats shape */ },
+  daysSinceLastAttendance: { presentCount, missingCount, numericCount, negativeCount, nonNumericCount },
+  totalClassSignIns:       { /* same NumericFieldStats shape */ },
+  isAtRisk:         { presentCount, missingCount, trueCount, falseCount, nonBooleanCount },
+  activeWithUsableLastAttendance, activeWithUsableLastClassSignIn, activeWithUsableEitherDate,
+  activeWithDaysSinceNumeric, activeWithUsableDateAndDaysSince,
+  firstSliceLastCheckInDerivable: "yes" | "partial" | "no",
+  lastCheckInNormalizationNeeded: "none" | "date_slice" | "unknown",
+  suitability: "sufficient" | "insufficient" | "unproven"
+}
+```
