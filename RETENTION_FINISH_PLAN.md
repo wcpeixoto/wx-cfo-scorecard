@@ -527,7 +527,7 @@ the standalone `/clients` shape-discovery; this PR's one-line patch + re-run bui
 first**, then rebase + merge #427, resolving §5 / README to keep both records (the `/clients` shape
 discovery from #428, and the patch + re-run outcome here).
 
-### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED + import-resolver mitigation (#432); SPA wiring (PR2) + live invoke gated on review — deploy/eszip import resolution still OPEN` (do this early, before broad live work)
+### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED + import-resolver mitigation (#432); deploy/eszip import-resolution proof RAN 2026-06-05 → FAILED (CLI 2.98.2 / edge-runtime v1.73.13); SPA wiring (PR2) + live invoke gated — live gate still OPEN, fix not selected` (do this early, before broad live work)
 
 Wire a **minimal** live-data path for one or two Retention cards before any broader live
 integration — a validation slice, not a rollout. The biggest remaining risk is whether
@@ -556,15 +556,27 @@ PR1's bundle/import proof found that the Edge Function's transitive **extensionl
 `tsconfig` change, `silentChurn.ts` untouched, no `.ts` added to the shared import.** Offline Deno-level
 proof on a clean copy of the exact bytes: strict `deno check` FAILS `TS2307` on `./silentChurn` **without**
 the config and **PASSES with it** → sloppy-imports resolves the transitive extensionless import. **This does
-NOT close the live gate.** The remaining blocker is **Supabase deploy / eszip resolution**, all three
-UNPROVEN: (1) deploy **discovers** the function-local `deno.json`; (2) deploy **honors**
-`unstable:["sloppy-imports"]`; (3) **eszip** resolves the shared `src/` graph like the offline proof.
-Resolution is a **bundle-time event** (deploy bundles before any secret read / Wodify fetch / POST), so the
-proof folds into the first authorized deploy — or a throwaway preview-branch deploy (never prod, no secret,
-no invoke). **With #432 there was no deploy / serve / invoke, no secret set, no Wodify call, no POST, and no
-PR2 / SPA wiring.** **If the eszip proof later FAILS, stop and rescope** — do **not** fork / mirror / vendor
-the classifier or date logic, change `tsconfig`, add `.ts` to the shared import, or introduce a generated
-bundle without separate approval.
+NOT close the live gate.** The remaining blocker was **Supabase deploy / eszip resolution**, with three
+open questions: (1) does deploy **discover** the function-local `deno.json`; (2) does deploy **honor**
+`unstable:["sloppy-imports"]`; (3) does **eszip** resolve the shared `src/` graph like the offline proof.
+Resolution is a **bundle-time event** (deploy bundles before any secret read / Wodify fetch / POST).
+
+**Deploy/eszip proof — RAN 2026-06-05, result FAIL (not BLOCKED).** A named-function-only deploy
+(`supabase functions deploy sync-wodify-retention --project-ref gzgxcvjvoivlwaksnmxy`, Reviewer-validated and
+Wesley-authorized; no `--no-verify-jwt`, no secret, no invoke) reached graph creation and errored:
+`failed to create the graph` → `Module not found ".../src/lib/gym/silentChurn"` at
+`src/lib/gym/wodifyRetentionAggregate.ts:24`. The edge-runtime image (`v1.73.13`) pulled and ran first, so
+this is a genuine bundle-time **module-resolution FAIL**, not a Docker / CLI / network / auth / project-ref
+BLOCK. **Proven fact (narrow):** with **Supabase CLI 2.98.2** and **edge-runtime v1.73.13**, this deploy path
+did **not** resolve the extensionless `./silentChurn` import from the shared `src/` graph despite the
+function-local `deno.json`. **Not claimed:** whether deploy failed to *discover* the `deno.json` or discovered
+it but did not *honor* `sloppy-imports` (this run does not distinguish them), nor that a future CLI /
+edge-runtime version could never resolve it. **Platform stayed clean:** `sync-wodify-retention` remains **not
+deployed** (absent on the platform); `ai-proxy` unchanged (version 2, `verify_jwt:false`,
+`ezbr_sha256 3d392f3e…`); no `WODIFY_API_KEY` secret; no serve / invoke / POST / Wodify call. **The live gate
+stays OPEN and the fix is NOT selected** — forking / mirroring / vendoring the classifier or date logic, a
+`tsconfig` change, adding `.ts` to the shared import, an import map, or a generated bundle are all **out of
+scope here** and must be chosen in a separate scoped strategy session.
 
 1. **Server-side reuse boundary (refined in PR1).** The server imports ONLY the locked, threshold-FREE
    date primitives — `parseYmdLocal` and `wholeDaysBetween` — from `silentChurn.ts`, and never forks them
