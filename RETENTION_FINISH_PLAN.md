@@ -527,7 +527,7 @@ the standalone `/clients` shape-discovery; this PR's one-line patch + re-run bui
 first**, then rebase + merge #427, resolving §5 / README to keep both records (the `/clients` shape
 discovery from #428, and the patch + re-run outcome here).
 
-### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — sync-wodify-retention deployed & ACTIVE (verify_jwt=true) but INERT (no key, no invoke); §6 live-data validation goal still OPEN (first authorized invoke pending); deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); PR2/SPA wiring still OPEN` (do this early, before broad live work)
+### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — sync-wodify-retention deployed & ACTIVE (verify_jwt=true) but INERT (no key, no invoke); §6 live-data validation goal still OPEN (first authorized invoke pending); deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); grants hardened #440 @ 7a3bc77 (anon/authenticated → SELECT-only); SYNC_TRIGGER_SECRET trigger-gate + fail-closed-500 LIVE #441 @ 67aafd0; redeployed v3 (verify_jwt=true, ezbr 35e21c14…), still INERT (no SYNC_TRIGGER_SECRET / no WODIFY_API_KEY / never invoked); PR2/SPA wiring still OPEN` (do this early, before broad live work)
 
 Wire a **minimal** live-data path for one or two Retention cards before any broader live
 integration — a validation slice, not a rollout. The biggest remaining risk is whether
@@ -564,24 +564,65 @@ deploy green → the tsconfig change is SPA-safe). `main` now **reproduces the d
 which the deploy bundler erases, so the feared lock-bound dead-end did **not** materialize.
 
 **Deployed but INERT — the live-data gate is still OPEN.** `sync-wodify-retention` is deployed and **ACTIVE**
-with **`verify_jwt: true`**, but it holds **no `WODIFY_API_KEY`**, has never been invoked, makes no POST and
-no Wodify call, and is **not** wired to the SPA. So **what is CLOSED is only the deploy/eszip
-import-resolution bundling sub-gate** — the **§6 live-data validation goal is NOT yet met.** Confirming
-whether Wodify actually supplies `status` / `lastCheckIn` cleanly and globally requires the **first
-authorized live invoke**, which still needs a Reviewer audit + Wesley's explicit authorization (its own
-two-AI gate). **Follow-up status:** (i) **`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06). The
-vestigial function-local `deno.json` was dropped and the function README reconciled; a name-scoped redeploy
-from merged `main` (CLI 2.98.2) **succeeded** and the deployed bundle's file set is **deno.json-free**
+with **`verify_jwt: true`**, but it holds **no `SYNC_TRIGGER_SECRET` and no `WODIFY_API_KEY`**, has never been
+invoked, makes no POST and no Wodify call, and is **not** wired to the SPA. So **what is CLOSED is only the
+deploy/eszip import-resolution bundling sub-gate** — the **§6 live-data validation goal is NOT yet met**, and
+stays OPEN until the first authorized invoke (Step D below) **succeeds** *and* the persisted row + §6.6
+conservation invariant are verified. Confirming whether Wodify actually supplies `status` / `lastCheckIn`
+cleanly and globally requires the **first authorized live invoke**, which still needs a Reviewer audit +
+Wesley's explicit authorization (its own two-AI gate).
+
+**Request-gate stack (current inert behavior; `verify_jwt:true` is the OUTER layer) — `index.ts` + #441:**
+
+- any request **without a valid project JWT → `401`** (platform; never reaches the function)
+- `GET` (valid JWT) **→ `405`**, before any secret/env/Wodify work (preserves the Step-0 reachability probe)
+- `POST` (valid JWT), `SYNC_TRIGGER_SECRET` **unset → `500` fail-closed** (never open) — **this is today's state**
+- `POST` (valid JWT), secret set but `x-sync-trigger-secret` missing/wrong **→ `403`** (constant-time digest compare)
+- only `POST` (valid JWT **+** correct `x-sync-trigger-secret` **+** `WODIFY_API_KEY` set) reaches Wodify
+
+The **`SYNC_TRIGGER_SECRET`** shared-secret gate (#441 @ `67aafd0`) is **required and fail-closed**:
+`verify_jwt:true` alone admits the public anon key shipped in the SPA bundle, so the trigger secret — not the
+JWT — is the structural authorization. The aggregate table's grants were hardened in **#440 @ `7a3bc77`**
+(anon + authenticated reduced to **SELECT-only**; the service-role writer is unchanged) — see
+`supabase/wodify_retention_schema.sql`.
+
+**Deploy rule — name-scoped only.** Any redeploy MUST be name-scoped
+(`supabase functions deploy sync-wodify-retention --project-ref gzgxcvjvoivlwaksnmxy`). A **bare**
+`supabase functions deploy` would also redeploy `ai-proxy` and **flip it to `verify_jwt:true`**, breaking the
+live SPA proxy.
+
+**First authorized live invoke — canonical order (documented, NOT executed; gated on Reviewer + Wesley):**
+
+- **A.** Set `SYNC_TRIGGER_SECRET` only (secret-safe flow — see the function README).
+- **B.** With `WODIFY_API_KEY` **still absent**, prove the gate: `GET → 405`; `POST` no header `→ 403`;
+  `POST` bad header `→ 403`; `POST` correct header `→ 500` fail-closed with **zero Wodify reachable**
+  (this proof is only possible while the key is unset).
+- **C.** Set the rotated `WODIFY_API_KEY` (secret-safe flow).
+- **D.** Single real `POST` at **midday gym-local** (valid JWT + correct `x-sync-trigger-secret`) — the
+  **irreversible external action** (first live Wodify pull).
+- **E.** Verify the persisted row + the §6.6 conservation invariant.
+- **F.** Unset `WODIFY_API_KEY` (disarm).
+
+**Next executable step (if separately authorized) = Step A.** **Next irreversible external action = Step D.**
+No `GET`/`POST`/invoke happens without explicit authorization — **including the Step B gate proofs**.
+
+**asOf timezone — interim mitigation.** `asOf` is the **server-UTC** fetch date (`index.ts`), which can shift
+the day boundary ±1 vs the gym's local day. **Interim mitigation: run the first invoke (Step D) at midday
+gym-local**, so a UTC offset cannot cross the date boundary. The **permanent fix** (gym-local `asOf`) remains a
+**separate, deferred code PR** — explicitly NOT this docs change, and NOT a blocker for the gated first invoke.
+
+**Prior-state facts (preserved).** The import-resolution sub-gate closed via Option A (#435 @ `b6bd9d6`); the
+**`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06) dropped the vestigial function-local `deno.json`
+and reconciled the README; a name-scoped redeploy from merged `main` (CLI 2.98.2) was **deno.json-free**
 (`index.ts` → `wodifyRetentionAggregate.ts` → `silentChurn.ts` via `.ts` imports alone; the type-only
-`./memberFixture` erased) — proving `deno.json` is not load-bearing for the deployed function bundle.
-`sync-wodify-retention` is now **v2, ACTIVE, `verify_jwt:true`, still INERT**; `ai-proxy` is provably
-untouched (v2, `verify_jwt:false`, `ezbr_sha256 3d392f3e…`, `updated_at` unmoved). Two cosmetic,
-zero-impact loose ends are deferred: (a) the platform `import_map_path` field still shows the old deleted
-worktree's `deno.json` path — orphaned metadata, not a live binding, because the deployed bundle is
-deno.json-free; (b) the deployed `index.ts` header comment still reads "bundler UNCONFIRMED" / "this PR" —
-reconcile on the next substantive `index.ts` redeploy, not as a dedicated cycle. (ii) **PR2 / SPA
-wiring** (apply the
-owner threshold + `WATCH_FLOOR_DAYS` rule client-side to the histogram). **Holds intact:** no secret, no
+`./memberFixture` erased), proving `deno.json` is not load-bearing for the deployed bundle.
+`sync-wodify-retention` is now **v3, ACTIVE, `verify_jwt:true`, still INERT**; `ai-proxy` is provably
+**untouched** (v2, `verify_jwt:false`, `ezbr_sha256 3d392f3e…`, `updated_at` unmoved). Two cosmetic,
+zero-impact loose ends are deferred: (a) the platform `import_map_path` / `entrypoint_path` fields still show
+old deleted-worktree paths — orphaned metadata, not a live binding (the deployed `ezbr_sha256 35e21c14…`
+bundle is authoritative); (b) the deployed `index.ts` header comment reconciles on the next substantive
+`index.ts` redeploy, not as a dedicated cycle. **(ii) PR2 / SPA wiring** (apply the owner threshold +
+`WATCH_FLOOR_DAYS` rule client-side to the histogram) remains OPEN. **Holds intact:** no secret, no
 invoke/POST/Wodify call, no SPA/PR2 wiring; `ai-proxy` unchanged (v2, `verify_jwt:false`, `ezbr_sha256
 3d392f3e…`).
 
