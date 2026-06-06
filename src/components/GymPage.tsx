@@ -278,7 +278,7 @@ function ChurnRiskByTenureCard() {
     [silentChurnThresholdDays],
   );
 
-  const { thresholdDays, activeTotal, bands, heroBandId } = result;
+  const { thresholdDays, activeTotal, bands, unknownTenure, heroBandId } = result;
   const heroBand = bands.find((b) => b.id === heroBandId) ?? null;
 
   return (
@@ -328,6 +328,26 @@ function ChurnRiskByTenureCard() {
                 <span className="churn-tenure-col churn-tenure-col--num">{formatRate(b.riskRate)}</span>
               </li>
             ))}
+            {/* Dirty-data members (missing/invalid or future membershipStart) are
+                shown here rather than silently dropped — keeps this card honest
+                against the Silent Churn count once live Wodify data lands. Hidden
+                while the sample data is clean. */}
+            {unknownTenure.activeTotal > 0 && (
+              <li className="churn-tenure-row churn-tenure-row--unknown">
+                <span className="churn-tenure-col churn-tenure-col--band">
+                  {unknownTenure.label}
+                </span>
+                <span className="churn-tenure-col churn-tenure-col--num">
+                  {unknownTenure.activeTotal}
+                </span>
+                <span className="churn-tenure-col churn-tenure-col--num">
+                  {unknownTenure.atRisk}
+                </span>
+                <span className="churn-tenure-col churn-tenure-col--num">
+                  {formatRate(unknownTenure.riskRate)}
+                </span>
+              </li>
+            )}
           </ul>
         </div>
       </div>
