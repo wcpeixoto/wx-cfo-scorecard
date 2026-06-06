@@ -527,7 +527,7 @@ the standalone `/clients` shape-discovery; this PR's one-line patch + re-run bui
 first**, then rebase + merge #427, resolving §5 / README to keep both records (the `/clients` shape
 discovery from #428, and the patch + re-run outcome here).
 
-### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — sync-wodify-retention deployed & ACTIVE (verify_jwt=true) but INERT (no key, no invoke); §6 live-data validation goal still OPEN (first authorized invoke pending); optional deno.json cleanup + PR2/SPA wiring still OPEN` (do this early, before broad live work)
+### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — sync-wodify-retention deployed & ACTIVE (verify_jwt=true) but INERT (no key, no invoke); §6 live-data validation goal still OPEN (first authorized invoke pending); deno.json cleanup PREPARED (cleanup PR drops it + reconciles the function README; DONE pending post-merge name-scoped deploy proof); PR2/SPA wiring still OPEN` (do this early, before broad live work)
 
 Wire a **minimal** live-data path for one or two Retention cards before any broader live
 integration — a validation slice, not a rollout. The biggest remaining risk is whether
@@ -569,9 +569,12 @@ no Wodify call, and is **not** wired to the SPA. So **what is CLOSED is only the
 import-resolution bundling sub-gate** — the **§6 live-data validation goal is NOT yet met.** Confirming
 whether Wodify actually supplies `status` / `lastCheckIn` cleanly and globally requires the **first
 authorized live invoke**, which still needs a Reviewer audit + Wesley's explicit authorization (its own
-two-AI gate). Two follow-ups also remain OPEN: (i) **optional `deno.json` cleanup** — the now-dead
-function-local `deno.json` can be dropped, but its `import_map_path` is wired into the deployed function, so
-removal needs a re-deploy **from merged `main`** to prove no regression; (ii) **PR2 / SPA wiring** (apply the
+two-AI gate). Two follow-ups remain: (i) **`deno.json` cleanup — PREPARED, pending post-merge deploy
+proof.** The now-dead function-local `deno.json` is dropped (and the function README reconciled to the
+post-Option-A reality) in the cleanup PR; because its `import_map_path` is wired into the deployed function,
+the cleanup is marked DONE only after a name-scoped re-deploy **from merged `main`** proves no regression
+(deploy succeeds, `import_map_path` clears, and Reviewer verifies `ai-proxy` unchanged); (ii) **PR2 / SPA
+wiring** (apply the
 owner threshold + `WATCH_FLOOR_DAYS` rule client-side to the histogram). **Holds intact:** no secret, no
 invoke/POST/Wodify call, no SPA/PR2 wiring; `ai-proxy` unchanged (v2, `verify_jwt:false`, `ezbr_sha256
 3d392f3e…`).
