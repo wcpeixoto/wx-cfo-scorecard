@@ -62,18 +62,33 @@ create index if not exists wodify_retention_aggregate_workspace_fetched_at_idx
   on public.wodify_retention_aggregate (workspace_id, fetched_at desc);
 
 -- Access model -------------------------------------------------------------
--- anon: SELECT only (safe — non-PII). NO insert/update/delete grant.
--- service_role: insert + select (the Edge Function writer). service_role also
--- bypasses RLS, so the read policy below is purely for the anon browser path.
+-- Security is enforced by the RLS policy below (no anon write policy → anon
+-- cannot write via the Data API). The grant layer is the SECOND barrier.
+-- IMPORTANT: Supabase's default privileges grant the FULL DML set to anon and
+-- authenticated on every new public table, so `grant select to anon` alone does
+-- NOT restrict writes — the broad defaults must be explicitly REVOKED (below).
+-- After this file:
+--   anon          → SELECT only
+--   authenticated → SELECT only (no writes; the app uses the anon key)
+--   service_role  → SELECT + INSERT (the Edge Function writer; also bypasses RLS,
+--                   so the read policy is purely for the anon browser path).
+-- NEVER revoke from service_role — it needs INSERT to persist.
 grant select on public.wodify_retention_aggregate to anon;
 grant select, insert on public.wodify_retention_aggregate to service_role;
+
+-- Strip the broad default-privilege DML grants from anon + authenticated so the
+-- grant layer matches the intended read-only boundary (defense in depth atop RLS).
+revoke insert, update, delete, truncate, references, trigger
+  on public.wodify_retention_aggregate
+  from anon, authenticated;
 
 alter table public.wodify_retention_aggregate enable row level security;
 
 -- anon read policy (scoped to the default workspace, matching the writer). There
--- is intentionally NO anon write policy: combined with the missing write grant,
--- anon writes are blocked two ways (defense in depth). The service-role writer
--- bypasses RLS entirely and needs no policy.
+-- is intentionally NO anon write policy — this RLS gap is the PRIMARY barrier
+-- blocking anon writes, reinforced by the grant revoke above (two barriers,
+-- defense in depth). The service-role writer bypasses RLS entirely and needs no
+-- policy.
 drop policy if exists "wodify_retention_aggregate_anon_read" on public.wodify_retention_aggregate;
 create policy "wodify_retention_aggregate_anon_read"
 on public.wodify_retention_aggregate
