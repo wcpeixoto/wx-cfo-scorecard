@@ -1,27 +1,39 @@
 // sync-wodify-retention Edge Function (RETENTION_FINISH_PLAN.md §6).
 //
-// THIN SHELL by design — the only logic here is fetch + persist. All
-// normalization and aggregation lives in the typechecked, vitest-covered
-// src/lib/gym/wodifyRetentionAggregate.ts so the Deno function holds no
-// untypechecked business logic. The shared-module bundle/import is nuanced —
-// esbuild resolves + inlines it, but strict `deno check` does not, and the
-// Supabase deploy bundler is UNCONFIRMED (a live-gate item; see README
-// "Bundle/import proof"). Mirrors ai-proxy: dependency-free raw `fetch`, no SDK,
-// secrets server-side only, never logs bodies or the key.
+// THIN SHELL by design — the only logic here is the request gate + fetch +
+// persist. All normalization/aggregation lives in the typechecked, vitest-covered
+// src/lib/gym/wodifyRetentionAggregate.ts, and the pure gate helpers
+// (classifySyncError / verifyTriggerSecret) in src/lib/gym/wodifyRetentionSync.ts,
+// so the Deno shell holds no untypechecked business logic. The shared-module
+// import across the runtime boundary is RESOLVED via Option A (explicit `.ts`
+// import + allowImportingTsExtensions, #435) — esbuild inlines it and the
+// Supabase deploy/eszip bundler resolves it. Mirrors ai-proxy: dependency-free
+// raw `fetch`, no SDK, secrets server-side only, never logs bodies or the key
+// (zero `console.*` — the 502 diagnostic `code` is returned in-body only).
 //
-// Flow: read server-side secrets → paginate Wodify /clients → computeRetentionAggregate
-// → persist the NON-PII aggregate row via the Supabase REST API (service role).
-// Raw /clients rows are transient in memory; they are never logged or persisted.
-// The browser never calls Wodify and never sees the key.
+// Request gate (strict order): non-POST → 405 (before any secret/env/Wodify
+// work, preserving the Step 0 probe) → SYNC_TRIGGER_SECRET unset → 500 (FAIL
+// CLOSED) → x-sync-trigger-secret header mismatch → 403 (constant-time compare)
+// → WODIFY_API_KEY/SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY missing → 500 → fetch.
 //
-// GATED: not invoked live in this PR. First live invoke requires Reviewer audit
-// + Wesley's explicit authorization to set WODIFY_API_KEY and run it (README).
+// Flow: gate → paginate Wodify /clients → computeRetentionAggregate → persist the
+// NON-PII aggregate row via the Supabase REST API (service role). Raw /clients
+// rows are transient in memory; they are never logged or persisted. The browser
+// never calls Wodify and never sees the key.
+//
+// GATED: not invoked live in this PR. First live invoke requires Reviewer audit +
+// Wesley's explicit authorization to set SYNC_TRIGGER_SECRET + WODIFY_API_KEY and
+// run it with the x-sync-trigger-secret header (README).
 
 import {
   computeRetentionAggregate,
   type RawWodifyClient,
   type RetentionAggregate,
 } from '../../../src/lib/gym/wodifyRetentionAggregate.ts';
+import {
+  classifySyncError,
+  verifyTriggerSecret,
+} from '../../../src/lib/gym/wodifyRetentionSync.ts';
 
 // Wodify /clients request — the exact proven shape from the §5 probes
 // (scripts/wodify/clientsRecencyProbe.ts #429): page/pageSize params, records
@@ -123,10 +135,28 @@ async function persistAggregate(
 
 Deno.serve(async (req: Request): Promise<Response> => {
   try {
+    // 1. Method guard FIRST — non-POST short-circuits before any secret / env /
+    //    Wodify work, preserving the Step 0 (GET → 405) reachability probe.
     if (req.method !== 'POST') {
       return jsonResponse(405, { error: 'method_not_allowed' });
     }
 
+    // 2. Structural trigger gate. verify_jwt (platform) only proves the caller
+    //    holds the PUBLIC anon JWT (it ships in the SPA bundle); this shared
+    //    secret is what actually authorizes an invoke. FAIL CLOSED if it is not
+    //    configured server-side — never fall open to an unguarded endpoint.
+    const triggerSecret = Deno.env.get('SYNC_TRIGGER_SECRET');
+    if (!triggerSecret) {
+      return jsonResponse(500, { error: 'internal_error' });
+    }
+    // 3. Constant-time compare of the provided header against the secret.
+    //    Missing or mismatched → generic 403 (never reveal which).
+    const providedSecret = req.headers.get('x-sync-trigger-secret') ?? '';
+    if (!(await verifyTriggerSecret(triggerSecret, providedSecret))) {
+      return jsonResponse(403, { error: 'forbidden' });
+    }
+
+    // 4. Only after the trigger gate passes do we read the data secrets.
     const apiKey = Deno.env.get('WODIFY_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -157,8 +187,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       diagnostics: aggregate.diagnostics,
       dataQuality: aggregate.dataQuality,
     });
-  } catch (_err) {
-    // Never echo error detail — it can carry the URL, headers, or the key.
-    return jsonResponse(502, { error: 'sync_failed' });
+  } catch (err) {
+    // Sanitized, fixed-vocabulary diagnostic code in-body — never raw err.message,
+    // URLs, headers, rows, or secrets (see classifySyncError). No logging, so the
+    // function keeps its zero-`console.*` invariant.
+    return jsonResponse(502, { error: 'sync_failed', code: classifySyncError(err) });
   }
 });

@@ -14,10 +14,13 @@ sees the key.
 
 ## Thin-shell design + reuse boundary
 
-`index.ts` does only fetch + persist. **All** normalization and aggregation lives
-in `src/lib/gym/wodifyRetentionAggregate.ts`, which is type-checked by
-`npm run build` and covered by `npm test`
-(`src/lib/gym/wodifyRetentionAggregate.test.ts`). That module imports the locked
+`index.ts` does only the request gate + fetch + persist. **All** normalization and
+aggregation lives in `src/lib/gym/wodifyRetentionAggregate.ts`, and the pure
+request-gate helpers (`classifySyncError`, `verifyTriggerSecret`) in
+`src/lib/gym/wodifyRetentionSync.ts` — both type-checked by `npm run build` and
+covered by `npm test`
+(`src/lib/gym/wodifyRetentionAggregate.test.ts`, `src/lib/gym/wodifyRetentionSync.test.ts`).
+The aggregate module imports the locked
 date primitives `parseYmdLocal` and `wholeDaysBetween` from
 `src/lib/gym/silentChurn.ts` and **never forks them**. It deliberately does not
 import the threshold-coupled `classifyMember` / `computeAttendanceHealth`: the
@@ -113,9 +116,12 @@ call** — and **nuanced**, not a clean pass:
 
 ## Behavior
 
-- POST only (else `405`). Reads `WODIFY_API_KEY`, `SUPABASE_URL`,
-  `SUPABASE_SERVICE_ROLE_KEY` from the environment; any missing → generic `500`
-  (never reveals which).
+- Request gate, strict order: non-`POST` → `405` (before any secret/env/Wodify
+  work — preserves the Step 0 reachability probe); `SYNC_TRIGGER_SECRET` unset →
+  generic `500` (**fail closed**); `x-sync-trigger-secret` header missing or not
+  matching (constant-time digest compare) → `403`; then `WODIFY_API_KEY`,
+  `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` are read from the environment, any
+  missing → generic `500` (never reveals which).
 - Paginates `GET https://api.wodify.com/v1/clients?page=N&pageSize=100` with the
   `x-api-key` header, records under `clients`, looping while
   `pagination.has_more` (hard cap `MAX_PAGES = 50`). If the cap is hit while
@@ -127,9 +133,12 @@ call** — and **nuanced**, not a clean pass:
   key (bypasses RLS; never browser-exposed). Append-only snapshot insert.
 - Returns a **counts-only** summary (`activeTotal`, `unknown`, `diagnostics`,
   `dataQuality`) — never raw rows.
-- On any error → generic `502 { "error": "sync_failed" }`. **Never logs request
-  bodies, response bodies, raw rows, or the key** (the bundle contains zero
-  `console.*` calls).
+- On any error → `502 { "error": "sync_failed", "code": <class> }`, where `code`
+  is a fixed-vocabulary class — `wodify_clients_http_<status>`,
+  `persist_http_<status>`, `bad_asof`, `timeout`, `parse_error`, `network_error`,
+  or `unknown` (see `classifySyncError`). It is **never** a raw error message,
+  URL, query string, header, row, or secret. **Nothing is logged** — the bundle
+  still contains zero `console.*` calls; the `code` is returned in-body only.
 
 ## Privacy guarantees (the member-PII anon-key blocker)
 
@@ -145,17 +154,27 @@ call** — and **nuanced**, not a clean pass:
 
 The function is **already deployed** (JWT-verified, `verify_jwt: true`) but holds no
 key and has never run. Manual / admin-triggered first; a scheduled refresh comes
-later, only after the first slice proves stable. Unlike `ai-proxy`, it deploys
-**with** JWT verification (never `--no-verify-jwt`) so only an authenticated /
-service-role caller can invoke it — there is no browser caller in this slice. Any
-redeploy must stay **name-scoped** so a bare `supabase functions deploy` never also
-redeploys `ai-proxy` (which must remain `verify_jwt:false`).
+later, only after the first slice proves stable. **Two gates, not one:**
+`verify_jwt: true` only keeps out *unauthenticated* callers — it admits **any**
+valid project JWT, including the **public anon key** that ships in the SPA bundle,
+so it is **not** sufficient on its own. The structural authorization is the
+**`SYNC_TRIGGER_SECRET`** shared secret: every POST must send a matching
+`x-sync-trigger-secret` header (constant-time compared) or it is rejected `403`
+before any Wodify work, and if the secret is not configured server-side the
+function **fails closed** (`500`) — never open. Any redeploy must stay
+**name-scoped** so a bare `supabase functions deploy` never also redeploys
+`ai-proxy` (which must remain `verify_jwt:false`).
 
 ```bash
 # Gated on Reviewer + Wesley approval — the live-invoke step, NOT run yet:
-supabase secrets set WODIFY_API_KEY=<value>     # server-side only; never VITE_*, never committed
+supabase secrets set SYNC_TRIGGER_SECRET=<value>  # structural trigger gate; server-side only
+supabase secrets set WODIFY_API_KEY=<value>       # server-side only; never VITE_*, never committed
 # Function is already deployed JWT-verified; any redeploy stays name-scoped:
 supabase functions deploy sync-wodify-retention --project-ref gzgxcvjvoivlwaksnmxy
+# Then invoke with BOTH the anon JWT and the trigger header (POST):
+#   curl -X POST .../functions/v1/sync-wodify-retention \
+#     -H "Authorization: Bearer <anon>" -H "apikey: <anon>" \
+#     -H "x-sync-trigger-secret: <value>"
 ```
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected by the platform at
