@@ -193,12 +193,56 @@ describe('cross-check with Silent Churn / Attendance Health (anti-drift guard)',
     }
   });
 
-  it('Σ band watch === Attendance Health watch count at every threshold', () => {
+  it('Σ band watch + unknown tenure watch === Attendance Health watch count at every threshold', () => {
     for (const t of [1, 8, 14, 21, 30, 90, 365, 500]) {
       const tenure = computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, t, FIXTURE_TODAY);
       const health = computeAttendanceHealth(SAMPLE_GYM_MEMBERS, t, FIXTURE_TODAY);
-      const summedWatch = tenure.bands.reduce((sum, b) => sum + b.watch, 0);
-      const summedAtRisk = tenure.bands.reduce((sum, b) => sum + b.atRisk, 0);
+      const summedWatch =
+        tenure.bands.reduce((sum, b) => sum + b.watch, 0) + tenure.unknownTenure.watch;
+      const summedAtRisk =
+        tenure.bands.reduce((sum, b) => sum + b.atRisk, 0) + tenure.unknownTenure.atRisk;
+      expect(summedWatch).toBe(health.watch);
+      expect(summedAtRisk).toBe(health.watch + health.silent);
+    }
+  });
+
+  it('keeps the watch / at-risk cross-check intact on DIRTY data: a bad-start WATCH member is counted in unknown tenure, not dropped', () => {
+    // The watch/atRisk analog of the silent guard above: an active member who is on
+    // WATCH (drifting, below threshold) but has a missing/invalid start date must
+    // still be counted. Under a real-bands-only sum they would be dropped, so
+    // Σ band watch < Attendance Health watch — this test fails under the old code.
+    const withWatchBadStart: GymMember[] = [
+      ...SAMPLE_GYM_MEMBERS,
+      {
+        id: 'watch-bad-start',
+        displayName: 'Drifter',
+        status: 'active',
+        monthlyDues: 130,
+        membershipStart: 'not-a-date', // no real tenure band
+        lastCheckIn: '2026-05-19', // 14 days before FIXTURE_TODAY → watch (8 <= 14 < t)
+      },
+    ];
+
+    // Thresholds where 14 days absent is on WATCH (>= WATCH_FLOOR_DAYS=8 and < t).
+    for (const t of [21, 30, 90, 365, 500]) {
+      const tenure = computeChurnRiskByTenure(withWatchBadStart, t, FIXTURE_TODAY);
+      const health = computeAttendanceHealth(withWatchBadStart, t, FIXTURE_TODAY);
+
+      // The dirty member is on watch, in the unknown-tenure bucket, NOT a real band.
+      expect(tenure.unknownTenure.watch).toBe(1);
+      expect(tenure.unknownTenure.atRisk).toBe(1);
+      expect(tenure.bands.reduce((sum, b) => sum + b.watch, 0)).toBe(
+        computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, t, FIXTURE_TODAY).bands.reduce(
+          (sum, b) => sum + b.watch,
+          0,
+        ),
+      );
+
+      // The watch / at-risk identities hold because unknown tenure is in the sum.
+      const summedWatch =
+        tenure.bands.reduce((sum, b) => sum + b.watch, 0) + tenure.unknownTenure.watch;
+      const summedAtRisk =
+        tenure.bands.reduce((sum, b) => sum + b.atRisk, 0) + tenure.unknownTenure.atRisk;
       expect(summedWatch).toBe(health.watch);
       expect(summedAtRisk).toBe(health.watch + health.silent);
     }
