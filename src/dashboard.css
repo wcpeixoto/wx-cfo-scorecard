@@ -13132,6 +13132,9 @@ body {
 .churn-tenure-row--hero { background: var(--bg-main); }
 .churn-tenure-row--hero .churn-tenure-col--band { font-weight: 600; }
 .churn-tenure-row--hero .churn-tenure-col--num:last-child { color: var(--warning); }
+/* Unknown-tenure (dirty-data) row — muted so it reads as a data-quality note,
+   matching the Attendance Health "Unknown" tile. Only renders when present. */
+.churn-tenure-row--unknown .churn-tenure-col { color: var(--text-secondary); }
 
 /* ── Member Movement — live (sample-data) census + join-cohort intake ─────
    Full-width Patterns card. Snapshot only: a RAW status census and intake by
