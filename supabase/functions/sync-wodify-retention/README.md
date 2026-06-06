@@ -7,10 +7,11 @@ slice (`RETENTION_FINISH_PLAN.md` §6). Fetches Wodify `/clients`, computes a
 sees the key.
 
 > **GATED — deployed but INERT.** The function is deployed and **ACTIVE**
-> (`verify_jwt: true`) but holds **no `WODIFY_API_KEY`**, has never been invoked,
-> makes no Wodify call, and is not wired to the SPA. The first live invoke requires
-> a Reviewer audit **and** Wesley's explicit authorization to set the secret and run
-> it. No secret is set and no Wodify call is made.
+> (v3, `verify_jwt: true`, `ezbr_sha256 35e21c14…`) but holds **no `SYNC_TRIGGER_SECRET`
+> and no `WODIFY_API_KEY`**, has never been invoked, makes no Wodify call, and is not
+> wired to the SPA. The first live invoke requires a Reviewer audit **and** Wesley's
+> explicit authorization to set the secrets and run it. No secret is set and no Wodify
+> call is made.
 
 ## Thin-shell design + reuse boundary
 
@@ -165,16 +166,66 @@ function **fails closed** (`500`) — never open. Any redeploy must stay
 **name-scoped** so a bare `supabase functions deploy` never also redeploys
 `ai-proxy` (which must remain `verify_jwt:false`).
 
+**Secrets are never placed on argv, shell history, `ps`, committed files, chat, or
+logs.** Use one of the two secret-safe forms below — **never** the inline
+`supabase secrets set NAME=value` form (the value would land in shell history / `ps`).
+
+**Canonical live-invoke order (gated on Reviewer + Wesley — NOT run yet).** The next
+executable step, if separately authorized, is **Step A**; the next irreversible external
+action is **Step D**. No `GET`/`POST`/invoke — **including the Step B gate proofs** —
+happens without explicit authorization.
+
+- **A. Set `SYNC_TRIGGER_SECRET` only** (secret-safe — see below). Generate the token
+  separately: `openssl rand -hex 32`.
+- **B. With `WODIFY_API_KEY` still absent, prove the gate** (only possible while the key is
+  unset): `GET` (valid JWT) → `405`; `POST` no `x-sync-trigger-secret` → `403`; `POST` bad
+  header → `403`; `POST` correct header → `500` fail-closed, **zero Wodify reachable**.
+- **C. Set the rotated `WODIFY_API_KEY`** (secret-safe; same flow as A, but ONLY at Step C).
+- **D. Single real `POST` at midday gym-local** (valid JWT + correct `x-sync-trigger-secret`)
+  — the first live Wodify pull. Midday gym-local is the **interim** asOf-UTC mitigation; the
+  permanent gym-local `asOf` fix is a **separate, deferred code PR**, not this one.
+- **E. Verify** the persisted row + the §6.6 conservation invariant.
+- **F. Unset `WODIFY_API_KEY`** (disarm).
+
+**Setting a secret — preferred (one-time, no shell):** Supabase Dashboard → Project
+Settings → Edge Functions → Secrets. No shell, no history, no argv.
+
+**Setting a secret — CLI alternative (`--env-file`, supported on CLI ≥ 2.98):** the value is
+read into a private temp file, never onto argv. Set `WODIFY_API_KEY` the same way, ONLY at
+Step C.
+
 ```bash
-# Gated on Reviewer + Wesley approval — the live-invoke step, NOT run yet:
-supabase secrets set SYNC_TRIGGER_SECRET=<value>  # structural trigger gate; server-side only
-supabase secrets set WODIFY_API_KEY=<value>       # server-side only; never VITE_*, never committed
-# Function is already deployed JWT-verified; any redeploy stays name-scoped:
+set +x; umask 077
+read -rs SYNC_TRIGGER_SECRET            # not echoed, not in shell history
+tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT
+printf 'SYNC_TRIGGER_SECRET=%s\n' "$SYNC_TRIGGER_SECRET" > "$tmp"
+unset SYNC_TRIGGER_SECRET
+supabase secrets set --project-ref gzgxcvjvoivlwaksnmxy --env-file "$tmp"
+rm -f "$tmp"
+```
+
+**Redeploy — name-scoped only** (a bare `supabase functions deploy` would also redeploy
+`ai-proxy` and flip it to `verify_jwt:true`):
+
+```bash
 supabase functions deploy sync-wodify-retention --project-ref gzgxcvjvoivlwaksnmxy
-# Then invoke with BOTH the anon JWT and the trigger header (POST):
-#   curl -X POST .../functions/v1/sync-wodify-retention \
-#     -H "Authorization: Bearer <anon>" -H "apikey: <anon>" \
-#     -H "x-sync-trigger-secret: <value>"
+```
+
+**Invoking (Step D) — trigger header via `curl --config`, never inline `-H`** (keeps the
+secret off argv / history):
+
+```bash
+umask 077; cfg="$(mktemp)"; trap 'rm -f "$cfg"' EXIT
+read -rs TRIG                            # trigger secret — read silently, never echoed
+# $ANON = the public anon key (ships in the SPA bundle — NOT a secret; safe to pre-export).
+# Only $TRIG is read via `read -rs`; the trigger secret is the one value that must stay private.
+{ printf 'header = "Authorization: Bearer %s"\n' "$ANON"
+  printf 'header = "apikey: %s"\n' "$ANON"
+  printf 'header = "x-sync-trigger-secret: %s"\n' "$TRIG"; } > "$cfg"
+unset TRIG
+curl -X POST --config "$cfg" \
+  https://<ref>.supabase.co/functions/v1/sync-wodify-retention
+rm -f "$cfg"
 ```
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected by the platform at
