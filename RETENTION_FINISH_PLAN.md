@@ -527,7 +527,7 @@ the standalone `/clients` shape-discovery; this PR's one-line patch + re-run bui
 first**, then rebase + merge #427, resolving §5 / README to keep both records (the `/clients` shape
 discovery from #428, and the patch + re-run outcome here).
 
-### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — sync-wodify-retention deployed & ACTIVE (verify_jwt=true) but INERT (no key, no invoke); §6 live-data validation goal still OPEN (first authorized invoke pending); deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); grants hardened #440 @ 7a3bc77 (anon/authenticated → SELECT-only); SYNC_TRIGGER_SECRET trigger-gate + fail-closed-500 LIVE #441 @ 67aafd0; redeployed v3 (verify_jwt=true, ezbr 35e21c14…), still INERT (no SYNC_TRIGGER_SECRET / no WODIFY_API_KEY / never invoked); PR2/SPA wiring still OPEN` (do this early, before broad live work)
+### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); grants hardened #440 @ 7a3bc77 (anon/authenticated → SELECT-only); SYNC_TRIGGER_SECRET trigger-gate + fail-closed-500 LIVE #441 @ 67aafd0; redeployed v3 (verify_jwt=true, ezbr 35e21c14… unchanged — no redeploy since #441); FIRST AUTHORIZED LIVE INVOKE EXECUTED 2026-06-07 19:48:53 UTC (one aggregate row verified: 412 active / 956 scanned, §6.6 conservation residual 0, no page cap, dues null + missing flag, PII-free) → first-slice §6 live-data validation goal MET; Step F disarm COMPLETE (both secrets unset, plaintext trigger file deleted) → function now DISARMED/inert; PR2/SPA wiring still OPEN` (do this early, before broad live work)
 
 Wire a **minimal** live-data path for one or two Retention cards before any broader live
 integration — a validation slice, not a rollout. The biggest remaining risk is whether
@@ -563,20 +563,28 @@ deploy green → the tsconfig change is SPA-safe). `main` now **reproduces the d
 `silentChurn.ts` was **not** touched — its only transitive import is the **type-only** `./memberFixture`,
 which the deploy bundler erases, so the feared lock-bound dead-end did **not** materialize.
 
-**Deployed but INERT — the live-data gate is still OPEN.** `sync-wodify-retention` is deployed and **ACTIVE**
-with **`verify_jwt: true`**, but it holds **no `SYNC_TRIGGER_SECRET` and no `WODIFY_API_KEY`**, has never been
-invoked, makes no POST and no Wodify call, and is **not** wired to the SPA. So **what is CLOSED is only the
-deploy/eszip import-resolution bundling sub-gate** — the **§6 live-data validation goal is NOT yet met**, and
-stays OPEN until the first authorized invoke (Step D below) **succeeds** *and* the persisted row + §6.6
-conservation invariant are verified. Confirming whether Wodify actually supplies `status` / `lastCheckIn`
-cleanly and globally requires the **first authorized live invoke**, which still needs a Reviewer audit +
-Wesley's explicit authorization (its own two-AI gate).
+**First authorized live invoke EXECUTED — first-slice live-data goal MET; now DISARMED.** `sync-wodify-retention`
+is deployed and **ACTIVE** with **`verify_jwt: true`** (`ezbr_sha256 35e21c14…` unchanged — no redeploy since #441;
+the live pull was an invoke, not a deploy). On **2026-06-07** the **first authorized live invoke ran once** under
+Reviewer + Wesley authorization. **Step D** fetched `/clients` globally and persisted **one non-PII aggregate row**
+at **`2026-06-07 19:48:53 UTC`**. **Step E verification passed:** `active_total=412`, `clients_scanned=956`, §6.6
+conservation residual **0**, `reached_page_cap=false` (`pages_fetched=10`), `monthly_dues_at_risk=null` with
+`missing_monthly_dues=true`, `future_last_check_in=0`, `unknown_status=0`, and the row contains only
+counts/dates/histogram fields. **Step F disarm is complete:** `WODIFY_API_KEY` absent, `SYNC_TRIGGER_SECRET` absent,
+and the plaintext trigger file was deleted. The **first-slice §6 live-data validation goal is therefore MET** — Wodify
+supplies `status` / `lastCheckIn` globally enough for the first aggregate slice, with unknown `lastCheckIn` values
+**surfaced explicitly** via the aggregate's `unknown` bucket (155 of 412 active members; 956 clients scanned overall),
+not hidden — *not* a failure, because the aggregate contract counts unknowns (conservation:
+`activeTotal === histogram + overflow + unknown`) rather than implying perfect coverage. The broader
+**PR2 / SPA wiring remains OPEN**, and any future
+re-arm, second pull, or scheduled pull requires a **fresh Reviewer audit + Wesley authorization** (its own two-AI
+gate).
 
 **Request-gate stack (current inert behavior; `verify_jwt:true` is the OUTER layer) — `index.ts` + #441:**
 
 - any request **without a valid project JWT → `401`** (platform; never reaches the function)
 - `GET` (valid JWT) **→ `405`**, before any secret/env/Wodify work (preserves the Step-0 reachability probe)
-- `POST` (valid JWT), `SYNC_TRIGGER_SECRET` **unset → `500` fail-closed** (never open) — **this is today's state**
+- `POST` (valid JWT), `SYNC_TRIGGER_SECRET` **unset → `500` fail-closed** (never open) — **this is the post-disarm resting state**
 - `POST` (valid JWT), secret set but `x-sync-trigger-secret` missing/wrong **→ `403`** (constant-time digest compare)
 - only `POST` (valid JWT **+** correct `x-sync-trigger-secret` **+** `WODIFY_API_KEY` set) reaches Wodify
 
@@ -591,7 +599,7 @@ JWT — is the structural authorization. The aggregate table's grants were harde
 `supabase functions deploy` would also redeploy `ai-proxy` and **flip it to `verify_jwt:true`**, breaking the
 live SPA proxy.
 
-**First authorized live invoke — canonical order (documented, NOT executed; gated on Reviewer + Wesley):**
+**First authorized live invoke — canonical order (EXECUTED once 2026-06-07; remains the repeatable runbook; any re-run needs fresh Reviewer + Wesley authorization):**
 
 - **A.** Set `SYNC_TRIGGER_SECRET` only (secret-safe flow — see the function README).
 - **B.** With `WODIFY_API_KEY` **still absent**, prove the gate: `GET → 405`; `POST` no header `→ 403`;
@@ -603,8 +611,15 @@ live SPA proxy.
 - **E.** Verify the persisted row + the §6.6 conservation invariant.
 - **F.** Unset `WODIFY_API_KEY` (disarm).
 
-**Next executable step (if separately authorized) = Step A.** **Next irreversible external action = Step D.**
-No `GET`/`POST`/invoke happens without explicit authorization — **including the Step B gate proofs**.
+**Execution record — 2026-06-07.** **A:** `SYNC_TRIGGER_SECRET` set. **B:** gate proofs passed — `GET → 405`;
+`POST` no/bad header → `403`; `POST` correct header + key absent → `500` fail-closed, zero Wodify reachable. **C:**
+rotated `WODIFY_API_KEY` set. **D:** one real `POST` at `19:48:53 UTC` — first live Wodify pull. **E:** row verified —
+412 active / 956 scanned, §6.6 conservation residual 0, no page cap, dues null + missing flag, PII-free. **F:**
+`WODIFY_API_KEY` and `SYNC_TRIGGER_SECRET` unset, plaintext trigger file deleted.
+
+**First cycle complete (2026-06-07); the function is DISARMED.** Re-arming Step A→D requires **fresh authorization**.
+**Next planned §6 work = PR2 / SPA wiring** — applying the owner threshold + `WATCH_FLOOR_DAYS` to the histogram
+client-side.
 
 **asOf timezone — interim mitigation.** `asOf` is the **server-UTC** fetch date (`index.ts`), which can shift
 the day boundary ±1 vs the gym's local day. **Interim mitigation: run the first invoke (Step D) at midday
@@ -616,14 +631,17 @@ gym-local**, so a UTC offset cannot cross the date boundary. The **permanent fix
 and reconciled the README; a name-scoped redeploy from merged `main` (CLI 2.98.2) was **deno.json-free**
 (`index.ts` → `wodifyRetentionAggregate.ts` → `silentChurn.ts` via `.ts` imports alone; the type-only
 `./memberFixture` erased), proving `deno.json` is not load-bearing for the deployed bundle.
-`sync-wodify-retention` is now **v3, ACTIVE, `verify_jwt:true`, still INERT**; `ai-proxy` is provably
-**untouched** (v2, `verify_jwt:false`, `ezbr_sha256 3d392f3e…`, `updated_at` unmoved). Two cosmetic,
+`sync-wodify-retention` is **ACTIVE, `verify_jwt:true`** (`ezbr_sha256 35e21c14…` unchanged — no redeploy; the
+2026-06-07 live pull was an invoke, not a deploy), and is now **DISARMED** after one authorized invoke on 2026-06-07
+(version pins are documentation only — identity is `ezbr` / `verify_jwt` / `updated_at`); `ai-proxy` is provably
+**untouched** (`verify_jwt:false`, `ezbr_sha256 3d392f3e…`, `updated_at` unmoved). Two cosmetic,
 zero-impact loose ends are deferred: (a) the platform `import_map_path` / `entrypoint_path` fields still show
 old deleted-worktree paths — orphaned metadata, not a live binding (the deployed `ezbr_sha256 35e21c14…`
 bundle is authoritative); (b) the deployed `index.ts` header comment reconciles on the next substantive
 `index.ts` redeploy, not as a dedicated cycle. **(ii) PR2 / SPA wiring** (apply the owner threshold +
-`WATCH_FLOOR_DAYS` rule client-side to the histogram) remains OPEN. **Holds intact:** no secret, no
-invoke/POST/Wodify call, no SPA/PR2 wiring; `ai-proxy` unchanged (v2, `verify_jwt:false`, `ezbr_sha256
+`WATCH_FLOOR_DAYS` rule client-side to the histogram) remains OPEN. **Post-cycle state:** exactly one
+authorized invoke/POST/Wodify call occurred on 2026-06-07, then the function was disarmed (both secrets unset,
+plaintext trigger file deleted); no SPA/PR2 wiring; `ai-proxy` unchanged (`verify_jwt:false`, `ezbr_sha256
 3d392f3e…`).
 
 1. **Server-side reuse boundary (refined in PR1).** The server imports ONLY the locked, threshold-FREE

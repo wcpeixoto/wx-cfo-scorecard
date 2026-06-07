@@ -6,12 +6,14 @@ slice (`RETENTION_FINISH_PLAN.md` §6). Fetches Wodify `/clients`, computes a
 `public.wodify_retention_aggregate`. The browser never calls Wodify and never
 sees the key.
 
-> **GATED — deployed but INERT.** The function is deployed and **ACTIVE**
-> (v3, `verify_jwt: true`, `ezbr_sha256 35e21c14…`) but holds **no `SYNC_TRIGGER_SECRET`
-> and no `WODIFY_API_KEY`**, has never been invoked, makes no Wodify call, and is not
-> wired to the SPA. The first live invoke requires a Reviewer audit **and** Wesley's
-> explicit authorization to set the secrets and run it. No secret is set and no Wodify
-> call is made.
+> **FIRST LIVE INVOKE DONE (2026-06-07) — now DISARMED.** The function is deployed and
+> **ACTIVE** (`verify_jwt: true`, `ezbr_sha256 35e21c14…` unchanged — no redeploy since #441).
+> The **first authorized live invoke ran once on 2026-06-07** (`19:48:53 UTC`) under a Reviewer
+> audit **and** Wesley's authorization, persisting one non-PII aggregate row (412 active /
+> 956 scanned, §6.6 conservation residual 0, PII-free). It is now **DISARMED**: it holds **no
+> `SYNC_TRIGGER_SECRET` and no `WODIFY_API_KEY`**, the plaintext trigger file was deleted, and it
+> makes no Wodify call and is not wired to the SPA. Any re-arm / second pull / scheduled pull
+> requires a **fresh Reviewer audit + Wesley authorization**.
 
 ## Thin-shell design + reuse boundary
 
@@ -151,11 +153,12 @@ call** — and **nuanced**, not a clean pass:
 - `monthlyDuesAtRisk` is always `null` + `missingMonthlyDues: true` — `/clients`
   carries no dues, and a fabricated `$0` is never emitted.
 
-## Trigger model + deploy (deployed; live invoke gated — NOT yet)
+## Trigger model + deploy (deployed; first live invoke DONE 2026-06-07 — now disarmed)
 
-The function is **already deployed** (JWT-verified, `verify_jwt: true`) but holds no
-key and has never run. Manual / admin-triggered first; a scheduled refresh comes
-later, only after the first slice proves stable. **Two gates, not one:**
+The function is **deployed** (JWT-verified, `verify_jwt: true`). The first authorized invoke
+ran once on **2026-06-07** and the function is now **disarmed** (no key set). Manual /
+admin-triggered; a scheduled refresh comes later, only after the first slice proves stable and
+only under fresh authorization. **Two gates, not one:**
 `verify_jwt: true` only keeps out *unauthenticated* callers — it admits **any**
 valid project JWT, including the **public anon key** that ships in the SPA bundle,
 so it is **not** sufficient on its own. The structural authorization is the
@@ -170,10 +173,10 @@ function **fails closed** (`500`) — never open. Any redeploy must stay
 logs.** Use one of the two secret-safe forms below — **never** the inline
 `supabase secrets set NAME=value` form (the value would land in shell history / `ps`).
 
-**Canonical live-invoke order (gated on Reviewer + Wesley — NOT run yet).** The next
-executable step, if separately authorized, is **Step A**; the next irreversible external
-action is **Step D**. No `GET`/`POST`/invoke — **including the Step B gate proofs** —
-happens without explicit authorization.
+**Canonical live-invoke order (EXECUTED once 2026-06-07; remains the repeatable runbook).** This
+sequence ran once under Reviewer + Wesley authorization; the function is now disarmed. Any re-run
+(re-arm Step A→D, second pull, or scheduled pull) requires **fresh authorization** — no
+`GET`/`POST`/invoke, **including the Step B gate proofs**, happens without it.
 
 - **A. Set `SYNC_TRIGGER_SECRET` only** (secret-safe — see below). Generate the token
   separately: `openssl rand -hex 32`.
@@ -231,19 +234,21 @@ rm -f "$cfg"
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected by the platform at
 runtime; they are not set manually.
 
-## Open items before the live invoke
+## Open items / follow-ups (first live invoke DONE 2026-06-07)
 
 - **Deploy/import resolution — CLOSED via Option A (#435, `b6bd9d6`, 2026-06-05).** The
   import-resolution sub-gate is closed: the explicit `./silentChurn.ts` import +
   `allowImportingTsExtensions` resolved the shared `src/` graph at the Supabase
   deploy/eszip path (the named-function deploy succeeded — see "Bundle/import proof").
-  The function is deployed and **ACTIVE** (`verify_jwt: true`) but **INERT** — no key,
-  never invoked, not wired to the SPA. The remaining §6 gate is the **first authorized
-  live invoke** (Reviewer audit + Wesley's explicit authorization), which alone proves
-  whether Wodify supplies `status` / `lastCheckIn` cleanly and globally.
-- Confirm the live `/clients` response uses snake_case field names
-  (`client_status`, `last_attendance`, `last_class_sign_in`, `is_at_risk`) as the
-  §5 probe observed. If casing differs, `dataQuality.unknownStatus` / `unknown`
-  will surface it loudly rather than silently mis-counting.
+  The function is deployed and **ACTIVE** (`verify_jwt: true`) and now **DISARMED** after the
+  first authorized live invoke on 2026-06-07 (no key, not wired to the SPA). That invoke **proved
+  Wodify supplies `status` / `lastCheckIn` globally enough for the first aggregate slice** (412 active /
+  956 scanned, conservation residual 0), with unknown last-check-in values **surfaced explicitly** via the
+  aggregate's `unknown` bucket (155 of 412 active members; 956 clients scanned overall) rather than hidden
+  — the first-slice §6 live-data goal is MET. PR2 / SPA wiring remains OPEN.
+- **Confirmed by the 2026-06-07 pull (`unknown_status=0`):** the live `/clients` response uses the
+  expected snake_case field names (`client_status`, `last_attendance`, `last_class_sign_in`,
+  `is_at_risk`) the §5 probe observed — no casing drift surfaced via `dataQuality.unknownStatus` /
+  `unknown`.
 - Confirm the `asOf` timezone basis (server-UTC date) is acceptable vs the gym's
   local day (±1 day only at the boundary; the histogram is exact-day).
