@@ -527,7 +527,7 @@ the standalone `/clients` shape-discovery; this PR's one-line patch + re-run bui
 first**, then rebase + merge #427, resolving §5 / README to keep both records (the `/clients` shape
 discovery from #428, and the patch + re-run outcome here).
 
-### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); grants hardened #440 @ 7a3bc77 (anon/authenticated → SELECT-only); SYNC_TRIGGER_SECRET trigger-gate + fail-closed-500 LIVE #441 @ 67aafd0; redeployed v3 (verify_jwt=true, ezbr 35e21c14… unchanged — no redeploy since #441); FIRST AUTHORIZED LIVE INVOKE EXECUTED 2026-06-07 19:48:53 UTC (one aggregate row verified: 412 active / 956 scanned, §6.6 conservation residual 0, no page cap, dues null + missing flag, PII-free) → first-slice §6 live-data validation goal MET; Step F disarm COMPLETE (both secrets unset, plaintext trigger file deleted) → function now DISARMED/inert; PR2/SPA wiring still OPEN` (do this early, before broad live work)
+### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); grants hardened #440 @ 7a3bc77 (anon/authenticated → SELECT-only); SYNC_TRIGGER_SECRET trigger-gate + fail-closed-500 LIVE #441 @ 67aafd0; redeployed v3 (verify_jwt=true, ezbr 35e21c14… unchanged — no redeploy since #441); FIRST AUTHORIZED LIVE INVOKE EXECUTED 2026-06-07 19:48:53 UTC (one aggregate row verified: 412 active / 956 scanned, §6.6 conservation residual 0, no page cap, dues null + missing flag, PII-free) → first-slice §6 live-data validation goal MET; Step F disarm COMPLETE (both secrets unset, plaintext trigger file deleted) → function now DISARMED/inert; idempotency upsert (unique CONSTRAINT (workspace_id, as_of) + PostgREST on_conflict) — code+schema on branch (PR pending), live constraint apply + name-scoped redeploy GATED; PR2/SPA wiring still OPEN` (do this early, before broad live work)
 
 Wire a **minimal** live-data path for one or two Retention cards before any broader live
 integration — a validation slice, not a rollout. The biggest remaining risk is whether
@@ -591,8 +591,15 @@ gate).
 The **`SYNC_TRIGGER_SECRET`** shared-secret gate (#441 @ `67aafd0`) is **required and fail-closed**:
 `verify_jwt:true` alone admits the public anon key shipped in the SPA bundle, so the trigger secret — not the
 JWT — is the structural authorization. The aggregate table's grants were hardened in **#440 @ `7a3bc77`**
-(anon + authenticated reduced to **SELECT-only**; the service-role writer is unchanged) — see
-`supabase/wodify_retention_schema.sql`.
+(anon + authenticated reduced to **SELECT-only**; the service-role writer left unchanged) — see
+`supabase/wodify_retention_schema.sql`. This **idempotency change** then makes the writer an idempotent
+upsert and adds a matching named unique **constraint** `wodify_retention_aggregate_workspace_as_of_key`
+on `(workspace_id, as_of)` (via `ALTER TABLE … ADD CONSTRAINT`, which fires this project's PostgREST
+schema-cache auto-reload — `CREATE INDEX` would not) + an explicit `service_role` **UPDATE** grant
+(documentary — premise-checked that live service_role already retains UPDATE; the file's intended
+write contract is now SELECT + INSERT + UPDATE, and does not bless the broader platform defaults
+service_role still carries). Live constraint apply (`ALTER TABLE … ADD CONSTRAINT …` then
+`notify pgrst, 'reload schema'`) + a name-scoped redeploy are separate gated steps.
 
 **Deploy rule — name-scoped only.** Any redeploy MUST be name-scoped
 (`supabase functions deploy sync-wodify-retention --project-ref gzgxcvjvoivlwaksnmxy`). A **bare**
@@ -618,8 +625,16 @@ rotated `WODIFY_API_KEY` set. **D:** one real `POST` at `19:48:53 UTC` — first
 `WODIFY_API_KEY` and `SYNC_TRIGGER_SECRET` unset, plaintext trigger file deleted.
 
 **First cycle complete (2026-06-07); the function is DISARMED.** Re-arming Step A→D requires **fresh authorization**.
-**Next planned §6 work = PR2 / SPA wiring** — applying the owner threshold + `WATCH_FLOOR_DAYS` to the histogram
-client-side.
+**Recommended next §6 work = idempotency** (prerequisite for any second/scheduled pull): a named unique
+**constraint** `wodify_retention_aggregate_workspace_as_of_key` on `(workspace_id, as_of)` (via
+`ALTER TABLE … ADD CONSTRAINT`, which fires this project's PostgREST cache auto-reload; `CREATE INDEX`
+would not) + an intentional PostgREST upsert (`on_conflict=workspace_id,as_of`,
+`Prefer: resolution=merge-duplicates`) so a same-day re-pull **replaces** the day's row instead of
+duplicating it. Code + schema are on the branch (PR pending); live constraint apply (`ALTER TABLE …
+ADD CONSTRAINT …` then `notify pgrst, 'reload schema'`) + a name-scoped redeploy are separate gated
+steps (premise-checked: zero duplicate rows, so the constraint builds clean; live service_role
+already has UPDATE). **Then PR2 / SPA wiring** — applying the owner threshold + `WATCH_FLOOR_DAYS` to
+the histogram client-side.
 
 **asOf timezone — interim mitigation.** `asOf` is the **server-UTC** fetch date (`index.ts`), which can shift
 the day boundary ±1 vs the gym's local day. **Interim mitigation: run the first invoke (Step D) at midday

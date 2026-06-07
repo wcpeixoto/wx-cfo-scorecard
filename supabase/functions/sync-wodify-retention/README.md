@@ -133,7 +133,11 @@ call** — and **nuanced**, not a clean pass:
   (`scripts/wodify/clientsRecencyProbe.ts`).
 - Calls `computeRetentionAggregate(rows, { asOf, fetchedAt, pagesFetched, reachedPageCap })`.
 - Persists the aggregate via the Supabase REST API using the **service-role**
-  key (bypasses RLS; never browser-exposed). Append-only snapshot insert.
+  key (bypasses RLS; never browser-exposed). **Idempotent upsert** keyed on
+  `(workspace_id, as_of)` — PostgREST `on_conflict=workspace_id,as_of` +
+  `Prefer: resolution=merge-duplicates`, backed by the unique constraint in
+  `wodify_retention_schema.sql`. A same-day re-pull **replaces** the day's row
+  instead of duplicating it; rows still accumulate across days.
 - Returns a **counts-only** summary (`activeTotal`, `unknown`, `diagnostics`,
   `dataQuality`) — never raw rows.
 - On any error → `502 { "error": "sync_failed", "code": <class> }`, where `code`
@@ -236,6 +240,22 @@ runtime; they are not set manually.
 
 ## Open items / follow-ups (first live invoke DONE 2026-06-07)
 
+- **Idempotency (this change; PR pending) — code + schema on branch; live apply + redeploy GATED.** The
+  persist path is now an idempotent upsert on `(workspace_id, as_of)`, and the schema declares a
+  matching named **unique constraint** `wodify_retention_aggregate_workspace_as_of_key` plus an
+  explicit `service_role` `UPDATE` grant (for auditability — live service_role already had UPDATE).
+  This makes a same-day re-pull, or a scheduler retry, **replace** the day's row instead of
+  duplicating it — the prerequisite that unblocks any second/scheduled pull. **Still pending, each
+  its own authorized step:** (1) apply the constraint live —
+  `alter table public.wodify_retention_aggregate add constraint wodify_retention_aggregate_workspace_as_of_key unique (workspace_id, as_of);`
+  then `notify pgrst, 'reload schema';` (a named constraint via `ALTER TABLE` fires this project's
+  PostgREST cache auto-reload, which `CREATE INDEX` does not; the `NOTIFY` is belt-and-suspenders).
+  Premise-checked — zero duplicate `(workspace_id, as_of)` rows, so it builds clean. (2) a
+  **name-scoped** redeploy so the deployed bundle carries the upsert. **Two fail-closed pre-states,
+  neither duplicates:** with the constraint present but the old plain-insert bundle still live, a
+  same-day re-insert fails `409` (unique violation `23505` → `persist_http_409`); if the upsert
+  bundle were ever invoked *before* the constraint exists, the upsert fails `400` (`42P10`, no
+  matching arbiter → `persist_http_400`).
 - **Deploy/import resolution — CLOSED via Option A (#435, `b6bd9d6`, 2026-06-05).** The
   import-resolution sub-gate is closed: the explicit `./silentChurn.ts` import +
   `allowImportingTsExtensions` resolved the shared `src/` graph at the Supabase
