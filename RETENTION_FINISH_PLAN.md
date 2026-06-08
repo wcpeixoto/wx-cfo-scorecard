@@ -527,7 +527,7 @@ the standalone `/clients` shape-discovery; this PR's one-line patch + re-run bui
 first**, then rebase + merge #427, resolving §5 / README to keep both records (the `/clients` shape
 discovery from #428, and the patch + re-run outcome here).
 
-### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); grants hardened #440 @ 7a3bc77 (anon/authenticated → SELECT-only); SYNC_TRIGGER_SECRET trigger-gate + fail-closed-500 LIVE #441 @ 67aafd0; redeployed v3 (verify_jwt=true, #441-era ezbr 35e21c14…); FIRST AUTHORIZED LIVE INVOKE EXECUTED 2026-06-07 19:48:53 UTC (one aggregate row verified: 412 active / 956 scanned, §6.6 conservation residual 0, no page cap, dues null + missing flag, PII-free) → first-slice §6 live-data validation goal MET; Step F disarm COMPLETE (both secrets unset, plaintext trigger file deleted) → function now DISARMED/inert; idempotency upsert (unique CONSTRAINT (workspace_id, as_of) + PostgREST on_conflict) DONE 2026-06-08 — constraint applied (gate-4) + function redeployed gate-5 as ezbr a4b19062… (source carried by #444), function still DISARMED; PR2/SPA wiring still OPEN` (do this early, before broad live work)
+### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); grants hardened #440 @ 7a3bc77 (anon/authenticated → SELECT-only); SYNC_TRIGGER_SECRET trigger-gate + fail-closed-500 LIVE #441 @ 67aafd0; redeployed v3 (verify_jwt=true, #441-era ezbr 35e21c14…); FIRST AUTHORIZED LIVE INVOKE EXECUTED 2026-06-07 19:48:53 UTC (one aggregate row verified: 412 active / 956 scanned, §6.6 conservation residual 0, no page cap, dues null + missing flag, PII-free) → first-slice §6 live-data validation goal MET; Step F disarm COMPLETE (both secrets unset, plaintext trigger file deleted) → function now DISARMED/inert; idempotency upsert (unique CONSTRAINT (workspace_id, as_of) + PostgREST on_conflict) DONE 2026-06-08 — constraint applied (gate-4) + function redeployed gate-5 as ezbr a4b19062… (source carried by #444), function still DISARMED; gym-local asOf permanent fix #445 REDEPLOYED LIVE 2026-06-08 (name-scoped CLI from main @ fb21a41, ezbr a4b19062…→eb5f5a33…, verify_jwt=true, still DISARMED, ai-proxy untouched, table unmoved); PR2/SPA wiring still OPEN` (do this early, before broad live work)
 
 Wire a **minimal** live-data path for one or two Retention cards before any broader live
 integration — a validation slice, not a rollout. The biggest remaining risk is whether
@@ -600,8 +600,9 @@ schema-cache auto-reload — `CREATE INDEX` would not) + an explicit `service_ro
 write contract is now SELECT + INSERT + UPDATE, and does not bless the broader platform defaults
 service_role still carries). The live constraint apply (`ALTER TABLE … ADD CONSTRAINT …` then
 `notify pgrst, 'reload schema'`, 2026-06-08, verified via `pg_constraint`) and the name-scoped redeploy
-are **DONE**; the deployed bundle's canonical identity is now `ezbr a4b19062…` (was `35e21c14…`,
-via `list_edge_functions` + a `get_edge_function` source read), with the function still DISARMED.
+are **DONE**; the gate-5 idempotency bundle's identity was `ezbr a4b19062…` (itself superseding the #441-era `35e21c14…`;
+verified via `list_edge_functions` + a `get_edge_function` source read), later superseded LIVE by the #445
+gym-local `asOf` redeploy `eb5f5a33…` (see the asOf note), with the function still DISARMED.
 
 **Deploy rule — name-scoped only.** Any redeploy MUST be name-scoped
 (`supabase functions deploy sync-wodify-retention --project-ref gzgxcvjvoivlwaksnmxy`). A **bare**
@@ -615,8 +616,10 @@ live SPA proxy.
   `POST` bad header `→ 403`; `POST` correct header `→ 500` fail-closed with **zero Wodify reachable**
   (this proof is only possible while the key is unset).
 - **C.** Set the rotated `WODIFY_API_KEY` (secret-safe flow).
-- **D.** Single real `POST` at **midday gym-local** (valid JWT + correct `x-sync-trigger-secret`) — the
-  **irreversible external action** (first live Wodify pull).
+- **D.** Single real `POST` (valid JWT + correct `x-sync-trigger-secret`) — the **irreversible external
+  action** (first live Wodify pull). *(Pull timing is no longer `asOf`-constrained: the gym-local `asOf`
+  fix is live (#445), so any time works; the former **midday gym-local** timing was the now-RETIRED
+  interim mitigation.)*
 - **E.** Verify the persisted row + the §6.6 conservation invariant.
 - **F.** Unset `WODIFY_API_KEY` (disarm).
 
@@ -637,30 +640,31 @@ the day's row instead of duplicating it. Constraint applied live + function rede
 DISARMED); the matching source is carried by **#444**. **Recommended next §6 work = PR2 / SPA
 wiring** — applying the owner threshold + `WATCH_FLOOR_DAYS` to the histogram client-side.
 
-**asOf timezone — permanent fix IMPLEMENTED IN CODE, NOT YET LIVE.** `asOf` was the **server-UTC** fetch
+**asOf timezone — permanent fix LIVE (2026-06-08, #445).** `asOf` was the **server-UTC** fetch
 date, which can shift the day boundary ±1 vs the gym's local day. The permanent fix is now **implemented in
 code**: `asOf` is derived gym-local (`America/New_York`) via the pure, dual-runtime `gymLocalDay(instant, tz)`
 helper in `wodifyRetentionSync.ts`, wired into the `index.ts` shell (`fetchedAt` stays a true UTC instant;
-`computeRetentionAggregate` unchanged). **It is NOT yet live:** this puts `main` **ahead of** the deployed
-`sync-wodify-retention` bundle (`ezbr a4b19062…`), which still computes **UTC** `asOf` until a **separate,
-later Reviewer + Wesley-authorized named redeploy** (function stays DISARMED). Until that redeploy, the
-**interim mitigation — run any invoke at midday gym-local** — remains the live protection against a
-boundary-crossing `asOf`.
+`computeRetentionAggregate` unchanged). **It is now LIVE (2026-06-08, #445):** a name-scoped CLI redeploy of `sync-wodify-retention` from merged
+`main` @ `fb21a41` replaced the prior UTC-`asOf` bundle. Two-AI gated (builder readiness packet + 4-blob-SHA
+byte-pin → read-only Reviewer pre/post close) and owner-run. The canonical live identity is now
+**`ezbr eb5f5a33…`** (was `a4b19062…`), `verify_jwt:true`, function **still DISARMED** — the redeploy is
+secret-neutral, and post-deploy the aggregate table was unmoved (1 row, `as_of 2026-06-07`, `fetched_at`
+unchanged), so no invoke fired. The **interim midday-gym-local mitigation is RETIRED**: the live bundle now
+buckets `asOf` to the gym's day regardless of pull time.
 
 **Prior-state facts (preserved).** The import-resolution sub-gate closed via Option A (#435 @ `b6bd9d6`); the
 **`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06) dropped the vestigial function-local `deno.json`
 and reconciled the README; a name-scoped redeploy from merged `main` (CLI 2.98.2) was **deno.json-free**
 (`index.ts` → `wodifyRetentionAggregate.ts` → `silentChurn.ts` via `.ts` imports alone; the type-only
 `./memberFixture` erased), proving `deno.json` is not load-bearing for the deployed bundle.
-`sync-wodify-retention` is **ACTIVE, `verify_jwt:true`**, current identity **`ezbr_sha256 a4b19062…`** (the gate-5
+`sync-wodify-retention` is **ACTIVE, `verify_jwt:true`**, current identity **`ezbr_sha256 eb5f5a33…`** (the #445 gym-local `asOf` redeploy 2026-06-08, superseding the gate-5
 idempotent-upsert redeploy; the 2026-06-07 live pull was an invoke against the prior #441-era `35e21c14…` bundle,
 not a deploy), and is **DISARMED** (version pins are documentation only — identity is `ezbr` / `verify_jwt` /
 `updated_at`); `ai-proxy` is provably **untouched** (`verify_jwt:false`, `ezbr_sha256 3d392f3e…`, `updated_at`
 unmoved). Loose ends: (a) **CLOSED by gate 5** — the redeploy reset the platform metadata, so `import_map_path`
 is now `null` and `entrypoint_path` points at the fresh deployed path (no more deleted-worktree references); the
-current `ezbr_sha256 a4b19062…` bundle is authoritative. (b) the deployed `index.ts` header comment reconciles on
-the next substantive `index.ts` redeploy, not as a dedicated cycle (the file is frozen for this PR so `main`
-reproduces `a4b19062…`). **(ii) PR2 / SPA wiring** (apply the owner threshold +
+current `ezbr_sha256 eb5f5a33…` bundle is authoritative. (b) **CLOSED** — the #445 redeploy was that next substantive `index.ts` redeploy, so the deployed
+header comment is now reconciled live; `main` @ `fb21a41` reproduces the live `eb5f5a33…`. **(ii) PR2 / SPA wiring** (apply the owner threshold +
 `WATCH_FLOOR_DAYS` rule client-side to the histogram) remains OPEN. **Post-cycle state:** exactly one
 authorized invoke/POST/Wodify call occurred on 2026-06-07, then the function was disarmed (both secrets unset,
 plaintext trigger file deleted); no SPA/PR2 wiring; `ai-proxy` unchanged (`verify_jwt:false`, `ezbr_sha256
