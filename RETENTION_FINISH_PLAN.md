@@ -616,8 +616,10 @@ live SPA proxy.
   `POST` bad header `→ 403`; `POST` correct header `→ 500` fail-closed with **zero Wodify reachable**
   (this proof is only possible while the key is unset).
 - **C.** Set the rotated `WODIFY_API_KEY` (secret-safe flow).
-- **D.** Single real `POST` at **midday gym-local** (valid JWT + correct `x-sync-trigger-secret`) — the
-  **irreversible external action** (first live Wodify pull).
+- **D.** Single real `POST` (valid JWT + correct `x-sync-trigger-secret`) — the **irreversible external
+  action** (first live Wodify pull). *(Pull timing is no longer `asOf`-constrained: the gym-local `asOf`
+  fix is live (#445), so any time works; the former **midday gym-local** timing was the now-RETIRED
+  interim mitigation.)*
 - **E.** Verify the persisted row + the §6.6 conservation invariant.
 - **F.** Unset `WODIFY_API_KEY` (disarm).
 
