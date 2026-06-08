@@ -6,14 +6,18 @@ slice (`RETENTION_FINISH_PLAN.md` §6). Fetches Wodify `/clients`, computes a
 `public.wodify_retention_aggregate`. The browser never calls Wodify and never
 sees the key.
 
-> **FIRST LIVE INVOKE DONE (2026-06-07) — now DISARMED.** The function is deployed and
-> **ACTIVE** (`verify_jwt: true`, `ezbr_sha256 35e21c14…` unchanged — no redeploy since #441).
-> The **first authorized live invoke ran once on 2026-06-07** (`19:48:53 UTC`) under a Reviewer
-> audit **and** Wesley's authorization, persisting one non-PII aggregate row (412 active /
-> 956 scanned, §6.6 conservation residual 0, PII-free). It is now **DISARMED**: it holds **no
-> `SYNC_TRIGGER_SECRET` and no `WODIFY_API_KEY`**, the plaintext trigger file was deleted, and it
-> makes no Wodify call and is not wired to the SPA. Any re-arm / second pull / scheduled pull
-> requires a **fresh Reviewer audit + Wesley authorization**.
+> **FIRST LIVE INVOKE DONE (2026-06-07) — still DISARMED; IDEMPOTENT-UPSERT redeploy DONE (2026-06-08).**
+> The function is deployed and **ACTIVE** (`verify_jwt: true`, via `list_edge_functions`). Its bundle was
+> **redeployed for the idempotent upsert** (named unique constraint on `(workspace_id, as_of)` + PostgREST
+> `on_conflict`); the canonical identity is now
+> `ezbr_sha256 a4b19062cebaa641d56de08706d492ca59d0877f05c84fe199337584dab0c4fa` (was `35e21c14…`),
+> verified via `list_edge_functions` **and** a deployed-source read (`get_edge_function`). The **first
+> authorized live invoke ran once on 2026-06-07** (`19:48:53 UTC`) under a Reviewer audit **and** Wesley's
+> authorization, persisting one non-PII aggregate row (412 active / 956 scanned, §6.6 conservation
+> residual 0, PII-free); the redeploy did **not** invoke it. It remains **DISARMED**: it holds **no
+> `SYNC_TRIGGER_SECRET` and no `WODIFY_API_KEY`** (per `supabase secrets list`, corroborated by the
+> fail-closed gate code), makes no Wodify call, and is not wired to the SPA. Any re-arm / second pull /
+> scheduled pull requires a **fresh Reviewer audit + Wesley authorization**.
 
 ## Thin-shell design + reuse boundary
 
@@ -238,24 +242,24 @@ rm -f "$cfg"
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected by the platform at
 runtime; they are not set manually.
 
-## Open items / follow-ups (first live invoke DONE 2026-06-07)
+## Open items / follow-ups (first live invoke DONE 2026-06-07; idempotent-upsert redeploy DONE 2026-06-08)
 
-- **Idempotency (this change; PR pending) — code + schema on branch; live apply + redeploy GATED.** The
-  persist path is now an idempotent upsert on `(workspace_id, as_of)`, and the schema declares a
-  matching named **unique constraint** `wodify_retention_aggregate_workspace_as_of_key` plus an
-  explicit `service_role` `UPDATE` grant (for auditability — live service_role already had UPDATE).
-  This makes a same-day re-pull, or a scheduler retry, **replace** the day's row instead of
-  duplicating it — the prerequisite that unblocks any second/scheduled pull. **Still pending, each
-  its own authorized step:** (1) apply the constraint live —
-  `alter table public.wodify_retention_aggregate add constraint wodify_retention_aggregate_workspace_as_of_key unique (workspace_id, as_of);`
-  then `notify pgrst, 'reload schema';` (a named constraint via `ALTER TABLE` fires this project's
-  PostgREST cache auto-reload, which `CREATE INDEX` does not; the `NOTIFY` is belt-and-suspenders).
-  Premise-checked — zero duplicate `(workspace_id, as_of)` rows, so it builds clean. (2) a
-  **name-scoped** redeploy so the deployed bundle carries the upsert. **Two fail-closed pre-states,
-  neither duplicates:** with the constraint present but the old plain-insert bundle still live, a
-  same-day re-insert fails `409` (unique violation `23505` → `persist_http_409`); if the upsert
-  bundle were ever invoked *before* the constraint exists, the upsert fails `400` (`42P10`, no
-  matching arbiter → `persist_http_400`).
+- **Idempotency — DONE (constraint applied gate-4 + function redeployed gate-5, 2026-06-08; source carried by #444).**
+  The persist path is now an idempotent upsert on `(workspace_id, as_of)`. **Live:** the named **unique
+  constraint** `wodify_retention_aggregate_workspace_as_of_key` is applied
+  (`ALTER TABLE … ADD CONSTRAINT … UNIQUE (workspace_id, as_of)` then `notify pgrst, 'reload schema'`;
+  premise-checked — zero duplicate rows, built clean — verified via `pg_constraint`), the explicit
+  `service_role` `UPDATE` grant is in the schema (a no-op live — service_role already had UPDATE), and
+  the upsert bundle is deployed (`ezbr a4b19062…`, version 11; `on_conflict=workspace_id,as_of` +
+  `resolution=merge-duplicates` confirmed in the deployed source via `get_edge_function`). A same-day
+  re-pull, or a scheduler retry, now **replaces** the day's row instead of duplicating it — the
+  prerequisite that unblocks any second/scheduled pull. The function stays **DISARMED**, so no pull is
+  reachable until separately armed. The deployed-bundle files (`index.ts` + the three `src/lib/gym/*`
+  modules) are frozen so `main` reproduces `ezbr a4b19062…` (source carried by #444).
+  *(Historical: two fail-closed pre-states existed only during the gate-4→gate-5 window — a same-day
+  re-insert against the old plain-insert bundle would fail `409`/`23505`, and the upsert before the
+  constraint existed would fail `400`/`42P10`; both fail closed, no duplicate. Both windows are now
+  closed.)*
 - **Deploy/import resolution — CLOSED via Option A (#435, `b6bd9d6`, 2026-06-05).** The
   import-resolution sub-gate is closed: the explicit `./silentChurn.ts` import +
   `allowImportingTsExtensions` resolved the shared `src/` graph at the Supabase
