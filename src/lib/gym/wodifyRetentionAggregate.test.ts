@@ -14,13 +14,12 @@ import {
   MAX_EXACT_DAYS,
   SENTINEL_NULL_DATE,
   type RawWodifyClient,
-  type RetentionAggregate,
 } from './wodifyRetentionAggregate';
-import {
-  WATCH_FLOOR_DAYS,
-  computeAttendanceHealth,
-  resolveSilentChurnThresholdDays,
-} from './silentChurn';
+import { WATCH_FLOOR_DAYS, computeAttendanceHealth } from './silentChurn';
+// PR2: the SPA-side bucket derivation is now a shipped module; this test imports it
+// (rather than re-declaring the rule) so the PARITY proof below covers the function
+// that actually ships. See src/lib/gym/retentionAggregateView.ts.
+import { deriveBuckets } from './retentionAggregateView';
 import { SAMPLE_GYM_MEMBERS, FIXTURE_TODAY, type GymMember } from './memberFixture';
 
 const OPTS = {
@@ -30,31 +29,9 @@ const OPTS = {
   reachedPageCap: false,
 };
 
-// What the SPA (PR2) will do: re-derive Healthy/Watch/Silent from the
-// threshold-free histogram at a resolved threshold. Mirrors classifyMember's
-// rule exactly (silent if d>=T, watch if d>=WATCH_FLOOR_DAYS, else healthy;
-// the >=365 overflow is silent for any T in [1,365]).
-function deriveBuckets(agg: RetentionAggregate, rawThreshold: number) {
-  const T = resolveSilentChurnThresholdDays(rawThreshold);
-  const { countsByDaysAbsent, overflow365Plus } = agg.daysAbsentHistogram;
-  let healthy = 0;
-  let watch = 0;
-  let silent = 0;
-  for (const [k, count] of Object.entries(countsByDaysAbsent)) {
-    const d = Number(k);
-    if (d >= T) silent += count;
-    else if (d >= WATCH_FLOOR_DAYS) watch += count;
-    else healthy += count;
-  }
-  silent += overflow365Plus;
-  return {
-    healthy,
-    watch,
-    silent,
-    unknown: agg.unknown,
-    activeTotal: healthy + watch + silent + agg.unknown,
-  };
-}
+// deriveBuckets is imported from ./retentionAggregateView (above): the SPA-side
+// re-derivation now ships, and the parity + payload tests below exercise the
+// shipped function directly.
 
 // Map a sample GymMember to the raw /clients shape so we can run the SAME fixture
 // through both the locked classifier and the server aggregate and compare.

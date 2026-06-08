@@ -12896,6 +12896,13 @@ body {
   background: var(--bg-main);
   white-space: nowrap;
 }
+/* PR2: live-aggregate variant of the amber sample pill. Green (--positive) marks a
+   card reading the real Wodify snapshot; the badge text still discloses the as-of
+   date, so "live" never over-promises freshness. Pairs with .gym-sample-badge. */
+.gym-live-badge {
+  border-color: var(--positive);
+  color: var(--positive);
+}
 .silent-churn-body {
   flex: 1;
   display: flex;
@@ -13012,7 +13019,8 @@ body {
 }
 .attendance-health-helper,
 .attendance-health-empty,
-.attendance-health-takeaway {
+.attendance-health-takeaway,
+.attendance-health-dataquality {
   margin: 0;
   font-size: 14px;
   color: var(--text-secondary);
