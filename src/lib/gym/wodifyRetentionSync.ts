@@ -35,7 +35,7 @@ export function classifySyncError(err: unknown): SyncErrorCode {
   if (/^persist_http_\d+$/.test(message)) return message as SyncErrorCode;
 
   // The aggregate's asOf format guard (wodifyRetentionAggregate.ts). Defensive
-  // only — asOf is server-generated (todayYmd), so this is effectively
+  // only — asOf is server-generated (gymLocalDay), so this is effectively
   // unreachable; kept for future-proofing. NOT the UTC-vs-local asOf concern.
   if (message.startsWith('computeRetentionAggregate:')) return 'bad_asof';
 
@@ -80,4 +80,43 @@ export async function verifyTriggerSecret(configured: string, provided: string):
   let diff = 0;
   for (let i = 0; i < av.length; i++) diff |= av[i] ^ bv[i];
   return diff === 0;
+}
+
+/**
+ * The gym's local business day for a given `instant`, as `'YYYY-MM-DD'`.
+ *
+ * This is the value the sync uses for `asOf`, which is load-bearing TWICE:
+ * it is the `(workspace_id, as_of)` idempotency-key bucket (#444) AND the
+ * recency day-diff anchor (`computeRetentionAggregate` measures each member's
+ * `daysAbsent` from `lastCheckIn` against it — RETENTION_FINISH_PLAN.md §6).
+ * The Edge runtime is UTC, so deriving the day straight from a UTC instant
+ * shifts the boundary ±1 vs the gym's real day near midnight: a pull that is
+ * still local day X but already UTC day X+1 would bucket — and measure recency —
+ * against the wrong day. Resolving the instant into the gym's IANA zone first
+ * fixes both. (This is §6's deferred "permanent fix"; the interim mitigation was
+ * to run the first invoke at midday gym-local.)
+ *
+ * The caller injects `instant` (the shell passes `new Date()`), so boundary
+ * behavior is deterministic in tests. `Intl.DateTimeFormat` with a `timeZone` is
+ * a Web API present — with full ICU tz data — in BOTH the Deno runtime and
+ * Node/vitest (verified in both), so one definition behaves identically across
+ * the runtime boundary, the same contract as the other helpers in this file.
+ * `formatToParts` is assembled manually rather than trusting a locale's string
+ * form, so the output is always hyphenated, zero-padded ISO regardless of locale
+ * quirks (separators, bidi marks).
+ *
+ * Throws (RangeError) on an invalid or empty `tz` instead of silently falling
+ * back to UTC — a wrong/unset zone would reintroduce the exact bug being fixed,
+ * so it must fail loud.
+ */
+export function gymLocalDay(instant: Date, tz: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(instant);
+  const part = (type: 'year' | 'month' | 'day'): string =>
+    parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifySyncError, verifyTriggerSecret } from './wodifyRetentionSync';
+import { classifySyncError, verifyTriggerSecret, gymLocalDay } from './wodifyRetentionSync';
 
 describe('classifySyncError', () => {
   it('passes through the status-suffixed Wodify HTTP code', () => {
@@ -94,5 +94,58 @@ describe('verifyTriggerSecret', () => {
   it('does not match on a SHA-256 prefix collision shortcut (full-digest compare)', async () => {
     // Two different values; ensure a difference anywhere in the value is caught.
     expect(await verifyTriggerSecret('abcdefghijklmnop', 'abcdefghijklmnoq')).toBe(false);
+  });
+});
+
+describe('gymLocalDay', () => {
+  // THE load-bearing case (RETENTION_FINISH_PLAN.md §6 permanent fix): an instant
+  // that is still local day X but already UTC day X+1 must resolve to X — both
+  // the (workspace_id, as_of) bucket and the recency anchor follow the gym, not
+  // server UTC. 03:30Z on 2026-06-07 is 23:30 EDT on 2026-06-06.
+  it('uses the gym-local day, not UTC, when the instant has already crossed UTC midnight', () => {
+    const lateLocalNight = new Date('2026-06-07T03:30:00Z');
+    expect(gymLocalDay(lateLocalNight, 'America/New_York')).toBe('2026-06-06');
+  });
+
+  it('resolves the SAME instant to different days in different zones (zone-relative, not UTC)', () => {
+    const instant = new Date('2026-06-07T03:30:00Z');
+    expect(gymLocalDay(instant, 'America/New_York')).toBe('2026-06-06'); // UTC-4
+    expect(gymLocalDay(instant, 'Pacific/Kiritimati')).toBe('2026-06-07'); // UTC+14
+  });
+
+  it('handles the positive-offset boundary too (local already on the next day)', () => {
+    // 22:00Z on 2026-06-06 is 12:00 on 2026-06-07 in Kiritimati (+14).
+    const instant = new Date('2026-06-06T22:00:00Z');
+    expect(gymLocalDay(instant, 'Pacific/Kiritimati')).toBe('2026-06-07');
+  });
+
+  it('matches the UTC calendar day for a midday-local pull (the existing 2026-06-07 row is not orphaned)', () => {
+    // Noon EDT on 2026-06-06 is 16:00Z the same day — no boundary crossing.
+    const middayLocal = new Date('2026-06-06T16:00:00Z');
+    expect(gymLocalDay(middayLocal, 'America/New_York')).toBe('2026-06-06');
+  });
+
+  it('tracks DST — the offset is not hardcoded', () => {
+    // Same 03:30Z wall-clock instant, winter vs summer: EST (-5) vs EDT (-4).
+    expect(gymLocalDay(new Date('2026-01-15T04:30:00Z'), 'America/New_York')).toBe('2026-01-14');
+    expect(gymLocalDay(new Date('2026-07-15T03:30:00Z'), 'America/New_York')).toBe('2026-07-14');
+  });
+
+  it('always emits strict zero-padded YYYY-MM-DD', () => {
+    const out = gymLocalDay(new Date('2026-03-05T15:00:00Z'), 'America/New_York');
+    expect(out).toBe('2026-03-05');
+    expect(out).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('is deterministic for a fixed (instant, tz)', () => {
+    const instant = new Date('2026-06-07T03:30:00Z');
+    expect(gymLocalDay(instant, 'America/New_York')).toBe(gymLocalDay(instant, 'America/New_York'));
+  });
+
+  it('throws (never silently falls back to UTC) on an invalid or empty zone', () => {
+    const instant = new Date('2026-06-07T03:30:00Z');
+    expect(() => gymLocalDay(instant, 'Not/AZone')).toThrow(RangeError);
+    expect(() => gymLocalDay(instant, '')).toThrow(RangeError);
+    expect(() => gymLocalDay(instant, ' ')).toThrow(RangeError);
   });
 });

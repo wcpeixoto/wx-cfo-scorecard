@@ -32,6 +32,7 @@ import {
 } from '../../../src/lib/gym/wodifyRetentionAggregate.ts';
 import {
   classifySyncError,
+  gymLocalDay,
   verifyTriggerSecret,
 } from '../../../src/lib/gym/wodifyRetentionSync.ts';
 
@@ -46,18 +47,17 @@ const WODIFY_TIMEOUT_MS = 15000;
 
 const RETENTION_TABLE = 'wodify_retention_aggregate';
 
+// The gym's IANA business-day zone. asOf is resolved to this zone (not the UTC
+// Edge runtime) so the (workspace_id, as_of) idempotency key and the recency
+// day-diff anchor bucket to the day the gym is actually open. Single gym → a
+// const, not env/config (no premature abstraction).
+const GYM_TZ = 'America/New_York';
+
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
-}
-
-// Today as YYYY-MM-DD (the day-diff anchor) and the fetch timestamp. Both member
-// dates and this anchor pass through the same parseYmdLocal in the aggregate, so
-// the whole-day math is internally consistent.
-function todayYmd(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 // Paginate all /clients pages. Returns raw rows (transient) + the page count +
@@ -173,7 +173,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return jsonResponse(500, { error: 'internal_error' });
     }
 
-    const asOf = todayYmd();
+    // asOf = the gym's local business day (the day-diff anchor); fetchedAt stays
+    // a true UTC instant. Both member dates and this anchor pass through the same
+    // parseYmdLocal in the aggregate, so the whole-day math is internally
+    // consistent.
+    const asOf = gymLocalDay(new Date(), GYM_TZ);
     const fetchedAt = new Date().toISOString();
 
     const { rows, pagesFetched, reachedPageCap } = await fetchAllClients(apiKey);

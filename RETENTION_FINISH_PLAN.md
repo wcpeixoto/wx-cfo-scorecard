@@ -637,10 +637,15 @@ the day's row instead of duplicating it. Constraint applied live + function rede
 DISARMED); the matching source is carried by **#444**. **Recommended next §6 work = PR2 / SPA
 wiring** — applying the owner threshold + `WATCH_FLOOR_DAYS` to the histogram client-side.
 
-**asOf timezone — interim mitigation.** `asOf` is the **server-UTC** fetch date (`index.ts`), which can shift
-the day boundary ±1 vs the gym's local day. **Interim mitigation: run the first invoke (Step D) at midday
-gym-local**, so a UTC offset cannot cross the date boundary. The **permanent fix** (gym-local `asOf`) remains a
-**separate, deferred code PR** — explicitly NOT this docs change, and NOT a blocker for the gated first invoke.
+**asOf timezone — permanent fix IMPLEMENTED IN CODE, NOT YET LIVE.** `asOf` was the **server-UTC** fetch
+date, which can shift the day boundary ±1 vs the gym's local day. The permanent fix is now **implemented in
+code**: `asOf` is derived gym-local (`America/New_York`) via the pure, dual-runtime `gymLocalDay(instant, tz)`
+helper in `wodifyRetentionSync.ts`, wired into the `index.ts` shell (`fetchedAt` stays a true UTC instant;
+`computeRetentionAggregate` unchanged). **It is NOT yet live:** this puts `main` **ahead of** the deployed
+`sync-wodify-retention` bundle (`ezbr a4b19062…`), which still computes **UTC** `asOf` until a **separate,
+later Reviewer + Wesley-authorized named redeploy** (function stays DISARMED). Until that redeploy, the
+**interim mitigation — run any invoke at midday gym-local** — remains the live protection against a
+boundary-crossing `asOf`.
 
 **Prior-state facts (preserved).** The import-resolution sub-gate closed via Option A (#435 @ `b6bd9d6`); the
 **`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06) dropped the vestigial function-local `deno.json`
