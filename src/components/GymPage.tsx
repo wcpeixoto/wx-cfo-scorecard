@@ -6,7 +6,7 @@
 // gate note — not built, gated on a data policy or API access (see
 // RETENTION_FINISH_PLAN.md). Overview / Membership / Classes are hidden for now.
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRetentionSettings } from '../context/RetentionSettingsContext';
 import { FIXTURE_TODAY, SAMPLE_GYM_MEMBERS } from '../lib/gym/memberFixture';
 import {
@@ -16,6 +16,11 @@ import {
 } from '../lib/gym/silentChurn';
 import { computeChurnRiskByTenure } from '../lib/gym/churnRiskByTenure';
 import { computeMemberMovement } from '../lib/gym/memberMovement';
+import { deriveBuckets } from '../lib/gym/retentionAggregateView';
+import {
+  fetchLatestRetentionAggregate,
+  type RetentionAggregateSnapshot,
+} from '../lib/gym/fetchRetentionAggregate';
 
 export function GymPage() {
   return (
@@ -177,18 +182,54 @@ function SilentChurnCard() {
 
 // Attendance Health — full-width secondary signal below the Silent Churn hero.
 // Buckets ACTIVE members by recency at the LIVE resolved threshold (Healthy
-// 0–7d · Watch 8…T−1d · Silent ≥T) using the same classifyMember the Silent
-// Churn card uses, so the Silent count here always equals that card's at-risk
-// count. The Watch count is the hero: members drifting but not yet churned.
-// Deterministic — the copy only rephrases code-computed counts. No trend and no
-// per-member call-list in v1: lastCheckIn alone can't honestly show a trend,
-// and the call-list is the Silent Churn card's job.
+// 0–7d · Watch 8…T−1d · Silent ≥T). The Watch count is the hero: members
+// drifting but not yet churned. Deterministic — the copy only rephrases
+// code-computed counts.
+//
+// PR2 (RETENTION_FINISH_PLAN.md §6): this is the FIRST card wired to the live
+// Wodify aggregate. On a successful read it derives the buckets from the non-PII
+// daysAbsentHistogram via deriveBuckets (same WATCH_FLOOR_DAYS + threshold rule,
+// precedence-correct at every threshold) and badges "Live · as of {asOf}".
+// Loading / error / empty / unconfigured all fall back to the SAMPLE fixture and
+// the "Sample data" badge — the live snapshot is optional, never a render error.
+// Only this card goes live: Silent Churn (needs dues + a call-list the aggregate
+// can't carry), Churn Risk by Tenure (needs per-member tenure) and Member Movement
+// (needs a census) stay on sample, so the live Attendance Health count is NOT
+// forced to agree with the sample Silent Churn hero.
 function AttendanceHealthCard() {
   const { silentChurnThresholdDays } = useRetentionSettings();
 
+  // Fetch the latest live snapshot once on mount. A successful read flips this card
+  // to live; anything else (loading, no row, HTTP/parse failure, no Supabase env)
+  // leaves `snapshot` null and the card stays on the sample fixture.
+  const [snapshot, setSnapshot] = useState<RetentionAggregateSnapshot | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    fetchLatestRetentionAggregate(controller.signal)
+      .then((snap) => {
+        if (!cancelled && snap) setSnapshot(snap);
+      })
+      .catch(() => {
+        // Unreachable / non-OK / malformed → stay on the sample fixture. A missing
+        // live snapshot is an expected state, not a failure worth surfacing.
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, []);
+
+  // One render path for both sources: deriveBuckets (live histogram) and
+  // computeAttendanceHealth (sample fixture) return the SAME H/W/S/unknown shape,
+  // re-cut at the owner's CURRENT threshold whenever it changes.
   const result = useMemo(
-    () => computeAttendanceHealth(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
-    [silentChurnThresholdDays],
+    () =>
+      snapshot
+        ? deriveBuckets(snapshot, silentChurnThresholdDays)
+        : computeAttendanceHealth(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
+    [snapshot, silentChurnThresholdDays],
   );
 
   const { thresholdDays, healthy, watch, silent, unknown } = result;
@@ -210,7 +251,11 @@ function AttendanceHealthCard() {
       <header className="gym-card-head">
         <div className="attendance-health-titlerow">
           <h3 className="gym-card-title">Attendance Health</h3>
-          <span className="gym-sample-badge">Sample data</span>
+          {snapshot ? (
+            <span className="gym-sample-badge gym-live-badge">Live · as of {snapshot.asOf}</span>
+          ) : (
+            <span className="gym-sample-badge">Sample data</span>
+          )}
         </div>
         <p className="gym-card-subtitle">Early warning before silent churn.</p>
       </header>
@@ -252,6 +297,14 @@ function AttendanceHealthCard() {
             </div>
           )}
         </dl>
+
+        {unknown > 0 && (
+          <p className="attendance-health-dataquality">
+            Unknown = active members with no usable Wodify check-in date yet — a
+            data-quality gap, not churn. They&rsquo;re held out of Healthy / Watch /
+            Silent rather than mislabeled.
+          </p>
+        )}
 
         {watch > 0 && (
           <p className="attendance-health-takeaway">
