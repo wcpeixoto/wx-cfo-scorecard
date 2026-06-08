@@ -97,13 +97,18 @@ async function fetchAllClients(
 }
 
 // Persist the NON-PII aggregate via the Supabase REST API using the service-role
-// key (bypasses RLS; never exposed to the browser). Append-only snapshot insert.
+// key (bypasses RLS; never exposed to the browser). IDEMPOTENT UPSERT keyed on
+// (workspace_id, as_of): a same-day re-pull REPLACES the day's row instead of
+// duplicating it — PostgREST `on_conflict` + `Prefer: resolution=merge-duplicates`,
+// backed by the unique constraint in wodify_retention_schema.sql. Needs service-role
+// INSERT + UPDATE on the table.
 async function persistAggregate(
   supabaseUrl: string,
   serviceKey: string,
   agg: RetentionAggregate,
 ): Promise<void> {
   const row = {
+    workspace_id: 'default', // explicit conflict target (matches the column default + anon read policy)
     source: agg.source,
     as_of: agg.asOf,
     fetched_at: agg.fetchedAt,
@@ -120,13 +125,16 @@ async function persistAggregate(
     clients_scanned: agg.dataQuality.clientsScanned,
   };
 
-  const res = await fetch(`${supabaseUrl}/rest/v1/${RETENTION_TABLE}`, {
+  // on_conflict names the unique key so PostgREST emits ON CONFLICT … DO UPDATE;
+  // resolution=merge-duplicates makes the POST an upsert (latest pull wins).
+  const url = `${supabaseUrl}/rest/v1/${RETENTION_TABLE}?on_conflict=workspace_id,as_of`;
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       apikey: serviceKey,
       Authorization: `Bearer ${serviceKey}`,
       'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
+      Prefer: 'return=minimal,resolution=merge-duplicates',
     },
     body: JSON.stringify(row),
   });

@@ -15,9 +15,12 @@
 -- Function sync-wodify-retention is the only writer and writes with the
 -- service-role key (which bypasses RLS); anon gets SELECT only.
 --
--- Storage pattern: append-only snapshots. Each manual/admin-triggered sync
--- inserts one row; "latest" = highest fetched_at (see the index). History is
--- kept cheaply for a future trend, but no trend is computed in this slice.
+-- Storage pattern: one snapshot row per (workspace_id, as_of) day, written by an
+-- IDEMPOTENT UPSERT (see the unique constraint below + the Edge Function writer). A
+-- re-pull on the same day REPLACES that day's row (latest pull wins) instead of
+-- duplicating it; rows still accumulate across days. "latest" = highest
+-- fetched_at (see the fetched_at index). History is kept cheaply for a future
+-- trend, but no trend is computed in this slice.
 --
 -- Data API exposure: as of the Supabase rollout (new projects 2026-05-30 /
 -- existing 2026-10-30) tables in `public` are not auto-exposed to the Data API,
@@ -61,6 +64,38 @@ create table if not exists public.wodify_retention_aggregate (
 create index if not exists wodify_retention_aggregate_workspace_fetched_at_idx
   on public.wodify_retention_aggregate (workspace_id, fetched_at desc);
 
+-- Idempotency key: at most one snapshot per (workspace_id, as_of) day. The Edge
+-- Function writer upserts on this key (PostgREST `on_conflict=workspace_id,as_of`
+-- + `Prefer: resolution=merge-duplicates`), so a same-day re-pull REPLACES the
+-- day's aggregate instead of duplicating it. Both columns are NOT NULL, so the
+-- unique constraint is exact (non-partial).
+--
+-- A NAMED UNIQUE CONSTRAINT via ALTER TABLE (not a bare CREATE UNIQUE INDEX) on
+-- purpose: it is clearer to introspect AND it fires this project's PostgREST
+-- schema-cache auto-reload event trigger (pgrst_ddl_watch reloads on ALTER TABLE
+-- but NOT on CREATE INDEX), so the on_conflict arbiter becomes visible to the
+-- Data API without a manual reload. Guarded with a DO block so this snapshot file
+-- stays safely re-appliable (Postgres has no `ADD CONSTRAINT IF NOT EXISTS`); the
+-- constraint is added only if absent, and builds only if there are no duplicate
+-- (workspace_id, as_of) rows.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'wodify_retention_aggregate_workspace_as_of_key'
+      and conrelid = 'public.wodify_retention_aggregate'::regclass
+  ) then
+    alter table public.wodify_retention_aggregate
+      add constraint wodify_retention_aggregate_workspace_as_of_key
+      unique (workspace_id, as_of);
+  end if;
+end $$;
+
+-- Refresh the PostgREST / Data API schema cache so on_conflict resolves
+-- immediately. The ALTER TABLE above already fires pgrst_ddl_watch; this explicit
+-- NOTIFY is harmless, idempotent belt-and-suspenders.
+notify pgrst, 'reload schema';
+
 -- Access model -------------------------------------------------------------
 -- Security is enforced by the RLS policy below (no anon write policy → anon
 -- cannot write via the Data API). The grant layer is the SECOND barrier.
@@ -70,11 +105,19 @@ create index if not exists wodify_retention_aggregate_workspace_fetched_at_idx
 -- After this file:
 --   anon          → SELECT only
 --   authenticated → SELECT only (no writes; the app uses the anon key)
---   service_role  → SELECT + INSERT (the Edge Function writer; also bypasses RLS,
---                   so the read policy is purely for the anon browser path).
--- NEVER revoke from service_role — it needs INSERT to persist.
+--   service_role  → required write contract is SELECT + INSERT + UPDATE. The Edge
+--                   Function writer UPSERTS (ON CONFLICT (workspace_id, as_of) DO
+--                   UPDATE), which needs UPDATE in addition to INSERT; it also
+--                   bypasses RLS, so the read policy is purely for the anon
+--                   browser path. NOTE: the live service_role role may retain
+--                   broader platform/default privileges (e.g. DELETE/TRUNCATE)
+--                   that this file neither grants nor revokes — those are NOT part
+--                   of the intended write contract, and any actual tightening of
+--                   them is a SEPARATE concern, out of scope here. This file
+--                   grants only the SELECT + INSERT + UPDATE the writer requires.
+-- NEVER revoke SELECT/INSERT/UPDATE from service_role — it upserts to persist.
 grant select on public.wodify_retention_aggregate to anon;
-grant select, insert on public.wodify_retention_aggregate to service_role;
+grant select, insert, update on public.wodify_retention_aggregate to service_role;
 
 -- Strip the broad default-privilege DML grants from anon + authenticated so the
 -- grant layer matches the intended read-only boundary (defense in depth atop RLS).
