@@ -2,11 +2,12 @@
 // /gym/retention; reached via the expandable Gym group in AppSidebar).
 // The Watch cards (Silent Churn, Attendance Health) read the live Wodify
 // aggregate when a snapshot is available and fall back to the sample fixture
-// otherwise; the Patterns cards (Member Movement, Churn Risk by Tenure) are
-// still sample-only. The three remaining Patterns cards stay as shells with an
-// honest parked/blocked gate note — not built, gated on a data policy or API
-// access (see RETENTION_FINISH_PLAN.md). Overview / Membership / Classes are
-// hidden for now.
+// otherwise; Member Movement's census (active/paused/ended) reads live the same
+// way while its join-cohort intake stays sample (membershipStart isn't on
+// /clients). Churn Risk by Tenure is still sample-only. The three remaining
+// Patterns cards stay as shells with an honest parked/blocked gate note — not
+// built, gated on a data policy or API access (see RETENTION_FINISH_PLAN.md).
+// Overview / Membership / Classes are hidden for now.
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRetentionSettings } from '../context/RetentionSettingsContext';
@@ -27,10 +28,10 @@ import {
 export function GymPage() {
   // RETENTION_FINISH_PLAN.md §6: fetch the live Wodify aggregate ONCE here at page
   // level and share the single snapshot with every card that reads it (Silent
-  // Churn + Attendance Health), so both derive from the SAME snapshot and their
-  // live badges render the SAME as-of. A failed / empty / unconfigured read leaves
-  // `snapshot` null and every card falls back to its sample fixture — the live
-  // snapshot is optional, never a render error.
+  // Churn + Attendance Health, plus Member Movement's census), so they derive from
+  // the SAME snapshot and their live badges render the SAME as-of. A failed / empty
+  // / unconfigured read leaves `snapshot` null and every card falls back to its
+  // sample fixture — the live snapshot is optional, never a render error.
   const [snapshot, setSnapshot] = useState<RetentionAggregateSnapshot | null>(null);
 
   useEffect(() => {
@@ -89,7 +90,7 @@ export function GymPage() {
               <p className="gym-section-helper">Monthly trends that explain where churn is happening.</p>
             </div>
             <div className="gym-card-grid">
-              <MemberMovementCard />
+              <MemberMovementCard snapshot={snapshot} />
               <ChurnRiskByTenureCard />
               <GymCardShell
                 modifier="gym-card--half"
@@ -256,9 +257,9 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
 // cards, so this card's live "Silent" bucket and the live Silent Churn count read
 // the SAME snapshot and agree by construction. Loading / error / empty /
 // unconfigured all fall back to the SAMPLE fixture and the "Sample data" badge —
-// the live snapshot is optional, never a render error. The Patterns cards (Churn
-// Risk by Tenure needs per-member tenure, Member Movement needs a paused/ended
-// census) stay on sample: the aggregate can't carry those yet.
+// the live snapshot is optional, never a render error. Churn Risk by Tenure stays
+// on sample (it needs per-member tenure the aggregate can't carry); Member
+// Movement's census now reads the same live snapshot (its intake stays sample).
 function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays } = useRetentionSettings();
 
@@ -457,18 +458,50 @@ function ChurnRiskByTenureCard() {
 // (RETENTION_FINISH_PLAN items 5–6). This card classifies no risk: it uses no
 // threshold and no classifyMember, so it has no asOf and no anti-drift check.
 // Deterministic — the copy only rephrases code-computed counts.
-function MemberMovementCard() {
-  const { census, cohorts, unknownJoin } = useMemo(
-    () => computeMemberMovement(SAMPLE_GYM_MEMBERS),
-    [],
-  );
+//
+// §6 live wiring: the CENSUS reads the live aggregate's active/paused/ended counts
+// when the snapshot carries them (badging "Live · as of {asOf}"); the INTAKE stays
+// sample (membershipStart isn't on /clients). A pre-census live row (census columns
+// null/absent) falls back to the sample census — never a fabricated zero census.
+function MemberMovementCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
+  // Intake (joins-by-cohort) is ALWAYS sample: membershipStart isn't on /clients, so
+  // the non-PII live aggregate can't carry a join timeline. The census
+  // (active/paused/ended) DOES go live when the snapshot carries the §6 census columns.
+  const sample = useMemo(() => computeMemberMovement(SAMPLE_GYM_MEMBERS), []);
+
+  // Live census only when BOTH census columns are present (not null) on the snapshot.
+  // A pre-census live row (paused/ended absent → null) falls back to the sample census,
+  // so we never render a fabricated zero census off a live-but-pre-census row.
+  const view = useMemo(() => {
+    if (snapshot && snapshot.pausedTotal !== null && snapshot.endedTotal !== null) {
+      const { activeTotal, pausedTotal, endedTotal, asOf } = snapshot;
+      return {
+        live: true as const,
+        asOf,
+        census: {
+          active: activeTotal,
+          paused: pausedTotal,
+          ended: endedTotal,
+          total: activeTotal + pausedTotal + endedTotal,
+        },
+      };
+    }
+    return { live: false as const, census: sample.census };
+  }, [snapshot, sample]);
+
+  const { census } = view;
+  const { cohorts, unknownJoin } = sample; // intake stays sample in both modes
 
   return (
     <article className="card gym-card gym-card--full member-movement-card">
       <header className="gym-card-head">
         <div className="member-movement-titlerow">
           <h3 className="gym-card-title">Member Movement</h3>
-          <span className="gym-sample-badge">Sample data</span>
+          {view.live ? (
+            <span className="gym-sample-badge gym-live-badge">Live · as of {view.asOf}</span>
+          ) : (
+            <span className="gym-sample-badge">Sample data</span>
+          )}
         </div>
         <p className="gym-card-subtitle">Current member mix and when they joined.</p>
       </header>
@@ -505,6 +538,11 @@ function MemberMovementCard() {
             series. */}
         <div className="member-movement-intake">
           <p className="member-movement-intake-title">Joins by cohort</p>
+          {view.live && (
+            <p className="member-movement-helper">
+              Join history isn&rsquo;t in the live data source yet — sample shown.
+            </p>
+          )}
           {cohorts.length === 0 ? (
             <p className="member-movement-empty">No recorded join dates to chart right now.</p>
           ) : (

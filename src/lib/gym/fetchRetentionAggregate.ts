@@ -12,6 +12,9 @@
 //   - days_absent_histogram is jsonb whose INNER keys are camelCase
 //     ({ countsByDaysAbsent, overflow365Plus, maxExactDays }) — it persists the
 //     server's daysAbsentHistogram object verbatim.
+//   - paused_total / ended_total (Member Movement census, §6) are NULLABLE and may be
+//     absent entirely on a table where the census migration hasn't been applied yet —
+//     handled as null → the SPA renders the sample census (see the select=* note below).
 //   - anon SELECT is granted and the RLS read policy is scoped to workspace_id='default',
 //     so we filter to the same workspace and never need the authenticated role.
 
@@ -29,6 +32,11 @@ const WORKSPACE_ID = 'default';
 export type RetentionAggregateSnapshot = DerivableAggregate & {
   asOf: string; // YYYY-MM-DD — the snapshot's gym-local day
   activeTotal: number; // active members scanned this snapshot (server's own total)
+  // Member Movement census. `number | null`: null when the column is absent (a
+  // snapshot from before the §6 census slice) or unwritten, so the SPA falls back to
+  // the sample census. A real 0 is a live zero, NOT null.
+  pausedTotal: number | null;
+  endedTotal: number | null;
 };
 
 // Loosely-typed shape of the REST row — every field is validated before use, since
@@ -36,6 +44,8 @@ export type RetentionAggregateSnapshot = DerivableAggregate & {
 type AggregateRow = {
   as_of?: unknown;
   active_total?: unknown;
+  paused_total?: unknown;
+  ended_total?: unknown;
   unknown_count?: unknown;
   days_absent_histogram?: unknown;
 };
@@ -50,6 +60,14 @@ function asCount(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
+// Census counts are `number | null`: a finite number passes through (a real 0 is a
+// live zero), while anything else — an absent column, null, or a malformed value —
+// becomes null so the SPA falls back to the sample census instead of rendering a
+// fabricated 0 off a pre-census row.
+function asCountOrNull(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
 // Fetch the latest snapshot (highest as_of) for the default workspace, or null when
 // unconfigured / no row / malformed. Throws only on a non-OK HTTP status, so the
 // caller can distinguish "no data yet" (null → sample) from "read failed" (throw →
@@ -59,9 +77,19 @@ export async function fetchLatestRetentionAggregate(
 ): Promise<RetentionAggregateSnapshot | null> {
   if (!isRetentionAggregateConfigured()) return null;
 
+  // select=* (not an explicit column list) on purpose: the Member Movement census
+  // columns (paused_total / ended_total) ship with the §6 census slice but its
+  // migration is applied separately, so they may not exist on the live table yet.
+  // PostgREST 400s the ENTIRE read when an explicit select names a column that does
+  // not exist — which would knock the already-live Attendance Health + Silent Churn
+  // cards back to Sample. `*` returns whatever columns exist (an absent census column
+  // is simply undefined → null → sample), and is safe here because the table is
+  // non-PII by construction: every column is a snapshot-level count or date (see
+  // wodify_retention_schema.sql). Do NOT narrow this back to an explicit list while a
+  // shipped-but-unapplied column exists.
   const path =
     `${RETENTION_TABLE}` +
-    `?select=as_of,active_total,unknown_count,days_absent_histogram` +
+    `?select=*` +
     `&workspace_id=eq.${WORKSPACE_ID}` +
     `&order=as_of.desc&limit=1`;
 
@@ -110,6 +138,8 @@ export async function fetchLatestRetentionAggregate(
   return {
     asOf,
     activeTotal: asCount(row.active_total),
+    pausedTotal: asCountOrNull(row.paused_total),
+    endedTotal: asCountOrNull(row.ended_total),
     unknown: asCount(row.unknown_count),
     daysAbsentHistogram: {
       countsByDaysAbsent,

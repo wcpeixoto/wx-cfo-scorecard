@@ -79,6 +79,13 @@ export type RetentionAggregate = {
   asOf: string; // YYYY-MM-DD — our day-diff anchor (server fetch date)
   fetchedAt: string; // ISO timestamp of the fetch
   activeTotal: number;
+  // Member Movement census (§6): paused/ended head-counts alongside activeTotal.
+  // Non-PII raw status tallies. The four-way partition
+  //   activeTotal + pausedTotal + endedTotal + dataQuality.unknownStatus
+  //     === dataQuality.clientsScanned
+  // holds by construction — every scanned row increments exactly one of the four.
+  pausedTotal: number;
+  endedTotal: number;
   daysAbsentHistogram: DaysAbsentHistogram;
   unknown: number; // active, missing/sentinel/invalid lastCheckIn (NOT Healthy)
   silentChurn: { monthlyDuesAtRisk: null; missingMonthlyDues: true };
@@ -178,6 +185,8 @@ export function computeRetentionAggregate(
   const countsByDaysAbsent: Record<string, number> = {};
   let overflow365Plus = 0;
   let activeTotal = 0;
+  let pausedTotal = 0;
+  let endedTotal = 0;
   let unknown = 0;
   let unknownStatus = 0;
   let futureLastCheckIn = 0;
@@ -192,8 +201,17 @@ export function computeRetentionAggregate(
       unknownStatus += 1;
       continue; // unmappable status — excluded from every bucket
     }
-    if (member.status !== 'active') continue; // paused / ended — not the live signal
-
+    // Paused / ended are not the active recency signal, but they ARE the Member
+    // Movement census — count each, then skip the active-only binning below.
+    if (member.status === 'paused') {
+      pausedTotal += 1;
+      continue;
+    }
+    if (member.status === 'ended') {
+      endedTotal += 1;
+      continue;
+    }
+    // member.status === 'active' from here.
     activeTotal += 1;
 
     if (member.lastCheckIn === '') {
@@ -223,6 +241,8 @@ export function computeRetentionAggregate(
     asOf: opts.asOf,
     fetchedAt: opts.fetchedAt,
     activeTotal,
+    pausedTotal,
+    endedTotal,
     daysAbsentHistogram: {
       maxExactDays: MAX_EXACT_DAYS,
       countsByDaysAbsent,
