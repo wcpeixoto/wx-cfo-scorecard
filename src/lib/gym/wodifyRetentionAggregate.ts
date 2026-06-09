@@ -54,9 +54,10 @@ export type RawWodifyClient = {
 export type NormalizedStatus = 'active' | 'paused' | 'ended';
 
 // Internal, transient, non-PII normalized member. `status: null` means the raw
-// status was missing/unmappable (excluded from every bucket, counted in
-// `unknownStatus`). `lastCheckIn: ''` means active-but-no-usable-date (→ unknown
-// bucket, never silently Healthy).
+// status was missing OR present-but-unrecognized (either way unmappable —
+// excluded from every census bucket, counted in `unknownStatus`).
+// `lastCheckIn: ''` means active-but-no-usable-date (→ unknown bucket, never
+// silently Healthy).
 export type NormalizedMember = {
   status: NormalizedStatus | null;
   lastCheckIn: string; // 'YYYY-MM-DD' or ''
@@ -108,17 +109,29 @@ export type AggregateOptions = {
   reachedPageCap: boolean;
 };
 
-// Map raw `client_status` to our status (§6.2). A PRESENT but unrecognized
-// string falls through to 'ended' ("everything else"); a MISSING / non-string /
-// empty value is unmappable → null (excluded + counted in unknownStatus). Only
-// active-ness is load-bearing for this slice.
+// Map raw `client_status` to our status (§6.2, fail-closed taxonomy). Matching is
+// CONSERVATIVE — only recognized values map into a census bucket:
+//   - exact `active` (case-insensitive)             → active
+//   - known paused-like (paus / frozen / hold)      → paused
+//   - explicit, ANCHORED ended values (Ended /      → ended
+//     Cancelled) — anchored so a substring like
+//     "Susp-ended" can never match as ended
+// Everything else is null: a PRESENT-but-unrecognized status (e.g. Trial,
+// Prospect, "Active - Comp") and a MISSING / non-string / empty value BOTH map to
+// null (excluded from every bucket, counted in unknownStatus). The earlier
+// catch-all routed the unrecognized tail to 'ended', silently inflating the ended
+// census with members we simply don't map yet — unknown now stays unknown. Only
+// active-ness is load-bearing for the Attendance Health / Silent Churn slice, and
+// `^active$` is deliberately NOT broadened: an active variant fails closed to
+// unknown rather than being guessed active.
 export function normalizeStatus(raw: unknown): NormalizedStatus | null {
   if (typeof raw !== 'string') return null;
   const s = raw.trim();
   if (s === '') return null;
   if (/^active$/i.test(s)) return 'active';
   if (/paus|frozen|hold/i.test(s)) return 'paused';
-  return 'ended';
+  if (/^(ended|cancelled)$/i.test(s)) return 'ended';
+  return null;
 }
 
 // Reduce one raw date field to a usable 'YYYY-MM-DD' or null, in the locked

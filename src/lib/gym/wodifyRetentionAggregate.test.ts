@@ -40,16 +40,44 @@ function memberToRawRow(m: GymMember): RawWodifyClient {
   return { client_status: statusWord, last_attendance: m.lastCheckIn };
 }
 
-describe('normalizeStatus', () => {
-  it('maps active / paused / ended; missing or unmappable → null', () => {
+describe('normalizeStatus (fail-closed taxonomy)', () => {
+  it('maps exact Active (case-insensitive) → active, without broadening', () => {
     expect(normalizeStatus('Active')).toBe('active');
     expect(normalizeStatus('active')).toBe('active');
+    expect(normalizeStatus('ACTIVE')).toBe('active');
+    // Active VARIANTS fail closed to unknown — never guessed active (which would
+    // inflate the paying-member count). `^active$` is intentionally exact.
+    expect(normalizeStatus('Active - Comp')).toBeNull();
+  });
+
+  it('maps known paused-like statuses → paused', () => {
     expect(normalizeStatus('Paused')).toBe('paused');
     expect(normalizeStatus('Frozen')).toBe('paused');
     expect(normalizeStatus('On Hold')).toBe('paused');
-    expect(normalizeStatus('Cancelled')).toBe('ended'); // present but unrecognized → ended
+  });
+
+  it('maps explicit, anchored ended values → ended', () => {
     expect(normalizeStatus('Ended')).toBe('ended');
-    expect(normalizeStatus('')).toBeNull(); // empty → unmappable
+    expect(normalizeStatus('Cancelled')).toBe('ended');
+    // Anchored: "ended" as a substring of another word must NOT match. "Suspended"
+    // ends in "...ended" but is ambiguous → unknown, not ended.
+    expect(normalizeStatus('Suspended')).toBeNull();
+  });
+
+  it('routes PRESENT-but-unrecognized statuses → null (unknown bucket, NOT ended)', () => {
+    // The fix (§6 fix B): real Wodify statuses we do not map yet no longer fall
+    // through to 'ended'. An unrecognized value is unclassified data, not a
+    // confirmed cancellation — unknown is the honest bucket.
+    expect(normalizeStatus('Trial')).toBeNull();
+    expect(normalizeStatus('Prospect')).toBeNull();
+    expect(normalizeStatus('Lead')).toBeNull();
+  });
+
+  it('routes MISSING / blank / non-string status → null (distinct cause, same bucket)', () => {
+    // Same null result as present-but-unrecognized, but a DIFFERENT root cause (no
+    // value at all vs. an unmapped value). Kept separate so a regression in one
+    // path cannot hide behind the other.
+    expect(normalizeStatus('')).toBeNull();
     expect(normalizeStatus('   ')).toBeNull();
     expect(normalizeStatus(undefined)).toBeNull();
     expect(normalizeStatus(null)).toBeNull();
@@ -172,7 +200,7 @@ describe('computeRetentionAggregate — binning, sentinel, future, overflow', ()
 });
 
 describe('Member Movement census (paused/ended counts, §6)', () => {
-  it('counts paused (incl. Frozen / On Hold) and ended (incl. unrecognized) per normalizeStatus', () => {
+  it('counts paused (incl. Frozen / On Hold) and explicit ended (Ended / Cancelled); unrecognized → unknownStatus', () => {
     const rows: RawWodifyClient[] = [
       { client_status: 'Active', last_attendance: '2026-06-05' },
       { client_status: 'Active', last_attendance: '2026-06-01' },
@@ -180,16 +208,17 @@ describe('Member Movement census (paused/ended counts, §6)', () => {
       { client_status: 'Frozen' }, // → paused
       { client_status: 'On Hold' }, // → paused
       { client_status: 'Ended' },
-      { client_status: 'Cancelled' }, // present-but-unrecognized → ended
-      { client_status: '' }, // unmappable → unknownStatus, NOT census
-      { client_status: undefined }, // unmappable → unknownStatus
+      { client_status: 'Cancelled' }, // explicit, anchored ended — not a fallback
+      { client_status: 'Trial' }, // present-but-unrecognized → unknownStatus, NOT ended
+      { client_status: '' }, // missing/blank → unknownStatus
+      { client_status: undefined }, // missing → unknownStatus
     ];
     const a = computeRetentionAggregate(rows, OPTS);
-    expect(a.activeTotal).toBe(2);
+    expect(a.activeTotal).toBe(2); // active path untouched by the Trial row
     expect(a.pausedTotal).toBe(3); // Paused + Frozen + On Hold
-    expect(a.endedTotal).toBe(2); // Ended + Cancelled
-    expect(a.dataQuality.unknownStatus).toBe(2);
-    expect(a.dataQuality.clientsScanned).toBe(9);
+    expect(a.endedTotal).toBe(2); // Ended + Cancelled (Trial is NOT ended)
+    expect(a.dataQuality.unknownStatus).toBe(3); // Trial + '' + undefined
+    expect(a.dataQuality.clientsScanned).toBe(10);
     // Four-way census partition === clients scanned (no row dropped or double-counted).
     expect(
       a.activeTotal + a.pausedTotal + a.endedTotal + a.dataQuality.unknownStatus,
