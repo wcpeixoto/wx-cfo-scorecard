@@ -527,7 +527,7 @@ the standalone `/clients` shape-discovery; this PR's one-line patch + re-run bui
 first**, then rebase + merge #427, resolving §5 / README to keep both records (the `/clients` shape
 discovery from #428, and the patch + re-run outcome here).
 
-### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); grants hardened #440 @ 7a3bc77 (anon/authenticated → SELECT-only); SYNC_TRIGGER_SECRET trigger-gate + fail-closed-500 LIVE #441 @ 67aafd0; redeployed v3 (verify_jwt=true, #441-era ezbr 35e21c14…); FIRST AUTHORIZED LIVE INVOKE EXECUTED 2026-06-07 19:48:53 UTC (one aggregate row verified: 412 active / 956 scanned, §6.6 conservation residual 0, no page cap, dues null + missing flag, PII-free) → first-slice §6 live-data validation goal MET; Step F disarm COMPLETE (both secrets unset, plaintext trigger file deleted) → function now DISARMED/inert; idempotency upsert (unique CONSTRAINT (workspace_id, as_of) + PostgREST on_conflict) DONE 2026-06-08 — constraint applied (gate-4) + function redeployed gate-5 as ezbr a4b19062… (source carried by #444), function still DISARMED; gym-local asOf permanent fix #445 REDEPLOYED LIVE 2026-06-08 (name-scoped CLI from main @ fb21a41, ezbr a4b19062…→eb5f5a33…, verify_jwt=true, still DISARMED, ai-proxy untouched, table unmoved); PR2/SPA wiring still OPEN` (do this early, before broad live work)
+### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); grants hardened #440 @ 7a3bc77 (anon/authenticated → SELECT-only); SYNC_TRIGGER_SECRET trigger-gate + fail-closed-500 LIVE #441 @ 67aafd0; redeployed v3 (verify_jwt=true, #441-era ezbr 35e21c14…); FIRST AUTHORIZED LIVE INVOKE EXECUTED 2026-06-07 19:48:53 UTC (one aggregate row verified: 412 active / 956 scanned, §6.6 conservation residual 0, no page cap, dues null + missing flag, PII-free) → first-slice §6 live-data validation goal MET; Step F disarm COMPLETE (both secrets unset, plaintext trigger file deleted) → function now DISARMED/inert; idempotency upsert (unique CONSTRAINT (workspace_id, as_of) + PostgREST on_conflict) DONE 2026-06-08 — constraint applied (gate-4) + function redeployed gate-5 as ezbr a4b19062… (source carried by #444), function still DISARMED; gym-local asOf permanent fix #445 REDEPLOYED LIVE 2026-06-08 (name-scoped CLI from main @ fb21a41, ezbr a4b19062…→eb5f5a33…, verify_jwt=true, still DISARMED, ai-proxy untouched, table unmoved); SPA wiring now LIVE — Attendance Health (PR2, #447 @ 28af0b9) + Silent Churn count-only (PR3, #448 @ 8d1b0b7), both off the shared aggregate snapshot` (do this early, before broad live work)
 
 Wire a **minimal** live-data path for one or two Retention cards before any broader live
 integration — a validation slice, not a rollout. The biggest remaining risk is whether
@@ -576,7 +576,7 @@ supplies `status` / `lastCheckIn` globally enough for the first aggregate slice,
 **surfaced explicitly** via the aggregate's `unknown` bucket (155 of 412 active members; 956 clients scanned overall),
 not hidden — *not* a failure, because the aggregate contract counts unknowns (conservation:
 `activeTotal === histogram + overflow + unknown`) rather than implying perfect coverage. The broader
-**PR2 / SPA wiring remains OPEN**, and any future
+**PR2 / SPA wiring has since SHIPPED** — Attendance Health (PR2, #447 @ 28af0b9) renders these buckets live at the owner threshold (T=21: **Healthy 146 / Watch 37 / Silent 74 / unknown 155**, summing to the 412 active) and Silent Churn count-only (PR3, #448 @ 8d1b0b7) reuses the same shared snapshot — and any future
 re-arm, second pull, or scheduled pull requires a **fresh Reviewer audit + Wesley authorization** (its own two-AI
 gate).
 
@@ -637,8 +637,15 @@ would not — applied gate-4 with `notify pgrst, 'reload schema'`; premise-check
 clean; live service_role already had UPDATE) + an intentional PostgREST upsert (`on_conflict=workspace_id,as_of`,
 `Prefer: resolution=merge-duplicates`) deployed gate-5 (`ezbr a4b19062…`), so a same-day re-pull **replaces**
 the day's row instead of duplicating it. Constraint applied live + function redeployed (function still
-DISARMED); the matching source is carried by **#444**. **Recommended next §6 work = PR2 / SPA
-wiring** — applying the owner threshold + `WATCH_FLOOR_DAYS` to the histogram client-side.
+DISARMED); the matching source is carried by **#444**. **PR2 / SPA wiring — DONE:** Attendance Health (PR2, #447 @ 28af0b9) and Silent Churn
+count-only (PR3, #448 @ 8d1b0b7) both apply the owner threshold + `WATCH_FLOOR_DAYS` to the
+shared aggregate histogram client-side (via `deriveBuckets`). **Recommended next §6 work** is the
+slice the non-PII aggregate cannot yet back, each gated on re-arming the **DISARMED** function
+(re-arm / 2nd / scheduled pull = a fresh Reviewer + Wesley two-AI gate): (i) **Member Movement**
+(#414) census and **Churn Risk by Tenure** (#411) are still Sample and need a re-armed re-pull —
+Tenure additionally needs the **unproven `membershipStart`** field; (ii) Silent Churn **$-at-risk**
+needs a dues source (CSV import — the Wodify financials API is tier-blocked); (iii) Silent Churn
+**call-list / member names** stay blocked by the §4 PII / auth gate.
 
 **asOf timezone — permanent fix LIVE (2026-06-08, #445).** `asOf` was the **server-UTC** fetch
 date, which can shift the day boundary ±1 vs the gym's local day. The permanent fix is now **implemented in
@@ -665,9 +672,11 @@ unmoved). Loose ends: (a) **CLOSED by gate 5** — the redeploy reset the platfo
 is now `null` and `entrypoint_path` points at the fresh deployed path (no more deleted-worktree references); the
 current `ezbr_sha256 eb5f5a33…` bundle is authoritative. (b) **CLOSED** — the #445 redeploy was that next substantive `index.ts` redeploy, so the deployed
 header comment is now reconciled live; `main` @ `fb21a41` reproduces the live `eb5f5a33…`. **(ii) PR2 / SPA wiring** (apply the owner threshold +
-`WATCH_FLOOR_DAYS` rule client-side to the histogram) remains OPEN. **Post-cycle state:** exactly one
+`WATCH_FLOOR_DAYS` rule client-side to the histogram) is now **DONE** — Attendance Health
+(PR2, #447 @ 28af0b9) + Silent Churn count-only (PR3, #448 @ 8d1b0b7), both off the shared
+aggregate snapshot via `deriveBuckets`. **Post-cycle state:** exactly one
 authorized invoke/POST/Wodify call occurred on 2026-06-07, then the function was disarmed (both secrets unset,
-plaintext trigger file deleted); no SPA/PR2 wiring; `ai-proxy` unchanged (`verify_jwt:false`, `ezbr_sha256
+plaintext trigger file deleted); SPA/PR2 wiring has since shipped frontend-only (PR2, #447 @ 28af0b9 + PR3, #448 @ 8d1b0b7 — no further invoke / deploy / Wodify call); `ai-proxy` unchanged (`verify_jwt:false`, `ezbr_sha256
 3d392f3e…`).
 
 1. **Server-side reuse boundary (refined in PR1).** The server imports ONLY the locked, threshold-FREE
