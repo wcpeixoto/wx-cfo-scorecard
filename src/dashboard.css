@@ -12940,6 +12940,13 @@ body {
   font-size: 14px;
   color: var(--text-secondary);
 }
+/* PR3: live Silent Churn is count-only — monthly dues at risk aren't on /clients
+   yet (§6.4), so the dollar shows this honest note instead of a fabricated $0. */
+.silent-churn-dues-na {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
 .silent-churn-calllist-head,
 .silent-churn-row {
   display: grid;

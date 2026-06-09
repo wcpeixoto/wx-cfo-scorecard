@@ -1,10 +1,12 @@
 // Gym › Retention — the Gym section's first real subpage (routed at
 // /gym/retention; reached via the expandable Gym group in AppSidebar).
-// Watch (Silent Churn, Attendance Health) and the first Patterns cards
-// (Member Movement, Churn Risk by Tenure) are live sample-data cards. The
-// three remaining Patterns cards stay as shells with an honest parked/blocked
-// gate note — not built, gated on a data policy or API access (see
-// RETENTION_FINISH_PLAN.md). Overview / Membership / Classes are hidden for now.
+// The Watch cards (Silent Churn, Attendance Health) read the live Wodify
+// aggregate when a snapshot is available and fall back to the sample fixture
+// otherwise; the Patterns cards (Member Movement, Churn Risk by Tenure) are
+// still sample-only. The three remaining Patterns cards stay as shells with an
+// honest parked/blocked gate note — not built, gated on a data policy or API
+// access (see RETENTION_FINISH_PLAN.md). Overview / Membership / Classes are
+// hidden for now.
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRetentionSettings } from '../context/RetentionSettingsContext';
@@ -23,6 +25,31 @@ import {
 } from '../lib/gym/fetchRetentionAggregate';
 
 export function GymPage() {
+  // RETENTION_FINISH_PLAN.md §6: fetch the live Wodify aggregate ONCE here at page
+  // level and share the single snapshot with every card that reads it (Silent
+  // Churn + Attendance Health), so both derive from the SAME snapshot and their
+  // live badges render the SAME as-of. A failed / empty / unconfigured read leaves
+  // `snapshot` null and every card falls back to its sample fixture — the live
+  // snapshot is optional, never a render error.
+  const [snapshot, setSnapshot] = useState<RetentionAggregateSnapshot | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    fetchLatestRetentionAggregate(controller.signal)
+      .then((snap) => {
+        if (!cancelled && snap) setSnapshot(snap);
+      })
+      .catch(() => {
+        // Unreachable / non-OK / malformed → stay on the sample fixture. A missing
+        // live snapshot is an expected state, not a failure worth surfacing.
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, []);
+
   return (
     <div className="stack-grid">
       <div className="ta-page">
@@ -48,8 +75,8 @@ export function GymPage() {
               <p className="gym-section-helper">Live signals to act on this week.</p>
             </div>
             <div className="gym-card-grid">
-              <SilentChurnCard />
-              <AttendanceHealthCard />
+              <SilentChurnCard snapshot={snapshot} />
+              <AttendanceHealthCard snapshot={snapshot} />
             </div>
           </section>
 
@@ -111,26 +138,49 @@ const usd = (amount: number) => `$${Math.round(amount).toLocaleString('en-US')}`
 const formatRate = (rate: number | null) => (rate === null ? '—' : `${Math.round(rate * 100)}%`);
 
 // Silent Churn hero — the Retention page's dominant live signal. Reads the
-// owner-tuned threshold from the local Retention settings store and renders a
-// code-computed at-risk call-list from the sample member fixture. Deterministic:
-// the copy only rephrases computed numbers (count, $/mo, days absent); it never
-// authors the at-risk call. Re-renders whenever the threshold changes.
-function SilentChurnCard() {
+// owner-tuned threshold from the local Retention settings store. Dual-source,
+// mirroring Attendance Health: with a live aggregate snapshot it shows the real
+// silent COUNT (deriveBuckets' silent bucket === computeSilentChurn count by
+// construction, so it can never disagree with the live Attendance Health "Silent"
+// tally on the same snapshot) and badges "Live · as of {asOf}". Live is
+// count-only: dollars-at-risk aren't on /clients yet (§6.4 — shown as "not
+// available", NEVER $0) and the per-member call-list needs PII the non-PII
+// aggregate can't carry, so neither is shown live. Without a snapshot it falls
+// back to the sample fixture's full count + $/mo + call-list and the "Sample data"
+// badge. Deterministic: the copy only rephrases computed numbers; it never authors
+// the at-risk call. Re-renders whenever the threshold or snapshot changes.
+function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays } = useRetentionSettings();
 
-  const result = useMemo(
-    () => computeSilentChurn(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
-    [silentChurnThresholdDays],
-  );
+  // One render path for both sources (mirrors AttendanceHealthCard). Live: derive
+  // the silent COUNT from the non-PII histogram. Sample: the full classifier result
+  // (count + dollars + call-list). The discriminated `live` flag keeps the
+  // sample-only fields (rows, monthlyDuesAtRisk) off the live branch entirely.
+  const view = useMemo(() => {
+    if (snapshot) {
+      const { thresholdDays, silent } = deriveBuckets(snapshot, silentChurnThresholdDays);
+      return { live: true as const, thresholdDays, count: silent, asOf: snapshot.asOf };
+    }
+    const { thresholdDays, count, monthlyDuesAtRisk, rows } = computeSilentChurn(
+      SAMPLE_GYM_MEMBERS,
+      silentChurnThresholdDays,
+      FIXTURE_TODAY,
+    );
+    return { live: false as const, thresholdDays, count, monthlyDuesAtRisk, rows };
+  }, [snapshot, silentChurnThresholdDays]);
 
-  const { thresholdDays, count, monthlyDuesAtRisk, rows } = result;
+  const { thresholdDays, count } = view;
 
   return (
     <article className="card gym-card gym-card--hero silent-churn-card">
       <header className="gym-card-head">
         <div className="silent-churn-titlerow">
           <h3 className="gym-card-title">Silent Churn</h3>
-          <span className="gym-sample-badge">Sample data</span>
+          {view.live ? (
+            <span className="gym-sample-badge gym-live-badge">Live · as of {view.asOf}</span>
+          ) : (
+            <span className="gym-sample-badge">Sample data</span>
+          )}
         </div>
         <p className="gym-card-subtitle">Still paying, not showing up.</p>
       </header>
@@ -147,13 +197,26 @@ function SilentChurnCard() {
               {count === 1 ? 'member at risk' : 'members at risk'}
             </span>
           </div>
-          <div className="silent-churn-metric">
-            <span className="silent-churn-metric-value">{usd(monthlyDuesAtRisk)}</span>
-            <span className="silent-churn-metric-label">/mo at risk</span>
-          </div>
+          {!view.live && (
+            <div className="silent-churn-metric">
+              <span className="silent-churn-metric-value">{usd(view.monthlyDuesAtRisk)}</span>
+              <span className="silent-churn-metric-label">/mo at risk</span>
+            </div>
+          )}
         </div>
 
-        {count === 0 ? (
+        {view.live ? (
+          <>
+            <p className="silent-churn-dues-na">
+              Monthly dues at risk is not available from this data source yet.
+            </p>
+            {count === 0 && (
+              <p className="silent-churn-empty">
+                No active members have been away for {thresholdDays}+ days right now.
+              </p>
+            )}
+          </>
+        ) : count === 0 ? (
           <p className="silent-churn-empty">
             No active members have been away for {thresholdDays}+ days right now.
           </p>
@@ -165,7 +228,7 @@ function SilentChurnCard() {
               <span className="silent-churn-col silent-churn-col--dues">$/mo</span>
             </div>
             <ul className="silent-churn-rows">
-              {rows.map((row) => (
+              {view.rows.map((row) => (
                 <li key={row.id} className="silent-churn-row">
                   <span className="silent-churn-col silent-churn-col--name">{row.displayName}</span>
                   <span className="silent-churn-col silent-churn-col--days">{row.daysAbsent} days</span>
@@ -186,40 +249,18 @@ function SilentChurnCard() {
 // drifting but not yet churned. Deterministic — the copy only rephrases
 // code-computed counts.
 //
-// PR2 (RETENTION_FINISH_PLAN.md §6): this is the FIRST card wired to the live
-// Wodify aggregate. On a successful read it derives the buckets from the non-PII
+// RETENTION_FINISH_PLAN.md §6: derives its buckets from the non-PII
 // daysAbsentHistogram via deriveBuckets (same WATCH_FLOOR_DAYS + threshold rule,
-// precedence-correct at every threshold) and badges "Live · as of {asOf}".
-// Loading / error / empty / unconfigured all fall back to the SAMPLE fixture and
-// the "Sample data" badge — the live snapshot is optional, never a render error.
-// Only this card goes live: Silent Churn (needs dues + a call-list the aggregate
-// can't carry), Churn Risk by Tenure (needs per-member tenure) and Member Movement
-// (needs a census) stay on sample, so the live Attendance Health count is NOT
-// forced to agree with the sample Silent Churn hero.
-function AttendanceHealthCard() {
+// precedence-correct at every threshold) and badges "Live · as of {asOf}". The
+// `snapshot` is fetched ONCE at page level (GymPage) and passed to both Watch
+// cards, so this card's live "Silent" bucket and the live Silent Churn count read
+// the SAME snapshot and agree by construction. Loading / error / empty /
+// unconfigured all fall back to the SAMPLE fixture and the "Sample data" badge —
+// the live snapshot is optional, never a render error. The Patterns cards (Churn
+// Risk by Tenure needs per-member tenure, Member Movement needs a paused/ended
+// census) stay on sample: the aggregate can't carry those yet.
+function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays } = useRetentionSettings();
-
-  // Fetch the latest live snapshot once on mount. A successful read flips this card
-  // to live; anything else (loading, no row, HTTP/parse failure, no Supabase env)
-  // leaves `snapshot` null and the card stays on the sample fixture.
-  const [snapshot, setSnapshot] = useState<RetentionAggregateSnapshot | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    fetchLatestRetentionAggregate(controller.signal)
-      .then((snap) => {
-        if (!cancelled && snap) setSnapshot(snap);
-      })
-      .catch(() => {
-        // Unreachable / non-OK / malformed → stay on the sample fixture. A missing
-        // live snapshot is an expected state, not a failure worth surfacing.
-      });
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, []);
 
   // One render path for both sources: deriveBuckets (live histogram) and
   // computeAttendanceHealth (sample fixture) return the SAME H/W/S/unknown shape,
