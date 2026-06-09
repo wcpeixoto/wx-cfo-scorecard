@@ -113,6 +113,8 @@ async function persistAggregate(
     as_of: agg.asOf,
     fetched_at: agg.fetchedAt,
     active_total: agg.activeTotal,
+    paused_total: agg.pausedTotal, // Member Movement census (§6)
+    ended_total: agg.endedTotal,
     days_absent_histogram: agg.daysAbsentHistogram,
     unknown_count: agg.unknown,
     monthly_dues_at_risk: agg.silentChurn.monthlyDuesAtRisk,

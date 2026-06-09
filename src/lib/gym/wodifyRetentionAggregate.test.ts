@@ -132,13 +132,21 @@ describe('computeRetentionAggregate — binning, sentinel, future, overflow', ()
     expect(agg.unknown).toBe(1); // sentinel member, active but no usable date
   });
 
-  it('counts active total, excludes paused/ended, surfaces dataQuality', () => {
+  it('counts active/paused/ended census, surfaces dataQuality', () => {
     expect(agg.activeTotal).toBe(10);
+    expect(agg.pausedTotal).toBe(1); // one 'Paused' row
+    expect(agg.endedTotal).toBe(1); // one 'Cancelled' → ended
     expect(agg.dataQuality.unknownStatus).toBe(1);
     expect(agg.dataQuality.futureLastCheckIn).toBe(1);
     expect(agg.dataQuality.clientsScanned).toBe(13);
     expect(agg.dataQuality.pagesFetched).toBe(1);
     expect(agg.diagnostics.wodifyAtRiskCount).toBe(1);
+  });
+
+  it('census conserves: activeTotal + pausedTotal + endedTotal + unknownStatus === clientsScanned', () => {
+    expect(
+      agg.activeTotal + agg.pausedTotal + agg.endedTotal + agg.dataQuality.unknownStatus,
+    ).toBe(agg.dataQuality.clientsScanned);
   });
 
   it('conserves: activeTotal === sum(bins) + overflow + unknown', () => {
@@ -160,6 +168,52 @@ describe('computeRetentionAggregate — binning, sentinel, future, overflow', ()
       const d = deriveBuckets(agg, T);
       expect(d.healthy).toBeGreaterThanOrEqual(2);
     }
+  });
+});
+
+describe('Member Movement census (paused/ended counts, §6)', () => {
+  it('counts paused (incl. Frozen / On Hold) and ended (incl. unrecognized) per normalizeStatus', () => {
+    const rows: RawWodifyClient[] = [
+      { client_status: 'Active', last_attendance: '2026-06-05' },
+      { client_status: 'Active', last_attendance: '2026-06-01' },
+      { client_status: 'Paused' },
+      { client_status: 'Frozen' }, // → paused
+      { client_status: 'On Hold' }, // → paused
+      { client_status: 'Ended' },
+      { client_status: 'Cancelled' }, // present-but-unrecognized → ended
+      { client_status: '' }, // unmappable → unknownStatus, NOT census
+      { client_status: undefined }, // unmappable → unknownStatus
+    ];
+    const a = computeRetentionAggregate(rows, OPTS);
+    expect(a.activeTotal).toBe(2);
+    expect(a.pausedTotal).toBe(3); // Paused + Frozen + On Hold
+    expect(a.endedTotal).toBe(2); // Ended + Cancelled
+    expect(a.dataQuality.unknownStatus).toBe(2);
+    expect(a.dataQuality.clientsScanned).toBe(9);
+    // Four-way census partition === clients scanned (no row dropped or double-counted).
+    expect(
+      a.activeTotal + a.pausedTotal + a.endedTotal + a.dataQuality.unknownStatus,
+    ).toBe(a.dataQuality.clientsScanned);
+  });
+
+  it('paused/ended members are excluded from the active recency histogram', () => {
+    // A paused member with an ancient check-in must NOT land in any active bin.
+    const a = computeRetentionAggregate(
+      [
+        { client_status: 'Active', last_attendance: '2026-06-05' }, // day 0
+        { client_status: 'Paused', last_attendance: '2020-01-01' },
+        { client_status: 'Ended', last_attendance: '2019-01-01' },
+      ],
+      OPTS,
+    );
+    expect(a.activeTotal).toBe(1);
+    expect(a.pausedTotal).toBe(1);
+    expect(a.endedTotal).toBe(1);
+    const binSum = Object.values(a.daysAbsentHistogram.countsByDaysAbsent).reduce(
+      (x, y) => x + y,
+      0,
+    );
+    expect(binSum + a.daysAbsentHistogram.overflow365Plus).toBe(1); // only the active row
   });
 });
 
@@ -265,6 +319,8 @@ describe('payload shape (non-PII contract)', () => {
       asOf: '2026-06-05',
       fetchedAt: '2026-06-05T12:00:00Z',
       activeTotal: 1,
+      pausedTotal: 0,
+      endedTotal: 0,
       daysAbsentHistogram: {
         maxExactDays: 364,
         countsByDaysAbsent: { '4': 1 },
