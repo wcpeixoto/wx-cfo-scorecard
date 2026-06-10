@@ -710,6 +710,14 @@ Wodify-UI-only — no `/clients` field carries it, consistent with the field-dis
 membership **product-type** metric, NOT the count of currently-running holds (11 on 2026-06-09) —
 different metrics, same label.
 
+**Census-populate run — GO'd 2026-06-10, ABORTED CLEAN at Step A (pre-flight selftest).** The
+`clientStatusVocab.ts --selftest` gate FAILED because its expectations still encoded the pre-#453 3-way
+taxonomy — a stale instrument, not a code defect (`normalizeStatus` is binary and correct); the run stopped
+before any arm/invoke: zero mutations, zero Wodify contact, platform identities unmoved, function still
+DISARMED (Builder-attested + Reviewer-verified). Remediation = a code-only selftest-fix PR (binary
+expectations + `Inactive` coverage; retired vocabulary kept as fail-closed unknown-traps); the
+Reviewer-validated run plan is unchanged and reusable — a fresh GO re-enters it at Step 0.
+
 **Prior-state facts (preserved).** The import-resolution sub-gate closed via Option A (#435 @ `b6bd9d6`); the
 **`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06) dropped the vestigial function-local `deno.json`
 and reconciled the README; a name-scoped redeploy from merged `main` (CLI 2.98.2) was **deno.json-free**

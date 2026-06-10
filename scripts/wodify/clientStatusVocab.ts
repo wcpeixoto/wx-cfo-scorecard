@@ -4,10 +4,10 @@
  * Purpose (RETENTION_FINISH_PLAN.md §6 — the pre-redeploy / pre-re-pull taxonomy gate)
  *   Before the next §6 sequence (schema ALTER → name-scoped edge redeploy → re-arm → re-pull), we
  *   must know the REAL distinct `client_status` values Wodify returns and how the current fail-closed
- *   `normalizeStatus` (the #451 mapping the redeploy will ship) maps each one — so no status is
+ *   `normalizeStatus` (the #453 binary mapping the redeploy will ship) maps each one — so no status is
  *   silently mis-mapped in EITHER direction:
- *     - ENDED direction: a genuinely-ended status that does NOT normalize to `ended` inflates
- *       `unknownStatus` and makes the new Member Movement census (paused/ended) misleading.
+ *     - INACTIVE direction: a genuinely-inactive status that does NOT normalize to `inactive` inflates
+ *       `unknownStatus` and makes the binary Member Movement census (active/inactive) misleading.
  *     - ACTIVE direction (HIGHER STAKES): an active-like status (e.g. `Active - Comp`) that does NOT
  *       normalize to `active` UNDER-counts active members — and Attendance Health + Silent Churn are
  *       ALREADY LIVE off that count, so a miss corrupts numbers already on the page, not just MM.
@@ -25,7 +25,7 @@
  *   2. It EMITS raw `client_status` STRINGS verbatim as `value`. The sibling probes bucket status into
  *      an allowlist of category names and NEVER emit a raw value; this probe must show the literal
  *      vocabulary, which is the entire point of the gate. This is safe because `client_status` is a
- *      membership-CATEGORY enum label (e.g. `Active`, `Paused`, `Ended`), not member PII — it
+ *      membership-CATEGORY enum label (e.g. `Active`, `Inactive`), not member PII — it
  *      identifies no individual. Every OTHER upstream value stays unemitted, exactly like the siblings.
  *
  * Safety contract (RETENTION_FINISH_PLAN.md §4/§5 — same posture as the merged sibling probes, with the
@@ -84,7 +84,7 @@ const ERROR_ENVELOPE_MARKER_KEYS = ['developermessage', 'errorcode', 'httpcode',
 
 // ─── Safe output contract ────────────────────────────────────────────────────────────────────────
 type HttpStatusClass = '2xx' | '4xx' | '5xx' | 'network_error';
-type NormalizedTo = 'active' | 'paused' | 'ended' | 'unknown';
+type NormalizedTo = 'active' | 'inactive' | 'unknown';
 
 // One vocabulary entry — THE primary artifact. `value` is the verbatim `client_status` string (or a
 // fixed synthetic/redacted label); `normalizedTo` is exactly what the edge's `normalizeStatus` returns
@@ -119,9 +119,11 @@ interface ClientStatusVocabResult {
   vocabulary: StatusVocabEntry[];
 
   // Pure rollups DERIVED from `vocabulary` (no new upstream data) — serve the two-direction acceptance.
-  byNormalized: { active: NormalizedRollup; paused: NormalizedRollup; ended: NormalizedRollup; unknown: NormalizedRollup };
+  // Buckets mirror the #453 binary `normalizeStatus` range exactly (active/inactive + the unknown
+  // fail-closed catch-all); the retired paused/ended buckets are gone — the edge can never produce them.
+  byNormalized: { active: NormalizedRollup; inactive: NormalizedRollup; unknown: NormalizedRollup };
   // The review spotlight: every value that maps to `unknown`. A human scans these for anything that is
-  // really active-like (active direction) or ended/paused-like (movement direction) → STOP + taxonomy PR.
+  // really active-like (active direction) or inactive-like (movement direction) → STOP + taxonomy PR.
   unknownStatusValues: StatusVocabEntry[];
 }
 
@@ -218,8 +220,7 @@ function buildResult(acc: Accumulator, meta: TransportMeta): ClientStatusVocabRe
   const totalRecordsScanned = vocabulary.reduce((sum, e) => sum + e.count, 0);
   const byNormalized = {
     active: { distinctValues: 0, members: 0 },
-    paused: { distinctValues: 0, members: 0 },
-    ended: { distinctValues: 0, members: 0 },
+    inactive: { distinctValues: 0, members: 0 },
     unknown: { distinctValues: 0, members: 0 },
   };
   for (const e of vocabulary) {
@@ -341,6 +342,11 @@ function runSelfTest(): void {
     { client_status: 'Active' },
     { client_status: 'Active' },
     { client_status: 'active' }, // distinct raw value vs 'Active' — both normalize to active
+    { client_status: 'Inactive' }, // the binary mapping's second half (live: 547-548 members)
+    { client_status: 'Inactive' },
+    { client_status: 'inactive' }, // distinct raw value vs 'Inactive' — both normalize to inactive
+    // Retired 3-way vocabulary (#453 binary rescope) — fail-closed traps: every one of these MUST map
+    // to unknown, proving the retired paused/ended taxonomy stays retired and nothing silently revives it.
     { client_status: 'Paused' },
     { client_status: 'Paused' },
     { client_status: 'Frozen' },
@@ -375,7 +381,7 @@ function runSelfTest(): void {
   }
 
   // (2) The allowed status STRINGS ARE present (by design — proves the vocabulary is actually emitted).
-  const mustAppear = ['Active', 'Paused', 'Ended', 'Active - Comp', 'Suspended'];
+  const mustAppear = ['Active', 'Inactive', 'Paused', 'Ended', 'Active - Comp', 'Suspended'];
   const missing = mustAppear.filter((s) => !serialized.includes(s));
   if (missing.length > 0) {
     console.error(`SELFTEST FAIL: expected status string(s) absent from output: ${missing.join(', ')}`);
@@ -401,27 +407,29 @@ function runSelfTest(): void {
   const expectations: Array<[string, boolean]> = [
     ['vocabulary shape == {value,count,normalizedTo}', shapeOk],
     ['normalizedTo matches imported normalizeStatus', importConsistent],
-    ['entries == 13', result.vocabulary.length === 13],
-    ['totalRecordsScanned == 20', result.totalRecordsScanned === 20],
+    ['entries == 15', result.vocabulary.length === 15],
+    ['totalRecordsScanned == 23', result.totalRecordsScanned === 23],
     ['Active → active × 3', find('Active', 'active')?.count === 3],
     ['active → active × 1 (distinct raw value)', find('active', 'active')?.count === 1],
-    ['Paused → paused × 2', find('Paused', 'paused')?.count === 2],
-    ['Frozen → paused', find('Frozen', 'paused')?.count === 1],
-    ['On Hold → paused', find('On Hold', 'paused')?.count === 1],
-    ['Ended → ended × 2', find('Ended', 'ended')?.count === 2],
-    ['Cancelled → ended', find('Cancelled', 'ended')?.count === 1],
+    ['Inactive → inactive × 2', find('Inactive', 'inactive')?.count === 2],
+    ['inactive → inactive × 1 (distinct raw value)', find('inactive', 'inactive')?.count === 1],
+    // Retired 3-way vocabulary — fail-closed traps: each MUST land in unknown, never paused/ended/active.
+    ['Paused → unknown × 2 (retired vocab trap)', find('Paused', 'unknown')?.count === 2],
+    ['Frozen → unknown (retired vocab trap)', find('Frozen', 'unknown')?.count === 1],
+    ['On Hold → unknown (retired vocab trap)', find('On Hold', 'unknown')?.count === 1],
+    ['Ended → unknown × 2 (retired vocab trap)', find('Ended', 'unknown')?.count === 2],
+    ['Cancelled → unknown (retired vocab trap)', find('Cancelled', 'unknown')?.count === 1],
     ['Active - Comp → unknown (ACTIVE-direction trap)', find('Active - Comp', 'unknown')?.count === 1],
     ['Suspended → unknown × 2 (MOVEMENT-direction trap)', find('Suspended', 'unknown')?.count === 2],
-    ['Trial → unknown', find('Trial', 'unknown')?.count === 1],
+    ['Trial → unknown (retired vocab trap)', find('Trial', 'unknown')?.count === 1],
     ['empty string → unknown', find('', 'unknown')?.count === 1],
     ['absent/non-string → unknown × 2', find(MISSING_LABEL, 'unknown')?.count === 2],
     ['oversized + email-like → redacted/unknown × 2', find(REDACTED_LABEL, 'unknown')?.count === 2],
     ['byNormalized.active == {2, 4}', result.byNormalized.active.distinctValues === 2 && result.byNormalized.active.members === 4],
-    ['byNormalized.paused == {3, 4}', result.byNormalized.paused.distinctValues === 3 && result.byNormalized.paused.members === 4],
-    ['byNormalized.ended == {2, 3}', result.byNormalized.ended.distinctValues === 2 && result.byNormalized.ended.members === 3],
-    ['byNormalized.unknown == {6, 9}', result.byNormalized.unknown.distinctValues === 6 && result.byNormalized.unknown.members === 9],
+    ['byNormalized.inactive == {2, 3}', result.byNormalized.inactive.distinctValues === 2 && result.byNormalized.inactive.members === 3],
+    ['byNormalized.unknown == {11, 16}', result.byNormalized.unknown.distinctValues === 11 && result.byNormalized.unknown.members === 16],
     ['conservation: Σ counts == totalRecordsScanned', result.vocabulary.reduce((s, e) => s + e.count, 0) === result.totalRecordsScanned],
-    ['unknownStatusValues count == 6', result.unknownStatusValues.length === 6],
+    ['unknownStatusValues count == 11', result.unknownStatusValues.length === 11],
     ['coverageComplete == true (all OK)', result.coverageComplete === true],
   ];
   const failed = expectations.filter(([, ok]) => !ok).map(([name]) => name);
@@ -443,7 +451,7 @@ function runSelfTest(): void {
     // (a) key seen ('clients') but the page carried zero members → isolates the `totalRecordsScanned > 0` guard.
     ['zeroRecordsButKeySeen', buildResult(new Map<string, StatusVocabEntry>(), { ...freshMeta(), httpStatusClass: '2xx', jsonParseable: true, recordArrayKey: 'clients', pagesFetched: 1 })],
     // (b) records present but the array key was never positively identified (shape regression / renamed key);
-    //     uses the populated 20-record acc so the ONLY failing condition is recordArrayKey === null → isolates
+    //     uses the populated 23-record acc so the ONLY failing condition is recordArrayKey === null → isolates
     //     the `recordArrayKey !== null` guard and proves it is independently load-bearing.
     ['recordArrayKeyNull', buildResult(acc, { ...freshMeta(), httpStatusClass: '2xx', jsonParseable: true, recordArrayKey: null, pagesFetched: 1 })],
   ];
