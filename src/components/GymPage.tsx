@@ -1,5 +1,5 @@
-// Gym › Retention — the Gym section's first real subpage (routed at
-// /gym/retention; reached via the expandable Gym group in AppSidebar).
+// Retention — top-level nav item routed at /gym/retention (the path keeps its
+// /gym prefix; a Gym sidebar group can return when sibling subpages are real).
 // The Watch cards (Silent Churn, Attendance Health) read the live Wodify
 // aggregate when a snapshot is available and fall back to the sample fixture
 // otherwise; Member Movement's census (active/inactive — binary, §6 rescope)
@@ -55,12 +55,6 @@ export function GymPage() {
     <div className="stack-grid">
       <div className="ta-page">
         <div className="gym-retention">
-          <nav className="gym-breadcrumb" aria-label="Breadcrumb">
-            <span className="gym-breadcrumb-item">Gym</span>
-            <span className="gym-breadcrumb-sep" aria-hidden="true">›</span>
-            <span className="gym-breadcrumb-item is-current" aria-current="page">Retention</span>
-          </nav>
-
           <div className="ta-page-header">
             <h1 className="ta-page-title">Retention</h1>
             <p className="ta-page-subtitle">
