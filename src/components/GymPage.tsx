@@ -537,12 +537,14 @@ function MemberMovementCard({ snapshot }: { snapshot: RetentionAggregateSnapshot
           )}
         </dl>
 
-        {/* Honest scope copy: Wodify's roster status is binary, and where on-hold
-            members land within it is unverified — the copy must not assert it. */}
+        {/* Verified 2026-06-10 (Wodify admin UI): members with a running membership
+            hold keep client status Active — they never appear under Inactive. The
+            "On hold" badge is Wodify-UI-only (no /clients field carries it, per the
+            field-discovery probe), so the binary census can assert this safely. */}
         <p className="member-movement-census-note">
-          Inactive groups every membership that isn&rsquo;t currently active in
-          Wodify — this can include paused or on-hold members as well as ended or
-          lapsed ones.
+          Counts reflect Wodify&rsquo;s client status: members with a membership on
+          hold stay Active in Wodify, so Active includes them — Inactive is members
+          whose membership has ended or lapsed.
         </p>
 
         {census.unknown > 0 && (

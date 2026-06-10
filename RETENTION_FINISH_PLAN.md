@@ -691,13 +691,24 @@ aggregate census partition is now `activeTotal + inactiveTotal + unknownStatus =
 (conservation tested); the unapplied draft schema's `paused_total`/`ended_total` became
 `inactive_total` (NULLABLE, no default — null → Sample, a real 0 renders live; verified 2026-06-10
 the live table has never had census columns); the card shows **Active / Inactive** with honest
-catch-all copy (on-hold placement within Wodify's binary is **unverified** — the copy hedges rather
-than asserts) and surfaces a nonzero unknown-status count (parity with Attendance Health's Unknown).
+catch-all copy (on-hold placement within Wodify's binary was **unverified at rescope time** — the copy
+hedged rather than asserted; since verified, see below) and surfaces a nonzero unknown-status count
+(parity with Attendance Health's Unknown).
 The AH/SC path is regression-clean by construction — the `/^active$/i` matcher, activeTotal, and the
 recency histogram are untouched (pinned by a parity-regression test). The card **keeps its Sample
 gate** until a future Wesley-gated re-armed re-pull populates `inactive_total`. A 3-way census would
 need a different source (another Wodify endpoint at a higher tier, or an Admin export) — a separate,
 unscoped discovery.
+
+**On-hold placement — VERIFIED (2026-06-10, Wesley, Wodify admin UI).** Members with a running
+membership hold keep client status **Active**: they appear under the "Active & On Ramp" roster
+filter, never under Inactive, with an orange Alerts pill "On hold: [date]" on the profile (cross-checked
+against the On-Hold Memberships report). So Active includes on-hold members and Inactive is ended /
+lapsed memberships only. The card copy now asserts this instead of hedging. The "On hold" badge is
+Wodify-UI-only — no `/clients` field carries it, consistent with the field-discovery probe's
+`separationConfidence: none`. Caveat for future readers: Wodify Insights' "On Hold" ≈30 is a
+membership **product-type** metric, NOT the count of currently-running holds (11 on 2026-06-09) —
+different metrics, same label.
 
 **Prior-state facts (preserved).** The import-resolution sub-gate closed via Option A (#435 @ `b6bd9d6`); the
 **`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06) dropped the vestigial function-local `deno.json`
