@@ -58,8 +58,8 @@ describe('fetchLatestRetentionAggregate — mapping + failure modes', () => {
     expect(snap).toEqual({
       asOf: '2026-06-07',
       activeTotal: 412,
-      pausedTotal: null, // VALID_ROW predates the §6 census columns → null → sample census
-      endedTotal: null,
+      inactiveTotal: null, // VALID_ROW predates the §6 census column → null → sample census
+      unknownStatus: 0, // absent on the row → coerced to 0 (NOT NULL default 0 live)
       unknown: 155,
       daysAbsentHistogram: {
         countsByDaysAbsent: { '0': 3, '8': 2, '21': 5 },
@@ -79,31 +79,37 @@ describe('fetchLatestRetentionAggregate — mapping + failure modes', () => {
     expect(init.headers.Authorization).toBe('Bearer anon-test-key');
   });
 
-  it('maps a present census (paused_total / ended_total, incl. a real 0) to live numbers', async () => {
+  it('maps a present census (inactive_total, incl. a real 0) to live numbers', async () => {
     stubConfiguredEnv();
-    installFetch({ ok: true, body: [{ ...VALID_ROW, paused_total: 18, ended_total: 0 }] });
+    installFetch({ ok: true, body: [{ ...VALID_ROW, inactive_total: 548, unknown_status: 2 }] });
     const { fetchLatestRetentionAggregate } = await loadModule();
     const snap = await fetchLatestRetentionAggregate();
-    expect(snap?.pausedTotal).toBe(18);
-    expect(snap?.endedTotal).toBe(0); // a real 0 is a live zero, never coerced to null
+    expect(snap?.inactiveTotal).toBe(548);
+    expect(snap?.unknownStatus).toBe(2);
   });
 
-  it('maps an absent census (pre-migration row, no census columns) to null → sample fallback', async () => {
+  it('maps a real census 0 to 0 (a live zero, never coerced to null)', async () => {
     stubConfiguredEnv();
-    installFetch({ ok: true, body: [VALID_ROW] }); // VALID_ROW carries no paused_total/ended_total
+    installFetch({ ok: true, body: [{ ...VALID_ROW, inactive_total: 0 }] });
     const { fetchLatestRetentionAggregate } = await loadModule();
     const snap = await fetchLatestRetentionAggregate();
-    expect(snap?.pausedTotal).toBeNull();
-    expect(snap?.endedTotal).toBeNull();
+    expect(snap?.inactiveTotal).toBe(0);
+  });
+
+  it('maps an absent census (pre-migration row, no census column) to null → sample fallback', async () => {
+    stubConfiguredEnv();
+    installFetch({ ok: true, body: [VALID_ROW] }); // VALID_ROW carries no inactive_total
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    const snap = await fetchLatestRetentionAggregate();
+    expect(snap?.inactiveTotal).toBeNull();
   });
 
   it('maps null / malformed census values to null (never a fabricated 0)', async () => {
     stubConfiguredEnv();
-    installFetch({ ok: true, body: [{ ...VALID_ROW, paused_total: null, ended_total: 'x' }] });
+    installFetch({ ok: true, body: [{ ...VALID_ROW, inactive_total: 'x' }] });
     const { fetchLatestRetentionAggregate } = await loadModule();
     const snap = await fetchLatestRetentionAggregate();
-    expect(snap?.pausedTotal).toBeNull();
-    expect(snap?.endedTotal).toBeNull();
+    expect(snap?.inactiveTotal).toBeNull();
   });
 
   it('returns null when no row exists (empty array)', async () => {

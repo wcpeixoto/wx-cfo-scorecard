@@ -424,3 +424,77 @@ global** — a broader run needs separate approval). Output stayed fully within 
   suitability: "sufficient" | "insufficient" | "unproven"
 }
 ```
+
+## `clientStatusVocab.ts` — `client_status` vocabulary + predicted `normalizeStatus` mapping (§6 pre-redeploy gate)
+
+Enumerates the **real distinct `client_status` values** Wodify returns and how the current fail-closed
+`normalizeStatus` (the #451 mapping the next redeploy ships) maps each — so before the §6 sequence
+(schema ALTER → name-scoped edge redeploy → re-arm → re-pull) we know no status is silently mis-mapped
+in **either** direction:
+
+- **ENDED direction** — a genuinely-ended status that does **not** normalize to `ended` inflates
+  `unknownStatus` and makes the new Member Movement census (paused/ended) misleading.
+- **ACTIVE direction (higher stakes)** — an active-like status (e.g. `Active - Comp`) that does **not**
+  normalize to `active` under-counts active members, and Attendance Health + Silent Churn are **already
+  live** off that count, so a miss corrupts numbers already on the page.
+
+The probe surfaces the vocabulary; the human + Reviewer decide. If any real status would mislead, the
+§6 runbook **STOPS** and ships the smallest taxonomy PR first. It does **not** deploy, re-arm, invoke,
+persist, or touch Supabase / the edge function.
+
+### Two deliberate departures from the sibling probes (both required so it faithfully predicts the edge)
+
+1. It **imports** the real `normalizeStatus` from `src/lib/gym/wodifyRetentionAggregate.ts` (rather than
+   reimplementing a mapping) so `normalizedTo` predicts the redeployed edge byte-for-byte. That module's
+   only transitive import is the locked `./silentChurn.ts`, whose only import is a **type-only**
+   `./memberFixture` (erased at runtime) — so the import is pure and side-effect-free.
+2. It **emits raw `client_status` strings** verbatim as `value`. The sibling probes bucket status into
+   allowlisted category names and never emit a raw value; this probe must show the literal vocabulary,
+   which is the point of the gate. Safe because `client_status` is a membership-**category** enum label
+   (`Active`, `Paused`, `Ended`, …), not member PII.
+
+### Safety (enforced by the script — sibling posture, plus the scoped status-string exception above)
+
+- Reads the key **only** from `process.env.WODIFY_API_KEY`; never `VITE_*`, hardcoded, logged, printed,
+  or echoed; exits without a request if unset. **Never** sources the key from Supabase secrets / the edge
+  function. Local / server-side only; never bundled.
+- Output is **only** `{ value, count, normalizedTo }` records (the vocabulary), safe transport/coverage
+  metadata (counts, booleans, HTTP status classes), and pure rollups **derived** from the vocabulary. The
+  only raw upstream data is the distinct `client_status` strings + counts. Never names, IDs, raw rows,
+  exact dates, dues, headers, URLs, keys, or raw response bodies.
+- **Defense in depth** on the one emitted upstream string: a `client_status` over `MAX_STATUS_LEN` (80)
+  chars or containing `@` is **redacted** to a fixed label and only counted (its `normalizedTo` is still
+  the true mapping). `1900-01-01` etc. are irrelevant here — only the status field is read.
+- Detects the Wodify **error envelope** (in-body `HTTPCode` → status class only).
+- **Paginates the full client set** (mirrors the edge `fetchAllClients`: loop while `pagination.has_more`,
+  `MAX_PAGES` safety bound) so a rare status on a later page is not missed; `coverageComplete` surfaces
+  whether the whole vocabulary was scanned.
+
+### Run
+
+```bash
+npx tsx scripts/wodify/clientStatusVocab.ts --selftest   # network-free, no key (run FIRST)
+npx tsx --env-file=/Users/wesley/Code/wx-cfo-scorecard/.env.local \
+  scripts/wodify/clientStatusVocab.ts
+```
+
+**Status: Phase 1 (author + self-test) done; self-test PASSes.** The **live run is gated** — it needs a
+separate explicit Wesley go after the Reviewer's leak-safety + code review. The live run still prints
+only the vocabulary histogram below.
+
+### Output shape (the only thing printed)
+
+```ts
+{
+  probe: "clientStatusVocab",
+  path: "/clients",                       // PATH only
+  endpointReached, httpStatusClass, errorEnvelopeDetected, embeddedHttpStatusClass,
+  jsonParseable, recordArrayKey,          // "clients" — confirms the edge's records-array shape
+  pagesFetched, reachedPageCap,
+  coverageComplete: boolean,              // true ⇒ the WHOLE client set was scanned (vocabulary exhaustive)
+  totalRecordsScanned: number,
+  vocabulary: Array<{ value: string, count: number, normalizedTo: "active"|"paused"|"ended"|"unknown" }>,
+  byNormalized: { active|paused|ended|unknown: { distinctValues: number, members: number } },
+  unknownStatusValues: Array<{ value, count, normalizedTo }>   // the review spotlight (every → unknown)
+}
+```

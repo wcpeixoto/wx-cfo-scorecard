@@ -13185,7 +13185,9 @@ body {
   color: var(--text-secondary);
 }
 .member-movement-helper,
-.member-movement-empty {
+.member-movement-empty,
+.member-movement-census-note,
+.member-movement-dataquality {
   margin: 0;
   font-size: 14px;
   color: var(--text-secondary);
@@ -13223,8 +13225,8 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .member-movement-stat--active .member-movement-stat-value { color: var(--positive); }
-.member-movement-stat--paused .member-movement-stat-value { color: var(--warning); }
-.member-movement-stat--ended .member-movement-stat-value { color: var(--text-secondary); }
+.member-movement-stat--inactive .member-movement-stat-value { color: var(--text-secondary); }
+.member-movement-stat--unknown .member-movement-stat-value { color: var(--text-secondary); }
 .member-movement-intake {
   display: flex;
   flex-direction: column;

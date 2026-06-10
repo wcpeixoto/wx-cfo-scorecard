@@ -34,13 +34,16 @@ const OPTS = {
 // shipped function directly.
 
 // Map a sample GymMember to the raw /clients shape so we can run the SAME fixture
-// through both the locked classifier and the server aggregate and compare.
+// through both the locked classifier and the server aggregate and compare. The
+// fixture keeps its 3-way status (it feeds the locked classifyMember); on the raw
+// side paused/ended both map to 'Inactive' — the only non-active value Wodify
+// actually returns (vocab gate, 2026-06-09).
 function memberToRawRow(m: GymMember): RawWodifyClient {
-  const statusWord = { active: 'Active', paused: 'Paused', ended: 'Ended' }[m.status];
+  const statusWord = m.status === 'active' ? 'Active' : 'Inactive';
   return { client_status: statusWord, last_attendance: m.lastCheckIn };
 }
 
-describe('normalizeStatus (fail-closed taxonomy)', () => {
+describe('normalizeStatus (fail-closed taxonomy, binary §6 rescope)', () => {
   it('maps exact Active (case-insensitive) → active, without broadening', () => {
     expect(normalizeStatus('Active')).toBe('active');
     expect(normalizeStatus('active')).toBe('active');
@@ -50,24 +53,30 @@ describe('normalizeStatus (fail-closed taxonomy)', () => {
     expect(normalizeStatus('Active - Comp')).toBeNull();
   });
 
-  it('maps known paused-like statuses → paused', () => {
-    expect(normalizeStatus('Paused')).toBe('paused');
-    expect(normalizeStatus('Frozen')).toBe('paused');
-    expect(normalizeStatus('On Hold')).toBe('paused');
+  it('maps exact Inactive (case-insensitive) → inactive, without broadening', () => {
+    expect(normalizeStatus('Inactive')).toBe('inactive');
+    expect(normalizeStatus('inactive')).toBe('inactive');
+    expect(normalizeStatus('INACTIVE')).toBe('inactive');
+    // Anchored like ^active$: a variant fails closed to unknown, never guessed.
+    expect(normalizeStatus('Inactive - Archived')).toBeNull();
   });
 
-  it('maps explicit, anchored ended values → ended', () => {
-    expect(normalizeStatus('Ended')).toBe('ended');
-    expect(normalizeStatus('Cancelled')).toBe('ended');
-    // Anchored: "ended" as a substring of another word must NOT match. "Suspended"
-    // ends in "...ended" but is ambiguous → unknown, not ended.
+  it('routes the formerly-mapped paused/ended vocabulary → null (proven vocabulary only)', () => {
+    // The binary rescope: Wodify returns exactly Active/Inactive (vocab gate,
+    // 957 records, coverage-complete), so the speculative paused/ended word maps
+    // are gone. None of these are statuses Wodify actually returns — if one ever
+    // appears it must surface in unknownStatus, never be silently bucketed.
+    expect(normalizeStatus('Paused')).toBeNull();
+    expect(normalizeStatus('Frozen')).toBeNull();
+    expect(normalizeStatus('On Hold')).toBeNull();
+    expect(normalizeStatus('Ended')).toBeNull();
+    expect(normalizeStatus('Cancelled')).toBeNull();
     expect(normalizeStatus('Suspended')).toBeNull();
   });
 
-  it('routes PRESENT-but-unrecognized statuses → null (unknown bucket, NOT ended)', () => {
-    // The fix (§6 fix B): real Wodify statuses we do not map yet no longer fall
-    // through to 'ended'. An unrecognized value is unclassified data, not a
-    // confirmed cancellation — unknown is the honest bucket.
+  it('routes PRESENT-but-unrecognized statuses → null (unknown bucket, never guessed)', () => {
+    // §6 fix B, preserved through the rescope: an unrecognized value is
+    // unclassified data — unknown is the honest bucket.
     expect(normalizeStatus('Trial')).toBeNull();
     expect(normalizeStatus('Prospect')).toBeNull();
     expect(normalizeStatus('Lead')).toBeNull();
@@ -141,8 +150,8 @@ describe('computeRetentionAggregate — binning, sentinel, future, overflow', ()
     { client_status: 'Active', last_attendance: '1900-01-01' }, // sentinel → unknown
     { client_status: 'Active', last_attendance: '2026-06-10' }, // future (-5) → day 0 + diag
     { client_status: 'Active', last_attendance: '2026-05-15', last_class_sign_in: '2026-06-04T09:00:00Z' }, // 1 (latest)
-    { client_status: 'Paused', last_attendance: '2020-01-01' }, // excluded
-    { client_status: 'Cancelled', last_attendance: '2020-01-01' }, // → ended, excluded
+    { client_status: 'Inactive', last_attendance: '2020-01-01' }, // census, excluded from binning
+    { client_status: 'INACTIVE', last_attendance: '2020-01-01' }, // case-insensitive → census, excluded
     { client_status: '', last_attendance: '2026-06-04' }, // unmappable status
   ];
   const agg = computeRetentionAggregate(rows, OPTS);
@@ -160,10 +169,9 @@ describe('computeRetentionAggregate — binning, sentinel, future, overflow', ()
     expect(agg.unknown).toBe(1); // sentinel member, active but no usable date
   });
 
-  it('counts active/paused/ended census, surfaces dataQuality', () => {
+  it('counts active/inactive census, surfaces dataQuality', () => {
     expect(agg.activeTotal).toBe(10);
-    expect(agg.pausedTotal).toBe(1); // one 'Paused' row
-    expect(agg.endedTotal).toBe(1); // one 'Cancelled' → ended
+    expect(agg.inactiveTotal).toBe(2); // the two Inactive rows
     expect(agg.dataQuality.unknownStatus).toBe(1);
     expect(agg.dataQuality.futureLastCheckIn).toBe(1);
     expect(agg.dataQuality.clientsScanned).toBe(13);
@@ -171,9 +179,9 @@ describe('computeRetentionAggregate — binning, sentinel, future, overflow', ()
     expect(agg.diagnostics.wodifyAtRiskCount).toBe(1);
   });
 
-  it('census conserves: activeTotal + pausedTotal + endedTotal + unknownStatus === clientsScanned', () => {
+  it('census conserves: activeTotal + inactiveTotal + unknownStatus === clientsScanned', () => {
     expect(
-      agg.activeTotal + agg.pausedTotal + agg.endedTotal + agg.dataQuality.unknownStatus,
+      agg.activeTotal + agg.inactiveTotal + agg.dataQuality.unknownStatus,
     ).toBe(agg.dataQuality.clientsScanned);
   });
 
@@ -199,50 +207,80 @@ describe('computeRetentionAggregate — binning, sentinel, future, overflow', ()
   });
 });
 
-describe('Member Movement census (paused/ended counts, §6)', () => {
-  it('counts paused (incl. Frozen / On Hold) and explicit ended (Ended / Cancelled); unrecognized → unknownStatus', () => {
+describe('Member Movement census (binary active/inactive, §6 rescope)', () => {
+  it('counts exact Active/Inactive; everything else → unknownStatus (proven vocabulary only)', () => {
     const rows: RawWodifyClient[] = [
       { client_status: 'Active', last_attendance: '2026-06-05' },
       { client_status: 'Active', last_attendance: '2026-06-01' },
-      { client_status: 'Paused' },
-      { client_status: 'Frozen' }, // → paused
-      { client_status: 'On Hold' }, // → paused
-      { client_status: 'Ended' },
-      { client_status: 'Cancelled' }, // explicit, anchored ended — not a fallback
-      { client_status: 'Trial' }, // present-but-unrecognized → unknownStatus, NOT ended
+      { client_status: 'Inactive' },
+      { client_status: 'inactive' }, // case-insensitive
+      { client_status: 'Paused' }, // formerly paused — now unknownStatus (not a proven status)
+      { client_status: 'Frozen' }, // formerly paused — now unknownStatus
+      { client_status: 'Ended' }, // formerly ended — now unknownStatus
+      { client_status: 'Cancelled' }, // formerly ended — now unknownStatus
+      { client_status: 'Trial' }, // present-but-unrecognized → unknownStatus
       { client_status: '' }, // missing/blank → unknownStatus
       { client_status: undefined }, // missing → unknownStatus
     ];
     const a = computeRetentionAggregate(rows, OPTS);
-    expect(a.activeTotal).toBe(2); // active path untouched by the Trial row
-    expect(a.pausedTotal).toBe(3); // Paused + Frozen + On Hold
-    expect(a.endedTotal).toBe(2); // Ended + Cancelled (Trial is NOT ended)
-    expect(a.dataQuality.unknownStatus).toBe(3); // Trial + '' + undefined
-    expect(a.dataQuality.clientsScanned).toBe(10);
-    // Four-way census partition === clients scanned (no row dropped or double-counted).
-    expect(
-      a.activeTotal + a.pausedTotal + a.endedTotal + a.dataQuality.unknownStatus,
-    ).toBe(a.dataQuality.clientsScanned);
+    expect(a.activeTotal).toBe(2); // active path untouched by unrecognized rows
+    expect(a.inactiveTotal).toBe(2); // Inactive + inactive only
+    expect(a.dataQuality.unknownStatus).toBe(7); // Paused/Frozen/Ended/Cancelled/Trial/''/undefined
+    expect(a.dataQuality.clientsScanned).toBe(11);
+    // Three-way census partition === clients scanned (no row dropped or double-counted).
+    expect(a.activeTotal + a.inactiveTotal + a.dataQuality.unknownStatus).toBe(
+      a.dataQuality.clientsScanned,
+    );
   });
 
-  it('paused/ended members are excluded from the active recency histogram', () => {
-    // A paused member with an ancient check-in must NOT land in any active bin.
+  it('inactive members are excluded from the active recency histogram', () => {
+    // An inactive member with an ancient check-in must NOT land in any active bin.
     const a = computeRetentionAggregate(
       [
         { client_status: 'Active', last_attendance: '2026-06-05' }, // day 0
-        { client_status: 'Paused', last_attendance: '2020-01-01' },
-        { client_status: 'Ended', last_attendance: '2019-01-01' },
+        { client_status: 'Inactive', last_attendance: '2020-01-01' },
+        { client_status: 'Inactive', last_attendance: '2019-01-01' },
       ],
       OPTS,
     );
     expect(a.activeTotal).toBe(1);
-    expect(a.pausedTotal).toBe(1);
-    expect(a.endedTotal).toBe(1);
+    expect(a.inactiveTotal).toBe(2);
     const binSum = Object.values(a.daysAbsentHistogram.countsByDaysAbsent).reduce(
       (x, y) => x + y,
       0,
     );
     expect(binSum + a.daysAbsentHistogram.overflow365Plus).toBe(1); // only the active row
+  });
+
+  it('AH/SC parity regression: non-active rows never perturb activeTotal or the histogram', () => {
+    // The rescope is regression-clean by construction for Attendance Health /
+    // Silent Churn: the /^active$/i matcher and the active-only binning are
+    // untouched, so adding ANY non-active rows (the proven Inactive value, the
+    // retired paused/ended words, junk) must leave activeTotal, the histogram,
+    // and the active-unknown count byte-identical to the active-rows-only run.
+    const activeRows: RawWodifyClient[] = [
+      { client_status: 'Active', last_attendance: '2026-06-05' }, // 0
+      { client_status: 'Active', last_attendance: '2026-05-28' }, // 8
+      { client_status: 'Active', last_attendance: '2026-05-15' }, // 21
+      { client_status: 'Active', last_attendance: '2024-06-05' }, // overflow
+      { client_status: 'Active', last_attendance: '1900-01-01' }, // sentinel → unknown
+    ];
+    const nonActiveRows: RawWodifyClient[] = [
+      { client_status: 'Inactive', last_attendance: '2026-06-05' },
+      { client_status: 'Paused', last_attendance: '2026-06-05' },
+      { client_status: 'Ended', last_attendance: '2026-06-05' },
+      { client_status: 'Trial', last_attendance: '2026-06-05' },
+      { client_status: '' },
+    ];
+    const activeOnly = computeRetentionAggregate(activeRows, OPTS);
+    const mixed = computeRetentionAggregate([...activeRows, ...nonActiveRows], OPTS);
+    expect(mixed.activeTotal).toBe(activeOnly.activeTotal);
+    expect(mixed.daysAbsentHistogram).toEqual(activeOnly.daysAbsentHistogram);
+    expect(mixed.unknown).toBe(activeOnly.unknown);
+    // And the census partition still conserves on the mixed set.
+    expect(mixed.activeTotal + mixed.inactiveTotal + mixed.dataQuality.unknownStatus).toBe(
+      mixed.dataQuality.clientsScanned,
+    );
   });
 });
 
@@ -309,7 +347,10 @@ describe('parity with the locked classifier (computeAttendanceHealth)', () => {
     expect(deriveBuckets(agg, 21).silent).toBe(classifier.silent);
   });
 
-  it('also holds with unknown + future + paused/ended members present', () => {
+  it('also holds with unknown + future + non-active members present', () => {
+    // The fixture members keep their 3-way status (the locked classifier consumes
+    // it); memberToRawRow maps paused/ended → 'Inactive' (the proven vocabulary),
+    // so both layers exclude the same members and parity must still hold.
     const mixed: GymMember[] = [
       { id: 'a', displayName: 'A', status: 'active', monthlyDues: 100, membershipStart: '2024-01-01', lastCheckIn: '2026-06-02' }, // healthy
       { id: 'b', displayName: 'B', status: 'active', monthlyDues: 100, membershipStart: '2024-01-01', lastCheckIn: '2026-05-01' }, // silent@21
@@ -348,8 +389,7 @@ describe('payload shape (non-PII contract)', () => {
       asOf: '2026-06-05',
       fetchedAt: '2026-06-05T12:00:00Z',
       activeTotal: 1,
-      pausedTotal: 0,
-      endedTotal: 0,
+      inactiveTotal: 0,
       daysAbsentHistogram: {
         maxExactDays: 364,
         countsByDaysAbsent: { '4': 1 },

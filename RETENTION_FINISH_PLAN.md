@@ -35,8 +35,10 @@ to Wodify data yet.
 - **Churn Risk by Tenure** (#411) — active-only risk rate by tenure band. Anti-drift
   invariant enforced by tests: Σ `silent` across bands === `computeSilentChurn(...).count`
   at the same T.
-- **Member Movement** (#414) — current census (active / paused / ended) + join-cohort
-  intake only. **No movement-over-time series by design** — the fixture carries no
+- **Member Movement** (#414) — current census + join-cohort intake only. The census
+  is **BINARY (active / inactive)** since the 2026-06-10 §6 rescope — the original
+  active/paused/ended design was RETIRED as source-unsupported (see §6, "Census
+  rescope"). **No movement-over-time series by design** — the fixture carries no
   dated status changes, so a flow/cancellation trend would be invented history.
 - **Parked / blocked gate labels** (#415) — the three remaining shells show honest gate
   notes via `GymCardShell`'s `gate` prop (still shells, no internals): Churn by Age +
@@ -646,12 +648,14 @@ slice the non-PII aggregate cannot yet back, each gated on re-arming the **DISAR
 returns and map each value explicitly. `normalizeStatus` now **fails closed to unknown** for any
 present-but-unrecognized status (the prior silent `else → 'ended'` catch-all is gone), so an
 un-enumerated status inflates `unknownStatus` rather than the ended census — **do not proceed with
-the pull if the real statuses would make `active` / `paused` / `ended` semantics misleading; stop
-and report and extend the taxonomy first.** (#451 is **edge-function logic only** and is **INERT in
+the pull if the real statuses would make the census semantics misleading; stop
+and report and extend the taxonomy first.** *(This gate was EXERCISED 2026-06-10: the vocab probe
+proved the 3-way semantics WERE misleading, and the census was rescoped to binary — see "Census
+rescope" below.)* (#451 is **edge-function logic only** and is **INERT in
 production** until the DISARMED `sync-wodify-retention` function is redeployed **and** a fresh
 authorized pull runs — the SPA bundle is unchanged.) The blocked slices: (i) **Member Movement** —
-the census SPA wiring **shipped (#450 @ `243a566`)**, but the card **stays Sample** until a
-re-armed re-pull populates the live census columns (`paused_total` / `ended_total`); its
+the census SPA wiring **shipped (#450 @ `243a566`, rescoped to binary 2026-06-10)**, but the card
+**stays Sample** until a re-armed re-pull populates the live census column (`inactive_total`); its
 **join-cohort intake** plus **Churn Risk by Tenure** (#411) bands additionally need the **unproven
 `membershipStart` / join-date** field; (ii) Silent Churn **$-at-risk** needs a dues source (CSV
 import — the Wodify financials API is tier-blocked); (iii) Silent Churn **call-list / member
@@ -670,6 +674,30 @@ byte-pin → read-only Reviewer pre/post close) and owner-run. The canonical liv
 secret-neutral, and post-deploy the aggregate table was unmoved (1 row, `as_of 2026-06-07`, `fetched_at`
 unchanged), so no invoke fired. The **interim midday-gym-local mitigation is RETIRED**: the live bundle now
 buckets `asOf` to the gym's day regardless of pull time.
+
+**Census rescope — BINARY (active/inactive), 2026-06-10. The paused/ended census is RETIRED as
+source-unsupported (not deferred).** Evidence, in order: (1) the **vocab gate** (2026-06-09, live
+`clientStatusVocab.ts` run, 957 records, coverage-complete) proved `client_status` is **binary** —
+exactly `Active` (409–410) / `Inactive` (547–548), no third value; (2) the **field-discovery probe**
+(`scripts/wodify/clientsMembershipStateDiscovery.ts`, 3-round Reviewer hardening gate, live run
+2026-06-10, output Reviewer-gated CLEAN) proved **NO other `/clients` field separates paused from
+ended**: 79 fields total, **no hold/freeze/cancel/membership-state field exists**, and every field is
+present on all 957 records, so presence-based separation is structurally impossible
+(`separationConfidence: none`). A 3-way census is therefore **unsourceable from `/clients`** — under
+the pre-rescope code a re-pull would have rendered paused 0 / ended 0 with all 548 Inactive members
+in unknown, a dishonest card. **The rescope (one code-only PR):** `normalizeStatus` maps the proven
+vocabulary only (`/^active$/i`, `/^inactive$/i`, anything else fail-closed → `unknownStatus`); the
+aggregate census partition is now `activeTotal + inactiveTotal + unknownStatus === clientsScanned`
+(conservation tested); the unapplied draft schema's `paused_total`/`ended_total` became
+`inactive_total` (NULLABLE, no default — null → Sample, a real 0 renders live; verified 2026-06-10
+the live table has never had census columns); the card shows **Active / Inactive** with honest
+catch-all copy (on-hold placement within Wodify's binary is **unverified** — the copy hedges rather
+than asserts) and surfaces a nonzero unknown-status count (parity with Attendance Health's Unknown).
+The AH/SC path is regression-clean by construction — the `/^active$/i` matcher, activeTotal, and the
+recency histogram are untouched (pinned by a parity-regression test). The card **keeps its Sample
+gate** until a future Wesley-gated re-armed re-pull populates `inactive_total`. A 3-way census would
+need a different source (another Wodify endpoint at a higher tier, or an Admin export) — a separate,
+unscoped discovery.
 
 **Prior-state facts (preserved).** The import-resolution sub-gate closed via Option A (#435 @ `b6bd9d6`); the
 **`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06) dropped the vestigial function-local `deno.json`
@@ -708,14 +736,15 @@ plaintext trigger file deleted); SPA/PR2 wiring has since shipped frontend-only 
    computeSilentChurn().count` by construction).
 
 2. **Wodify `/clients` → internal normalization (server-side, transient).**
-   - **`status`** ← per-record `client_status` (the `status=Active` query does **not** filter — §5). Map
-     `/^active$/i → 'active'`, `paus|frozen|hold → 'paused'`, **anchored** `/^(ended|cancelled)$/i → 'ended'`;
-     **everything else fails closed to unknown** — present-but-unrecognized values (e.g. `Trial`, `Prospect`,
-     `Active - Comp`) **and** missing / non-string / empty — are excluded from active/paused/ended **and**
-     counted in `dataQuality.unknownStatus`. **Hardened in #451 (@ `058b470`):** the prior catch-all
-     `else → 'ended'` silently routed any unrecognized status into the ended census; the anchored match keeps
-     `ended` honest (a loose `/end/i` would also match `Suspended`) and unknown now stays unknown. Only
-     active-ness is load-bearing for this slice.
+   - **`status`** ← per-record `client_status` (the `status=Active` query does **not** filter — §5).
+     **BINARY since the 2026-06-10 rescope (proven vocabulary only):** map `/^active$/i → 'active'`,
+     `/^inactive$/i → 'inactive'`; **everything else fails closed to unknown** — present-but-unrecognized
+     values (e.g. `Trial`, `Prospect`, `Active - Comp`, and the formerly-mapped `Paused`/`Frozen`/`On Hold`/
+     `Ended`/`Cancelled` words, none of which Wodify returns) **and** missing / non-string / empty — are
+     excluded from both census buckets **and** counted in `dataQuality.unknownStatus`. *(History: #451
+     (@ `058b470`) removed the original `else → 'ended'` catch-all; the 2026-06-10 rescope then replaced the
+     speculative paused/ended word-maps with the proven binary vocabulary — see "Census rescope" above.)*
+     Only active-ness is load-bearing for this slice.
    - **`lastCheckIn`** ← the most-recent **usable** of `last_attendance` and `last_class_sign_in` (both
      primary). Per field, **in this order**: (a) **slice the leading `YYYY-MM-DD`** off the ISO timestamp
      (#429: every value carried a time component, `strictYmd 0`); (b) if it equals the **`1900-01-01`

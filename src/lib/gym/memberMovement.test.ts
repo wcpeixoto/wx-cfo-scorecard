@@ -8,17 +8,16 @@ import { computeMemberMovement } from './memberMovement';
 // census is "right now by status", intake is anchored to membershipStart — so
 // these assertions need no asOf and are deterministic over the fixture.
 
-describe('computeMemberMovement — census (raw status tally)', () => {
-  it('counts active / paused / ended directly from the fixture status field', () => {
+describe('computeMemberMovement — census (raw status tally, binary §6 rescope)', () => {
+  it('counts active / inactive from the fixture status field (paused + ended → inactive)', () => {
     const { census } = computeMemberMovement(SAMPLE_GYM_MEMBERS);
     expect(census.active).toBe(20);
-    expect(census.paused).toBe(4);
-    expect(census.ended).toBe(6);
+    expect(census.inactive).toBe(10); // 4 paused + 6 ended fixture members
   });
 
-  it('census integrity: active + paused + ended === total === members.length', () => {
+  it('census integrity: active + inactive === total === members.length', () => {
     const { census } = computeMemberMovement(SAMPLE_GYM_MEMBERS);
-    expect(census.active + census.paused + census.ended).toBe(census.total);
+    expect(census.active + census.inactive).toBe(census.total);
     expect(census.total).toBe(SAMPLE_GYM_MEMBERS.length);
   });
 });
