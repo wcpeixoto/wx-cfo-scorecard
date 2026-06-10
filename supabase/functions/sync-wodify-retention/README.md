@@ -6,18 +6,22 @@ slice (`RETENTION_FINISH_PLAN.md` §6). Fetches Wodify `/clients`, computes a
 `public.wodify_retention_aggregate`. The browser never calls Wodify and never
 sees the key.
 
-> **FIRST LIVE INVOKE DONE (2026-06-07) — still DISARMED; IDEMPOTENT-UPSERT redeploy DONE (2026-06-08).**
-> The function is deployed and **ACTIVE** (`verify_jwt: true`, via `list_edge_functions`). Its bundle was
-> **redeployed for the idempotent upsert** (named unique constraint on `(workspace_id, as_of)` + PostgREST
-> `on_conflict`); the canonical identity is now
-> `ezbr_sha256 a4b19062cebaa641d56de08706d492ca59d0877f05c84fe199337584dab0c4fa` (was `35e21c14…`),
-> verified via `list_edge_functions` **and** a deployed-source read (`get_edge_function`). The **first
-> authorized live invoke ran once on 2026-06-07** (`19:48:53 UTC`) under a Reviewer audit **and** Wesley's
-> authorization, persisting one non-PII aggregate row (412 active / 956 scanned, §6.6 conservation
-> residual 0, PII-free); the redeploy did **not** invoke it. It remains **DISARMED**: it holds **no
+> **CENSUS-POPULATE PULL DONE (2026-06-10) — DISARMED again; canonical identity
+> `ezbr_sha256 40307a387ac387b21c3042949baba9fbc42d9856a2d1fceace9d7152dc4dd00f`.**
+> The function is deployed and **ACTIVE** (`verify_jwt: true`, via `list_edge_functions`). Identity
+> history: `35e21c14…` (#441-era) → `a4b19062…` (idempotent-upsert redeploy, 2026-06-08) → `eb5f5a33…`
+> (#445 gym-local `asOf` redeploy, 2026-06-08) → **`40307a38…`** (census-populate redeploy, 2026-06-10 —
+> first bundle carrying the binary-census writer against the `20260610193617` nullable `inactive_total`
+> column). **Two authorized live invokes have run**, each under a Reviewer audit + Wesley's
+> authorization: 2026-06-07 (first pull — 412 active / 956 scanned, conservation residual 0) and
+> 2026-06-10 (census-populate pull — 408 active / 549 inactive / 957 scanned, conservation residual 0,
+> inserted as a second row). The SPA reads the aggregate snapshot (Attendance Health #447, Silent Churn
+> #448, MM census live since the 2026-06-10 pull). Between runs it is **DISARMED**: it holds **no
 > `SYNC_TRIGGER_SECRET` and no `WODIFY_API_KEY`** (per `supabase secrets list`, corroborated by the
-> fail-closed gate code), makes no Wodify call, and is not wired to the SPA. Any re-arm / second pull /
-> scheduled pull requires a **fresh Reviewer audit + Wesley authorization**.
+> fail-closed gate code) and makes no Wodify call. Any re-arm / further pull / scheduled pull requires a
+> **fresh Reviewer audit + Wesley authorization**. **Identity note:** secrets operations bump EVERY
+> function's platform version counter project-wide while `ezbr_sha256` + `updated_at` stay unmoved —
+> identify deployments by **`ezbr_sha256` + `updated_at`, never version**.
 
 ## Thin-shell design + reuse boundary
 
@@ -242,7 +246,7 @@ rm -f "$cfg"
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected by the platform at
 runtime; they are not set manually.
 
-## Open items / follow-ups (first live invoke DONE 2026-06-07; idempotent-upsert redeploy DONE 2026-06-08)
+## Open items / follow-ups (first live invoke DONE 2026-06-07; idempotent-upsert redeploy DONE 2026-06-08; census-populate pull DONE 2026-06-10)
 
 - **Idempotency — DONE (constraint applied gate-4 + function redeployed gate-5, 2026-06-08; source carried by #444).**
   The persist path is now an idempotent upsert on `(workspace_id, as_of)`. **Live:** the named **unique
@@ -250,12 +254,14 @@ runtime; they are not set manually.
   (`ALTER TABLE … ADD CONSTRAINT … UNIQUE (workspace_id, as_of)` then `notify pgrst, 'reload schema'`;
   premise-checked — zero duplicate rows, built clean — verified via `pg_constraint`), the explicit
   `service_role` `UPDATE` grant is in the schema (a no-op live — service_role already had UPDATE), and
-  the upsert bundle is deployed (`ezbr a4b19062…`, version 11; `on_conflict=workspace_id,as_of` +
-  `resolution=merge-duplicates` confirmed in the deployed source via `get_edge_function`). A same-day
+  the upsert bundle was deployed as `ezbr a4b19062…` (since superseded — see the identity history in
+  the header banner; `on_conflict=workspace_id,as_of` + `resolution=merge-duplicates` confirmed in the
+  deployed source via `get_edge_function`). A same-day
   re-pull, or a scheduler retry, now **replaces** the day's row instead of duplicating it — the
   prerequisite that unblocks any second/scheduled pull. The function stays **DISARMED**, so no pull is
   reachable until separately armed. The deployed-bundle files (`index.ts` + the three `src/lib/gym/*`
-  modules) are frozen so `main` reproduces `ezbr a4b19062…` (source carried by #444).
+  modules) are kept reproducible from `main` (gate-5's `a4b19062…` came from #444; the current
+  `40307a38…` reproduces from `main` @ `d53ccd0`).
   *(Historical: two fail-closed pre-states existed only during the gate-4→gate-5 window — a same-day
   re-insert against the old plain-insert bundle would fail `409`/`23505`, and the upsert before the
   constraint existed would fail `400`/`42P10`; both fail closed, no duplicate. Both windows are now
@@ -264,12 +270,13 @@ runtime; they are not set manually.
   import-resolution sub-gate is closed: the explicit `./silentChurn.ts` import +
   `allowImportingTsExtensions` resolved the shared `src/` graph at the Supabase
   deploy/eszip path (the named-function deploy succeeded — see "Bundle/import proof").
-  The function is deployed and **ACTIVE** (`verify_jwt: true`) and now **DISARMED** after the
-  first authorized live invoke on 2026-06-07 (no key, not wired to the SPA). That invoke **proved
+  The function is deployed and **ACTIVE** (`verify_jwt: true`) and **DISARMED between authorized
+  runs** (two so far: 2026-06-07, 2026-06-10; no key held at rest). The first invoke **proved
   Wodify supplies `status` / `lastCheckIn` globally enough for the first aggregate slice** (412 active /
   956 scanned, conservation residual 0), with unknown last-check-in values **surfaced explicitly** via the
   aggregate's `unknown` bucket (155 of 412 active members; 956 clients scanned overall) rather than hidden
-  — the first-slice §6 live-data goal is MET. PR2 / SPA wiring remains OPEN.
+  — the first-slice §6 live-data goal is MET. PR2 / SPA wiring has since SHIPPED (Attendance Health
+  #447 + Silent Churn #448; the MM census is live since the 2026-06-10 census-populate pull).
 - **Confirmed by the 2026-06-07 pull (`unknown_status=0`):** the live `/clients` response uses the
   expected snake_case field names (`client_status`, `last_attendance`, `last_class_sign_in`,
   `is_at_risk`) the §5 probe observed — no casing drift surfaced via `dataQuality.unknownStatus` /

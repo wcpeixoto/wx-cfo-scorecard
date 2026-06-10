@@ -22,9 +22,12 @@ for when (and how) it is finally retired.
 
 ## Current status — UI-complete on sample data
 
-Every card on the page renders from the **sample member fixture**
-(`src/lib/gym/memberFixture.ts`). The page is **not fully live**: it is not wired
-to Wodify data yet.
+The page began with every card on the **sample member fixture**
+(`src/lib/gym/memberFixture.ts`). Since the §6 live slices landed, **Attendance
+Health, Silent Churn (count-only), and the Member Movement census are LIVE** from
+the non-PII aggregate (the census since the 2026-06-10 census-populate run — see
+§6); the MM **join-cohort intake** and **Churn Risk by Tenure** still render from
+the fixture.
 
 **Built and merged:**
 
@@ -38,7 +41,8 @@ to Wodify data yet.
 - **Member Movement** (#414) — current census + join-cohort intake only. The census
   is **BINARY (active / inactive)** since the 2026-06-10 §6 rescope — the original
   active/paused/ended design was RETIRED as source-unsupported (see §6, "Census
-  rescope"). **No movement-over-time series by design** — the fixture carries no
+  rescope") — and is **LIVE since the 2026-06-10 census-populate run** (the
+  join-cohort intake stays sample, honestly labeled on the card). **No movement-over-time series by design** — the fixture carries no
   dated status changes, so a flow/cancellation trend would be invented history.
 - **Parked / blocked gate labels** (#415) — the three remaining shells show honest gate
   notes via `GymCardShell`'s `gate` prop (still shells, no internals): Churn by Age +
@@ -529,7 +533,7 @@ the standalone `/clients` shape-discovery; this PR's one-line patch + re-run bui
 first**, then rebase + merge #427, resolving §5 / README to keep both records (the `/clients` shape
 discovery from #428, and the patch + re-run outcome here).
 
-### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); grants hardened #440 @ 7a3bc77 (anon/authenticated → SELECT-only); SYNC_TRIGGER_SECRET trigger-gate + fail-closed-500 LIVE #441 @ 67aafd0; redeployed v3 (verify_jwt=true, #441-era ezbr 35e21c14…); FIRST AUTHORIZED LIVE INVOKE EXECUTED 2026-06-07 19:48:53 UTC (one aggregate row verified: 412 active / 956 scanned, §6.6 conservation residual 0, no page cap, dues null + missing flag, PII-free) → first-slice §6 live-data validation goal MET; Step F disarm COMPLETE (both secrets unset, plaintext trigger file deleted) → function now DISARMED/inert; idempotency upsert (unique CONSTRAINT (workspace_id, as_of) + PostgREST on_conflict) DONE 2026-06-08 — constraint applied (gate-4) + function redeployed gate-5 as ezbr a4b19062… (source carried by #444), function still DISARMED; gym-local asOf permanent fix #445 REDEPLOYED LIVE 2026-06-08 (name-scoped CLI from main @ fb21a41, ezbr a4b19062…→eb5f5a33…, verify_jwt=true, still DISARMED, ai-proxy untouched, table unmoved); SPA wiring now LIVE — Attendance Health (PR2, #447 @ 28af0b9) + Silent Churn count-only (PR3, #448 @ 8d1b0b7), both off the shared aggregate snapshot; Member Movement census SPA wiring shipped (#450 @ 243a566) but the card stays Sample until a re-armed re-pull populates the live census columns; normalizeStatus taxonomy HARDENED (#451 @ 058b470) — present-but-unrecognized client_status now fails closed to unknown instead of silently 'ended', edge-function logic only and INERT in prod until the DISARMED function is redeployed + re-pulled` (do this early, before broad live work)
+### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); grants hardened #440 @ 7a3bc77 (anon/authenticated → SELECT-only); SYNC_TRIGGER_SECRET trigger-gate + fail-closed-500 LIVE #441 @ 67aafd0; redeployed v3 (verify_jwt=true, #441-era ezbr 35e21c14…); FIRST AUTHORIZED LIVE INVOKE EXECUTED 2026-06-07 19:48:53 UTC (one aggregate row verified: 412 active / 956 scanned, §6.6 conservation residual 0, no page cap, dues null + missing flag, PII-free) → first-slice §6 live-data validation goal MET; Step F disarm COMPLETE (both secrets unset, plaintext trigger file deleted) → function now DISARMED/inert; idempotency upsert (unique CONSTRAINT (workspace_id, as_of) + PostgREST on_conflict) DONE 2026-06-08 — constraint applied (gate-4) + function redeployed gate-5 as ezbr a4b19062… (source carried by #444), function still DISARMED; gym-local asOf permanent fix #445 REDEPLOYED LIVE 2026-06-08 (name-scoped CLI from main @ fb21a41, ezbr a4b19062…→eb5f5a33…, verify_jwt=true, still DISARMED, ai-proxy untouched, table unmoved); SPA wiring now LIVE — Attendance Health (PR2, #447 @ 28af0b9) + Silent Churn count-only (PR3, #448 @ 8d1b0b7), both off the shared aggregate snapshot; Member Movement census SPA wiring shipped (#450 @ 243a566) but the card stays Sample until a re-armed re-pull populates the live census columns; normalizeStatus taxonomy HARDENED (#451 @ 058b470) — present-but-unrecognized client_status now fails closed to unknown instead of silently 'ended', edge-function logic only and INERT in prod until the DISARMED function is redeployed + re-pulled; CENSUS-POPULATE RUN DONE 2026-06-10 (fresh GO post-#456): migration 20260610193617 added nullable inactive_total, name-scoped redeploy → NEW CANONICAL ezbr 40307a38… (eb5f5a33… historical), single pull inserted as_of 2026-06-10 (408 active / 549 inactive / 0 unknown_status / 957 scanned, conservation 0), MM census LIVE on the deployed site, function re-DISARMED` (do this early, before broad live work)
 
 Wire a **minimal** live-data path for one or two Retention cards before any broader live
 integration — a validation slice, not a rollout. The biggest remaining risk is whether
@@ -604,7 +608,9 @@ service_role still carries). The live constraint apply (`ALTER TABLE … ADD CON
 `notify pgrst, 'reload schema'`, 2026-06-08, verified via `pg_constraint`) and the name-scoped redeploy
 are **DONE**; the gate-5 idempotency bundle's identity was `ezbr a4b19062…` (itself superseding the #441-era `35e21c14…`;
 verified via `list_edge_functions` + a `get_edge_function` source read), later superseded LIVE by the #445
-gym-local `asOf` redeploy `eb5f5a33…` (see the asOf note), with the function still DISARMED.
+gym-local `asOf` redeploy `eb5f5a33…` (see the asOf note), with the function still DISARMED —
+`eb5f5a33…` itself superseded by the 2026-06-10 census-populate redeploy; **current canonical:
+`40307a38…`** (see "Census-populate run #2" below).
 
 **Deploy rule — name-scoped only.** Any redeploy MUST be name-scoped
 (`supabase functions deploy sync-wodify-retention --project-ref gzgxcvjvoivlwaksnmxy`). A **bare**
@@ -654,14 +660,15 @@ proved the 3-way semantics WERE misleading, and the census was rescoped to binar
 rescope" below.)* (#451 is **edge-function logic only** and is **INERT in
 production** until the DISARMED `sync-wodify-retention` function is redeployed **and** a fresh
 authorized pull runs — the SPA bundle is unchanged.) The blocked slices: (i) **Member Movement** —
-the census SPA wiring **shipped (#450 @ `243a566`, rescoped to binary 2026-06-10)**, but the card
-**stays Sample** until a re-armed re-pull populates the live census column (`inactive_total`); its
+the census SPA wiring **shipped (#450 @ `243a566`, rescoped to binary 2026-06-10)**, and the census
+is now **LIVE** — the 2026-06-10 census-populate run populated `inactive_total` (see "Census-populate
+run #2" below); its
 **join-cohort intake** plus **Churn Risk by Tenure** (#411) bands additionally need the **unproven
 `membershipStart` / join-date** field; (ii) Silent Churn **$-at-risk** needs a dues source (CSV
 import — the Wodify financials API is tier-blocked); (iii) Silent Churn **call-list / member
 names** stay blocked by the §4 PII / auth gate. **Live status:** Attendance Health + Silent Churn
-(count-only) are **LIVE** from the aggregate; Member Movement + Churn Risk by Tenure remain **not
-fully live** (Sample).
+(count-only) + the **Member Movement census** are **LIVE** from the aggregate (census since
+2026-06-10); the MM join-cohort intake + Churn Risk by Tenure remain Sample.
 
 **asOf timezone — permanent fix LIVE (2026-06-08, #445).** `asOf` was the **server-UTC** fetch
 date, which can shift the day boundary ±1 vs the gym's local day. The permanent fix is now **implemented in
@@ -696,7 +703,9 @@ hedged rather than asserted; since verified, see below) and surfaces a nonzero u
 (parity with Attendance Health's Unknown).
 The AH/SC path is regression-clean by construction — the `/^active$/i` matcher, activeTotal, and the
 recency histogram are untouched (pinned by a parity-regression test). The card **keeps its Sample
-gate** until a future Wesley-gated re-armed re-pull populates `inactive_total`. A 3-way census would
+gate** until a future Wesley-gated re-armed re-pull populates `inactive_total`. *(That gate CLEARED
+2026-06-10 — the census-populate run populated `inactive_total` and the card renders Live; see
+"Census-populate run #2" below.)* A 3-way census would
 need a different source (another Wodify endpoint at a higher tier, or an Admin export) — a separate,
 unscoped discovery.
 
@@ -716,20 +725,44 @@ taxonomy — a stale instrument, not a code defect (`normalizeStatus` is binary 
 before any arm/invoke: zero mutations, zero Wodify contact, platform identities unmoved, function still
 DISARMED (Builder-attested + Reviewer-verified). Remediation = a code-only selftest-fix PR (binary
 expectations + `Inactive` coverage; retired vocabulary kept as fail-closed unknown-traps); the
-Reviewer-validated run plan is unchanged and reusable — a fresh GO re-enters it at Step 0.
+Reviewer-validated run plan is unchanged and reusable — a fresh GO re-enters it at Step 0. *(That
+remediation merged as #456 @ `d53ccd0`; the fresh GO ran clean — see the next record.)*
+
+**Census-populate run #2 — EXECUTED CLEAN, 2026-06-10 (fresh GO post-#456; Steps 0/A–F ALL PASS;
+Builder-executed, Reviewer post-run verify PASS).** Step A taxonomy gate: selftest PASS, then the live
+vocabulary run — binary exactly (Active 408 / Inactive 549 / 957 scanned, coverage-complete, ZERO
+unknown; the probe predicted the edge byte-for-byte). Step B: migration
+`20260610193617_add_inactive_total_to_wodify_retention_aggregate` applied (nullable integer, no
+default; Data API cache proven via REST `200 [{"inactive_total":null}]`). Step C: name-scoped redeploy
+→ `sync-wodify-retention` deployed as v13, **NEW CANONICAL
+`ezbr_sha256 40307a387ac387b21c3042949baba9fbc42d9856a2d1fceace9d7152dc4dd00f`** (supersedes
+`eb5f5a33…`), `verify_jwt:true`; `ai-proxy` untouched (`3d392f3e…`, `updated_at` unmoved). Step D:
+re-armed from scratch (digest-matched), gate proofs PASS with the key absent (GET→405 / POST
+no-header→403 / bad-header→403 / correct-header→500 fail-closed). Step E: the single authorized POST
+→ 200; it **INSERTED row 2** — `as_of 2026-06-10`: active 408 / inactive 549 / unknown_status 0 /
+clients_scanned 957, conservation residual 0, no page cap; the 2026-06-07 row is intact with NULL
+`inactive_total` (harmless — the SPA reads the latest row). Step F: clean-slate disarm verified (both
+secrets unset; resting probes POST→500 fail-closed / GET→405; all local 0600 secret files deleted).
+**The MM census is LIVE on the deployed site** (bundle unchanged `index-3Zsg04am.js` — a data-only
+flip, no SPA deploy); AH/SC re-anchored to the same `2026-06-10` snapshot (AH buckets sum to the new
+activeTotal 408; SC == AH Silent at the same T; dues still "not available"; no call-list).
+**Operational lesson — function identity:** secrets operations bump EVERY function's platform
+**version counter** project-wide (+1 per op — after this run's three secret ops, sync listed as v16
+and ai-proxy as v12 with both `ezbr_sha256` + `updated_at` unmoved); identity is **`ezbr_sha256` +
+`updated_at`, never version**.
 
 **Prior-state facts (preserved).** The import-resolution sub-gate closed via Option A (#435 @ `b6bd9d6`); the
 **`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06) dropped the vestigial function-local `deno.json`
 and reconciled the README; a name-scoped redeploy from merged `main` (CLI 2.98.2) was **deno.json-free**
 (`index.ts` → `wodifyRetentionAggregate.ts` → `silentChurn.ts` via `.ts` imports alone; the type-only
 `./memberFixture` erased), proving `deno.json` is not load-bearing for the deployed bundle.
-`sync-wodify-retention` is **ACTIVE, `verify_jwt:true`**, current identity **`ezbr_sha256 eb5f5a33…`** (the #445 gym-local `asOf` redeploy 2026-06-08, superseding the gate-5
+`sync-wodify-retention` is **ACTIVE, `verify_jwt:true`**, identity then **`ezbr_sha256 eb5f5a33…`** (the #445 gym-local `asOf` redeploy 2026-06-08 — since superseded by the 2026-06-10 census-populate redeploy, current canonical `40307a38…`; superseding the gate-5
 idempotent-upsert redeploy; the 2026-06-07 live pull was an invoke against the prior #441-era `35e21c14…` bundle,
 not a deploy), and is **DISARMED** (version pins are documentation only — identity is `ezbr` / `verify_jwt` /
 `updated_at`); `ai-proxy` is provably **untouched** (`verify_jwt:false`, `ezbr_sha256 3d392f3e…`, `updated_at`
 unmoved). Loose ends: (a) **CLOSED by gate 5** — the redeploy reset the platform metadata, so `import_map_path`
 is now `null` and `entrypoint_path` points at the fresh deployed path (no more deleted-worktree references); the
-current `ezbr_sha256 eb5f5a33…` bundle is authoritative. (b) **CLOSED** — the #445 redeploy was that next substantive `index.ts` redeploy, so the deployed
+then-current `ezbr_sha256 eb5f5a33…` bundle was authoritative (now `40307a38…`). (b) **CLOSED** — the #445 redeploy was that next substantive `index.ts` redeploy, so the deployed
 header comment is now reconciled live; `main` @ `fb21a41` reproduces the live `eb5f5a33…`. **(ii) PR2 / SPA wiring** (apply the owner threshold +
 `WATCH_FLOOR_DAYS` rule client-side to the histogram) is now **DONE** — Attendance Health
 (PR2, #447 @ 28af0b9) + Silent Churn count-only (PR3, #448 @ 8d1b0b7), both off the shared
