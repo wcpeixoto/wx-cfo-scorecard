@@ -336,9 +336,11 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
 
         {unknown > 0 && (
           <p className="attendance-health-dataquality">
-            Unknown = active members with no usable Wodify check-in date yet — a
-            data-quality gap, not churn. They&rsquo;re held out of Healthy / Watch /
-            Silent rather than mislabeled.
+            Unknown = active accounts with no Wodify attendance or class sign-in
+            on record — typically guardian/parent billing accounts (the child
+            trains; the paying adult never signs in), staff accounts, or legacy
+            members from before digital check-in. Structural blanks, not churn —
+            held out of Healthy / Watch / Silent rather than mislabeled.
           </p>
         )}
 
