@@ -187,13 +187,14 @@ switch, with unknown paths falling back to `today`. A path may have more than on
 segment (e.g. `/gym/retention`) as long as `pathToTab` maps it explicitly to a
 single `TabId`; it still resolves through the flat switch, not a nested route.
 
-Sidebar navigation is the `NAV_ITEMS` array in `AppSidebar.tsx` — a discriminated
-union of `NavLeaf` (a single `/x` link) and `NavGroup` (an expandable parent with
-`basePath` + `children`). The **Gym** group is the reference example
-(`basePath: '/gym'`, child `{ to: '/gym/retention', label: 'Retention' }`,
-treated as active when `location.pathname.startsWith(basePath)`); it is
-deliberately scaffolded to gain sibling children (Overview / Membership /
-Classes) as those pages become real.
+Sidebar navigation is the `NAV_ITEMS` array in `AppSidebar.tsx` — flat `NavLeaf`
+entries, each a single link. A leaf's path may be multi-segment (**Retention**
+is `/gym/retention`). An expandable `NavGroup` tier (TailAdmin submenu: parent
+toggle + `basePath` + `children`, PR #402) existed while Gym was a group with
+Retention as its only child; it was removed when Retention was promoted to a
+top-level leaf — a one-child group cost a click and implied structure that
+didn't exist. Recover it from git history if a section grows real sibling
+subpages (e.g. Gym Overview / Membership / Classes).
 
 For a new surface, pick the simplest tier that fits:
 1. **Top-level page** — add a `NavLeaf` + a `TabId`/`TAB_TO_PATH` entry, and
@@ -201,10 +202,10 @@ For a new surface, pick the simplest tier that fits:
 2. **In-page sub-tabs** — for sections within one page, use in-page state tabs
    (the Settings `activeSection` pattern).
 3. **Expandable group with child pages** — only when a section genuinely needs
-   sibling subpages (the Gym pattern): add a `NavGroup` with `basePath` +
-   `children`, give each child a multi-segment path under `basePath`, and map
-   every child path explicitly in `pathToTab`. Don't reach for this tier for a
-   single flat page.
+   sibling subpages: reintroduce the `NavGroup` + `SidebarGroup` machinery from
+   git history (removed when the one-child Gym group was flattened), give each
+   child a multi-segment path under `basePath`, and map every child path
+   explicitly in `pathToTab`. Don't reach for this tier for a single flat page.
 
 ## Commands
 

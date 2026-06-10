@@ -4750,7 +4750,7 @@ export default function Dashboard() {
               </div>
 
               {/* ── Section 5: RETENTION ──────────────────────────────────
-                  Gym/Retention operating settings (Silent Churn threshold).
+                  Retention operating settings (Silent Churn threshold).
                   Local, browser-only, non-financial — but kept INSIDE the
                   edit-lock fieldset with the other Settings panes, so it freezes
                   with the rest of Settings during a partner walkthrough (a stray
