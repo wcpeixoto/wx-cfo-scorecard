@@ -51,7 +51,7 @@ export type RawWodifyClient = {
   is_at_risk?: unknown;
 };
 
-export type NormalizedStatus = 'active' | 'paused' | 'ended';
+export type NormalizedStatus = 'active' | 'inactive';
 
 // Internal, transient, non-PII normalized member. `status: null` means the raw
 // status was missing OR present-but-unrecognized (either way unmappable —
@@ -80,13 +80,17 @@ export type RetentionAggregate = {
   asOf: string; // YYYY-MM-DD — our day-diff anchor (server fetch date)
   fetchedAt: string; // ISO timestamp of the fetch
   activeTotal: number;
-  // Member Movement census (§6): paused/ended head-counts alongside activeTotal.
-  // Non-PII raw status tallies. The four-way partition
-  //   activeTotal + pausedTotal + endedTotal + dataQuality.unknownStatus
+  // Member Movement census (§6, BINARY rescope 2026-06-10): the inactive
+  // head-count alongside activeTotal. Non-PII raw status tally. Binary because
+  // that is what Wodify /clients actually supports — the vocab gate proved
+  // client_status is exactly Active/Inactive, and the field-discovery probe
+  // (scripts/wodify/clientsMembershipStateDiscovery.ts) proved NO other /clients
+  // field separates paused from ended, so a paused/ended census is unsourceable.
+  // The three-way partition
+  //   activeTotal + inactiveTotal + dataQuality.unknownStatus
   //     === dataQuality.clientsScanned
-  // holds by construction — every scanned row increments exactly one of the four.
-  pausedTotal: number;
-  endedTotal: number;
+  // holds by construction — every scanned row increments exactly one of the three.
+  inactiveTotal: number;
   daysAbsentHistogram: DaysAbsentHistogram;
   unknown: number; // active, missing/sentinel/invalid lastCheckIn (NOT Healthy)
   silentChurn: { monthlyDuesAtRisk: null; missingMonthlyDues: true };
@@ -109,28 +113,28 @@ export type AggregateOptions = {
   reachedPageCap: boolean;
 };
 
-// Map raw `client_status` to our status (§6.2, fail-closed taxonomy). Matching is
-// CONSERVATIVE — only recognized values map into a census bucket:
-//   - exact `active` (case-insensitive)             → active
-//   - known paused-like (paus / frozen / hold)      → paused
-//   - explicit, ANCHORED ended values (Ended /      → ended
-//     Cancelled) — anchored so a substring like
-//     "Susp-ended" can never match as ended
+// Map raw `client_status` to our status (§6.2, fail-closed taxonomy; BINARY
+// rescope 2026-06-10). Matching is the PROVEN vocabulary only — the 2026-06-09
+// vocab gate found `client_status` is exactly Active/Inactive across the full
+// 957-record set, and the 2026-06-10 field-discovery probe confirmed no other
+// /clients field subdivides Inactive:
+//   - exact `active` (case-insensitive)   → active
+//   - exact `inactive` (case-insensitive) → inactive
 // Everything else is null: a PRESENT-but-unrecognized status (e.g. Trial,
-// Prospect, "Active - Comp") and a MISSING / non-string / empty value BOTH map to
-// null (excluded from every bucket, counted in unknownStatus). The earlier
-// catch-all routed the unrecognized tail to 'ended', silently inflating the ended
-// census with members we simply don't map yet — unknown now stays unknown. Only
-// active-ness is load-bearing for the Attendance Health / Silent Churn slice, and
-// `^active$` is deliberately NOT broadened: an active variant fails closed to
-// unknown rather than being guessed active.
+// Prospect, "Active - Comp", and the formerly-mapped Paused/Frozen/On Hold/
+// Ended/Cancelled words — none of which Wodify actually returns) and a MISSING /
+// non-string / empty value BOTH map to null (excluded from every bucket, counted
+// in unknownStatus). Never bucket unproven statuses. Only active-ness is
+// load-bearing for the Attendance Health / Silent Churn slice, and `^active$` is
+// deliberately NOT broadened: an active variant fails closed to unknown rather
+// than being guessed active. `^inactive$` is anchored the same way so a variant
+// like "Inactive - Archived" surfaces in unknownStatus instead of being guessed.
 export function normalizeStatus(raw: unknown): NormalizedStatus | null {
   if (typeof raw !== 'string') return null;
   const s = raw.trim();
   if (s === '') return null;
   if (/^active$/i.test(s)) return 'active';
-  if (/paus|frozen|hold/i.test(s)) return 'paused';
-  if (/^(ended|cancelled)$/i.test(s)) return 'ended';
+  if (/^inactive$/i.test(s)) return 'inactive';
   return null;
 }
 
@@ -198,8 +202,7 @@ export function computeRetentionAggregate(
   const countsByDaysAbsent: Record<string, number> = {};
   let overflow365Plus = 0;
   let activeTotal = 0;
-  let pausedTotal = 0;
-  let endedTotal = 0;
+  let inactiveTotal = 0;
   let unknown = 0;
   let unknownStatus = 0;
   let futureLastCheckIn = 0;
@@ -214,14 +217,10 @@ export function computeRetentionAggregate(
       unknownStatus += 1;
       continue; // unmappable status — excluded from every bucket
     }
-    // Paused / ended are not the active recency signal, but they ARE the Member
-    // Movement census — count each, then skip the active-only binning below.
-    if (member.status === 'paused') {
-      pausedTotal += 1;
-      continue;
-    }
-    if (member.status === 'ended') {
-      endedTotal += 1;
+    // Inactive is not the active recency signal, but it IS the Member Movement
+    // census — count it, then skip the active-only binning below.
+    if (member.status === 'inactive') {
+      inactiveTotal += 1;
       continue;
     }
     // member.status === 'active' from here.
@@ -254,8 +253,7 @@ export function computeRetentionAggregate(
     asOf: opts.asOf,
     fetchedAt: opts.fetchedAt,
     activeTotal,
-    pausedTotal,
-    endedTotal,
+    inactiveTotal,
     daysAbsentHistogram: {
       maxExactDays: MAX_EXACT_DAYS,
       countsByDaysAbsent,

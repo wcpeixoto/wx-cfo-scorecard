@@ -2,7 +2,11 @@
 //
 // Code decides what is true (AGENTS.md "deterministic + AI layers"): this module
 // owns two HONEST, snapshot-only facts about the member base —
-//   1. Census   — the current active / paused / ended head-count (a RAW status tally).
+//   1. Census   — the current active / inactive head-count (a RAW status tally).
+//                 BINARY (§6 rescope 2026-06-10): Wodify /clients carries a binary
+//                 client_status and no field that separates paused from ended, so
+//                 the card's census is Active/Inactive in both modes; the sample
+//                 fixture's paused + ended statuses both tally as inactive here.
 //   2. Intake   — how many members joined in each half-year, by membershipStart.
 //
 // What this module deliberately does NOT do: any movement-over-time, net flow,
@@ -15,7 +19,7 @@
 // computeSilentChurn / the threshold resolver, and there is no at-risk figure to
 // cross-check, so there is nothing to drift against — by design.
 //   - Census is a RAW status tally: classifyMember returns null for non-active
-//     members and so cannot produce the paused / ended counts this card needs.
+//     members and so cannot produce the inactive count this card needs.
 //   - Intake counts ALL members (not active-only): an active-only intake would
 //     silently drop members who joined and later paused/ended, understating past
 //     intake. All-members is the honest, deterministic answer.
@@ -29,9 +33,8 @@ import { parseYmdLocal } from './silentChurn';
 
 export type MemberStatusCensus = {
   active: number;
-  paused: number;
-  ended: number;
-  total: number; // active + paused + ended — the integrity sum over all members
+  inactive: number; // sample: paused + ended fixture statuses; live: Wodify's Inactive
+  total: number; // active + inactive — the integrity sum over all members
 };
 
 export type JoinCohort = {
@@ -64,34 +67,27 @@ function cohortLabel(year: number, half: 1 | 2): string {
 // half-year of membershipStart. No risk classification, no time-series.
 //
 // Invariants asserted in the tests:
-//   - census.active + census.paused + census.ended === census.total === members.length
+//   - census.active + census.inactive === census.total === members.length
 //     (raw status tally — no member dropped or double-counted).
 //   - totalJoined + unknownJoin === members.length, and Σ cohort.count === totalJoined
 //     (intake counts every member exactly once; bad join dates surface as
 //     unknownJoin rather than vanishing).
 export function computeMemberMovement(members: GymMember[]): MemberMovementResult {
   // ── Census: a raw tally of the CURRENT status field, nothing derived. ──────
+  // Binary on purpose (§6 rescope): the fixture's 3-way status maps active →
+  // active, paused/ended → inactive, matching the binary census the live source
+  // actually supports. The GymMember type keeps its 3-way status — it feeds the
+  // locked classifyMember — only the census collapses it.
   let active = 0;
-  let paused = 0;
-  let ended = 0;
+  let inactive = 0;
   for (const member of members) {
-    switch (member.status) {
-      case 'active':
-        active += 1;
-        break;
-      case 'paused':
-        paused += 1;
-        break;
-      case 'ended':
-        ended += 1;
-        break;
-    }
+    if (member.status === 'active') active += 1;
+    else inactive += 1; // 'paused' | 'ended'
   }
   const census: MemberStatusCensus = {
     active,
-    paused,
-    ended,
-    total: active + paused + ended,
+    inactive,
+    total: active + inactive,
   };
 
   // ── Intake: bucket ALL members by the half-year of membershipStart. ────────

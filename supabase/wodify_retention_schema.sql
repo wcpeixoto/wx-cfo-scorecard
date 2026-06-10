@@ -41,13 +41,18 @@ create table if not exists public.wodify_retention_aggregate (
   as_of date not null,                           -- our whole-day-diff anchor (server fetch date)
   fetched_at timestamptz not null default now(), -- when the sync ran; latest-row selector
   active_total integer not null,                 -- active members scanned this snapshot
-  -- Member Movement census (§6): paused/ended head-counts beside active_total.
-  -- NULLABLE on purpose — a row written before this slice (or before a re-armed
-  -- pull) carries no census, and the SPA must tell "column absent/null → fall back
-  -- to sample" apart from a real zero. NEVER NOT NULL / NEVER default 0 (a default
-  -- would masquerade as a live "0 paused" census on a pre-census row).
-  paused_total integer null,                     -- paused members this snapshot (null until populated)
-  ended_total integer null,                      -- ended members this snapshot (null until populated)
+  -- Member Movement census (§6, BINARY rescope 2026-06-10): the inactive
+  -- head-count beside active_total. Binary because Wodify /clients is binary —
+  -- the vocab gate proved client_status is exactly Active/Inactive, and the
+  -- field-discovery probe proved no other /clients field separates paused from
+  -- ended (a paused/ended census is unsourceable; the earlier draft
+  -- paused_total/ended_total columns were never applied live and are replaced
+  -- by this column). NULLABLE on purpose — a row written before this slice (or
+  -- before a re-armed pull) carries no census, and the SPA must tell "column
+  -- absent/null → fall back to sample" apart from a real zero. NEVER NOT NULL /
+  -- NEVER default 0 (a default would masquerade as a live "0 inactive" census
+  -- on a pre-census row).
+  inactive_total integer null,                   -- inactive members this snapshot (null until populated)
   -- Threshold-free exact-day histogram over ACTIVE members (non-PII counts only):
   -- { maxExactDays: 364, countsByDaysAbsent: { "<days>": <count> }, overflow365Plus: <count> }.
   -- The SPA derives Silent Churn count + Healthy/Watch/Silent at ANY owner threshold from this.
@@ -67,17 +72,17 @@ create table if not exists public.wodify_retention_aggregate (
   clients_scanned integer not null default 0
 );
 
--- Backfill the Member Movement census columns onto an ALREADY-APPLIED table.
+-- Backfill the Member Movement census column onto an ALREADY-APPLIED table.
 -- `create table if not exists` above does NOT add columns to a table that already
--- exists (see the re-application note at the top of this file), so these idempotent
--- ALTERs are how paused_total / ended_total land on the live table when this
--- snapshot file is re-applied. NULLABLE + no default, matching the column defs above:
--- a pre-census row stays null and the SPA falls back to sample rather than showing a
--- fabricated zero. `add column if not exists` makes re-running this file a no-op.
+-- exists (see the re-application note at the top of this file), so this idempotent
+-- ALTER is how inactive_total lands on the live table when this snapshot file is
+-- re-applied. NULLABLE + no default, matching the column def above: a pre-census
+-- row stays null and the SPA falls back to sample rather than showing a fabricated
+-- zero. `add column if not exists` makes re-running this file a no-op. (The earlier
+-- draft paused_total / ended_total backfills were REMOVED before ever being applied
+-- — the live table has never had census columns, verified 2026-06-10.)
 alter table public.wodify_retention_aggregate
-  add column if not exists paused_total integer;
-alter table public.wodify_retention_aggregate
-  add column if not exists ended_total integer;
+  add column if not exists inactive_total integer;
 
 -- Latest snapshot per workspace = order by fetched_at desc limit 1.
 create index if not exists wodify_retention_aggregate_workspace_fetched_at_idx

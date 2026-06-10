@@ -12,9 +12,11 @@
 //   - days_absent_histogram is jsonb whose INNER keys are camelCase
 //     ({ countsByDaysAbsent, overflow365Plus, maxExactDays }) — it persists the
 //     server's daysAbsentHistogram object verbatim.
-//   - paused_total / ended_total (Member Movement census, §6) are NULLABLE and may be
-//     absent entirely on a table where the census migration hasn't been applied yet —
-//     handled as null → the SPA renders the sample census (see the select=* note below).
+//   - inactive_total (Member Movement census, §6 — BINARY rescope: Wodify /clients
+//     supports Active/Inactive only) is NULLABLE and may be absent entirely on a table
+//     where the census migration hasn't been applied yet — handled as null → the SPA
+//     renders the sample census (see the select=* note below). unknown_status is a
+//     NOT NULL data-quality counter present since the original table.
 //   - anon SELECT is granted and the RLS read policy is scoped to workspace_id='default',
 //     so we filter to the same workspace and never need the authenticated role.
 
@@ -32,11 +34,16 @@ const WORKSPACE_ID = 'default';
 export type RetentionAggregateSnapshot = DerivableAggregate & {
   asOf: string; // YYYY-MM-DD — the snapshot's gym-local day
   activeTotal: number; // active members scanned this snapshot (server's own total)
-  // Member Movement census. `number | null`: null when the column is absent (a
-  // snapshot from before the §6 census slice) or unwritten, so the SPA falls back to
-  // the sample census. A real 0 is a live zero, NOT null.
-  pausedTotal: number | null;
-  endedTotal: number | null;
+  // Member Movement census (binary — Active/Inactive is all /clients supports).
+  // `number | null`: null when the column is absent (a snapshot from before the §6
+  // census slice) or unwritten, so the SPA falls back to the sample census. A real 0
+  // is a live zero, NOT null.
+  inactiveTotal: number | null;
+  // Rows whose client_status was present-but-unrecognized or missing — excluded from
+  // both census buckets by the fail-closed normalizeStatus. Surfaced on the card when
+  // nonzero (honesty parity with Attendance Health's Unknown). NOT NULL default 0 on
+  // the live table, so a missing/malformed value coerces to 0, never to a gate.
+  unknownStatus: number;
 };
 
 // Loosely-typed shape of the REST row — every field is validated before use, since
@@ -44,8 +51,8 @@ export type RetentionAggregateSnapshot = DerivableAggregate & {
 type AggregateRow = {
   as_of?: unknown;
   active_total?: unknown;
-  paused_total?: unknown;
-  ended_total?: unknown;
+  inactive_total?: unknown;
+  unknown_status?: unknown;
   unknown_count?: unknown;
   days_absent_histogram?: unknown;
 };
@@ -78,8 +85,8 @@ export async function fetchLatestRetentionAggregate(
   if (!isRetentionAggregateConfigured()) return null;
 
   // select=* (not an explicit column list) on purpose: the Member Movement census
-  // columns (paused_total / ended_total) ship with the §6 census slice but its
-  // migration is applied separately, so they may not exist on the live table yet.
+  // column (inactive_total) ships with the §6 census slice but its migration is
+  // applied separately, so it may not exist on the live table yet.
   // PostgREST 400s the ENTIRE read when an explicit select names a column that does
   // not exist — which would knock the already-live Attendance Health + Silent Churn
   // cards back to Sample. `*` returns whatever columns exist (an absent census column
@@ -138,8 +145,8 @@ export async function fetchLatestRetentionAggregate(
   return {
     asOf,
     activeTotal: asCount(row.active_total),
-    pausedTotal: asCountOrNull(row.paused_total),
-    endedTotal: asCountOrNull(row.ended_total),
+    inactiveTotal: asCountOrNull(row.inactive_total),
+    unknownStatus: asCount(row.unknown_status),
     unknown: asCount(row.unknown_count),
     daysAbsentHistogram: {
       countsByDaysAbsent,
