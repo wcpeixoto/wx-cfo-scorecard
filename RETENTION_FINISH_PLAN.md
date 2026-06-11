@@ -787,6 +787,23 @@ work order** (tenure-band histogram computed server-side into the non-PII aggreg
 doc only: no SPA, no schema, no deploy; `sync-wodify-retention` stays DISARMED (the probe ran
 locally, key-from-env, never through the edge function).
 
+**membershipStart semantics — round-2 addendum (head-coach re-check 2026-06-11; recorded
+2026-06-11; name-free by design — mechanisms only, no member identifiers).** A second
+head-coach pass over five `member_since` cases **RE-CONFIRMED the core semantic**: Wodify's
+"Client Since Date" (== `member_since`) is the FIRST matriculation / profile-creation date in
+this location's system. It also surfaced **three additional interpretive caveat mechanisms**
+— the same structural-honesty class as the Tenure card's two disclosed caveats (records-era
+undercount + staff setup dates), and the non-PII aggregate is UNAFFECTED (counts only; these
+change interpretation, not data): **(a) gaps are ignored** — a leave-and-return member keeps
+their FIRST-join date, so the `2yplus` band can include members whose current continuous
+stint is days old (the field measures relationship age, which can OVERSTATE continuous
+tenure); **(b) guardian / guest-pass profile artifacts** — the date can record the
+profile-creator's start rather than the actual training member's; **(c) cross-location
+transfer resets** — a profile re-created in this location's system carries the new-location
+date (UNDERSTATES true tenure; the original profile lives in the sister location's system).
+**Card copy is unchanged by design:** the live caveat copy's "typically" hedge stays honest
+under all three mechanisms; a copy revisit happens only on Wesley's explicit ask.
+
 **Churn-by-Tenure aggregate extension — PR-1 (code-only) SHIPPED this PR; the card stays Sample
 until the gated run.** *(That gated run EXECUTED CLEAN 2026-06-11 — the card is now LIVE; see
 "Tenure aggregate-extension gated run" below.)* Per the Reviewer-validated aggregate-extension plan (2026-06-11, PASS no
