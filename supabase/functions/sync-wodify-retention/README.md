@@ -6,17 +6,22 @@ slice (`RETENTION_FINISH_PLAN.md` §6). Fetches Wodify `/clients`, computes a
 `public.wodify_retention_aggregate`. The browser never calls Wodify and never
 sees the key.
 
-> **CENSUS-POPULATE PULL DONE (2026-06-10) — DISARMED again; canonical identity
-> `ezbr_sha256 40307a387ac387b21c3042949baba9fbc42d9856a2d1fceace9d7152dc4dd00f`.**
+> **TENURE AGGREGATE-EXTENSION PULL DONE (2026-06-11) — DISARMED again; canonical identity
+> `ezbr_sha256 3ae170006fa0ca27ed9bb23b9e4c7f8482b83cdd616ab2da245e5893cf6a2719`.**
 > The function is deployed and **ACTIVE** (`verify_jwt: true`, via `list_edge_functions`). Identity
 > history: `35e21c14…` (#441-era) → `a4b19062…` (idempotent-upsert redeploy, 2026-06-08) → `eb5f5a33…`
-> (#445 gym-local `asOf` redeploy, 2026-06-08) → **`40307a38…`** (census-populate redeploy, 2026-06-10 —
+> (#445 gym-local `asOf` redeploy, 2026-06-08) → `40307a38…` (census-populate redeploy, 2026-06-10 —
 > first bundle carrying the binary-census writer against the `20260610193617` nullable `inactive_total`
-> column). **Two authorized live invokes have run**, each under a Reviewer audit + Wesley's
-> authorization: 2026-06-07 (first pull — 412 active / 956 scanned, conservation residual 0) and
+> column) → **`3ae17000…`** (tenure aggregate-extension redeploy, 2026-06-11 — first bundle carrying
+> the per-tenure-band histogram writer against the `20260611130857` nullable `tenure_band_histogram`
+> column). **Three authorized live invokes have run**, each under a Reviewer audit + Wesley's
+> authorization: 2026-06-07 (first pull — 412 active / 956 scanned, conservation residual 0),
 > 2026-06-10 (census-populate pull — 408 active / 549 inactive / 957 scanned, conservation residual 0,
-> inserted as a second row). The SPA reads the aggregate snapshot (Attendance Health #447, Silent Churn
-> #448, MM census live since the 2026-06-10 pull). Between runs it is **DISARMED**: it holds **no
+> inserted as a second row), and 2026-06-11 (tenure pull — 408 active / 549 inactive / 957 scanned,
+> conservation residual 0, band totals 75/60/93/86/94 + unknownTenure 0 = 408, upserted as a third
+> row). The SPA reads the aggregate snapshot (Attendance Health #447, Silent Churn
+> #448, MM census live since the 2026-06-10 pull, Churn Risk by Tenure live since the 2026-06-11
+> pull). Between runs it is **DISARMED**: it holds **no
 > `SYNC_TRIGGER_SECRET` and no `WODIFY_API_KEY`** (per `supabase secrets list`, corroborated by the
 > fail-closed gate code) and makes no Wodify call. Any re-arm / further pull / scheduled pull requires a
 > **fresh Reviewer audit + Wesley authorization**. **Identity note:** secrets operations bump EVERY
@@ -254,17 +259,17 @@ rm -f "$cfg"
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected by the platform at
 runtime; they are not set manually.
 
-## Open items / follow-ups (first live invoke DONE 2026-06-07; idempotent-upsert redeploy DONE 2026-06-08; census-populate pull DONE 2026-06-10)
+## Open items / follow-ups (first live invoke DONE 2026-06-07; idempotent-upsert redeploy DONE 2026-06-08; census-populate pull DONE 2026-06-10; tenure aggregate-extension run DONE 2026-06-11)
 
-- **Churn-by-Tenure aggregate extension (§6) — CODE ON MAIN, NOT YET DEPLOYED.** The source now
-  also bins active members into per-tenure-band recency histograms from `member_since` (counts
-  only; persisted as the NULLABLE `tenure_band_histogram` column — see
+- **Churn-by-Tenure aggregate extension (§6) — DEPLOYED + LIVE (gated run EXECUTED CLEAN
+  2026-06-11).** The source bins active members into per-tenure-band recency histograms from
+  `member_since` (counts only; persisted as the NULLABLE `tenure_band_histogram` column — see
   `wodify_retention_schema.sql`) and reports per-band active totals in the 200 summary. The
-  **live deployed bundle (`40307a38…`) predates this** and the column is **unapplied**; both
-  land only inside the next gated run (migration → name-scoped redeploy → re-arm → single pull
-  → verify → disarm) under a fresh Reviewer audit + Wesley authorization. Until that run, the
-  SPA's Tenure card stays honestly on Sample (the reader maps an absent/null column to a sample
-  fallback).
+  gated run applied migration `20260611130857`, shipped the bundle as the new canonical
+  `3ae17000…` (name-scoped redeploy), and the single authorized pull populated the column
+  (`as_of 2026-06-11` — band totals 75/60/93/86/94 + unknownTenure 0 = 408, partition merge
+  exact, anti-drift @T=21 band-silent 76 == global 76); the SPA's Tenure card renders **LIVE**.
+  The function was re-DISARMED at Step F (resting probes 405/500, secrets list clean).
 
 - **Idempotency — DONE (constraint applied gate-4 + function redeployed gate-5, 2026-06-08; source carried by #444).**
   The persist path is now an idempotent upsert on `(workspace_id, as_of)`. **Live:** the named **unique
@@ -289,7 +294,7 @@ runtime; they are not set manually.
   `allowImportingTsExtensions` resolved the shared `src/` graph at the Supabase
   deploy/eszip path (the named-function deploy succeeded — see "Bundle/import proof").
   The function is deployed and **ACTIVE** (`verify_jwt: true`) and **DISARMED between authorized
-  runs** (two so far: 2026-06-07, 2026-06-10; no key held at rest). The first invoke **proved
+  runs** (three so far: 2026-06-07, 2026-06-10, 2026-06-11; no key held at rest). The first invoke **proved
   Wodify supplies `status` / `lastCheckIn` globally enough for the first aggregate slice** (412 active /
   956 scanned, conservation residual 0), with unknown last-check-in values **surfaced explicitly** via the
   aggregate's `unknown` bucket (155 of 412 active members; 956 clients scanned overall) rather than hidden

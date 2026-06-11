@@ -24,10 +24,10 @@ for when (and how) it is finally retired.
 
 The page began with every card on the **sample member fixture**
 (`src/lib/gym/memberFixture.ts`). Since the §6 live slices landed, **Attendance
-Health, Silent Churn (count-only), and the Member Movement census are LIVE** from
-the non-PII aggregate (the census since the 2026-06-10 census-populate run — see
-§6); the MM **join-cohort intake** and **Churn Risk by Tenure** still render from
-the fixture.
+Health, Silent Churn (count-only), the Member Movement census, and Churn Risk by
+Tenure are LIVE** from the non-PII aggregate (the census since the 2026-06-10
+census-populate run; tenure since the 2026-06-11 aggregate-extension run — see
+§6); the MM **join-cohort intake** is the page's only remaining sample surface.
 
 **Built and merged:**
 
@@ -533,7 +533,7 @@ the standalone `/clients` shape-discovery; this PR's one-line patch + re-run bui
 first**, then rebase + merge #427, resolving §5 / README to keep both records (the `/clients` shape
 discovery from #428, and the patch + re-run outcome here).
 
-### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); grants hardened #440 @ 7a3bc77 (anon/authenticated → SELECT-only); SYNC_TRIGGER_SECRET trigger-gate + fail-closed-500 LIVE #441 @ 67aafd0; redeployed v3 (verify_jwt=true, #441-era ezbr 35e21c14…); FIRST AUTHORIZED LIVE INVOKE EXECUTED 2026-06-07 19:48:53 UTC (one aggregate row verified: 412 active / 956 scanned, §6.6 conservation residual 0, no page cap, dues null + missing flag, PII-free) → first-slice §6 live-data validation goal MET; Step F disarm COMPLETE (both secrets unset, plaintext trigger file deleted) → function now DISARMED/inert; idempotency upsert (unique CONSTRAINT (workspace_id, as_of) + PostgREST on_conflict) DONE 2026-06-08 — constraint applied (gate-4) + function redeployed gate-5 as ezbr a4b19062… (source carried by #444), function still DISARMED; gym-local asOf permanent fix #445 REDEPLOYED LIVE 2026-06-08 (name-scoped CLI from main @ fb21a41, ezbr a4b19062…→eb5f5a33…, verify_jwt=true, still DISARMED, ai-proxy untouched, table unmoved); SPA wiring now LIVE — Attendance Health (PR2, #447 @ 28af0b9) + Silent Churn count-only (PR3, #448 @ 8d1b0b7), both off the shared aggregate snapshot; Member Movement census SPA wiring shipped (#450 @ 243a566) but the card stays Sample until a re-armed re-pull populates the live census columns; normalizeStatus taxonomy HARDENED (#451 @ 058b470) — present-but-unrecognized client_status now fails closed to unknown instead of silently 'ended', edge-function logic only and INERT in prod until the DISARMED function is redeployed + re-pulled; CENSUS-POPULATE RUN DONE 2026-06-10 (fresh GO post-#456): migration 20260610193617 added nullable inactive_total, name-scoped redeploy → NEW CANONICAL ezbr 40307a38… (eb5f5a33… historical), single pull inserted as_of 2026-06-10 (408 active / 549 inactive / 0 unknown_status / 957 scanned, conservation 0), MM census LIVE on the deployed site, function re-DISARMED` (do this early, before broad live work)
+### 6. Live wiring spike — 1–2 cards · `Server-side slice (PR1, #431) IMPLEMENTED; deploy/eszip import-resolution sub-gate CLOSED via Option A (explicit .ts import + allowImportingTsExtensions, #435 @ b6bd9d6, 2026-06-05) — deno.json cleanup DONE (#437 @ 04cd034, 2026-06-06 — vestigial deno.json dropped + README reconciled; name-scoped redeploy from merged main PROVEN deno.json-free); grants hardened #440 @ 7a3bc77 (anon/authenticated → SELECT-only); SYNC_TRIGGER_SECRET trigger-gate + fail-closed-500 LIVE #441 @ 67aafd0; redeployed v3 (verify_jwt=true, #441-era ezbr 35e21c14…); FIRST AUTHORIZED LIVE INVOKE EXECUTED 2026-06-07 19:48:53 UTC (one aggregate row verified: 412 active / 956 scanned, §6.6 conservation residual 0, no page cap, dues null + missing flag, PII-free) → first-slice §6 live-data validation goal MET; Step F disarm COMPLETE (both secrets unset, plaintext trigger file deleted) → function now DISARMED/inert; idempotency upsert (unique CONSTRAINT (workspace_id, as_of) + PostgREST on_conflict) DONE 2026-06-08 — constraint applied (gate-4) + function redeployed gate-5 as ezbr a4b19062… (source carried by #444), function still DISARMED; gym-local asOf permanent fix #445 REDEPLOYED LIVE 2026-06-08 (name-scoped CLI from main @ fb21a41, ezbr a4b19062…→eb5f5a33…, verify_jwt=true, still DISARMED, ai-proxy untouched, table unmoved); SPA wiring now LIVE — Attendance Health (PR2, #447 @ 28af0b9) + Silent Churn count-only (PR3, #448 @ 8d1b0b7), both off the shared aggregate snapshot; Member Movement census SPA wiring shipped (#450 @ 243a566) but the card stays Sample until a re-armed re-pull populates the live census columns; normalizeStatus taxonomy HARDENED (#451 @ 058b470) — present-but-unrecognized client_status now fails closed to unknown instead of silently 'ended', edge-function logic only and INERT in prod until the DISARMED function is redeployed + re-pulled; CENSUS-POPULATE RUN DONE 2026-06-10 (fresh GO post-#456): migration 20260610193617 added nullable inactive_total, name-scoped redeploy → NEW CANONICAL ezbr 40307a38… (eb5f5a33… historical), single pull inserted as_of 2026-06-10 (408 active / 549 inactive / 0 unknown_status / 957 scanned, conservation 0), MM census LIVE on the deployed site, function re-DISARMED; TENURE AGGREGATE-EXTENSION GATED RUN EXECUTED CLEAN 2026-06-11 (Steps 0/A–F ALL PASS, Reviewer post-run PASS): migration 20260611130857 added nullable tenure_band_histogram, name-scoped redeploy → NEW CANONICAL ezbr 3ae17000… (40307a38… historical), single pull upserted as_of 2026-06-11 (408 active / 549 inactive / 0 unknown_status / 957 scanned, conservation 0; band totals 75/60/93/86/94 + unknownTenure 0 = 408, partition merge exact; anti-drift @T=21 band-silent 76 == global 76), ALL FOUR live cards on the deployed site, function re-DISARMED` (do this early, before broad live work)
 
 Wire a **minimal** live-data path for one or two Retention cards before any broader live
 integration — a validation slice, not a rollout. The biggest remaining risk is whether
@@ -669,10 +669,10 @@ semantic confirm closed 2026-06-11; see "membershipStart field-discovery" below;
 aggregate-extension build is a separate gated slice); (ii) Silent Churn **$-at-risk** needs a dues source (CSV
 import — the Wodify financials API is tier-blocked); (iii) Silent Churn **call-list / member
 names** stay blocked by the §4 PII / auth gate. **Live status:** Attendance Health + Silent Churn
-(count-only) + the **Member Movement census** are **LIVE** from the aggregate (census since
-2026-06-10); the MM join-cohort intake + Churn Risk by Tenure remain Sample — Tenure's
-aggregate-extension **PR-1 code is on main** (data-gated flip at the next gated run; see
-"Churn-by-Tenure aggregate extension" below).
+(count-only) + the **Member Movement census** + **Churn Risk by Tenure** are **LIVE** from the
+aggregate (census since 2026-06-10; tenure since the 2026-06-11 aggregate-extension gated run —
+see "Tenure aggregate-extension gated run" below); the **MM join-cohort intake is the page's only
+remaining sample surface**.
 
 **asOf timezone — permanent fix LIVE (2026-06-08, #445).** `asOf` was the **server-UTC** fetch
 date, which can shift the day boundary ±1 vs the gym's local day. The permanent fix is now **implemented in
@@ -788,7 +788,8 @@ doc only: no SPA, no schema, no deploy; `sync-wodify-retention` stays DISARMED (
 locally, key-from-env, never through the edge function).
 
 **Churn-by-Tenure aggregate extension — PR-1 (code-only) SHIPPED this PR; the card stays Sample
-until the gated run.** Per the Reviewer-validated aggregate-extension plan (2026-06-11, PASS no
+until the gated run.** *(That gated run EXECUTED CLEAN 2026-06-11 — the card is now LIVE; see
+"Tenure aggregate-extension gated run" below.)* Per the Reviewer-validated aggregate-extension plan (2026-06-11, PASS no
 must-fix; GO'd for PR-1 only — all six review points resolved: #411 band edges unchanged, 2-D
 tenure×recency histogram accepted as non-PII, ACTIVE-only scoping, Step-A live probe re-run
 skipped, per-band totals kept in the 200 body, caveat copy baseline approved). The server
@@ -815,6 +816,35 @@ re-arm, single pull, verify, disarm are ALL deferred to the gated run (Steps 0/A
 Reviewer audit + Wesley GO). Local gates green (tsc, full vitest incl. the new
 partition/parity/contract suites, vite build, esbuild bundle proof of the Edge graph with zero
 `console.*`).
+
+**Tenure aggregate-extension gated run — EXECUTED CLEAN, 2026-06-11 (Steps 0/A–F ALL PASS;
+Builder-executed under fresh Reviewer audit + Wesley GO; Reviewer post-run verify PASS).**
+**Step 0/B (migration + redeploy):** migration
+`20260611130857_add_tenure_band_histogram_to_wodify_retention_aggregate` applied the **NULLABLE**
+`tenure_band_histogram` column (jsonb, no default — null → Sample, mirroring `inactive_total`);
+the name-scoped redeploy shipped the PR-1 (#460) bundle as the **NEW CANONICAL
+`ezbr_sha256 3ae170006fa0ca27ed9bb23b9e4c7f8482b83cdd616ab2da245e5893cf6a2719`**
+(`updated_at 1781183398586`, `verify_jwt:true`; supersedes `40307a38…`, now historical);
+`ai-proxy` untouched (`3d392f3e…`, `updated_at 1778341247547` unmoved; version counters are
+secrets-op noise — identity is `ezbr_sha256` + `updated_at`, never version). **Step D/E (single
+pull + verify):** the one authorized POST upserted row 3 — `as_of 2026-06-11`: **408 active /
+549 inactive / 0 unknown_status / 957 scanned** (conservation residual 0), `unknown_count 153`,
+no page cap; **tenure band totals lt3m 75 / 3to6m 60 / 6to12m 93 / 1to2y 86 / 2yplus 94 +
+unknownTenure 0 = 408** (the bands PARTITION the global histogram — merge exact), and the #411
+anti-drift invariant held on live data: **@T=21 Σ band silent 76 == global Silent 76** (AH
+buckets 144 Healthy / 35 Watch / 76 Silent / 153 unknown, summing to the 408 active).
+**Deployed-site verify:** ALL FOUR cards render **Live · as of 2026-06-11** — Attendance Health,
+Silent Churn (count-only), Member Movement census, and Churn Risk by Tenure (hero band 2yplus at
+34%, both disclosed `member_since` caveats — records-era undercount + staff setup dates — in the
+live card copy). **Step F (disarm):** complete — both secrets unset (`supabase secrets list`
+shows neither name), resting probes `GET → 405` / `POST` no-header `→ 500` fail-closed, local
+secret files deleted; platform identity unmoved post-disarm (same `ezbr` + `updated_at`).
+*(The Step F resting probes + secrets-list + identity check were independently re-run clean at
+record time, 2026-06-11 — formally closing the Reviewer's classifier-blocked disarm re-probe
+from the run session.)* **Operational lesson — permission mode:** gated mutating runs must START
+the Builder session in default/manual permission mode (`claude --permission-mode default`) —
+auto-mode's classifier blocks the arming steps and discounts relayed consent, and switching
+modes mid-run is not viable; plan the mode before Step A, never mid-run.
 
 **Prior-state facts (preserved).** The import-resolution sub-gate closed via Option A (#435 @ `b6bd9d6`); the
 **`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06) dropped the vestigial function-local `deno.json`
