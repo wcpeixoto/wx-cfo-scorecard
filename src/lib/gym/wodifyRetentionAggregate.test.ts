@@ -11,15 +11,23 @@ import {
   pickLastCheckIn,
   normalizeClient,
   computeRetentionAggregate,
+  tenureBandActiveTotals,
   MAX_EXACT_DAYS,
   SENTINEL_NULL_DATE,
   type RawWodifyClient,
+  type TenureBandHistogram,
 } from './wodifyRetentionAggregate';
-import { WATCH_FLOOR_DAYS, computeAttendanceHealth } from './silentChurn';
+import { WATCH_FLOOR_DAYS, computeAttendanceHealth, computeSilentChurn } from './silentChurn';
 // PR2: the SPA-side bucket derivation is now a shipped module; this test imports it
 // (rather than re-declaring the rule) so the PARITY proof below covers the function
 // that actually ships. See src/lib/gym/retentionAggregateView.ts.
 import { deriveBuckets } from './retentionAggregateView';
+import {
+  TENURE_BANDS,
+  UNKNOWN_TENURE_ID,
+  computeChurnRiskByTenure,
+  computeChurnRiskByTenureFromAggregate,
+} from './churnRiskByTenure';
 import { SAMPLE_GYM_MEMBERS, FIXTURE_TODAY, type GymMember } from './memberFixture';
 
 const OPTS = {
@@ -37,10 +45,33 @@ const OPTS = {
 // through both the locked classifier and the server aggregate and compare. The
 // fixture keeps its 3-way status (it feeds the locked classifyMember); on the raw
 // side paused/ended both map to 'Inactive' — the only non-active value Wodify
-// actually returns (vocab gate, 2026-06-09).
+// actually returns (vocab gate, 2026-06-09). membershipStart rides as
+// member_since (the proven /clients field), so the SAME fixture also drives the
+// tenure parity below.
 function memberToRawRow(m: GymMember): RawWodifyClient {
   const statusWord = m.status === 'active' ? 'Active' : 'Inactive';
-  return { client_status: statusWord, last_attendance: m.lastCheckIn };
+  return {
+    client_status: statusWord,
+    last_attendance: m.lastCheckIn,
+    member_since: m.membershipStart,
+  };
+}
+
+// Bin-wise merge of every tenure band (incl. the unknown-tenure bucket) — used to
+// prove the bands PARTITION the global histogram, which is what makes Σ band
+// silent === the global silent count at every threshold.
+function mergeTenureBands(tenure: TenureBandHistogram) {
+  const countsByDaysAbsent: Record<string, number> = {};
+  let overflow365Plus = 0;
+  let unknownRecency = 0;
+  for (const band of Object.values(tenure.bands)) {
+    for (const [k, v] of Object.entries(band.countsByDaysAbsent)) {
+      countsByDaysAbsent[k] = (countsByDaysAbsent[k] ?? 0) + v;
+    }
+    overflow365Plus += band.overflow365Plus;
+    unknownRecency += band.unknownRecency;
+  }
+  return { countsByDaysAbsent, overflow365Plus, unknownRecency };
 }
 
 describe('normalizeStatus (fail-closed taxonomy, binary §6 rescope)', () => {
@@ -284,6 +315,168 @@ describe('Member Movement census (binary active/inactive, §6 rescope)', () => {
   });
 });
 
+describe('tenure-band histogram (§6 aggregate extension)', () => {
+  // asOf 2026-06-05. One member per placement case, ACTIVE unless noted.
+  const rows: RawWodifyClient[] = [
+    // lt3m (35d tenure), checked in today (day 0)
+    { client_status: 'Active', member_since: '2026-05-01', last_attendance: '2026-06-05' },
+    // 3to6m (124d), silent at the default threshold (day 21)
+    { client_status: 'Active', member_since: '2026-02-01', last_attendance: '2026-05-15' },
+    // 6to12m (247d), sentinel check-in → unknown RECENCY inside a known band
+    { client_status: 'Active', member_since: '2025-10-01', last_attendance: '1900-01-01' },
+    // 1to2y (520d), gone 730d → overflow
+    { client_status: 'Active', member_since: '2025-01-01', last_attendance: '2024-06-05' },
+    // 1to2y (369d), FUTURE check-in → day-0 bin in THIS band + diagnostic
+    // (Reviewer fold-in: proves the future→day-0 rule is identical per-band vs global)
+    { client_status: 'Active', member_since: '2025-06-01', last_attendance: '2026-06-10' },
+    // 2yplus, watch floor (day 8)
+    { client_status: 'Active', member_since: '2020-01-01', last_attendance: '2026-05-28' },
+    // unknown TENURE: member_since missing / sentinel / invalid / after asOf
+    { client_status: 'Active', last_attendance: '2026-06-04' }, // missing → day 1
+    { client_status: 'Active', member_since: '1900-01-01', last_attendance: '2026-06-03' }, // sentinel → day 2
+    { client_status: 'Active', member_since: 'not-a-date', last_attendance: '2026-06-02' }, // invalid → day 3
+    { client_status: 'Active', member_since: '2026-07-01', last_attendance: '2026-06-01' }, // future start → day 4
+    // non-active rows must not touch any tenure band
+    { client_status: 'Inactive', member_since: '2020-01-01', last_attendance: '2020-01-01' },
+    { client_status: 'Trial', member_since: '2020-01-01', last_attendance: '2026-06-05' },
+  ];
+  const agg = computeRetentionAggregate(rows, OPTS);
+  const bands = agg.tenureBandHistogram.bands;
+
+  it('persists the bandEdges contract (id + minDays, in band order, no labels)', () => {
+    expect(agg.tenureBandHistogram.bandEdges).toEqual(
+      TENURE_BANDS.map(({ id, minDays }) => ({ id, minDays })),
+    );
+  });
+
+  it('always carries every band key (empty bands emit zero counts, never vanish)', () => {
+    expect(Object.keys(bands).sort()).toEqual(
+      [...TENURE_BANDS.map((b) => b.id), UNKNOWN_TENURE_ID].sort(),
+    );
+  });
+
+  it('bins each active member into the band their member_since tenure selects', () => {
+    expect(bands.lt3m).toEqual({ countsByDaysAbsent: { '0': 1 }, overflow365Plus: 0, unknownRecency: 0 });
+    expect(bands['3to6m']).toEqual({ countsByDaysAbsent: { '21': 1 }, overflow365Plus: 0, unknownRecency: 0 });
+    expect(bands['6to12m']).toEqual({ countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 1 });
+    expect(bands['2yplus']).toEqual({ countsByDaysAbsent: { '8': 1 }, overflow365Plus: 0, unknownRecency: 0 });
+  });
+
+  it('bins a FUTURE check-in at day 0 inside its own tenure band, same rule as the global histogram', () => {
+    // 1to2y holds the overflow member AND the future-check-in member: the future
+    // date lands in this band's day-0 bin (Healthy-compatible), is counted once
+    // in the global diagnostic, and the global day-0 bin sees the same member —
+    // per-band and global future handling are one rule, not two.
+    expect(bands['1to2y']).toEqual({
+      countsByDaysAbsent: { '0': 1 },
+      overflow365Plus: 1,
+      unknownRecency: 0,
+    });
+    expect(agg.dataQuality.futureLastCheckIn).toBe(1);
+    expect(agg.daysAbsentHistogram.countsByDaysAbsent['0']).toBe(2); // lt3m today + 1to2y future
+  });
+
+  it('routes missing / sentinel / invalid / after-asOf member_since into the unknown-tenure bucket (#439, never dropped)', () => {
+    // The 1900-01-01 member_since is a WIRE-level sentinel: sliceUsableDate nulls
+    // it before any tenure math, so it can never masquerade as a ~46-year tenure.
+    expect(bands[UNKNOWN_TENURE_ID]).toEqual({
+      countsByDaysAbsent: { '1': 1, '2': 1, '3': 1, '4': 1 },
+      overflow365Plus: 0,
+      unknownRecency: 0,
+    });
+  });
+
+  it('PARTITION invariant: merging the bands reproduces the global histogram + unknown', () => {
+    const merged = mergeTenureBands(agg.tenureBandHistogram);
+    expect(merged.countsByDaysAbsent).toEqual(agg.daysAbsentHistogram.countsByDaysAbsent);
+    expect(merged.overflow365Plus).toBe(agg.daysAbsentHistogram.overflow365Plus);
+    expect(merged.unknownRecency).toBe(agg.unknown);
+  });
+
+  it('Σ per-band active totals === activeTotal (non-active rows touch no band)', () => {
+    const totals = tenureBandActiveTotals(agg.tenureBandHistogram);
+    const sum = Object.values(totals).reduce((a, b) => a + b, 0);
+    expect(sum).toBe(agg.activeTotal);
+    expect(agg.activeTotal).toBe(10);
+    expect(totals).toEqual({
+      lt3m: 1,
+      '3to6m': 1,
+      '6to12m': 1,
+      '1to2y': 2,
+      '2yplus': 1,
+      [UNKNOWN_TENURE_ID]: 4,
+    });
+  });
+});
+
+describe('tenure parity with the locked sample compute (computeChurnRiskByTenure)', () => {
+  // Same FIXTURE_TODAY anchor as the Attendance Health parity above; member_since
+  // rides through memberToRawRow, so the identical fixture drives both paths.
+  const asOfStr = '2026-06-02';
+  const fixtureOpts = {
+    asOf: asOfStr,
+    fetchedAt: '2026-06-02T12:00:00Z',
+    pagesFetched: 1,
+    reachedPageCap: false,
+  };
+  const agg = computeRetentionAggregate(SAMPLE_GYM_MEMBERS.map(memberToRawRow), fixtureOpts);
+
+  it('adapter result equals the sample compute at every threshold (bands, rates, hero)', () => {
+    for (const T of [1, 8, 21, 90, 365, 500]) {
+      const live = computeChurnRiskByTenureFromAggregate(agg.tenureBandHistogram, T);
+      const sample = computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, T, FIXTURE_TODAY);
+      expect(live).toEqual(sample);
+    }
+  });
+
+  it('anti-drift on the live path: Σ band silent + unknown-tenure silent === the live Silent Churn count', () => {
+    for (const T of [1, 8, 21, 90, 365, 500]) {
+      const live = computeChurnRiskByTenureFromAggregate(agg.tenureBandHistogram, T);
+      const summedSilent =
+        live.bands.reduce((sum, b) => sum + b.silent, 0) + live.unknownTenure.silent;
+      // The live Silent Churn card derives its count from the SAME snapshot via
+      // deriveBuckets — and both equal the locked classifier on this fixture.
+      expect(summedSilent).toBe(deriveBuckets(agg, T).silent);
+      expect(summedSilent).toBe(computeSilentChurn(SAMPLE_GYM_MEMBERS, T, FIXTURE_TODAY).count);
+    }
+  });
+
+  it('parity holds on DIRTY data (invalid + after-asOf starts route to unknown tenure on both paths)', () => {
+    // NOTE: a 1900-01-01 member_since is deliberately NOT in this parity fixture.
+    // It is a WIRE-level sentinel the server nulls before tenure math (proven in
+    // the binning suite above); the GymMember model never carries it, and the
+    // sample compute would parse it as a real ancient date — there is no honest
+    // GymMember analog to compare against.
+    const dirty: GymMember[] = [
+      ...SAMPLE_GYM_MEMBERS,
+      { id: 'x1', displayName: 'X1', status: 'active', monthlyDues: 100, membershipStart: 'not-a-date', lastCheckIn: '2026-05-19' }, // watch @21, unknown tenure
+      { id: 'x2', displayName: 'X2', status: 'active', monthlyDues: 100, membershipStart: '2027-01-01', lastCheckIn: '2025-01-01' }, // silent, future start → unknown tenure
+      { id: 'x3', displayName: 'X3', status: 'active', monthlyDues: 100, membershipStart: '2026-05-30', lastCheckIn: '' }, // lt3m, unknown recency
+    ];
+    const dirtyAgg = computeRetentionAggregate(dirty.map(memberToRawRow), fixtureOpts);
+    for (const T of [1, 21, 365]) {
+      expect(computeChurnRiskByTenureFromAggregate(dirtyAgg.tenureBandHistogram, T)).toEqual(
+        computeChurnRiskByTenure(dirty, T, FIXTURE_TODAY),
+      );
+    }
+  });
+
+  it('hero tie-break matches the sample rule (rate tie → larger atRisk wins)', () => {
+    // lt3m: 1 of 1 silent (rate 1.0, atRisk 1) vs 1to2y: 2 of 2 silent (rate 1.0,
+    // atRisk 2) → the hero is 1to2y on both paths.
+    const tie: GymMember[] = [
+      { id: 't1', displayName: 'T1', status: 'active', monthlyDues: 100, membershipStart: '2026-05-20', lastCheckIn: '2026-04-01' },
+      { id: 't2', displayName: 'T2', status: 'active', monthlyDues: 100, membershipStart: '2025-01-01', lastCheckIn: '2026-04-01' },
+      { id: 't3', displayName: 'T3', status: 'active', monthlyDues: 100, membershipStart: '2025-01-01', lastCheckIn: '2026-04-01' },
+    ];
+    const tieAgg = computeRetentionAggregate(tie.map(memberToRawRow), fixtureOpts);
+    const live = computeChurnRiskByTenureFromAggregate(tieAgg.tenureBandHistogram, 21);
+    const sample = computeChurnRiskByTenure(tie, 21, FIXTURE_TODAY);
+    expect(live.heroBandId).toBe('1to2y');
+    expect(live).toEqual(sample);
+  });
+});
+
 describe('threshold derivation from the histogram (no refetch)', () => {
   const rows: RawWodifyClient[] = [
     { client_status: 'Active', last_attendance: '2026-06-05' }, // 0  healthy
@@ -394,6 +587,25 @@ describe('payload shape (non-PII contract)', () => {
         maxExactDays: 364,
         countsByDaysAbsent: { '4': 1 },
         overflow365Plus: 0,
+      },
+      // §6 aggregate extension: per-band counts only (no labels, no dates). The
+      // single row has no member_since, so it bins under unknown tenure.
+      tenureBandHistogram: {
+        bandEdges: [
+          { id: 'lt3m', minDays: 0 },
+          { id: '3to6m', minDays: 90 },
+          { id: '6to12m', minDays: 180 },
+          { id: '1to2y', minDays: 365 },
+          { id: '2yplus', minDays: 730 },
+        ],
+        bands: {
+          lt3m: { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 },
+          '3to6m': { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 },
+          '6to12m': { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 },
+          '1to2y': { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 },
+          '2yplus': { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 },
+          unknownTenure: { countsByDaysAbsent: { '4': 1 }, overflow365Plus: 0, unknownRecency: 0 },
+        },
       },
       unknown: 0,
       silentChurn: { monthlyDuesAtRisk: null, missingMonthlyDues: true },

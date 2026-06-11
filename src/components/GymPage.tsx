@@ -3,8 +3,10 @@
 // The Watch cards (Silent Churn, Attendance Health) read the live Wodify
 // aggregate when a snapshot is available and fall back to the sample fixture
 // otherwise; Member Movement's census (active/inactive — binary, §6 rescope)
-// reads live the same way while its join-cohort intake stays sample
-// (membershipStart isn't on /clients). Churn Risk by Tenure is still sample-only. The three remaining
+// reads live the same way while its join-cohort intake stays sample. Churn Risk
+// by Tenure reads the snapshot's per-band tenure histogram (§6 aggregate
+// extension, sourced from Wodify member_since) and stays on sample until a
+// gated re-pull populates that column. The three remaining
 // Patterns cards stay as shells with an honest parked/blocked gate note — not
 // built, gated on a data policy or API access (see RETENTION_FINISH_PLAN.md).
 // Overview / Membership / Classes are hidden for now.
@@ -17,7 +19,10 @@ import {
   computeAttendanceHealth,
   computeSilentChurn,
 } from '../lib/gym/silentChurn';
-import { computeChurnRiskByTenure } from '../lib/gym/churnRiskByTenure';
+import {
+  computeChurnRiskByTenure,
+  computeChurnRiskByTenureFromAggregate,
+} from '../lib/gym/churnRiskByTenure';
 import { computeMemberMovement } from '../lib/gym/memberMovement';
 import { deriveBuckets } from '../lib/gym/retentionAggregateView';
 import {
@@ -85,7 +90,7 @@ export function GymPage() {
             </div>
             <div className="gym-card-grid">
               <MemberMovementCard snapshot={snapshot} />
-              <ChurnRiskByTenureCard />
+              <ChurnRiskByTenureCard snapshot={snapshot} />
               <GymCardShell
                 modifier="gym-card--half"
                 title="Churn by Age"
@@ -251,9 +256,9 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
 // cards, so this card's live "Silent" bucket and the live Silent Churn count read
 // the SAME snapshot and agree by construction. Loading / error / empty /
 // unconfigured all fall back to the SAMPLE fixture and the "Sample data" badge —
-// the live snapshot is optional, never a render error. Churn Risk by Tenure stays
-// on sample (it needs per-member tenure the aggregate can't carry); Member
-// Movement's census now reads the same live snapshot (its intake stays sample).
+// the live snapshot is optional, never a render error. Churn Risk by Tenure now
+// reads the same snapshot's per-band tenure histogram (§6 aggregate extension);
+// Member Movement's census reads it too (its intake stays sample).
 function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays } = useRetentionSettings();
 
@@ -361,13 +366,32 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
 // the silent slices here re-partition the Silent Churn set rather than redefining
 // it. The hero is the band with the highest risk rate. Deterministic: the copy
 // only rephrases code-computed counts and rates; it never authors the at-risk call.
-function ChurnRiskByTenureCard() {
+//
+// Dual-source (§6 aggregate extension): with a snapshot carrying the per-band
+// tenure histogram (validated against this build's band edges — see
+// fetchRetentionAggregate), the card derives the SAME result shape live via
+// computeChurnRiskByTenureFromAggregate (deriveBuckets per band, one hero rule)
+// and badges "Live · as of {asOf}". Σ band silent here === the live Silent Churn
+// count at the same threshold by construction. A snapshot without tenure data
+// (pre-migration row, or a contract mismatch) falls back to the sample fixture —
+// the tenure flip is data-gated, not deploy-gated. The live caveat note carries
+// the two disclosed member_since caveats (records-era undercount; staff
+// accounts) — honesty notes, not defects.
+function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays } = useRetentionSettings();
 
+  const tenureBands = snapshot?.tenureBands ?? null;
   const result = useMemo(
-    () => computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
-    [silentChurnThresholdDays],
+    () =>
+      tenureBands
+        ? computeChurnRiskByTenureFromAggregate(tenureBands, silentChurnThresholdDays)
+        : computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
+    [tenureBands, silentChurnThresholdDays],
   );
+  // Live only when the snapshot actually carries a usable tenure histogram — the
+  // other live cards may already be live off this snapshot while this card is
+  // still honestly Sample (pre-tenure row → tenureBands null).
+  const liveAsOf = tenureBands && snapshot ? snapshot.asOf : null;
 
   const { thresholdDays, activeTotal, bands, unknownTenure, heroBandId } = result;
   const heroBand = bands.find((b) => b.id === heroBandId) ?? null;
@@ -377,7 +401,11 @@ function ChurnRiskByTenureCard() {
       <header className="gym-card-head">
         <div className="churn-tenure-titlerow">
           <h3 className="gym-card-title">Churn Risk by Tenure</h3>
-          <span className="gym-sample-badge">Sample data</span>
+          {liveAsOf ? (
+            <span className="gym-sample-badge gym-live-badge">Live · as of {liveAsOf}</span>
+          ) : (
+            <span className="gym-sample-badge">Sample data</span>
+          )}
         </div>
         <p className="gym-card-subtitle">Which tenure cohort is drifting most.</p>
       </header>
@@ -441,6 +469,15 @@ function ChurnRiskByTenureCard() {
             )}
           </ul>
         </div>
+
+        {liveAsOf && (
+          <p className="churn-tenure-caveat">
+            Tenure counts from each member&rsquo;s start date in our current records
+            (Wodify&rsquo;s &ldquo;Client Since&rdquo;). Members whose history predates
+            these records can show shorter tenure than their real one, and staff
+            accounts carry account-setup dates rather than member tenure.
+          </p>
+        )}
       </div>
     </article>
   );

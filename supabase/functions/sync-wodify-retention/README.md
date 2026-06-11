@@ -140,14 +140,20 @@ call** — and **nuanced**, not a clean pass:
   snapshot — never a silent truncation. Request shape matches the §5 probes
   (`scripts/wodify/clientsRecencyProbe.ts`).
 - Calls `computeRetentionAggregate(rows, { asOf, fetchedAt, pagesFetched, reachedPageCap })`.
+  Since the §6 aggregate extension this also bins ACTIVE members into per-tenure-band
+  recency histograms from `member_since` (normalized by the same
+  ISO-slice → `1900-01-01`-sentinel → `parseYmdLocal` rule; unusable or after-`asOf`
+  starts route to the unknown-tenure bucket, never dropped). Band edges live in
+  `src/lib/gym/tenureBands.ts` (dependency-free, shared with the SPA card — one
+  definition; imported with the proven explicit-`.ts` Option-A form).
 - Persists the aggregate via the Supabase REST API using the **service-role**
   key (bypasses RLS; never browser-exposed). **Idempotent upsert** keyed on
   `(workspace_id, as_of)` — PostgREST `on_conflict=workspace_id,as_of` +
   `Prefer: resolution=merge-duplicates`, backed by the unique constraint in
   `wodify_retention_schema.sql`. A same-day re-pull **replaces** the day's row
   instead of duplicating it; rows still accumulate across days.
-- Returns a **counts-only** summary (`activeTotal`, `unknown`, `diagnostics`,
-  `dataQuality`) — never raw rows.
+- Returns a **counts-only** summary (`activeTotal`, `unknown`, `tenure` — per-band
+  active totals, a count per band id — `diagnostics`, `dataQuality`) — never raw rows.
 - On any error → `502 { "error": "sync_failed", "code": <class> }`, where `code`
   is a fixed-vocabulary class — `wodify_clients_http_<status>`,
   `persist_http_<status>`, `bad_asof`, `timeout`, `parse_error`, `network_error`,
@@ -159,9 +165,10 @@ call** — and **nuanced**, not a clean pass:
 
 - Raw `/clients` rows are transient in memory only — never logged or persisted.
 - The persisted row holds **no PII**: no id, name, exact member date, or dues.
-  Every column is a snapshot-level date, a count, or the counts-only histogram
-  (see `supabase/wodify_retention_schema.sql`). That is why the SPA may read it
-  with the anon key.
+  Every column is a snapshot-level date, a count, or a counts-only histogram
+  (days-absent / tenure-band — `member_since` is read for BANDING only and never
+  leaves the normalize step; see `supabase/wodify_retention_schema.sql`). That is
+  why the SPA may read it with the anon key.
 - `monthlyDuesAtRisk` is always `null` + `missingMonthlyDues: true` — `/clients`
   carries no dues, and a fabricated `$0` is never emitted.
 
@@ -196,9 +203,10 @@ sequence ran once under Reviewer + Wesley authorization; the function is now dis
   unset): `GET` (valid JWT) → `405`; `POST` no `x-sync-trigger-secret` → `403`; `POST` bad
   header → `403`; `POST` correct header → `500` fail-closed, **zero Wodify reachable**.
 - **C. Set the rotated `WODIFY_API_KEY`** (secret-safe; same flow as A, but ONLY at Step C).
-- **D. Single real `POST` at midday gym-local** (valid JWT + correct `x-sync-trigger-secret`)
-  — the first live Wodify pull. Midday gym-local is the **interim** asOf-UTC mitigation; the
-  permanent gym-local `asOf` fix is a **separate, deferred code PR**, not this one.
+- **D. Single real `POST`** (valid JWT + correct `x-sync-trigger-secret`) — the live Wodify
+  pull. *(Pull timing is no longer `asOf`-constrained: the gym-local `asOf` fix is **LIVE**
+  (#445), so any time works — the former "midday gym-local" guidance was the now-RETIRED
+  interim mitigation. This bullet previously carried the stale interim wording.)*
 - **E. Verify** the persisted row + the §6.6 conservation invariant.
 - **F. Unset `WODIFY_API_KEY`** (disarm).
 
@@ -247,6 +255,16 @@ rm -f "$cfg"
 runtime; they are not set manually.
 
 ## Open items / follow-ups (first live invoke DONE 2026-06-07; idempotent-upsert redeploy DONE 2026-06-08; census-populate pull DONE 2026-06-10)
+
+- **Churn-by-Tenure aggregate extension (§6) — CODE ON MAIN, NOT YET DEPLOYED.** The source now
+  also bins active members into per-tenure-band recency histograms from `member_since` (counts
+  only; persisted as the NULLABLE `tenure_band_histogram` column — see
+  `wodify_retention_schema.sql`) and reports per-band active totals in the 200 summary. The
+  **live deployed bundle (`40307a38…`) predates this** and the column is **unapplied**; both
+  land only inside the next gated run (migration → name-scoped redeploy → re-arm → single pull
+  → verify → disarm) under a fresh Reviewer audit + Wesley authorization. Until that run, the
+  SPA's Tenure card stays honestly on Sample (the reader maps an absent/null column to a sample
+  fallback).
 
 - **Idempotency — DONE (constraint applied gate-4 + function redeployed gate-5, 2026-06-08; source carried by #444).**
   The persist path is now an idempotent upsert on `(workspace_id, as_of)`. **Live:** the named **unique

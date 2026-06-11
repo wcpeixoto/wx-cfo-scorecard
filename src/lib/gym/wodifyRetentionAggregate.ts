@@ -29,6 +29,11 @@
 // dropping the extension reproduces the proven deploy failure
 // (Module not found "./silentChurn").
 import { parseYmdLocal, wholeDaysBetween } from './silentChurn.ts';
+// Tenure band edges (§6 aggregate extension) — the same explicit-`.ts` rule
+// applies to this second shared import. tenureBands.ts is dependency-free pure
+// constants, so the Edge bundle gains band edges only — never the
+// threshold-coupled classifiers (the §6.1 reuse boundary is unchanged).
+import { TENURE_BANDS, UNKNOWN_TENURE_ID, bandForTenure } from './tenureBands.ts';
 
 // Highest exact day-count bin. Days absent 0..364 get an exact bin; >= 365 rolls
 // into `overflow365Plus`. Bounding the histogram means it carries no exact dates
@@ -49,6 +54,12 @@ export type RawWodifyClient = {
   last_attendance?: unknown;
   last_class_sign_in?: unknown;
   is_at_risk?: unknown;
+  // Membership start (§6 aggregate extension). PROVEN SOURCEABLE by the
+  // membershipStart field-discovery (2026-06-11): true membership start —
+  // Wodify's UI "Client Since Date" — 408/408 active usable, semantically
+  // confirmed by owner + Reviewer. Read for tenure BANDING only; the exact
+  // date never leaves the normalize step.
+  member_since?: unknown;
 };
 
 export type NormalizedStatus = 'active' | 'inactive';
@@ -57,10 +68,13 @@ export type NormalizedStatus = 'active' | 'inactive';
 // status was missing OR present-but-unrecognized (either way unmappable —
 // excluded from every census bucket, counted in `unknownStatus`).
 // `lastCheckIn: ''` means active-but-no-usable-date (→ unknown bucket, never
-// silently Healthy).
+// silently Healthy). `membershipStart: ''` means no usable member_since
+// (missing/sentinel/invalid) — the member bins into the unknown-TENURE bucket,
+// never silently into "< 3 mo".
 export type NormalizedMember = {
   status: NormalizedStatus | null;
   lastCheckIn: string; // 'YYYY-MM-DD' or ''
+  membershipStart: string; // 'YYYY-MM-DD' or ''
   isAtRisk: boolean;
 };
 
@@ -71,6 +85,37 @@ export type DaysAbsentHistogram = {
   maxExactDays: number; // always MAX_EXACT_DAYS (364)
   countsByDaysAbsent: Record<string, number>;
   overflow365Plus: number;
+};
+
+// One tenure band's recency counts (§6 aggregate extension): the same sparse
+// exact-day bins + overflow as the global histogram, restricted to the active
+// members whose tenure falls in this band, plus that band's unknown-RECENCY
+// count (active in band, no usable lastCheckIn — in activeTotal, never at
+// risk). Counts only — no member dates, names, or IDs.
+export type TenureBandRecency = {
+  countsByDaysAbsent: Record<string, number>;
+  overflow365Plus: number;
+  unknownRecency: number;
+};
+
+// The band-edge contract persisted alongside the per-band counts so the
+// snapshot is self-describing: the SPA validates these edges EXACTLY (length,
+// order, id, minDays) against its own TENURE_BANDS and falls back to Sample on
+// any mismatch — a snapshot binned under different edges is never rendered
+// under the SPA's labels. Labels are presentation-only and stay SPA-side.
+export type TenureBandEdge = { id: string; minDays: number };
+
+// Per-tenure-band partition of the active recency histogram, keyed by band id
+// plus the synthetic unknown-tenure bucket (#439: active members whose
+// member_since is missing/sentinel/invalid/future — surfaced, never dropped).
+// Every TENURE_BANDS id and UNKNOWN_TENURE_ID is always present (empty bands
+// carry zero counts), so the SPA contract is deterministic. The bands partition
+// the global histogram: merging them bin-wise reproduces daysAbsentHistogram
+// and Σ unknownRecency === unknown (proven by test), which is what makes
+// Σ band silent === the live Silent Churn count at every threshold.
+export type TenureBandHistogram = {
+  bandEdges: TenureBandEdge[];
+  bands: Record<string, TenureBandRecency>;
 };
 
 // The non-PII aggregate snapshot — exactly what the Edge Function persists and
@@ -92,6 +137,10 @@ export type RetentionAggregate = {
   // holds by construction — every scanned row increments exactly one of the three.
   inactiveTotal: number;
   daysAbsentHistogram: DaysAbsentHistogram;
+  // Churn-by-Tenure (§6 aggregate extension): the per-band partition of
+  // daysAbsentHistogram + unknown, over the SAME active members. ACTIVE-ONLY by
+  // design — inactive members are the census, not a tenure cohort.
+  tenureBandHistogram: TenureBandHistogram;
   unknown: number; // active, missing/sentinel/invalid lastCheckIn (NOT Healthy)
   silentChurn: { monthlyDuesAtRisk: null; missingMonthlyDues: true };
   diagnostics: { wodifyAtRiskCount: number };
@@ -172,10 +221,14 @@ export function pickLastCheckIn(
 
 // Normalize one raw `/clients` row to the transient non-PII shape. `is_at_risk`
 // is captured as a diagnostic only (Wodify's own flag), never used to classify.
+// `member_since` goes through the SAME sliceUsableDate rule as the recency
+// dates (ISO slice → 1900-01-01 sentinel → parseYmdLocal), so the wire-level
+// sentinel can never reach the tenure math as a real ~46-year tenure.
 export function normalizeClient(raw: RawWodifyClient): NormalizedMember {
   return {
     status: normalizeStatus(raw.client_status),
     lastCheckIn: pickLastCheckIn(raw.last_attendance, raw.last_class_sign_in),
+    membershipStart: sliceUsableDate(raw.member_since) ?? '',
     isAtRisk: raw.is_at_risk === true,
   };
 }
@@ -208,6 +261,15 @@ export function computeRetentionAggregate(
   let futureLastCheckIn = 0;
   let wodifyAtRiskCount = 0;
 
+  // Per-tenure-band recency accumulators (§6 aggregate extension). Every band id
+  // plus the unknown-tenure bucket is present from the start, so empty bands emit
+  // zero counts rather than vanishing from the payload.
+  const tenureBands: Record<string, TenureBandRecency> = {};
+  for (const band of TENURE_BANDS) {
+    tenureBands[band.id] = { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 };
+  }
+  tenureBands[UNKNOWN_TENURE_ID] = { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 };
+
   for (const raw of rawRows) {
     const member = normalizeClient(raw);
 
@@ -226,13 +288,24 @@ export function computeRetentionAggregate(
     // member.status === 'active' from here.
     activeTotal += 1;
 
+    // Resolve the tenure band before the recency split, so EVERY recency
+    // increment below mirrors into exactly one band — the per-band histograms
+    // partition the global one by construction. No usable member_since, or a
+    // start after asOf (negative tenure, bandForTenure → null), routes to the
+    // unknown-tenure bucket (#439) — counted, never dropped.
+    const startDate = member.membershipStart === '' ? null : parseYmdLocal(member.membershipStart);
+    const tenureBand = startDate === null ? null : bandForTenure(wholeDaysBetween(startDate, asOfDate));
+    const bandRecency = tenureBands[tenureBand ? tenureBand.id : UNKNOWN_TENURE_ID];
+
     if (member.lastCheckIn === '') {
       unknown += 1; // active but no usable date — NEVER folded into Healthy
+      bandRecency.unknownRecency += 1;
       continue;
     }
     const lastCheckInDate = parseYmdLocal(member.lastCheckIn);
     if (lastCheckInDate === null) {
       unknown += 1; // defensive: sliceUsableDate already validated, but never drop a member
+      bandRecency.unknownRecency += 1;
       continue;
     }
 
@@ -240,11 +313,14 @@ export function computeRetentionAggregate(
     if (daysAbsent < 0) {
       futureLastCheckIn += 1;
       countsByDaysAbsent['0'] = (countsByDaysAbsent['0'] ?? 0) + 1; // day-0 = Healthy-compatible
+      bandRecency.countsByDaysAbsent['0'] = (bandRecency.countsByDaysAbsent['0'] ?? 0) + 1;
     } else if (daysAbsent <= MAX_EXACT_DAYS) {
       const key = String(daysAbsent);
       countsByDaysAbsent[key] = (countsByDaysAbsent[key] ?? 0) + 1;
+      bandRecency.countsByDaysAbsent[key] = (bandRecency.countsByDaysAbsent[key] ?? 0) + 1;
     } else {
       overflow365Plus += 1;
+      bandRecency.overflow365Plus += 1;
     }
   }
 
@@ -259,6 +335,10 @@ export function computeRetentionAggregate(
       countsByDaysAbsent,
       overflow365Plus,
     },
+    tenureBandHistogram: {
+      bandEdges: TENURE_BANDS.map(({ id, minDays }) => ({ id, minDays })),
+      bands: tenureBands,
+    },
     unknown,
     silentChurn: { monthlyDuesAtRisk: null, missingMonthlyDues: true },
     diagnostics: { wodifyAtRiskCount },
@@ -270,4 +350,19 @@ export function computeRetentionAggregate(
       clientsScanned: rawRows.length,
     },
   };
+}
+
+// Per-band active totals (counts only) — each band's bin sum + overflow +
+// unknownRecency. Used by the Edge Function's counts-only 200 summary so a
+// post-pull verify can eyeball the band split without reading the table; also
+// the per-band denominator the SPA's risk rate divides by.
+export function tenureBandActiveTotals(
+  tenure: TenureBandHistogram,
+): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const [id, band] of Object.entries(tenure.bands)) {
+    const binSum = Object.values(band.countsByDaysAbsent).reduce((a, b) => a + b, 0);
+    totals[id] = binSum + band.overflow365Plus + band.unknownRecency;
+  }
+  return totals;
 }

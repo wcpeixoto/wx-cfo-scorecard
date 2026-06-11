@@ -10,8 +10,8 @@
 -- WHY THIS TABLE IS ANON-READABLE (the member-PII anon-key blocker):
 -- the SPA reads it with the public anon key, which is safe ONLY because the row
 -- holds NO PII. There is structurally no member-level column here — every column
--- is a snapshot-level date, a count, or the counts-only days-absent histogram.
--- No id, name, exact member date, or dues value is ever stored. The Edge
+-- is a snapshot-level date, a count, or a counts-only histogram (days-absent /
+-- tenure-band). No id, name, exact member date, or dues value is ever stored. The Edge
 -- Function sync-wodify-retention is the only writer and writes with the
 -- service-role key (which bypasses RLS); anon gets SELECT only.
 --
@@ -57,6 +57,17 @@ create table if not exists public.wodify_retention_aggregate (
   -- { maxExactDays: 364, countsByDaysAbsent: { "<days>": <count> }, overflow365Plus: <count> }.
   -- The SPA derives Silent Churn count + Healthy/Watch/Silent at ANY owner threshold from this.
   days_absent_histogram jsonb not null,
+  -- Churn-by-Tenure (§6 aggregate extension): the per-tenure-band partition of
+  -- days_absent_histogram + unknown_count over the SAME active members, keyed by
+  -- band id (lt3m/3to6m/6to12m/1to2y/2yplus + unknownTenure), each
+  -- { countsByDaysAbsent, overflow365Plus, unknownRecency }, plus the bandEdges
+  -- contract the SPA validates EXACTLY against its own TENURE_BANDS. Counts only
+  -- — no member-level data, sourced from Wodify member_since which never leaves
+  -- the server's normalize step. NULLABLE on purpose (same rule as
+  -- inactive_total): a row written before this slice carries no tenure
+  -- structure, and the SPA must tell "absent/null → Sample fallback" apart from
+  -- a real value. NEVER NOT NULL / NEVER a default.
+  tenure_band_histogram jsonb null,
   unknown_count integer not null,                -- active, missing/sentinel/invalid lastCheckIn
   -- Silent Churn dues gap: /clients carries no dues, so the dollar is unavailable
   -- this slice. Always null + missing flag true — never a fabricated 0.
@@ -83,6 +94,14 @@ create table if not exists public.wodify_retention_aggregate (
 -- — the live table has never had census columns, verified 2026-06-10.)
 alter table public.wodify_retention_aggregate
   add column if not exists inactive_total integer;
+
+-- Backfill the Churn-by-Tenure column the same way (NULLABLE + no default, see
+-- the column def above): pre-tenure rows stay null and the SPA falls back to
+-- sample rather than rendering a fabricated empty tenure split. `add column if
+-- not exists` keeps this file safely re-appliable. The live apply happens only
+-- inside the gated §6 run (Step B), never on merge.
+alter table public.wodify_retention_aggregate
+  add column if not exists tenure_band_histogram jsonb;
 
 -- Latest snapshot per workspace = order by fetched_at desc limit 1.
 create index if not exists wodify_retention_aggregate_workspace_fetched_at_idx

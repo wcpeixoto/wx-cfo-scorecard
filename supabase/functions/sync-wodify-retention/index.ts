@@ -27,6 +27,7 @@
 
 import {
   computeRetentionAggregate,
+  tenureBandActiveTotals,
   type RawWodifyClient,
   type RetentionAggregate,
 } from '../../../src/lib/gym/wodifyRetentionAggregate.ts';
@@ -115,6 +116,9 @@ async function persistAggregate(
     active_total: agg.activeTotal,
     inactive_total: agg.inactiveTotal, // Member Movement census (§6, binary rescope)
     days_absent_histogram: agg.daysAbsentHistogram,
+    // Churn-by-Tenure (§6 aggregate extension): per-band recency counts +
+    // bandEdges contract. Counts only — non-PII like every other column.
+    tenure_band_histogram: agg.tenureBandHistogram,
     unknown_count: agg.unknown,
     monthly_dues_at_risk: agg.silentChurn.monthlyDuesAtRisk,
     missing_monthly_dues: agg.silentChurn.missingMonthlyDues,
@@ -190,12 +194,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
     await persistAggregate(supabaseUrl, serviceKey, aggregate);
 
-    // Counts-only summary back to the caller — NO raw rows, NO PII.
+    // Counts-only summary back to the caller — NO raw rows, NO PII. The tenure
+    // entry is per-band ACTIVE TOTALS only (a count per band id), so a post-pull
+    // verify can eyeball the band split without reading the table.
     return jsonResponse(200, {
       ok: true,
       asOf: aggregate.asOf,
       activeTotal: aggregate.activeTotal,
       unknown: aggregate.unknown,
+      tenure: tenureBandActiveTotals(aggregate.tenureBandHistogram),
       missingMonthlyDues: aggregate.silentChurn.missingMonthlyDues,
       diagnostics: aggregate.diagnostics,
       dataQuality: aggregate.dataQuality,
