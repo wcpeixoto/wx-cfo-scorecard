@@ -663,8 +663,10 @@ authorized pull runs — the SPA bundle is unchanged.) The blocked slices: (i) *
 the census SPA wiring **shipped (#450 @ `243a566`, rescoped to binary 2026-06-10)**, and the census
 is now **LIVE** — the 2026-06-10 census-populate run populated `inactive_total` (see "Census-populate
 run #2" below); its
-**join-cohort intake** plus **Churn Risk by Tenure** (#411) bands additionally need the **unproven
-`membershipStart` / join-date** field; (ii) Silent Churn **$-at-risk** needs a dues source (CSV
+**join-cohort intake** plus **Churn Risk by Tenure** (#411) bands additionally need the
+`membershipStart` / join-date field — **now PROVEN SOURCEABLE as `member_since`** (discovery run +
+semantic confirm closed 2026-06-11; see "membershipStart field-discovery" below; the
+aggregate-extension build is a separate gated slice); (ii) Silent Churn **$-at-risk** needs a dues source (CSV
 import — the Wodify financials API is tier-blocked); (iii) Silent Churn **call-list / member
 names** stay blocked by the §4 PII / auth gate. **Live status:** Attendance Health + Silent Churn
 (count-only) + the **Member Movement census** are **LIVE** from the aggregate (census since
@@ -750,6 +752,38 @@ activeTotal 408; SC == AH Silent at the same T; dues still "not available"; no c
 **version counter** project-wide (+1 per op — after this run's three secret ops, sync listed as v16
 and ai-proxy as v12 with both `ezbr_sha256` + `updated_at` unmoved); identity is **`ezbr_sha256` +
 `updated_at`, never version**.
+
+**membershipStart field-discovery — RUN CLEAN (one gated run), semantic confirm CLOSED 2026-06-11:
+`member_since` is SOURCEABLE.** The Churn-Risk-by-Tenure gate question ("does `/clients` expose a
+usable membership start / join date?") is ANSWERED. New local-only probe
+`scripts/wodify/clientsMembershipStartDiscovery.ts` (this PR commits it byte-identical to the
+reviewed-and-run artifact, blob `e0ae9d21e069514cb2ae6e723ddb2c4d210a8648`): walks every `/clients`
+field, classifies join-date candidates by NAME into STRONG vs WEAK/PROXY buckets, and reports
+ACTIVE-scoped population-quality aggregates only (counts, booleans, guarded min/max YEAR — no member
+names / IDs / raw rows / exact per-member dates / dues; a `YYYY-MM-DD` string can never appear in
+output, selftest-enforced). Process: Builder build + network-free selftest PASS → Reviewer script
+review PASS (leak-safety + coverage, all 6 plan fold-ins line-cited) → Wesley GO → ONE live run →
+Reviewer post-run verify PASS. **Run facts:** 10 pages / 957 scanned, coverage-complete, census
+408 active / 549 inactive / 0 unknown — byte-matching the 2026-06-10 census-populate edge run; 79
+fields walked (matches the membership-state probe's field count); `conclusion:
+"strong_candidate_found"`. **The strong candidate `member_since`: 408/408 active members (100%
+usable), 0 missing, 0 sentinel-1900, 0 invalid, 0 future, valid years 2015–2026.** Weak proxy
+`created_on.created_on_datetime`: also 408/408, years 2016–2026 (account creation — never a tenure
+source on its own per the probe's decision rule). **Semantic confirm (owner + Reviewer sign-off
+complete; Reviewer verdict logged `b6d70d9`):** `member_since` is a TRUE membership-start date, not
+an account-creation mirror — Wodify's UI "Client Since Date" IS this field (5-profile owner
+eyeball: the displayed tenure derives from it exactly), and the head coach independently
+corroborated 4/4 sampled families' join dates approximately (recall predates the lookup; no member
+names or per-member dates are recorded here). **Two disclosed caveats (structural honesty notes,
+not defects — same class as the Attendance Health Unknown copy):** (a) **records-era undercount** —
+members whose relationship predates this location/records era show tenure at the current gym's
+records, which can undercount a longer real history; (b) **staff records** carry account-setup
+dates, not member tenure (same structural population as the AH Unknown note). **Decision:**
+`membershipStart` is **SOURCEABLE** → Churn Risk by Tenure is **cleared for the aggregate-extension
+work order** (tenure-band histogram computed server-side into the non-PII aggregate table) as a
+**SEPARATE fresh-session gated slice — explicitly NOT this PR**. This record PR is script + plan
+doc only: no SPA, no schema, no deploy; `sync-wodify-retention` stays DISARMED (the probe ran
+locally, key-from-env, never through the edge function).
 
 **Prior-state facts (preserved).** The import-resolution sub-gate closed via Option A (#435 @ `b6bd9d6`); the
 **`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06) dropped the vestigial function-local `deno.json`
