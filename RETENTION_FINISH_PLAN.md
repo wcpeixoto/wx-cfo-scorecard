@@ -670,7 +670,9 @@ aggregate-extension build is a separate gated slice); (ii) Silent Churn **$-at-r
 import — the Wodify financials API is tier-blocked); (iii) Silent Churn **call-list / member
 names** stay blocked by the §4 PII / auth gate. **Live status:** Attendance Health + Silent Churn
 (count-only) + the **Member Movement census** are **LIVE** from the aggregate (census since
-2026-06-10); the MM join-cohort intake + Churn Risk by Tenure remain Sample.
+2026-06-10); the MM join-cohort intake + Churn Risk by Tenure remain Sample — Tenure's
+aggregate-extension **PR-1 code is on main** (data-gated flip at the next gated run; see
+"Churn-by-Tenure aggregate extension" below).
 
 **asOf timezone — permanent fix LIVE (2026-06-08, #445).** `asOf` was the **server-UTC** fetch
 date, which can shift the day boundary ±1 vs the gym's local day. The permanent fix is now **implemented in
@@ -784,6 +786,35 @@ work order** (tenure-band histogram computed server-side into the non-PII aggreg
 **SEPARATE fresh-session gated slice — explicitly NOT this PR**. This record PR is script + plan
 doc only: no SPA, no schema, no deploy; `sync-wodify-retention` stays DISARMED (the probe ran
 locally, key-from-env, never through the edge function).
+
+**Churn-by-Tenure aggregate extension — PR-1 (code-only) SHIPPED this PR; the card stays Sample
+until the gated run.** Per the Reviewer-validated aggregate-extension plan (2026-06-11, PASS no
+must-fix; GO'd for PR-1 only — all six review points resolved: #411 band edges unchanged, 2-D
+tenure×recency histogram accepted as non-PII, ACTIVE-only scoping, Step-A live probe re-run
+skipped, per-band totals kept in the 200 body, caveat copy baseline approved). The server
+aggregate now bins ACTIVE members into per-tenure-band recency histograms from `member_since`
+(normalized by the same `sliceUsableDate` rule — ISO slice → `1900-01-01` sentinel →
+`parseYmdLocal`; missing/sentinel/invalid/after-`asOf` starts route to the #439 unknown-tenure
+bucket, never dropped, never "< 3 mo"). Band edges = the shipped #411 set, extracted to
+`src/lib/gym/tenureBands.ts` (single source, dependency-free, inside the Edge deploy graph via
+the proven explicit-`.ts` Option-A form; `churnRiskByTenure.ts` re-exports so existing consumers
+are unchanged). New payload/column `tenure_band_histogram` (jsonb, **NULLABLE, no default** —
+null → Sample, mirroring `inactive_total`) carries `bandEdges` (id+minDays contract) + per-band
+`{ countsByDaysAbsent, overflow365Plus, unknownRecency }` — counts only, no member dates/IDs;
+the bands **PARTITION** the global histogram (merge invariant tested, incl. the future→day-0
+rule per-band), so Σ band silent === the live Silent Churn count at every threshold — the #411
+anti-drift invariant on live data by construction. SPA: `fetchRetentionAggregate` validates the
+column fail-closed (**EXACT** bandEdges equality vs `TENURE_BANDS` — length/order/id/minDays;
+any mismatch → `tenureBands: null` with **PER-FIELD degradation**, so AH/SC/MM keep their live
+data) and the Tenure card renders dual-source via `computeChurnRiskByTenureFromAggregate`
+(`deriveBuckets` per band, ONE shared hero rule) with the two disclosed `member_since` caveats
+in the live card copy (records-era undercount; staff setup dates — honesty notes, not defects).
+The Edge 200 summary adds per-band active totals (counts only). **Deployed bundle UNCHANGED
+(`40307a38…`, DISARMED) and the live column UNAPPLIED** — migration, name-scoped redeploy,
+re-arm, single pull, verify, disarm are ALL deferred to the gated run (Steps 0/A–F, fresh
+Reviewer audit + Wesley GO). Local gates green (tsc, full vitest incl. the new
+partition/parity/contract suites, vite build, esbuild bundle proof of the Edge graph with zero
+`console.*`).
 
 **Prior-state facts (preserved).** The import-resolution sub-gate closed via Option A (#435 @ `b6bd9d6`); the
 **`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06) dropped the vestigial function-local `deno.json`

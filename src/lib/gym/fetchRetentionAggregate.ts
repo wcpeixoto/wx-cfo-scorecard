@@ -21,6 +21,11 @@
 //     so we filter to the same workspace and never need the authenticated role.
 
 import type { DerivableAggregate } from './retentionAggregateView';
+import { TENURE_BANDS, UNKNOWN_TENURE_ID } from './tenureBands';
+import type {
+  TenureBandHistogram,
+  TenureBandRecency,
+} from './wodifyRetentionAggregate';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
 const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
@@ -44,6 +49,14 @@ export type RetentionAggregateSnapshot = DerivableAggregate & {
   // nonzero (honesty parity with Attendance Health's Unknown). NOT NULL default 0 on
   // the live table, so a missing/malformed value coerces to 0, never to a gate.
   unknownStatus: number;
+  // Churn-by-Tenure (§6 aggregate extension): the per-tenure-band partition of the
+  // recency histogram. `null` when the column is absent (pre-tenure snapshot), SQL
+  // null, malformed, or binned under DIFFERENT band edges than this build's
+  // TENURE_BANDS (exact id/minDays/order match required) — the Tenure card then
+  // falls back to its sample fixture. PER-FIELD degradation on purpose: a bad
+  // tenure payload never nulls the whole snapshot (AH / SC / MM keep their live
+  // data), mirroring the inactiveTotal rule.
+  tenureBands: TenureBandHistogram | null;
 };
 
 // Loosely-typed shape of the REST row — every field is validated before use, since
@@ -55,6 +68,7 @@ type AggregateRow = {
   unknown_status?: unknown;
   unknown_count?: unknown;
   days_absent_histogram?: unknown;
+  tenure_band_histogram?: unknown;
 };
 
 // True only when the SPA build carries Supabase env. When false (e.g. local dev with
@@ -73,6 +87,64 @@ function asCount(value: unknown): number {
 // fabricated 0 off a pre-census row.
 function asCountOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+// Coerce one tenure band's jsonb entry, or null when structurally unusable.
+function parseTenureBandRecency(value: unknown): TenureBandRecency | null {
+  if (!value || typeof value !== 'object') return null;
+  const entry = value as {
+    countsByDaysAbsent?: unknown;
+    overflow365Plus?: unknown;
+    unknownRecency?: unknown;
+  };
+  if (!entry.countsByDaysAbsent || typeof entry.countsByDaysAbsent !== 'object') return null;
+  const countsByDaysAbsent: Record<string, number> = {};
+  for (const [k, v] of Object.entries(entry.countsByDaysAbsent as Record<string, unknown>)) {
+    countsByDaysAbsent[k] = asCount(v);
+  }
+  return {
+    countsByDaysAbsent,
+    overflow365Plus: asCount(entry.overflow365Plus),
+    unknownRecency: asCount(entry.unknownRecency),
+  };
+}
+
+// Validate the Churn-by-Tenure jsonb into the typed histogram, or null → the
+// Tenure card falls back to sample. Two contract checks, both fail-closed:
+//
+// 1. bandEdges must EXACTLY equal this build's TENURE_BANDS — same length, same
+//    order, same id, same minDays. A snapshot binned under different edges must
+//    never render under this build's band labels (mislabeled cohorts are worse
+//    than the sample badge).
+// 2. Every expected band key (each TENURE_BANDS id + the unknown-tenure bucket)
+//    must be present and well-formed. Unexpected EXTRA keys are ignored — any
+//    semantic band change would also change bandEdges and fail check 1.
+function parseTenureBandHistogram(value: unknown): TenureBandHistogram | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as { bandEdges?: unknown; bands?: unknown };
+
+  if (!Array.isArray(v.bandEdges) || v.bandEdges.length !== TENURE_BANDS.length) return null;
+  for (let i = 0; i < TENURE_BANDS.length; i++) {
+    const edge = v.bandEdges[i] as { id?: unknown; minDays?: unknown } | null;
+    if (!edge || typeof edge !== 'object') return null;
+    if (edge.id !== TENURE_BANDS[i].id || edge.minDays !== TENURE_BANDS[i].minDays) return null;
+  }
+
+  if (!v.bands || typeof v.bands !== 'object') return null;
+  const rawBands = v.bands as Record<string, unknown>;
+  const bands: Record<string, TenureBandRecency> = {};
+  for (const id of [...TENURE_BANDS.map((b) => b.id), UNKNOWN_TENURE_ID]) {
+    const band = parseTenureBandRecency(rawBands[id]);
+    if (band === null) return null;
+    bands[id] = band;
+  }
+
+  // Rebuild bandEdges from this build's TENURE_BANDS (proven equal above) so no
+  // unvalidated extra properties ride through from the wire.
+  return {
+    bandEdges: TENURE_BANDS.map(({ id, minDays }) => ({ id, minDays })),
+    bands,
+  };
 }
 
 // Fetch the latest snapshot (highest as_of) for the default workspace, or null when
@@ -152,5 +224,6 @@ export async function fetchLatestRetentionAggregate(
       countsByDaysAbsent,
       overflow365Plus: asCount(histogram.overflow365Plus),
     },
+    tenureBands: parseTenureBandHistogram(row.tenure_band_histogram),
   };
 }

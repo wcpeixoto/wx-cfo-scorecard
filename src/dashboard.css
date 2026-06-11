@@ -13101,7 +13101,8 @@ body {
   color: var(--text-secondary);
 }
 .churn-tenure-helper,
-.churn-tenure-empty {
+.churn-tenure-empty,
+.churn-tenure-caveat {
   margin: 0;
   font-size: 14px;
   color: var(--text-secondary);

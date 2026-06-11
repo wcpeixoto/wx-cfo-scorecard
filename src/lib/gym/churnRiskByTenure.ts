@@ -16,40 +16,21 @@ import {
   resolveSilentChurnThresholdDays,
   wholeDaysBetween,
 } from './silentChurn';
+import { TENURE_BANDS, UNKNOWN_TENURE_ID, bandForTenure } from './tenureBands';
+import { deriveBuckets } from './retentionAggregateView';
+import type { TenureBandHistogram, TenureBandRecency } from './wodifyRetentionAggregate';
 
 // At-risk = the Attendance Health "watch" + "silent" buckets: a member who is
 // drifting (watch) OR already past the Silent Churn threshold (silent). Healthy
 // and unknown are active but not at risk. This is the one place the at-risk
 // definition for this card is stated.
 //
-// Tenure band definition (tunable — this constant is the single source of
-// truth). Bands are LABELLED in months/years but CUT on whole days, so the
-// boundaries are deterministic and timezone-safe. Each entry's `minDays` is the
-// inclusive lower edge; a member lands in the band with the greatest `minDays`
-// that is <= their tenure in days. The list must stay sorted ascending by
-// minDays and start at 0 so every non-negative tenure resolves to exactly one
-// band.
-export type TenureBandDef = {
-  id: string;
-  label: string;
-  minDays: number;
-};
-
-export const TENURE_BANDS: readonly TenureBandDef[] = [
-  { id: 'lt3m', label: '< 3 mo', minDays: 0 },
-  { id: '3to6m', label: '3–6 mo', minDays: 90 },
-  { id: '6to12m', label: '6–12 mo', minDays: 180 },
-  { id: '1to2y', label: '1–2 yr', minDays: 365 },
-  { id: '2yplus', label: '2 yr+', minDays: 730 },
-];
-
-// Stable id/label for the synthetic "unknown tenure" bucket: ACTIVE members whose
-// tenure band can't be determined — a missing/invalid membershipStart, or a start
-// AFTER asOf (negative tenure). It is deliberately NOT a TENURE_BANDS entry, so
-// `bands` stays one row per real cohort and the hero is always a real cohort; but
-// it IS surfaced in the result and counted in activeTotal, so a dirty-data member
-// is shown rather than silently dropped. Matters once live Wodify data lands.
-export const UNKNOWN_TENURE_ID = 'unknownTenure';
+// The tenure band definition (band edges + the unknown-tenure bucket id) lives
+// in ./tenureBands — extracted there because the §6 aggregate extension bins by
+// the SAME bands server-side, and one definition keeps the live histogram and
+// this card from ever disagreeing. Re-exported so existing consumers (tests,
+// UI) keep importing from here.
+export { TENURE_BANDS, UNKNOWN_TENURE_ID, type TenureBandDef } from './tenureBands';
 const UNKNOWN_TENURE_LABEL = 'Unknown';
 
 export type TenureBandRisk = {
@@ -70,17 +51,27 @@ export type ChurnRiskByTenureResult = {
   heroBandId: string | null; // band with the highest risk rate (null when no active members)
 };
 
-// The band whose minDays is the greatest value <= tenureDays. Returns null for a
-// negative tenure (membershipStart after asOf — bad data), so the caller routes
-// such a member into the "unknown tenure" bucket rather than silently forcing
-// them into "< 3 mo".
-function bandForTenure(tenureDays: number): TenureBandDef | null {
-  if (tenureDays < 0) return null;
-  let match: TenureBandDef | null = null;
-  for (const band of TENURE_BANDS) {
-    if (tenureDays >= band.minDays) match = band;
+// Hero = the band with the highest risk rate, considering only bands that have
+// active members (an empty band has no rate). Ties break toward the larger
+// at-risk count, then toward the earlier (shorter-tenure) band for stability.
+// ONE rule for both sources — the sample compute and the live-aggregate adapter
+// below both call this, so the hero can never differ by data source.
+function selectHeroBandId(bands: TenureBandRisk[]): string | null {
+  let heroBandId: string | null = null;
+  let bestRate = -1;
+  let bestAtRisk = -1;
+  for (const band of bands) {
+    if (band.activeTotal === 0 || band.riskRate === null) continue;
+    if (
+      band.riskRate > bestRate ||
+      (band.riskRate === bestRate && band.atRisk > bestAtRisk)
+    ) {
+      bestRate = band.riskRate;
+      bestAtRisk = band.atRisk;
+      heroBandId = band.id;
+    }
   }
-  return match;
+  return heroBandId;
 }
 
 // Churn Risk by Tenure (deterministic): bucket ACTIVE members by tenure and,
@@ -169,29 +160,78 @@ export function computeChurnRiskByTenure(
   const activeTotal =
     bands.reduce((sum, band) => sum + band.activeTotal, 0) + unknownTenure.activeTotal;
 
-  // Hero = the band with the highest risk rate, considering only bands that have
-  // active members (an empty band has no rate). Ties break toward the larger
-  // at-risk count, then toward the earlier (shorter-tenure) band for stability.
-  let heroBandId: string | null = null;
-  let bestRate = -1;
-  let bestAtRisk = -1;
-  for (const band of bands) {
-    if (band.activeTotal === 0 || band.riskRate === null) continue;
-    if (
-      band.riskRate > bestRate ||
-      (band.riskRate === bestRate && band.atRisk > bestAtRisk)
-    ) {
-      bestRate = band.riskRate;
-      bestAtRisk = band.atRisk;
-      heroBandId = band.id;
-    }
-  }
-
   return {
     thresholdDays: resolvedThreshold,
     activeTotal,
     bands,
     unknownTenure,
-    heroBandId,
+    heroBandId: selectHeroBandId(bands),
+  };
+}
+
+// Churn Risk by Tenure from the LIVE non-PII aggregate (§6 aggregate extension):
+// the server bins active members into per-tenure-band recency histograms
+// (counts only — see wodifyRetentionAggregate.ts), and this adapter re-derives
+// the SAME ChurnRiskByTenureResult shape at the owner's CURRENT threshold,
+// entirely client-side, so the card renders sample and live through one code
+// path — exactly the deriveBuckets pattern Attendance Health uses.
+//
+// Per band, deriveBuckets applies the locked WATCH_FLOOR_DAYS + threshold rule
+// (precedence-correct at every threshold); watch + silent = at risk, and the
+// band's unknown-RECENCY members (no usable check-in) count in activeTotal but
+// are never at risk — byte-for-byte the sample path's semantics. Because the
+// per-band histograms partition the global one (proven by test), Σ band silent
+// here === the live Silent Churn count at the same threshold — the #411
+// anti-drift invariant, now holding on live data by construction.
+//
+// The unknown-TENURE bucket (#439) arrives as a first-class entry from the
+// server (active members whose member_since is missing/sentinel/invalid/future)
+// — surfaced, never dropped, exactly like the sample path's dirty-data routing.
+export function computeChurnRiskByTenureFromAggregate(
+  tenure: TenureBandHistogram,
+  thresholdDays: number,
+): ChurnRiskByTenureResult {
+  const resolvedThreshold = resolveSilentChurnThresholdDays(thresholdDays);
+
+  const toBandRisk = (id: string, label: string, recency: TenureBandRecency | undefined): TenureBandRisk => {
+    // The fetch layer validates every expected band key is present; an absent
+    // entry here is defensively treated as an empty band, never a crash.
+    const counts = recency ?? { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 };
+    const derived = deriveBuckets(
+      {
+        daysAbsentHistogram: {
+          countsByDaysAbsent: counts.countsByDaysAbsent,
+          overflow365Plus: counts.overflow365Plus,
+        },
+        unknown: counts.unknownRecency,
+      },
+      resolvedThreshold,
+    );
+    const atRisk = derived.watch + derived.silent;
+    return {
+      id,
+      label,
+      activeTotal: derived.activeTotal,
+      watch: derived.watch,
+      silent: derived.silent,
+      atRisk,
+      riskRate: derived.activeTotal === 0 ? null : atRisk / derived.activeTotal,
+    };
+  };
+
+  const bands = TENURE_BANDS.map((band) => toBandRisk(band.id, band.label, tenure.bands[band.id]));
+  const unknownTenure = toBandRisk(
+    UNKNOWN_TENURE_ID,
+    UNKNOWN_TENURE_LABEL,
+    tenure.bands[UNKNOWN_TENURE_ID],
+  );
+
+  return {
+    thresholdDays: resolvedThreshold,
+    activeTotal:
+      bands.reduce((sum, band) => sum + band.activeTotal, 0) + unknownTenure.activeTotal,
+    bands,
+    unknownTenure,
+    heroBandId: selectHeroBandId(bands),
   };
 }

@@ -20,6 +20,26 @@ const VALID_ROW = {
   },
 };
 
+// A valid tenure_band_histogram jsonb (§6 aggregate extension): the exact
+// bandEdges contract this build's TENURE_BANDS defines, plus every band key.
+const VALID_TENURE = {
+  bandEdges: [
+    { id: 'lt3m', minDays: 0 },
+    { id: '3to6m', minDays: 90 },
+    { id: '6to12m', minDays: 180 },
+    { id: '1to2y', minDays: 365 },
+    { id: '2yplus', minDays: 730 },
+  ],
+  bands: {
+    lt3m: { countsByDaysAbsent: { '0': 1 }, overflow365Plus: 0, unknownRecency: 0 },
+    '3to6m': { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 },
+    '6to12m': { countsByDaysAbsent: { '21': 1 }, overflow365Plus: 0, unknownRecency: 0 },
+    '1to2y': { countsByDaysAbsent: { '8': 1 }, overflow365Plus: 1, unknownRecency: 0 },
+    '2yplus': { countsByDaysAbsent: { '0': 2, '21': 4 }, overflow365Plus: 1, unknownRecency: 155 },
+    unknownTenure: { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 },
+  },
+};
+
 function stubConfiguredEnv() {
   vi.stubEnv('VITE_SUPABASE_URL', 'https://example.supabase.co');
   vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'anon-test-key');
@@ -65,6 +85,7 @@ describe('fetchLatestRetentionAggregate — mapping + failure modes', () => {
         countsByDaysAbsent: { '0': 3, '8': 2, '21': 5 },
         overflow365Plus: 2,
       },
+      tenureBands: null, // pre-tenure row (column absent) → null → sample Tenure card
     });
 
     // Read path: a single anon GET against the right table with the latest-row query.
@@ -110,6 +131,108 @@ describe('fetchLatestRetentionAggregate — mapping + failure modes', () => {
     const { fetchLatestRetentionAggregate } = await loadModule();
     const snap = await fetchLatestRetentionAggregate();
     expect(snap?.inactiveTotal).toBeNull();
+  });
+
+  it('parses a valid tenure_band_histogram (coercing jsonb counts defensively)', async () => {
+    stubConfiguredEnv();
+    installFetch({ ok: true, body: [{ ...VALID_ROW, tenure_band_histogram: VALID_TENURE }] });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    const snap = await fetchLatestRetentionAggregate();
+    expect(snap?.tenureBands).toEqual(VALID_TENURE);
+  });
+
+  it('maps a SQL-null / malformed tenure column to null (Tenure card → sample)', async () => {
+    stubConfiguredEnv();
+    installFetch({ ok: true, body: [{ ...VALID_ROW, tenure_band_histogram: null }] });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    expect((await fetchLatestRetentionAggregate())?.tenureBands).toBeNull();
+  });
+
+  it('rejects tenure data binned under DIFFERENT band edges (exact id/minDays/order match)', async () => {
+    stubConfiguredEnv();
+    const editedEdges = VALID_TENURE.bandEdges.map((e, i) => (i === 1 ? { ...e, minDays: 91 } : e));
+    installFetch({
+      ok: true,
+      body: [{ ...VALID_ROW, tenure_band_histogram: { ...VALID_TENURE, bandEdges: editedEdges } }],
+    });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    const snap = await fetchLatestRetentionAggregate();
+    expect(snap?.tenureBands).toBeNull();
+    // PER-FIELD degradation: the rest of the snapshot survives — the live
+    // Attendance Health / Silent Churn / census cards must NOT fall back to
+    // sample because the tenure payload alone is unusable.
+    expect(snap?.asOf).toBe('2026-06-07');
+    expect(snap?.activeTotal).toBe(412);
+    expect(snap?.daysAbsentHistogram).toEqual({
+      countsByDaysAbsent: { '0': 3, '8': 2, '21': 5 },
+      overflow365Plus: 2,
+    });
+  });
+
+  it('rejects tenure data with a wrong band-edge COUNT (extra or missing band)', async () => {
+    stubConfiguredEnv();
+    installFetch({
+      ok: true,
+      body: [{
+        ...VALID_ROW,
+        tenure_band_histogram: { ...VALID_TENURE, bandEdges: VALID_TENURE.bandEdges.slice(0, 4) },
+      }],
+    });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    expect((await fetchLatestRetentionAggregate())?.tenureBands).toBeNull();
+  });
+
+  it('rejects tenure data missing an expected band key (incl. the unknown-tenure bucket)', async () => {
+    stubConfiguredEnv();
+    const { unknownTenure: _dropped, ...bandsWithoutUnknown } = VALID_TENURE.bands;
+    installFetch({
+      ok: true,
+      body: [{
+        ...VALID_ROW,
+        tenure_band_histogram: { ...VALID_TENURE, bands: bandsWithoutUnknown },
+      }],
+    });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    expect((await fetchLatestRetentionAggregate())?.tenureBands).toBeNull();
+  });
+
+  it('rejects a malformed band entry (no countsByDaysAbsent) and coerces non-numeric counts', async () => {
+    stubConfiguredEnv();
+    installFetch({
+      ok: true,
+      body: [{
+        ...VALID_ROW,
+        tenure_band_histogram: {
+          ...VALID_TENURE,
+          bands: { ...VALID_TENURE.bands, lt3m: { overflow365Plus: 1 } },
+        },
+      }],
+    });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    expect((await fetchLatestRetentionAggregate())?.tenureBands).toBeNull();
+
+    // Non-numeric jsonb values inside a structurally-valid band coerce to 0,
+    // never NaN (same rule as the global histogram).
+    installFetch({
+      ok: true,
+      body: [{
+        ...VALID_ROW,
+        tenure_band_histogram: {
+          ...VALID_TENURE,
+          bands: {
+            ...VALID_TENURE.bands,
+            lt3m: { countsByDaysAbsent: { '0': 'x' }, overflow365Plus: 'y', unknownRecency: 2 },
+          },
+        },
+      }],
+    });
+    const { fetchLatestRetentionAggregate: fetchAgain } = await loadModule();
+    const snap = await fetchAgain();
+    expect(snap?.tenureBands?.bands.lt3m).toEqual({
+      countsByDaysAbsent: { '0': 0 },
+      overflow365Plus: 0,
+      unknownRecency: 2,
+    });
   });
 
   it('returns null when no row exists (empty array)', async () => {
