@@ -402,9 +402,20 @@ describe('fetchLatestRetentionAggregate — silent_dues_snapshot (isolated dues 
     }
   });
 
-  it('rejects malformed dates (format AND calendar validity)', async () => {
+  it('rejects malformed dates (format, calendar validity, AND short-month rollover)', async () => {
     stubConfiguredEnv();
-    for (const bad of ['2026-6-11', '2026-13-11', '2026-06-99', 'not-a-date', 20260611]) {
+    // '2026-02-31' / '2026-06-31' pass parseYmdLocal's 1-31 day guard but roll over
+    // to the next month via the Date constructor — the PR-3b round-trip check
+    // rejects them (the parsed components must equal the input numbers exactly).
+    for (const bad of [
+      '2026-6-11',
+      '2026-13-11',
+      '2026-06-99',
+      '2026-02-31',
+      '2026-06-31',
+      'not-a-date',
+      20260611,
+    ]) {
       installFetch(
         { ok: true, body: [VALID_ROW] },
         { ok: true, body: duesRows({ ...VALID_DUES, duesAsOf: bad }) },
