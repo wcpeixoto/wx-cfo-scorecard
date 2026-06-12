@@ -12965,6 +12965,53 @@ body {
 .db-tooltip-panel.silent-churn-dues-tooltip-panel {
   width: 280px;
 }
+/* Wodify bridge (live branch only): action line + outbound report link + the
+   one-time-setup tooltip. The anchor follows the 40px SECONDARY card-level
+   button spec (UI_RULES button taxonomy: #D0D5DD trigger border, 8px radius,
+   14px text) — mirrors .forecast-compare-btn, as an <a> since it navigates. */
+.silent-churn-action {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.silent-churn-action-line {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.silent-churn-action-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.silent-churn-action-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 10px 16px;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #344054;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 150ms ease;
+}
+.silent-churn-action-btn:hover {
+  background: #F9FAFB;
+  color: #101828;
+}
+/* Trigger sits on the card's left half (like the dues tooltip), so the panel
+   opens rightward via the shared .is-left modifier. */
+.db-tooltip-panel.silent-churn-setup-tooltip-panel {
+  width: 300px;
+}
 .silent-churn-calllist-head,
 .silent-churn-row {
   display: grid;
