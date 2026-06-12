@@ -258,7 +258,10 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
         {view.live ? (
           <>
             {view.dues.kind === 'shown' ? (
-              <p className="silent-churn-dues-meta">
+              // A <div>, not <p>: the tooltip panel inside is a <div> with a <ul>,
+              // which is invalid HTML inside a paragraph (PR-3b nesting fix; the
+              // CSS targets the class, tag-agnostic).
+              <div className="silent-churn-dues-meta">
                 Dues known for {view.dues.duesKnownCount} of {view.dues.silentMembers} silent
                 members · dues from {view.dues.duesAsOf} export
                 <span className="db-tooltip-wrap silent-churn-dues-tipwrap">
@@ -287,7 +290,7 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
                     </ul>
                   </div>
                 </span>
-              </p>
+              </div>
             ) : (
               <p className="silent-churn-dues-na">{duesHiddenLine(view.dues, thresholdDays)}</p>
             )}

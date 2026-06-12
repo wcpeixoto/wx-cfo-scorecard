@@ -162,10 +162,25 @@ function parseTenureBandHistogram(value: unknown): TenureBandHistogram | null {
 }
 
 // A strict YYYY-MM-DD that also parses as a real local date (parseYmdLocal is the
-// repo's one date-parse definition — reused, not forked).
+// repo's one date-parse definition — reused, not forked). parseYmdLocal range-guards
+// month 1-12 / day 1-31 but a day-in-short-month like 2026-02-31 rolls over via the
+// Date constructor (to March 3) instead of failing, so additionally require the
+// parsed Date's components to round-trip EXACTLY to the input numbers (PR-3b
+// hardening; the locked parseYmdLocal itself is untouched).
 function asValidYmd(value: unknown): string | null {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  return parseYmdLocal(value) ? value : null;
+  if (typeof value !== 'string') return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const parsed = parseYmdLocal(value);
+  if (!parsed) return null;
+  if (
+    parsed.getFullYear() !== Number(match[1]) ||
+    parsed.getMonth() !== Number(match[2]) - 1 ||
+    parsed.getDate() !== Number(match[3])
+  ) {
+    return null;
+  }
+  return value;
 }
 
 // Counts in the dues contract are head-counts/thresholds — integers, never
