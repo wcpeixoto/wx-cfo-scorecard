@@ -12940,12 +12940,30 @@ body {
   font-size: 14px;
   color: var(--text-secondary);
 }
-/* PR3: live Silent Churn is count-only — monthly dues at risk aren't on /clients
-   yet (§6.4), so the dollar shows this honest note instead of a fabricated $0. */
+/* PR3: live Silent Churn dues-hidden states — when the locally-written dues
+   aggregate is absent / threshold-mismatched / stale / coverage-less (§6.4), the
+   dollar shows an honest reason line instead of a fabricated $0. */
 .silent-churn-dues-na {
   margin: 0;
   font-size: 13px;
   color: var(--text-secondary);
+}
+/* SC dues slice: live dues coverage sub-line ("Dues known for N of M silent
+   members · dues from {date} export") under the $ metric, with the floor-caveat
+   info tooltip riding the shared .db-tooltip-* pattern. */
+.silent-churn-dues-meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.silent-churn-dues-meta .silent-churn-dues-tipwrap {
+  margin-left: 6px;
+  vertical-align: -1px;
+}
+/* The trigger sits at the line's end on the card's LEFT half, so the panel uses
+   the shared .is-left modifier (opens rightward) with a per-tooltip width. */
+.db-tooltip-panel.silent-churn-dues-tooltip-panel {
+  width: 280px;
 }
 .silent-churn-calllist-head,
 .silent-churn-row {

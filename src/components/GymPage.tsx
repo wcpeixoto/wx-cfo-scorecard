@@ -11,7 +11,7 @@
 // built, gated on a data policy or API access (see RETENTION_FINISH_PLAN.md).
 // Overview / Membership / Classes are hidden for now.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useRetentionSettings } from '../context/RetentionSettingsContext';
 import { FIXTURE_TODAY, SAMPLE_GYM_MEMBERS } from '../lib/gym/memberFixture';
 import {
@@ -25,6 +25,11 @@ import {
 } from '../lib/gym/churnRiskByTenure';
 import { computeMemberMovement } from '../lib/gym/memberMovement';
 import { deriveBuckets } from '../lib/gym/retentionAggregateView';
+import {
+  DUES_STALE_AFTER_DAYS,
+  deriveSilentChurnDuesView,
+  type SilentChurnDuesView,
+} from '../lib/gym/silentChurnDuesView';
 import {
   fetchLatestRetentionAggregate,
   type RetentionAggregateSnapshot,
@@ -137,29 +142,68 @@ const usd = (amount: number) => `$${Math.round(amount).toLocaleString('en-US')}`
 // (which would imply low risk where there is simply no data).
 const formatRate = (rate: number | null) => (rate === null ? '—' : `${Math.round(rate * 100)}%`);
 
+// Copy for the live card's dues-hidden states — deterministic, only rephrasing
+// the view's computed reason and the dues snapshot's OWN dates/threshold; the $
+// itself is never fabricated in any hidden state. The stale line is
+// direction-NEUTRAL on purpose ("more than N days apart"): the dues export can be
+// older than the snapshot (no fresh export before a pull) or newer (export
+// refreshed, snapshot pull pending), and copy like "predates this snapshot" would
+// lie in the second case.
+function duesHiddenLine(
+  view: Extract<SilentChurnDuesView, { kind: 'hidden' }>,
+  currentThresholdDays: number,
+): string {
+  const notAvailable = 'Monthly dues at risk is not available from this data source yet.';
+  if (!view.dues) return notAvailable; // 'noDues' — the standing count-only line
+  switch (view.reason) {
+    case 'thresholdMismatch':
+      return (
+        `Monthly dues at risk was computed at the ${view.dues.thresholdDays}-day threshold — ` +
+        `not shown at the current ${currentThresholdDays}-day setting.`
+      );
+    case 'stale':
+      return (
+        `The dues figure (from the ${view.dues.duesAsOf} export) and this snapshot are more ` +
+        `than ${DUES_STALE_AFTER_DAYS} days apart — not shown until they're refreshed together.`
+      );
+    case 'noCoverage':
+      return `No dues are known yet for the silent members in the ${view.dues.duesAsOf} export.`;
+    default:
+      return notAvailable;
+  }
+}
+
 // Silent Churn hero — the Retention page's dominant live signal. Reads the
 // owner-tuned threshold from the local Retention settings store. Dual-source,
 // mirroring Attendance Health: with a live aggregate snapshot it shows the real
 // silent COUNT (deriveBuckets' silent bucket === computeSilentChurn count by
 // construction, so it can never disagree with the live Attendance Health "Silent"
-// tally on the same snapshot) and badges "Live · as of {asOf}". Live is
-// count-only: dollars-at-risk aren't on /clients yet (§6.4 — shown as "not
-// available", NEVER $0) and the per-member call-list needs PII the non-PII
-// aggregate can't carry, so neither is shown live. Without a snapshot it falls
-// back to the sample fixture's full count + $/mo + call-list and the "Sample data"
-// badge. Deterministic: the copy only rephrases computed numbers; it never authors
-// the at-risk call. Re-renders whenever the threshold or snapshot changes.
+// tally on the same snapshot) and badges "Live · as of {asOf}". The live DOLLAR
+// (§6.4 SC dues slice) renders only when deriveSilentChurnDuesView says the
+// locally-written dues aggregate still matches what the card shows (threshold
+// exact-match, within the staleness window, with real coverage) — every other
+// state degrades to a count-only line with an explicit reason, NEVER a fabricated
+// $0, and the badge stays Live (dues is per-field additive, like tenureBands).
+// The per-member call-list needs PII the non-PII aggregate can't carry, so it is
+// never shown live. Without a snapshot the card falls back to the sample
+// fixture's full count + $/mo + call-list and the "Sample data" badge.
+// Deterministic: the copy only rephrases computed numbers; it never authors the
+// at-risk call. Re-renders whenever the threshold or snapshot changes.
 function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays } = useRetentionSettings();
+  const duesTooltipId = useId();
 
   // One render path for both sources (mirrors AttendanceHealthCard). Live: derive
-  // the silent COUNT from the non-PII histogram. Sample: the full classifier result
-  // (count + dollars + call-list). The discriminated `live` flag keeps the
-  // sample-only fields (rows, monthlyDuesAtRisk) off the live branch entirely.
+  // the silent COUNT from the non-PII histogram, plus the dues view gated against
+  // the RESOLVED threshold deriveBuckets cut at (never the raw setting). Sample:
+  // the full classifier result (count + dollars + call-list). The discriminated
+  // `live` flag keeps the sample-only fields (rows, monthlyDuesAtRisk) off the
+  // live branch entirely.
   const view = useMemo(() => {
     if (snapshot) {
       const { thresholdDays, silent } = deriveBuckets(snapshot, silentChurnThresholdDays);
-      return { live: true as const, thresholdDays, count: silent, asOf: snapshot.asOf };
+      const dues = deriveSilentChurnDuesView(snapshot.dues, snapshot.asOf, thresholdDays);
+      return { live: true as const, thresholdDays, count: silent, asOf: snapshot.asOf, dues };
     }
     const { thresholdDays, count, monthlyDuesAtRisk, rows } = computeSilentChurn(
       SAMPLE_GYM_MEMBERS,
@@ -203,13 +247,50 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
               <span className="silent-churn-metric-label">/mo at risk</span>
             </div>
           )}
+          {view.live && view.dues.kind === 'shown' && (
+            <div className="silent-churn-metric">
+              <span className="silent-churn-metric-value">{usd(view.dues.totalMonthly)}</span>
+              <span className="silent-churn-metric-label">/mo at risk</span>
+            </div>
+          )}
         </div>
 
         {view.live ? (
           <>
-            <p className="silent-churn-dues-na">
-              Monthly dues at risk is not available from this data source yet.
-            </p>
+            {view.dues.kind === 'shown' ? (
+              <p className="silent-churn-dues-meta">
+                Dues known for {view.dues.duesKnownCount} of {view.dues.silentMembers} silent
+                members · dues from {view.dues.duesAsOf} export
+                <span className="db-tooltip-wrap silent-churn-dues-tipwrap">
+                  <button
+                    type="button"
+                    className="db-tooltip-btn"
+                    aria-label="How monthly dues at risk is computed"
+                    aria-describedby={duesTooltipId}
+                  >
+                    &#9432;
+                  </button>
+                  <div
+                    id={duesTooltipId}
+                    role="tooltip"
+                    className="db-tooltip-panel is-left silent-churn-dues-tooltip-panel"
+                  >
+                    <ul className="db-tooltip-list">
+                      <li className="db-tooltip-body">
+                        A floor, not a ceiling — memberships whose monthly value can&rsquo;t be
+                        derived are excluded.
+                      </li>
+                      <li className="db-tooltip-body">
+                        Computed at the {view.dues.thresholdDays}-day threshold against the{' '}
+                        {view.dues.duesAsOf} dues export.
+                      </li>
+                    </ul>
+                  </div>
+                </span>
+              </p>
+            ) : (
+              <p className="silent-churn-dues-na">{duesHiddenLine(view.dues, thresholdDays)}</p>
+            )}
             {count === 0 && (
               <p className="silent-churn-empty">
                 No active members have been away for {thresholdDays}+ days right now.
