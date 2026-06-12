@@ -863,6 +863,40 @@ the Builder session in default/manual permission mode (`claude --permission-mode
 auto-mode's classifier blocks the arming steps and discounts relayed consent, and switching
 modes mid-run is not viable; plan the mode before Step A, never mid-run.
 
+**Silent Churn $-at-risk dues preview — RUN CLEAN (one authorized local run, 2026-06-11;
+Reviewer interpretation PASS, advisor log 5a7e7af; recorded 2026-06-12).** First measured
+dollar for the §6.4 dues gap, produced LOCALLY — nothing persisted, deployed, or changed (no
+schema / edge / SPA / Supabase contact; the function stayed DISARMED and untouched). The run
+followed the 3-gate pattern: Reviewer script APPROVE → Wesley GO → single run → Reviewer
+interpretation PASS. `scripts/wodify/silentChurnDuesPreview.ts` (since FROZEN verbatim on
+`main` via #463, merged as `eda9f0b`, blob `e3a232a10cdd49a88a38e885b1ea528add5adff5`) pulled
+`/clients` live (read-only GETs, the edge-mirroring paginate), classified every active member
+with the LOCKED shared `classifyMember`, and joined the local dues CSV in memory.
+`coverageComplete true`; the leak gate held (output scanned clean: no at-sign, no 7-plus-digit
+run, no date other than the run-day asOf). **The deliverable: silent monthly dues floor
+$6,734.17/mo — 63 of 75 silent members dues-known (84% coverage) — computed at the RESOLVED
+DEFAULT 21-DAY THRESHOLD** (the $ is threshold-coupled, unlike the live count, which re-cuts
+at any T). Floor semantics: per-membership monthly-equivalent = Commitment Total ÷ commitment
+months over INCLUSIVE dates (expiration = last covered day, so period = days + 1), snapped to
+a whole month count within the 0.2-month tolerance (~±6 days); $0 comp/guest rows are
+dues-KNOWN at $0; open-ended (session packs), future-start (queued renewals — excluded so a
+current+queued pair never double-counts), expired, and degenerate rows are counted but NEVER
+guessed — the $ is an honest floor, not a ceiling. Comparators: watch $4,669.82/mo (31/33
+known), healthy $23,558.59/mo (100% known). Cross-checks recorded: the run's census
+byte-matched the same-day edge row — **957 scanned / 408 active / 549 inactive / 0
+unknown-status**; the id join was perfect (0 CSV clients not in `/clients`, 0
+matched-to-non-active, 0 active records missing an id); and the unknown-recency bucket is
+structurally corroborated as predominantly no-membership profiles (138 of 153 carry no
+membership row — consistent with the guardian/staff/legacy taxonomy in the membershipStart
+records above). The feed: Wodify Admin → Analytics → Standard Reports → Memberships → "All
+Memberships" export (2026-06-11, "Keep the data formatted" UNCHECKED); the raw CSV carries
+names + emails so it lives ONLY at `~/.config/wx-cfo/dues/` (0700 dir / 0600 file), never
+committed or uploaded; the weekly Monday 7:00 AM email subscription is the refresh feed for
+future runs (fresh-export-before-run convention). Next legs per the Reviewer plan-validation
+PASS (2026-06-12): PR-3 SPA slice + nullable no-default `silent_dues_snapshot` schema delta,
+PR-4 `--emit-write-payload` script extension (leak-gate allowlist extended to exactly the
+run-day asOf + duesAsOf), then the gated first live $ write.
+
 **Prior-state facts (preserved).** The import-resolution sub-gate closed via Option A (#435 @ `b6bd9d6`); the
 **`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06) dropped the vestigial function-local `deno.json`
 and reconciled the README; a name-scoped redeploy from merged `main` (CLI 2.98.2) was **deno.json-free**
@@ -938,7 +972,8 @@ plaintext trigger file deleted); SPA/PR2 wiring has since shipped frontend-only 
    `missingMonthlyDues: true` (**never `0`, never a fabricated dollar**); the card shows the dollar as "not
    available from this source yet," never `$0`. A real dollar waits on a dues source — the §5 hybrid
    **monthly Wodify Admin CSV** (financials are API-tier-blocked), joined server-side by an internal key —
-   deferred to its own slice.
+   deferred to its own slice. *(Slice now underway: the 2026-06-11 local dues preview measured the first
+   honest floor — see the "Silent Churn $-at-risk dues preview" run record above.)*
 
 5. **Transport + PII safety (binds §4 + the member-PII anon-key blocker).**
    - **DECIDED (d):** the Supabase **Edge Function `sync-wodify-retention`** holds `WODIFY_API_KEY` via
