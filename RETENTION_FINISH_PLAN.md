@@ -900,8 +900,9 @@ run-day asOf + duesAsOf), then the gated first live $ write.
 **SC dues gated run — FIRST LIVE $ WRITE EXECUTED CLEAN, 2026-06-12 (fresh
 default-permission-mode Builder session; the Reviewer-validated Steps 0/A–F runbook; both hard
 stops honored — Step C payload validation PASS, Step F post-run verification PASS; recorded
-2026-06-12).** The Silent Churn count-only era is CLOSED: all four live cards now include the
-SC dollar. Two native-prompt mutations TOTAL, the edge function NEVER contacted. **Step A:**
+2026-06-12).** The Silent Churn count-only era is CLOSED: all four Retention cards now run
+fully live, and the SC card shows its first real dollar. Two native-prompt mutations TOTAL,
+the edge function NEVER contacted. **Step A:**
 migration `20260612130954_add_silent_dues_snapshot_to_wodify_retention_aggregate` applied the
 schema file's backfill ALTER verbatim — `silent_dues_snapshot` jsonb, additive, NULLABLE, no
 default; column verified (information_schema: jsonb / nullable YES / null default) and the
