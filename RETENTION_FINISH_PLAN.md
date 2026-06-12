@@ -897,6 +897,49 @@ PASS (2026-06-12): PR-3 SPA slice + nullable no-default `silent_dues_snapshot` s
 PR-4 `--emit-write-payload` script extension (leak-gate allowlist extended to exactly the
 run-day asOf + duesAsOf), then the gated first live $ write.
 
+**SC dues gated run — FIRST LIVE $ WRITE EXECUTED CLEAN, 2026-06-12 (fresh
+default-permission-mode Builder session; the Reviewer-validated Steps 0/A–F runbook; both hard
+stops honored — Step C payload validation PASS, Step F post-run verification PASS; recorded
+2026-06-12).** The Silent Churn count-only era is CLOSED: all four live cards now include the
+SC dollar. Two native-prompt mutations TOTAL, the edge function NEVER contacted. **Step A:**
+migration `20260612130954_add_silent_dues_snapshot_to_wodify_retention_aggregate` applied the
+schema file's backfill ALTER verbatim — `silent_dues_snapshot` jsonb, additive, NULLABLE, no
+default; column verified (information_schema: jsonb / nullable YES / null default) and the
+SPA's dues GET flipped from the designed pre-migration 400 to a 200 empty result. **Step B:**
+one read-only emit run (10 GET pages — the run's only Wodify contact) against the 2026-06-11
+All Memberships export with `--csv-export-date 2026-06-11` and NO threshold override:
+`coverageComplete true`, leak gate held (date allowlist exactly the two run dates), census
+byte-matched the standing edge row — **957 scanned / 408 active / 549 inactive / 0
+unknown-status**; the id join perfect (0 not-in-API / 0 matched-non-active / 0 missing-id);
+`membershipTypes` whitelist emitted exactly the three pinned categories. **Step D (after the
+C gate):** the script-printed UPDATE executed VERBATIM via Supabase MCP execute_sql — one row
+× one column on the `as_of 2026-06-11` row via the date-literal-free max(as_of) subselect;
+the invariant check returned exactly **1** non-null dues row. **The write:**
+`silent_dues_snapshot = { duesAsOf 2026-06-11, computedAsOf 2026-06-12, thresholdDays 21,
+silentMembers 75, duesKnownCount 63, totalMonthly 6734.17 }` — the SAME floor the preview
+measured (**$6,734.17/mo, 63 of 75 dues-known, 84%, resolved default 21-day threshold**).
+**Day-over-day vs the 06-11 preview:** a clean −7/+7 healthy→watch swap (147→140 / 33→40;
+silent 75 and unknown 153 unchanged), and 3 CSV rows whose last covered day was 06-11 itself
+are honestly EXPIRED against the 06-12 run day (inclusive-expiration semantics) — accounting
+exactly for the all-bucket dues-known drop 253→250; the silent deliverable untouched.
+**Step E verify:** the anon read returns the payload SEMANTICALLY (Postgres jsonb normalizes
+key order — semantic equality is the test, never string equality); the deployed card renders
+the shown state end-to-end — hero count 76 (re-cut from the snapshot histogram at T=21)
+beside the dues line's "Dues known for 63 of 75 silent members · dues from 2026-06-11 export"
+(the run-day classification), each citing its own provenance (the designed honest
+cross-citation), with the floor-caveat + threshold tooltip; AH 144/35/76/153, the MM census,
+and Tenure all unchanged; bundle held `index-DqxxekpV.js` (no merge inside the run). Edge
+identities byte-identical before/after: sync-wodify-retention
+`ezbr_sha256 3ae170006fa0ca27ed9bb23b9e4c7f8482b83cdd616ab2da245e5893cf6a2719`
+(`updated_at 1781183398586`, `verify_jwt:true`, DISARMED held); ai-proxy `3d392f3e…`
+(`updated_at 1778341247547`) untouched. **OPERATIONAL COUPLING RULE (forward-looking,
+Reviewer-required):** the card's staleness gate is |duesAsOf − snapshot.asOf| ≤ 7 days. With
+no new census pull the pair ages TOGETHER (the $ stays shown; the badge dates disclose age).
+Any future gated census pull that advances `as_of` more than 7 days past the dues export will
+honestly HIDE the dollar until a fresh dues write — so PAIR every future census pull with a
+fresh weekly All Memberships export + dues write (this run's validated runbook is the
+template).
+
 **Prior-state facts (preserved).** The import-resolution sub-gate closed via Option A (#435 @ `b6bd9d6`); the
 **`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06) dropped the vestigial function-local `deno.json`
 and reconciled the README; a name-scoped redeploy from merged `main` (CLI 2.98.2) was **deno.json-free**
@@ -972,8 +1015,8 @@ plaintext trigger file deleted); SPA/PR2 wiring has since shipped frontend-only 
    `missingMonthlyDues: true` (**never `0`, never a fabricated dollar**); the card shows the dollar as "not
    available from this source yet," never `$0`. A real dollar waits on a dues source — the §5 hybrid
    **monthly Wodify Admin CSV** (financials are API-tier-blocked), joined server-side by an internal key —
-   deferred to its own slice. *(Slice now underway: the 2026-06-11 local dues preview measured the first
-   honest floor — see the "Silent Churn $-at-risk dues preview" run record above.)*
+   deferred to its own slice. *(Slice DONE: the 2026-06-11 local dues preview measured the first honest
+   floor, and the first live dollar is now WRITTEN and shown — see the "SC dues gated run" record above.)*
 
 5. **Transport + PII safety (binds §4 + the member-PII anon-key blocker).**
    - **DECIDED (d):** the Supabase **Edge Function `sync-wodify-retention`** holds `WODIFY_API_KEY` via
