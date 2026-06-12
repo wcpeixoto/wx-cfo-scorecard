@@ -38,6 +38,20 @@
  *      MIN_KNOWN_FOR_DISTRIBUTION = 5 dues-known members — the year-range-guard precedent;
  *      count/sum/mean always emit, sum being the deliverable).
  *
+ * Write-payload emit mode (SC $-at-risk slice PR-4 — the script still EXECUTES NOTHING):
+ *   With `--emit-write-payload` (which REQUIRES `--csv-export-date YYYY-MM-DD`), a clean,
+ *   coverage-complete run additionally carries, INSIDE the leak-gated result:
+ *     - `writePayload`: the exact silent_dues_snapshot jsonb object — six camelCase keys,
+ *       nothing else, matching the deployed SPA parse contract key-for-key:
+ *       { duesAsOf, computedAsOf, thresholdDays, silentMembers, duesKnownCount, totalMonthly }
+ *       (thresholdDays = the run's RESOLVED threshold; computedAsOf = the run-day asOf;
+ *       duesAsOf = the --csv-export-date flag, cross-checked against the timestamp in the CSV
+ *       filename when parseable — mismatch ABORTS before any network call).
+ *     - `updateStatement`: the exact UPDATE to run later via Supabase MCP execute_sql under a
+ *       native prompt in the gated run. Row targeting is DATE-LITERAL-FREE (subselect on
+ *       max(as_of)); the ONLY dates anywhere in the emitted output sit inside the jsonb
+ *       payload. The script itself makes NO Supabase call and writes NOTHING — it prints.
+ *
  * Safety contract (same §4/§5 posture as the merged sibling probes):
  *   - Local / server-side ONLY. Never imported by the SPA, never bundled, never `VITE_*`.
  *   - Reads the rotated key ONLY from `process.env.WODIFY_API_KEY`; never hardcoded, logged,
@@ -45,15 +59,21 @@
  *     from Supabase secrets or the edge function. `--selftest` returns BEFORE any env read and
  *     reads NO file.
  *   - ZERO member-level output. Stdout carries counts, booleans, status classes, dollar
- *     aggregates, and the run-day `asOf` ONLY. NEVER names, emails, member ids, raw rows,
- *     per-member dates or dollars, request headers/URLs, keys, or echoed bodies. A LEAK GATE
- *     scans the serialized result before printing (live AND selftest): any '@', any >= 7-digit
- *     run (ids are 7-8 digits; no emitted aggregate reaches 7 integer digits), or any
- *     YYYY-MM-DD other than the run-day asOf ⇒ the result is withheld and the run fails.
+ *     aggregates, and allowlisted snapshot-level dates ONLY. NEVER names, emails, member ids,
+ *     raw rows, per-member dates or dollars, request headers/URLs, keys, or echoed bodies. A
+ *     LEAK GATE scans the serialized result before printing (live AND selftest): any '@', any
+ *     >= 7-digit run (ids are 7-8 digits; no emitted aggregate reaches 7 integer digits), or
+ *     any YYYY-MM-DD outside the allowlist ⇒ the result is withheld and the run fails. The
+ *     allowlist is EXACTLY {run-day asOf} — extended to EXACTLY {run-day asOf, duesAsOf} in
+ *     emit mode (the ONE deliberate gate change of PR-4; any third date still trips it).
+ *   - csv.membershipTypes is keyed by a CLOSED whitelist of category values profiled from the
+ *     real export (PII columns never read); any other raw value folds under 'other' so no
+ *     free-form export string can ride a record key into the gated output.
  *   - The dues CSV is read into memory, joined, and discarded. Nothing is written anywhere.
  *   - Detects the Wodify ERROR ENVELOPE at transport-2xx; in-body HTTPCode reduced to a class.
  *   - Paginates the FULL client set (edge-mirroring loop, MAX_PAGES bound); `coverageComplete`
- *     distinguishes a whole scan from a partial — a partial is never reported as a preview.
+ *     distinguishes a whole scan from a partial — a partial is never reported as a preview,
+ *     and emit mode WITHHOLDS the write payload on a non-coverage-complete run.
  *
  * Run (LOCAL ONLY — key via gitignored env file; CSV by absolute path):
  *   Network-free self-test FIRST (no request, no key, no env, no file read):
@@ -62,6 +82,8 @@
  *     npx tsx --env-file=/Users/wesley/Code/wx-cfo-scorecard/.env.local \
  *       scripts/wodify/silentChurnDuesPreview.ts \
  *       ~/.config/wx-cfo/dues/all_memberships_2026-06-11T21_09_23.892773466Z.csv
+ *   Gated-run emit mode (adds the leak-gated write payload + UPDATE statement):
+ *     ... silentChurnDuesPreview.ts <csv path> --emit-write-payload --csv-export-date YYYY-MM-DD
  *
  * Call budget — GET `/clients` pages only (the same request the edge makes); no per-client
  * calls, no writes, no Supabase calls, no Wodify mutation of any kind.
@@ -110,6 +132,22 @@ const REQUIRED_COLUMNS = [
 
 // §5 / #423: Wodify error-envelope markers (matched case-insensitively; values never emitted).
 const ERROR_ENVELOPE_MARKER_KEYS = ['developermessage', 'errorcode', 'httpcode', 'usermessage'];
+
+// Reviewer carry-in (dac13f6 script review): csv.membershipTypes is an OUTPUT record keyed by
+// a raw CSV column value — an unbounded free-string key could smuggle arbitrary export text
+// into the gated output. The key set is therefore CLOSED: the Membership Type category values
+// actually present in the real All-Memberships export (profiled 2026-06-12 by reading ONLY the
+// 'Membership Type' column — the PII columns are never read), pinned as constants the Reviewer
+// verifies against their own profile of the file. Anything else folds under 'other'.
+const MEMBERSHIP_TYPE_WHITELIST: ReadonlySet<string> = new Set([
+  'Appointment Pack',
+  'Class Pack',
+  'Class Plan',
+]);
+
+function membershipTypeKey(raw: string): string {
+  return MEMBERSHIP_TYPE_WHITELIST.has(raw) ? raw : 'other';
+}
 
 // ─── Safe output contract ──────────────────────────────────────────────────────────────────────────
 type HttpStatusClass = '2xx' | '4xx' | '5xx' | 'network_error';
@@ -187,6 +225,24 @@ interface SilentChurnDuesPreviewResult {
   csv: CsvSummary;
   buckets: Record<AttendanceBucket, BucketDues>; // silent = the deliverable; others = comparators.
   interpretationNotes: string[]; // self-describing caveats, restated in-band.
+  // Emit mode ONLY (--emit-write-payload, coverage-complete run): the exact jsonb object +
+  // UPDATE statement for the gated MCP write. INSIDE the result on purpose — the leak gate
+  // scans the whole serialized result, so the payload and statement are gated too.
+  writePayload?: SilentDuesWritePayload;
+  updateStatement?: string;
+}
+
+// The silent_dues_snapshot inner contract — must match the deployed SPA parse
+// (src/lib/gym/silentChurnDuesView.ts SilentDuesSnapshot) KEY-FOR-KEY: six camelCase
+// keys, nothing else. The SPA's parse is fail-closed on missing keys and drops
+// extras, so any drift here surfaces as the card degrading to count-only.
+interface SilentDuesWritePayload {
+  duesAsOf: string; // the CSV export day (--csv-export-date) — the figure's staleness anchor
+  computedAsOf: string; // the run-day asOf this preview classified members on
+  thresholdDays: number; // the run's RESOLVED threshold (the $ is threshold-coupled)
+  silentMembers: number; // M — silent actives at thresholdDays
+  duesKnownCount: number; // N — silent members with a derivable monthly-equivalent
+  totalMonthly: number; // the floor $ (round2'd, same as buckets.silent.totalMonthly)
 }
 
 const INTERPRETATION_NOTES = [
@@ -605,7 +661,9 @@ function buildResult(
     rowKinds[deriveRow(row, asOfUtcMs).kind] += 1;
     if (row.commitmentTotal === 0) zeroCommitmentRows += 1;
     cadence[row.cadence] += 1;
-    membershipTypes[row.membershipType] = (membershipTypes[row.membershipType] ?? 0) + 1;
+    // Whitelist-or-'other': only pinned category values may key the gated output.
+    const typeKey = membershipTypeKey(row.membershipType);
+    membershipTypes[typeKey] = (membershipTypes[typeKey] ?? 0) + 1;
     autorenew[row.autorenew] += 1;
   }
 
@@ -695,13 +753,51 @@ function buildResult(
   };
 }
 
+// ─── Write payload + UPDATE statement (emit mode; built, never executed) ──────────────────────────
+// The jsonb object for the gated MCP write — silent-bucket aggregates only, six keys,
+// key order matching the documented contract for byte-stable review diffs.
+function buildWritePayload(
+  result: SilentChurnDuesPreviewResult,
+  duesAsOf: string,
+): SilentDuesWritePayload {
+  const s = result.buckets.silent;
+  return {
+    duesAsOf,
+    computedAsOf: result.asOf,
+    thresholdDays: result.thresholdDays,
+    silentMembers: s.members,
+    duesKnownCount: s.duesKnownCount,
+    totalMonthly: s.totalMonthly,
+  };
+}
+
+// The exact statement the gated run executes via Supabase MCP execute_sql. Row targeting is
+// DATE-LITERAL-FREE by Reviewer pin: the latest row is selected via a max(as_of) subselect, so
+// the ONLY dates in the whole emitted output live inside the jsonb payload (allowlisted by the
+// leak gate). Single-quote escaping is defensive — no payload field can legally contain one.
+function buildUpdateStatement(payload: SilentDuesWritePayload): string {
+  const json = JSON.stringify(payload).replace(/'/g, "''");
+  return [
+    'update public.wodify_retention_aggregate',
+    `  set silent_dues_snapshot = '${json}'::jsonb`,
+    "  where workspace_id = 'default'",
+    '    and as_of = (select max(as_of) from public.wodify_retention_aggregate',
+    "                 where workspace_id = 'default');",
+  ].join('\n');
+}
+
 // ─── Leak gate (live AND selftest; the result is withheld on any hit) ─────────────────────────────
-function leakGateViolations(serialized: string, asOfYmd: string): string[] {
+// The date allowlist is EXACTLY {run-day asOf} — in emit mode EXACTLY {run-day asOf, duesAsOf}
+// (PR-4's one deliberate gate change). Any other YYYY-MM-DD still withholds the result.
+function leakGateViolations(serialized: string, asOfYmd: string, duesAsOfYmd?: string): string[] {
   const violations: string[] = [];
   if (serialized.includes('@')) violations.push('an @ (email-like) character reached the output');
   if (/\d{7,}/.test(serialized)) violations.push('a 7+ digit run (id-like) reached the output');
+  const allowed = new Set(duesAsOfYmd ? [asOfYmd, duesAsOfYmd] : [asOfYmd]);
   const dates = serialized.match(/\d{4}-\d{2}-\d{2}/g) ?? [];
-  if (dates.some((d) => d !== asOfYmd)) violations.push('a date other than the run-day asOf reached the output');
+  if (dates.some((d) => !allowed.has(d))) {
+    violations.push('a date outside the allowlist (run-day asOf + duesAsOf) reached the output');
+  }
   return violations;
 }
 
@@ -944,6 +1040,51 @@ function runSelfTest(): void {
     ['canonical id: number/string/zero-padded converge; non-digits rejected', canonicalClientId(9000001) === '9000001' && canonicalClientId(' 9000001 ') === '9000001' && canonicalClientId('09000001') === '9000001' && canonicalClientId('abc') === null && canonicalClientId(null) === null],
     ['coverageComplete == true (all OK)', result.coverageComplete === true],
     ['threshold defaults to the shipped 21', result.thresholdDays === 21 && DEFAULT_SILENT_CHURN_THRESHOLD_DAYS === 21],
+    // ── PR-4 emit-mode pins (no network/env/file — pure functions on the fixture result) ──
+    // Leak-gate allowlist: duesAsOf joins the allowlist in emit mode; a THIRD date still trips;
+    // and WITHOUT the emit-mode arg the old single-date gate is unchanged (regression pin).
+    ['gate: emit allowlist passes {asOf, duesAsOf}', leakGateViolations(`{"a":"${ASOF}","b":"2026-06-12"}`, ASOF, '2026-06-12').length === 0],
+    ['gate: a third date trips the emit allowlist', leakGateViolations(`{"a":"${ASOF}","b":"2026-06-12","c":"2026-06-13"}`, ASOF, '2026-06-12').length === 1],
+    ['gate: without emit mode a second date still trips', leakGateViolations(`{"a":"${ASOF}","b":"2026-06-12"}`, ASOF).length === 1],
+    // Payload shape: EXACTLY the six camelCase keys of the deployed SPA parse contract,
+    // key-for-key and in contract order; values come from the silent bucket + run meta.
+    ['payload: six keys, key-for-key against the SPA contract', (() => {
+      const p = buildWritePayload(result, '2026-06-12');
+      const keys = Object.keys(p);
+      const contract = ['duesAsOf', 'computedAsOf', 'thresholdDays', 'silentMembers', 'duesKnownCount', 'totalMonthly'];
+      return keys.length === contract.length && keys.every((k, i) => k === contract[i]);
+    })()],
+    ['payload: values = silent-bucket aggregates + run meta (279 floor, 1 of 4, T, asOf)', (() => {
+      const p = buildWritePayload(result, '2026-06-12');
+      return p.duesAsOf === '2026-06-12' && p.computedAsOf === ASOF && p.thresholdDays === T &&
+        p.silentMembers === 4 && p.duesKnownCount === 1 && p.totalMonthly === 279;
+    })()],
+    // UPDATE statement: subselect row targeting, workspace-scoped, and NO date literal outside
+    // the jsonb payload (strip the payload substring → zero YYYY-MM-DD remain).
+    ['update: date-literal-free outside the jsonb; subselect targeting present', (() => {
+      const p = buildWritePayload(result, '2026-06-12');
+      const stmt = buildUpdateStatement(p);
+      const jsonInStmt = JSON.stringify(p).replace(/'/g, "''");
+      const outsideJson = stmt.replace(jsonInStmt, '');
+      return stmt.includes(jsonInStmt) &&
+        !/\d{4}-\d{2}-\d{2}/.test(outsideJson) &&
+        stmt.includes('select max(as_of) from public.wodify_retention_aggregate') &&
+        stmt.includes("where workspace_id = 'default'") &&
+        stmt.includes("set silent_dues_snapshot = '");
+    })()],
+    // Full emit-mode output passes the gate WITH the allowlist — and would trip WITHOUT it
+    // (the duesAsOf inside the payload is exactly what the extension allowlists, nothing more).
+    ['gate: full emit-mode result passes with allowlist, trips without', (() => {
+      const emitResult = { ...result, writePayload: buildWritePayload(result, '2026-06-12') } as SilentChurnDuesPreviewResult;
+      emitResult.updateStatement = buildUpdateStatement(emitResult.writePayload as SilentDuesWritePayload);
+      const s2 = JSON.stringify(emitResult, null, 2);
+      return leakGateViolations(s2, ASOF, '2026-06-12').length === 0 &&
+        leakGateViolations(s2, ASOF).length === 1;
+    })()],
+    // membershipTypes whitelist: pinned categories pass through, a stray value folds to
+    // 'other', and the fixture result's key set stays inside the closed set.
+    ['whitelist: known categories pass, stray folds to other', membershipTypeKey('Class Plan') === 'Class Plan' && membershipTypeKey('Class Pack') === 'Class Pack' && membershipTypeKey('Appointment Pack') === 'Appointment Pack' && membershipTypeKey('Mystery Plan') === 'other' && membershipTypeKey('') === 'other'],
+    ['whitelist: result membershipTypes keys ⊆ whitelist ∪ {other}', Object.keys(result.csv.membershipTypes).every((k) => k === 'other' || MEMBERSHIP_TYPE_WHITELIST.has(k))],
   ];
   const failed = expectations.filter(([, ok]) => !ok).map(([name]) => name);
   if (failed.length > 0) {
@@ -971,7 +1112,10 @@ function runSelfTest(): void {
       'PiF 12-month and fractional proration, 30-day Monthly snap, open-ended/future/expired/degenerate ' +
       'never guessed, trailing-space cadence trimmed, quoted-comma CSV alignment, 0E-8 zero, unmatched + ' +
       'inactive join splits, distribution suppression under 5, leak gate clean (no name/email/id/date/dollar ' +
-      'at member level); no network call, no env read, no file read.',
+      'at member level); PR-4 emit-mode pins: gate allowlist exactly {asOf, duesAsOf} (third date trips; ' +
+      'non-emit gate unchanged), write payload six-keys key-for-key vs the SPA contract, UPDATE date-literal-' +
+      'free outside the jsonb with max(as_of) subselect targeting, membershipTypes whitelist-or-other; ' +
+      'no network call, no env read, no file read.',
   );
 }
 
@@ -986,17 +1130,57 @@ async function main(): Promise<void> {
   let thresholdRaw: unknown;
   const tIdx = args.indexOf('--threshold');
   if (tIdx !== -1) thresholdRaw = args[tIdx + 1];
-  const positional = args.filter((a: string, i: number) => !a.startsWith('--') && (tIdx === -1 || i !== tIdx + 1));
+  const emitWritePayload = args.includes('--emit-write-payload');
+  const dIdx = args.indexOf('--csv-export-date');
+  const csvExportDate = dIdx !== -1 ? (args[dIdx + 1] ?? '') : null;
+  // Value-flag positions are excluded from positionals (the CSV path is the one positional).
+  const valueIdx = new Set<number>([tIdx, dIdx].filter((i) => i !== -1).map((i) => i + 1));
+  const positional = args.filter((a: string, i: number) => !a.startsWith('--') && !valueIdx.has(i));
   const csvPath = positional[0];
   if (!csvPath) {
     console.error(
       'Usage: npx tsx --env-file=<abs path to .env.local> scripts/wodify/silentChurnDuesPreview.ts ' +
-        '<path to All Memberships CSV> [--threshold N]   (or --selftest). No request was made.',
+        '<path to All Memberships CSV> [--threshold N] ' +
+        '[--emit-write-payload --csv-export-date YYYY-MM-DD]   (or --selftest). No request was made.',
     );
     process.exit(1);
     return;
   }
   const thresholdDays = resolveSilentChurnThresholdDays(thresholdRaw);
+
+  // Emit-mode flag validation — ALL failures here abort BEFORE any env read or network call.
+  // The two flags are strictly paired: --csv-export-date is required by emit mode (explicit
+  // beats inference) and meaningless without it (fail closed on operator confusion).
+  if (emitWritePayload && (csvExportDate === null || csvExportDate === '')) {
+    console.error('--emit-write-payload requires --csv-export-date YYYY-MM-DD. No request was made.');
+    process.exit(1);
+    return;
+  }
+  if (!emitWritePayload && csvExportDate !== null) {
+    console.error('--csv-export-date has no effect without --emit-write-payload. No request was made.');
+    process.exit(1);
+    return;
+  }
+  if (csvExportDate !== null && strictYmdToUtcMs(csvExportDate) === null) {
+    console.error('--csv-export-date must be a real calendar date in YYYY-MM-DD form. No request was made.');
+    process.exit(1);
+    return;
+  }
+  // Cross-check the explicit export date against the timestamp in the CSV filename when one is
+  // parseable (the subscription names files like all_memberships_YYYY-MM-DDTHH_MM_….csv).
+  // A mismatch means the operator is pointing at a different export than they think — ABORT.
+  if (csvExportDate !== null) {
+    const base = csvPath.split('/').pop() ?? '';
+    const fnMatch = /(\d{4}-\d{2}-\d{2})T\d{2}[_:]\d{2}/.exec(base);
+    if (fnMatch && fnMatch[1] !== csvExportDate) {
+      console.error(
+        `--csv-export-date ${csvExportDate} does not match the date in the CSV filename ` +
+          `(${fnMatch[1]}). Pass the export's own date. No request was made.`,
+      );
+      process.exit(1);
+      return;
+    }
+  }
 
   const apiKey = process.env.WODIFY_API_KEY;
   if (!apiKey || apiKey.trim() === '') {
@@ -1031,9 +1215,28 @@ async function main(): Promise<void> {
   const { classified, meta } = await scanAllClients(apiKey, thresholdDays, asOfDate);
   const result = buildResult(classified, parsed, byClient, parsed.rows, meta, asOfYmd, asOfUtcMs, thresholdDays);
 
+  // Emit mode: attach the write payload + UPDATE statement INSIDE the result so the leak gate
+  // scans them with everything else. WITHHELD on a non-coverage-complete run — a partial scan
+  // must never produce a writable dollar (fail closed, exit non-zero so the gated run stops).
+  if (emitWritePayload && csvExportDate !== null) {
+    if (!result.coverageComplete) {
+      const serialized = JSON.stringify(result, null, 2);
+      const violations = leakGateViolations(serialized, asOfYmd, csvExportDate);
+      if (violations.length === 0) console.log(serialized);
+      console.error(
+        'WRITE PAYLOAD WITHHELD: the run is not coverage-complete — no payload or UPDATE was emitted.',
+      );
+      process.exit(1);
+      return;
+    }
+    result.writePayload = buildWritePayload(result, csvExportDate);
+    result.updateStatement = buildUpdateStatement(result.writePayload);
+  }
+
   // LEAK GATE — on any violation the result is withheld entirely (counts of violations only).
+  // In emit mode the allowlist is EXACTLY {run-day asOf, duesAsOf}; otherwise {run-day asOf}.
   const serialized = JSON.stringify(result, null, 2);
-  const violations = leakGateViolations(serialized, asOfYmd);
+  const violations = leakGateViolations(serialized, asOfYmd, csvExportDate ?? undefined);
   if (violations.length > 0) {
     console.error(
       `LEAK GATE FAILED — result withheld (${violations.length} violation(s)): ${violations.join('; ')}`,
