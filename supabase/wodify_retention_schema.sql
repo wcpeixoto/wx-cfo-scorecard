@@ -10,10 +10,15 @@
 -- WHY THIS TABLE IS ANON-READABLE (the member-PII anon-key blocker):
 -- the SPA reads it with the public anon key, which is safe ONLY because the row
 -- holds NO PII. There is structurally no member-level column here — every column
--- is a snapshot-level date, a count, or a counts-only histogram (days-absent /
--- tenure-band). No id, name, exact member date, or dues value is ever stored. The Edge
--- Function sync-wodify-retention is the only writer and writes with the
--- service-role key (which bypasses RLS); anon gets SELECT only.
+-- is a snapshot-level date, a count, a counts-only histogram (days-absent /
+-- tenure-band), or a snapshot-level dues AGGREGATE (silent_dues_snapshot: one
+-- summed cohort dollar + coverage counts — never a per-member dues value). No id,
+-- name, or exact member date is ever stored. TWO write paths, both gated, neither
+-- anon: the Edge Function sync-wodify-retention (service-role key, bypasses RLS)
+-- is the only AUTOMATED writer and writes every column EXCEPT
+-- silent_dues_snapshot; that one column is written ONLY by a human-gated Supabase
+-- MCP execute_sql UPDATE inside an authorized gated run (see the column comment
+-- below). Anon gets SELECT only either way.
 --
 -- Storage pattern: one snapshot row per (workspace_id, as_of) day, written by an
 -- IDEMPOTENT UPSERT (see the unique constraint below + the Edge Function writer). A
@@ -69,10 +74,32 @@ create table if not exists public.wodify_retention_aggregate (
   -- a real value. NEVER NOT NULL / NEVER a default.
   tenure_band_histogram jsonb null,
   unknown_count integer not null,                -- active, missing/sentinel/invalid lastCheckIn
-  -- Silent Churn dues gap: /clients carries no dues, so the dollar is unavailable
-  -- this slice. Always null + missing flag true — never a fabricated 0.
+  -- Silent Churn dues gap — the EDGE-SOURCED dollar: /clients carries no dues, so
+  -- the Edge Function writes these two honesty flags on every pull (always null +
+  -- missing flag true — never a fabricated 0). They stay truthful and are NEVER
+  -- repurposed for the locally-sourced dollar: that lives in silent_dues_snapshot
+  -- below, precisely because the edge re-writes these columns on every upsert and
+  -- would clobber any value parked here.
   monthly_dues_at_risk numeric null,
   missing_monthly_dues boolean not null default true,
+  -- Silent Churn $-at-risk (§6.4 SC dues slice): the locally-computed dues
+  -- aggregate for the silent cohort — a SNAPSHOT-LEVEL summed dollar + coverage
+  -- counts, NEVER member-level. Inner contract (camelCase, verbatim-object
+  -- convention; coverage % is derived in the SPA, not stored):
+  --   { duesAsOf, computedAsOf, thresholdDays, silentMembers, duesKnownCount,
+  --     totalMonthly }
+  -- duesAsOf = the Wodify All-Memberships CSV export day (the figure's own
+  -- staleness anchor); the dues CSV and every member-level value stay on the
+  -- owner's machine — only this aggregate object is ever written. WRITER: a
+  -- human-gated Supabase MCP execute_sql UPDATE inside an authorized gated run —
+  -- the Edge Function NEVER writes this column, so its merge-duplicates upsert
+  -- (which only touches payload columns) preserves a written value on same-day
+  -- re-pulls, and a new day's row simply carries null until the next gated dues
+  -- write (the SPA reads the latest NON-NULL value, separately from the latest
+  -- snapshot row). NULLABLE on purpose, NEVER NOT NULL / NEVER a default (same
+  -- rule as inactive_total / tenure_band_histogram): null/absent/malformed → the
+  -- SPA degrades to the count-only dues line, never a fabricated $0.
+  silent_dues_snapshot jsonb null,
   -- Diagnostics: Wodify's own at-risk flag count (not used to classify).
   wodify_at_risk_count integer not null default 0,
   -- Data quality counters.
@@ -102,6 +129,14 @@ alter table public.wodify_retention_aggregate
 -- inside the gated §6 run (Step B), never on merge.
 alter table public.wodify_retention_aggregate
   add column if not exists tenure_band_histogram jsonb;
+
+-- Backfill the Silent Churn dues column the same way (NULLABLE + no default, see
+-- the column def above): pre-dues rows stay null and the SPA degrades to the
+-- count-only dues line rather than a fabricated $0. `add column if not exists`
+-- keeps this file safely re-appliable. The live apply happens only inside the
+-- gated SC dues run (its Step A), never on merge.
+alter table public.wodify_retention_aggregate
+  add column if not exists silent_dues_snapshot jsonb;
 
 -- Latest snapshot per workspace = order by fetched_at desc limit 1.
 create index if not exists wodify_retention_aggregate_workspace_fetched_at_idx
@@ -159,6 +194,10 @@ notify pgrst, 'reload schema';
 --                   them is a SEPARATE concern, out of scope here. This file
 --                   grants only the SELECT + INSERT + UPDATE the writer requires.
 -- NEVER revoke SELECT/INSERT/UPDATE from service_role — it upserts to persist.
+-- NOTE: the gated silent_dues_snapshot write (Supabase MCP execute_sql, see the
+-- column comment) runs as the platform's SQL-editor role OUTSIDE the Data API,
+-- so the grant/RLS layers below don't govern it — it is gated by human
+-- authorization (Reviewer + owner GO inside a gated run), not by this file.
 grant select on public.wodify_retention_aggregate to anon;
 grant select, insert, update on public.wodify_retention_aggregate to service_role;
 

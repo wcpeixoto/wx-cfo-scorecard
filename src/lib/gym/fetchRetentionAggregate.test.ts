@@ -40,19 +40,45 @@ const VALID_TENURE = {
   },
 };
 
+// A valid silent_dues_snapshot jsonb (§6.4 SC dues slice): the six-key camelCase
+// contract the gated MCP write produces (values from the 2026-06-11 preview run).
+const VALID_DUES = {
+  duesAsOf: '2026-06-11',
+  computedAsOf: '2026-06-11',
+  thresholdDays: 21,
+  silentMembers: 75,
+  duesKnownCount: 63,
+  totalMonthly: 6734.17,
+};
+
 function stubConfiguredEnv() {
   vi.stubEnv('VITE_SUPABASE_URL', 'https://example.supabase.co');
   vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'anon-test-key');
 }
 
-function installFetch(response: { ok: boolean; status?: number; body: unknown }) {
-  const fn = vi.fn((..._args: unknown[]) =>
-    Promise.resolve({
-      ok: response.ok,
-      status: response.status ?? (response.ok ? 200 : 500),
-      json: () => Promise.resolve(response.body),
-    }),
-  );
+// Routes by URL: the dues read (the only query filtering silent_dues_snapshot)
+// gets `duesResponse`, everything else gets `response`. The dues default — an
+// empty result — mirrors a live table where no dues write has happened yet, so
+// pre-dues tests keep passing with dues:null. `'reject'` simulates a network-level
+// failure of the dues read alone (the isolation contract).
+function installFetch(
+  response: { ok: boolean; status?: number; body: unknown },
+  duesResponse: { ok: boolean; status?: number; body: unknown } | 'reject' = {
+    ok: true,
+    body: [],
+  },
+) {
+  const fn = vi.fn((...args: unknown[]) => {
+    const r = String(args[0]).includes('silent_dues_snapshot=not.is.null')
+      ? duesResponse
+      : response;
+    if (r === 'reject') return Promise.reject(new Error('network down'));
+    return Promise.resolve({
+      ok: r.ok,
+      status: r.status ?? (r.ok ? 200 : 500),
+      json: () => Promise.resolve(r.body),
+    });
+  });
   vi.stubGlobal('fetch', fn);
   return fn;
 }
@@ -86,10 +112,12 @@ describe('fetchLatestRetentionAggregate — mapping + failure modes', () => {
         overflow365Plus: 2,
       },
       tenureBands: null, // pre-tenure row (column absent) → null → sample Tenure card
+      dues: null, // no dues write yet (the routed default) → count-only dues line
     });
 
-    // Read path: a single anon GET against the right table with the latest-row query.
-    expect(fetchFn).toHaveBeenCalledTimes(1);
+    // Read path: the main latest-row anon GET, then the ISOLATED dues GET (latest
+    // non-null silent_dues_snapshot) — two requests, same table, same anon headers.
+    expect(fetchFn).toHaveBeenCalledTimes(2);
     const url = fetchFn.mock.calls[0][0] as string;
     expect(url).toContain('/rest/v1/wodify_retention_aggregate');
     expect(url).toContain('workspace_id=eq.default');
@@ -98,6 +126,15 @@ describe('fetchLatestRetentionAggregate — mapping + failure modes', () => {
     const init = fetchFn.mock.calls[0][1] as { headers: Record<string, string> };
     expect(init.headers.apikey).toBe('anon-test-key');
     expect(init.headers.Authorization).toBe('Bearer anon-test-key');
+    const duesUrl = fetchFn.mock.calls[1][0] as string;
+    expect(duesUrl).toContain('/rest/v1/wodify_retention_aggregate');
+    expect(duesUrl).toContain('select=silent_dues_snapshot,as_of');
+    expect(duesUrl).toContain('silent_dues_snapshot=not.is.null');
+    expect(duesUrl).toContain('workspace_id=eq.default');
+    expect(duesUrl).toContain('order=as_of.desc');
+    expect(duesUrl).toContain('limit=1');
+    const duesInit = fetchFn.mock.calls[1][1] as { headers: Record<string, string> };
+    expect(duesInit.headers.apikey).toBe('anon-test-key');
   });
 
   it('maps a present census (inactive_total, incl. a real 0) to live numbers', async () => {
@@ -235,11 +272,13 @@ describe('fetchLatestRetentionAggregate — mapping + failure modes', () => {
     });
   });
 
-  it('returns null when no row exists (empty array)', async () => {
+  it('returns null when no row exists (empty array) — and skips the dues read', async () => {
     stubConfiguredEnv();
-    installFetch({ ok: true, body: [] });
+    const fetchFn = installFetch({ ok: true, body: [] });
     const { fetchLatestRetentionAggregate } = await loadModule();
     expect(await fetchLatestRetentionAggregate()).toBeNull();
+    // No usable snapshot → every card is Sample and dues is moot; one GET only.
+    expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 
   it('returns null when the histogram is malformed (no countsByDaysAbsent)', async () => {
@@ -282,5 +321,142 @@ describe('fetchLatestRetentionAggregate — mapping + failure modes', () => {
     expect(isRetentionAggregateConfigured()).toBe(false);
     expect(await fetchLatestRetentionAggregate()).toBeNull();
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchLatestRetentionAggregate — silent_dues_snapshot (isolated dues read)', () => {
+  // The dues row the routed read returns: the latest NON-NULL dues value, usually
+  // on an OLDER row than the latest snapshot (the edge never writes the column).
+  const duesRows = (dues: unknown) => [{ as_of: '2026-06-05', silent_dues_snapshot: dues }];
+
+  it('parses a valid dues aggregate (incl. one riding an older row than the snapshot)', async () => {
+    stubConfiguredEnv();
+    installFetch({ ok: true, body: [VALID_ROW] }, { ok: true, body: duesRows(VALID_DUES) });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    const snap = await fetchLatestRetentionAggregate();
+    expect(snap?.dues).toEqual(VALID_DUES);
+    expect(snap?.asOf).toBe('2026-06-07'); // the snapshot keeps ITS OWN as-of
+  });
+
+  it('drops unexpected extra keys (the object is rebuilt field-by-field)', async () => {
+    stubConfiguredEnv();
+    installFetch(
+      { ok: true, body: [VALID_ROW] },
+      { ok: true, body: duesRows({ ...VALID_DUES, smuggled: 'x' }) },
+    );
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    expect((await fetchLatestRetentionAggregate())?.dues).toEqual(VALID_DUES);
+  });
+
+  it('keeps a real $0 floor (totalMonthly 0 is dues-KNOWN at zero, never nulled)', async () => {
+    stubConfiguredEnv();
+    installFetch(
+      { ok: true, body: [VALID_ROW] },
+      { ok: true, body: duesRows({ ...VALID_DUES, totalMonthly: 0 }) },
+    );
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    expect((await fetchLatestRetentionAggregate())?.dues?.totalMonthly).toBe(0);
+  });
+
+  it('maps an empty dues result (no write yet) to null', async () => {
+    stubConfiguredEnv();
+    installFetch({ ok: true, body: [VALID_ROW] }, { ok: true, body: [] });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    expect((await fetchLatestRetentionAggregate())?.dues).toBeNull();
+  });
+
+  it('rejects a payload missing ANY of the six required keys', async () => {
+    stubConfiguredEnv();
+    for (const key of Object.keys(VALID_DUES)) {
+      const { [key as keyof typeof VALID_DUES]: _dropped, ...incomplete } = VALID_DUES;
+      installFetch({ ok: true, body: [VALID_ROW] }, { ok: true, body: duesRows(incomplete) });
+      const { fetchLatestRetentionAggregate } = await loadModule();
+      expect((await fetchLatestRetentionAggregate())?.dues, `missing ${key}`).toBeNull();
+    }
+  });
+
+  it('rejects non-integer / negative / non-numeric counts and thresholds', async () => {
+    stubConfiguredEnv();
+    const badCases: Array<Record<string, unknown>> = [
+      { ...VALID_DUES, thresholdDays: 21.5 },
+      { ...VALID_DUES, silentMembers: '75' },
+      { ...VALID_DUES, duesKnownCount: -1 },
+      { ...VALID_DUES, duesKnownCount: 63.4 },
+    ];
+    for (const bad of badCases) {
+      installFetch({ ok: true, body: [VALID_ROW] }, { ok: true, body: duesRows(bad) });
+      const { fetchLatestRetentionAggregate } = await loadModule();
+      expect((await fetchLatestRetentionAggregate())?.dues).toBeNull();
+    }
+  });
+
+  it('rejects a non-finite / negative / non-numeric totalMonthly', async () => {
+    stubConfiguredEnv();
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, -1, '6734.17']) {
+      installFetch(
+        { ok: true, body: [VALID_ROW] },
+        { ok: true, body: duesRows({ ...VALID_DUES, totalMonthly: bad }) },
+      );
+      const { fetchLatestRetentionAggregate } = await loadModule();
+      expect((await fetchLatestRetentionAggregate())?.dues).toBeNull();
+    }
+  });
+
+  it('rejects malformed dates (format AND calendar validity)', async () => {
+    stubConfiguredEnv();
+    for (const bad of ['2026-6-11', '2026-13-11', '2026-06-99', 'not-a-date', 20260611]) {
+      installFetch(
+        { ok: true, body: [VALID_ROW] },
+        { ok: true, body: duesRows({ ...VALID_DUES, duesAsOf: bad }) },
+      );
+      const { fetchLatestRetentionAggregate } = await loadModule();
+      expect((await fetchLatestRetentionAggregate())?.dues).toBeNull();
+    }
+  });
+
+  it('rejects duesKnownCount > silentMembers (impossible coverage)', async () => {
+    stubConfiguredEnv();
+    installFetch(
+      { ok: true, body: [VALID_ROW] },
+      { ok: true, body: duesRows({ ...VALID_DUES, duesKnownCount: 76 }) },
+    );
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    expect((await fetchLatestRetentionAggregate())?.dues).toBeNull();
+  });
+
+  it('ISOLATION: a 400 on the dues read (pre-migration column) leaves the snapshot intact', async () => {
+    stubConfiguredEnv();
+    // PostgREST 400s an explicit select naming a column that does not exist —
+    // exactly the live state between this PR's merge and the gated migration.
+    installFetch({ ok: true, body: [VALID_ROW] }, { ok: false, status: 400, body: {} });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    const snap = await fetchLatestRetentionAggregate();
+    expect(snap?.dues).toBeNull();
+    // The four live cards' data survives — the dues read can NEVER knock the
+    // snapshot back to Sample.
+    expect(snap?.asOf).toBe('2026-06-07');
+    expect(snap?.activeTotal).toBe(412);
+    expect(snap?.daysAbsentHistogram).toEqual({
+      countsByDaysAbsent: { '0': 3, '8': 2, '21': 5 },
+      overflow365Plus: 2,
+    });
+  });
+
+  it('ISOLATION: a network-level dues failure also degrades to dues:null only', async () => {
+    stubConfiguredEnv();
+    installFetch({ ok: true, body: [VALID_ROW] }, 'reject');
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    const snap = await fetchLatestRetentionAggregate();
+    expect(snap?.dues).toBeNull();
+    expect(snap?.asOf).toBe('2026-06-07');
+  });
+
+  it('ISOLATION: a malformed dues body (non-array) degrades to dues:null only', async () => {
+    stubConfiguredEnv();
+    installFetch({ ok: true, body: [VALID_ROW] }, { ok: true, body: { error: 'nope' } });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    const snap = await fetchLatestRetentionAggregate();
+    expect(snap?.dues).toBeNull();
+    expect(snap?.activeTotal).toBe(412);
   });
 });

@@ -17,10 +17,15 @@
 //     where the census migration hasn't been applied yet — handled as null → the SPA
 //     renders the sample census (see the select=* note below). unknown_status is a
 //     NOT NULL data-quality counter present since the original table.
+//   - silent_dues_snapshot (§6.4 SC dues slice) is NULLABLE, never written by the Edge
+//     Function, and may be absent entirely pre-migration — read by a SECOND, ISOLATED
+//     query (latest non-null) that fails open to null and can never break this read.
 //   - anon SELECT is granted and the RLS read policy is scoped to workspace_id='default',
 //     so we filter to the same workspace and never need the authenticated role.
 
 import type { DerivableAggregate } from './retentionAggregateView';
+import { parseYmdLocal } from './silentChurn';
+import type { SilentDuesSnapshot } from './silentChurnDuesView';
 import { TENURE_BANDS, UNKNOWN_TENURE_ID } from './tenureBands';
 import type {
   TenureBandHistogram,
@@ -57,6 +62,15 @@ export type RetentionAggregateSnapshot = DerivableAggregate & {
   // tenure payload never nulls the whole snapshot (AH / SC / MM keep their live
   // data), mirroring the inactiveTotal rule.
   tenureBands: TenureBandHistogram | null;
+  // Silent Churn $-at-risk (§6.4 SC dues slice): the locally-written
+  // silent_dues_snapshot aggregate, read by a SECOND, ISOLATED query for the
+  // latest NON-NULL value (the figure persists across later edge pulls, which
+  // never write that column). `null` when the column is absent (pre-migration),
+  // SQL null, malformed, or the isolated read fails for ANY reason — the card
+  // then degrades to its count-only dues line, never a fabricated $0. Same
+  // per-field rule as tenureBands: a bad/missing dues payload never nulls the
+  // snapshot.
+  dues: SilentDuesSnapshot | null;
 };
 
 // Loosely-typed shape of the REST row — every field is validated before use, since
@@ -147,10 +161,94 @@ function parseTenureBandHistogram(value: unknown): TenureBandHistogram | null {
   };
 }
 
+// A strict YYYY-MM-DD that also parses as a real local date (parseYmdLocal is the
+// repo's one date-parse definition — reused, not forked).
+function asValidYmd(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  return parseYmdLocal(value) ? value : null;
+}
+
+// Counts in the dues contract are head-counts/thresholds — integers, never
+// fractional (a non-integer here means a malformed payload, not a rounding choice).
+function asNonNegativeInt(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+// Validate the silent_dues_snapshot jsonb into the typed contract, or null → the
+// card degrades to its count-only dues line. Fail-closed like
+// parseTenureBandHistogram: ALL six keys required and well-formed — dates strict
+// YYYY-MM-DD + real local dates; thresholdDays / silentMembers / duesKnownCount
+// non-negative INTEGERS; totalMonthly finite and non-negative (a real 0 is a
+// legitimate floor, never coerced to null); duesKnownCount <= silentMembers
+// (coverage over more members than exist is structurally impossible — reject).
+// Unexpected EXTRA keys are dropped (the object is rebuilt field-by-field) so no
+// unvalidated properties ride through from the wire.
+function parseSilentDuesSnapshot(value: unknown): SilentDuesSnapshot | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+  const duesAsOf = asValidYmd(v.duesAsOf);
+  const computedAsOf = asValidYmd(v.computedAsOf);
+  const thresholdDays = asNonNegativeInt(v.thresholdDays);
+  const silentMembers = asNonNegativeInt(v.silentMembers);
+  const duesKnownCount = asNonNegativeInt(v.duesKnownCount);
+  const totalMonthly =
+    typeof v.totalMonthly === 'number' && Number.isFinite(v.totalMonthly) && v.totalMonthly >= 0
+      ? v.totalMonthly
+      : null;
+  if (
+    duesAsOf === null ||
+    computedAsOf === null ||
+    thresholdDays === null ||
+    silentMembers === null ||
+    duesKnownCount === null ||
+    totalMonthly === null
+  ) {
+    return null;
+  }
+  if (duesKnownCount > silentMembers) return null;
+  return { duesAsOf, computedAsOf, thresholdDays, silentMembers, duesKnownCount, totalMonthly };
+}
+
+// Fetch the latest NON-NULL silent_dues_snapshot for the default workspace —
+// SEPARATE from the latest-row read on purpose: the edge never writes the dues
+// column, so the newest snapshot row usually carries null there and the dues
+// figure lives on an older row (the view layer handles the as-of gap honestly).
+// ISOLATED + fail-open-to-null: this query names the column explicitly, so on a
+// table where the migration hasn't been applied yet PostgREST 400s it — that 400
+// (and ANY other failure: network, abort, malformed body) returns null here and
+// must NEVER propagate, or it would knock the four live cards back to Sample.
+async function fetchLatestDuesSnapshot(signal?: AbortSignal): Promise<SilentDuesSnapshot | null> {
+  try {
+    const path =
+      `${RETENTION_TABLE}` +
+      `?select=silent_dues_snapshot,as_of` +
+      `&workspace_id=eq.${WORKSPACE_ID}` +
+      `&silent_dues_snapshot=not.is.null` +
+      `&order=as_of.desc&limit=1`;
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        Accept: 'application/json',
+      },
+      signal,
+    });
+    if (!response.ok) return null;
+    const rows = (await response.json()) as unknown;
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+    return parseSilentDuesSnapshot(
+      (rows[0] as { silent_dues_snapshot?: unknown }).silent_dues_snapshot,
+    );
+  } catch {
+    return null;
+  }
+}
+
 // Fetch the latest snapshot (highest as_of) for the default workspace, or null when
 // unconfigured / no row / malformed. Throws only on a non-OK HTTP status, so the
 // caller can distinguish "no data yet" (null → sample) from "read failed" (throw →
-// sample). Read-only: a single GET against the Data API, anon role, no writes.
+// sample). Read-only: a single GET against the Data API, anon role, no writes —
+// plus the isolated dues GET above once a usable snapshot exists.
 export async function fetchLatestRetentionAggregate(
   signal?: AbortSignal,
 ): Promise<RetentionAggregateSnapshot | null> {
@@ -225,5 +323,8 @@ export async function fetchLatestRetentionAggregate(
       overflow365Plus: asCount(histogram.overflow365Plus),
     },
     tenureBands: parseTenureBandHistogram(row.tenure_band_histogram),
+    // Runs only after the main read produced a usable snapshot (no snapshot →
+    // every card is Sample and dues is moot); isolated, never throws.
+    dues: await fetchLatestDuesSnapshot(signal),
   };
 }
