@@ -173,6 +173,13 @@ function duesHiddenLine(
   }
 }
 
+// Wodify "Most Recent Attendance" report — the member-level (PII) view of the
+// silent rule lives there, in the system of record, never in this app. The URL
+// is stable but carries no filter state; the setup tooltip tells the owner how
+// to make the report match the card's rule (and save it as default).
+const WODIFY_ATTENDANCE_REPORT_URL =
+  'https://app.wodify.com/Admin/Main?q=ViewReport%7CIsFromScreen%3DAttendance%26ReportId%3D36';
+
 // Silent Churn hero — the Retention page's dominant live signal. Reads the
 // owner-tuned threshold from the local Retention settings store. Dual-source,
 // mirroring Attendance Health: with a live aggregate snapshot it shows the real
@@ -192,6 +199,7 @@ function duesHiddenLine(
 function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays } = useRetentionSettings();
   const duesTooltipId = useId();
+  const setupTooltipId = useId();
 
   // One render path for both sources (mirrors AttendanceHealthCard). Live: derive
   // the silent COUNT from the non-PII histogram, plus the dues view gated against
@@ -299,6 +307,64 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
                 No active members have been away for {thresholdDays}+ days right now.
               </p>
             )}
+            {/* Wodify bridge (live only): the per-member list the non-PII aggregate
+                can't carry lives in Wodify, the system of record. Copy frames the
+                report as LIVE vs this card's dated snapshot — never a count-equality
+                promise. Rendered in every live dues state and at count 0: the
+                snapshot doesn't govern Wodify. The sample branch keeps its fixture
+                call-list instead. */}
+            <div className="silent-churn-action">
+              <p className="silent-churn-action-line">
+                See the current silent-member list in Wodify — it&rsquo;s live, so it can
+                differ from this card&rsquo;s {view.asOf} snapshot.
+              </p>
+              <div className="silent-churn-action-row">
+                <a
+                  className="silent-churn-action-btn"
+                  href={WODIFY_ATTENDANCE_REPORT_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Open Wodify report (opens in new tab)"
+                >
+                  Open Wodify report
+                </a>
+                <span className="db-tooltip-wrap silent-churn-setup-tipwrap">
+                  <button
+                    type="button"
+                    className="db-tooltip-btn"
+                    aria-label="How to set up the Wodify report"
+                    aria-describedby={setupTooltipId}
+                  >
+                    &#9432;
+                  </button>
+                  <div
+                    id={setupTooltipId}
+                    role="tooltip"
+                    className="db-tooltip-panel is-left silent-churn-setup-tooltip-panel"
+                  >
+                    <ul className="db-tooltip-list">
+                      <li className="db-tooltip-body">
+                        One-time setup — set these in the report, then use Wodify&rsquo;s
+                        &ldquo;Set As Default Filters&rdquo; so this link lands
+                        pre-configured:
+                      </li>
+                      <li className="db-tooltip-body">
+                        Membership Status: Free, Paid, and On Hold — on-hold members
+                        still count as active.
+                      </li>
+                      <li className="db-tooltip-body">
+                        Sort &ldquo;Days Since Last Class Sign In&rdquo; descending;
+                        silent = {thresholdDays}+ days.
+                      </li>
+                      <li className="db-tooltip-body">
+                        Ignore members with a blank Last Attendance — never-attended
+                        isn&rsquo;t silent.
+                      </li>
+                    </ul>
+                  </div>
+                </span>
+              </div>
+            </div>
           </>
         ) : count === 0 ? (
           <p className="silent-churn-empty">
