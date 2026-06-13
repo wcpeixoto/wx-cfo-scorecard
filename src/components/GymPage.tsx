@@ -22,9 +22,11 @@ import {
 import {
   computeChurnRiskByTenure,
   computeChurnRiskByTenureFromAggregate,
+  type TenureBandRisk,
 } from '../lib/gym/churnRiskByTenure';
 import { computeMemberMovement } from '../lib/gym/memberMovement';
 import { deriveBuckets } from '../lib/gym/retentionAggregateView';
+import { buildRetentionRateView, pickRateFacet } from '../lib/gym/retentionRates';
 import {
   DUES_STALE_AFTER_DAYS,
   deriveSilentChurnDuesView,
@@ -142,6 +144,44 @@ const usd = (amount: number) => `$${Math.round(amount).toLocaleString('en-US')}`
 // (which would imply low risk where there is simply no data).
 const formatRate = (rate: number | null) => (rate === null ? '—' : `${Math.round(rate * 100)}%`);
 
+// The universal Unknown disclosure (Option B). Always renders when the card has an
+// unknown bucket, in BOTH toggle states — never silently drop the unknown. The
+// inline affordance flips the shared `includeUnknown` view toggle (the same state
+// the Settings switch drives). Rendered nothing when the card has no unknowns
+// (e.g. the clean sample fixture), where known base === full base.
+function UnknownToggleNote({
+  count,
+  includeUnknown,
+  setIncludeUnknown,
+  className = 'gym-unknown-note',
+  descriptor = 'unknown',
+  target = 'these rates',
+}: {
+  count: number;
+  includeUnknown: boolean;
+  setIncludeUnknown: (value: boolean) => void;
+  className?: string;
+  descriptor?: string; // how to name the bucket, e.g. 'unknown' / 'unrecognized-status'
+  target?: string; // what they are held out of, e.g. 'these rates' / 'the member base'
+}) {
+  if (count <= 0) return null;
+  const noun = count === 1 ? 'member' : 'members';
+  return (
+    <p className={className}>
+      {includeUnknown
+        ? `Including ${count} ${descriptor} ${noun} in ${target}.`
+        : `${count} ${descriptor} ${noun} held out of ${target}.`}{' '}
+      <button
+        type="button"
+        className="gym-unknown-toggle"
+        onClick={() => setIncludeUnknown(!includeUnknown)}
+      >
+        {includeUnknown ? 'show known-only' : 'include'}
+      </button>
+    </p>
+  );
+}
+
 // Copy for the live card's dues-hidden states — deterministic, only rephrasing
 // the view's computed reason and the dues snapshot's OWN dates/threshold; the $
 // itself is never fabricated in any hidden state. The stale line is
@@ -197,7 +237,7 @@ const WODIFY_ATTENDANCE_REPORT_URL =
 // Deterministic: the copy only rephrases computed numbers; it never authors the
 // at-risk call. Re-renders whenever the threshold or snapshot changes.
 function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
-  const { silentChurnThresholdDays } = useRetentionSettings();
+  const { silentChurnThresholdDays, includeUnknown, setIncludeUnknown } = useRetentionSettings();
   const duesTooltipId = useId();
   const setupTooltipId = useId();
 
@@ -209,19 +249,49 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
   // live branch entirely.
   const view = useMemo(() => {
     if (snapshot) {
-      const { thresholdDays, silent } = deriveBuckets(snapshot, silentChurnThresholdDays);
-      const dues = deriveSilentChurnDuesView(snapshot.dues, snapshot.asOf, thresholdDays);
-      return { live: true as const, thresholdDays, count: silent, asOf: snapshot.asOf, dues };
+      const buckets = deriveBuckets(snapshot, silentChurnThresholdDays);
+      const dues = deriveSilentChurnDuesView(snapshot.dues, snapshot.asOf, buckets.thresholdDays);
+      return {
+        live: true as const,
+        thresholdDays: buckets.thresholdDays,
+        count: buckets.silent,
+        // Known base for the silent rate (Option B): healthy + watch + silent,
+        // i.e. activeTotal − unknown. The COUNT is unchanged in both toggle states.
+        knownActive: buckets.healthy + buckets.watch + buckets.silent,
+        unknown: buckets.unknown,
+        asOf: snapshot.asOf,
+        dues,
+      };
     }
     const { thresholdDays, count, monthlyDuesAtRisk, rows } = computeSilentChurn(
       SAMPLE_GYM_MEMBERS,
       silentChurnThresholdDays,
       FIXTURE_TODAY,
     );
-    return { live: false as const, thresholdDays, count, monthlyDuesAtRisk, rows };
+    // Same fixture + threshold + classifyMember, so buckets.silent === count by
+    // construction; computeAttendanceHealth supplies the healthy/watch base the
+    // silent rate needs (the silent COUNT still comes from computeSilentChurn).
+    const buckets = computeAttendanceHealth(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY);
+    return {
+      live: false as const,
+      thresholdDays,
+      count,
+      knownActive: buckets.healthy + buckets.watch + buckets.silent,
+      unknown: buckets.unknown,
+      monthlyDuesAtRisk,
+      rows,
+    };
   }, [snapshot, silentChurnThresholdDays]);
 
   const { thresholdDays, count } = view;
+  // Silent as a share of the chosen base (default OFF = attendance-known actives).
+  const silentRateView = buildRetentionRateView(
+    count,
+    view.knownActive,
+    view.unknown,
+    'attendance-known actives',
+  );
+  const silentFacet = pickRateFacet(silentRateView, includeUnknown);
 
   return (
     <article className="card gym-card gym-card--hero silent-churn-card">
@@ -262,6 +332,21 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
             </div>
           )}
         </div>
+
+        {silentFacet.base > 0 && (
+          <p className="silent-churn-rate">
+            {formatRate(silentFacet.rate)} of{' '}
+            {includeUnknown
+              ? `all ${silentFacet.base} actives`
+              : `${silentFacet.base} attendance-known actives`}
+          </p>
+        )}
+        <UnknownToggleNote
+          count={view.unknown}
+          includeUnknown={includeUnknown}
+          setIncludeUnknown={setIncludeUnknown}
+          className="silent-churn-unknown-note"
+        />
 
         {view.live ? (
           <>
@@ -410,7 +495,7 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
 // reads the same snapshot's per-band tenure histogram (§6 aggregate extension);
 // Member Movement's census reads it too (its intake stays sample).
 function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
-  const { silentChurnThresholdDays } = useRetentionSettings();
+  const { silentChurnThresholdDays, includeUnknown, setIncludeUnknown } = useRetentionSettings();
 
   // One render path for both sources: deriveBuckets (live histogram) and
   // computeAttendanceHealth (sample fixture) return the SAME H/W/S/unknown shape,
@@ -424,6 +509,18 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
   );
 
   const { thresholdDays, healthy, watch, silent, unknown } = result;
+
+  // Option B rates — known base = healthy + watch + silent (activeTotal − unknown).
+  // Counts above are unchanged; these only add a denominator/rate view.
+  const knownActive = healthy + watch + silent;
+  const atRiskFacet = pickRateFacet(
+    buildRetentionRateView(watch + silent, knownActive, unknown, 'attendance-known actives'),
+    includeUnknown,
+  );
+  const silentFacet = pickRateFacet(
+    buildRetentionRateView(silent, knownActive, unknown, 'attendance-known actives'),
+    includeUnknown,
+  );
 
   // Copy reads the RESOLVED threshold (result.thresholdDays), never the raw
   // setting. The Watch band is [WATCH_FLOOR_DAYS, thresholdDays − 1]. When the
@@ -468,6 +565,16 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
           </>
         )}
 
+        {atRiskFacet.base > 0 && (
+          <p className="attendance-health-rate">
+            {formatRate(atRiskFacet.rate)} of{' '}
+            {includeUnknown
+              ? `all ${atRiskFacet.base} actives`
+              : `${atRiskFacet.base} attendance-known actives`}{' '}
+            are drifting or silent.
+          </p>
+        )}
+
         <dl className="attendance-health-breakdown">
           <div className="attendance-health-stat attendance-health-stat--healthy">
             <dt className="attendance-health-stat-label">Healthy</dt>
@@ -479,7 +586,10 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
           </div>
           <div className="attendance-health-stat attendance-health-stat--silent">
             <dt className="attendance-health-stat-label">Silent</dt>
-            <dd className="attendance-health-stat-value">{silent}</dd>
+            <dd className="attendance-health-stat-value">
+              {silent}
+              <span className="attendance-health-stat-rate"> · {formatRate(silentFacet.rate)}</span>
+            </dd>
           </div>
           {unknown > 0 && (
             <div className="attendance-health-stat attendance-health-stat--unknown">
@@ -498,6 +608,13 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
             held out of Healthy / Watch / Silent rather than mislabeled.
           </p>
         )}
+
+        <UnknownToggleNote
+          count={unknown}
+          includeUnknown={includeUnknown}
+          setIncludeUnknown={setIncludeUnknown}
+          className="attendance-health-unknown-note"
+        />
 
         {watch > 0 && (
           <p className="attendance-health-takeaway">
@@ -528,7 +645,7 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
 // the two disclosed member_since caveats (records-era undercount; staff
 // accounts) — honesty notes, not defects.
 function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
-  const { silentChurnThresholdDays } = useRetentionSettings();
+  const { silentChurnThresholdDays, includeUnknown, setIncludeUnknown } = useRetentionSettings();
 
   const tenureBands = snapshot?.tenureBands ?? null;
   const result = useMemo(
@@ -543,8 +660,22 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
   // still honestly Sample (pre-tenure row → tenureBands null).
   const liveAsOf = tenureBands && snapshot ? snapshot.asOf : null;
 
-  const { thresholdDays, activeTotal, bands, unknownTenure, heroBandId } = result;
+  const { thresholdDays, activeTotal, bands, unknownTenure } = result;
+
+  // Option B: default to the attendance-known base (de-diluted per-band rates);
+  // the toggle restores the full base. The hero re-selects per base and can
+  // legitimately differ (de-diluting promotes the cohort with the most
+  // recency-unknowns). atRisk is unchanged in both states — only the denominator
+  // and rate move. The displayed Active column tracks the chosen denominator so
+  // the row reconciles (atRisk / Active === Risk rate).
+  const heroBandId = includeUnknown ? result.heroBandId : result.heroBandIdKnown;
   const heroBand = bands.find((b) => b.id === heroBandId) ?? null;
+  const bandActive = (b: TenureBandRisk) => (includeUnknown ? b.activeTotal : b.knownActiveTotal);
+  const bandRate = (b: TenureBandRisk) => (includeUnknown ? b.riskRate : b.riskRateKnown);
+  // Recency-unknowns held out of the known base, summed across the REAL bands.
+  // (The unknownTenure bucket is a SEPARATE population — bad membershipStart, not
+  // bad attendance — and is never part of any band's rate denominator.)
+  const unknownRecencyTotal = bands.reduce((sum, b) => sum + b.unknownRecency, 0);
 
   return (
     <article className="card gym-card gym-card--full churn-tenure-card">
@@ -566,14 +697,15 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
         ) : (
           <>
             <div className="churn-tenure-hero">
-              <span className="churn-tenure-hero-value">{formatRate(heroBand.riskRate)}</span>
+              <span className="churn-tenure-hero-value">{formatRate(bandRate(heroBand))}</span>
               <span className="churn-tenure-hero-label">
                 at risk in the {heroBand.label} cohort — the highest by tenure
               </span>
             </div>
             <p className="churn-tenure-helper">
               At-risk = active members on watch or silent at the {thresholdDays}-day threshold
-              ({heroBand.atRisk} of {heroBand.activeTotal} active in this band).
+              ({heroBand.atRisk} of {bandActive(heroBand)}{' '}
+              {includeUnknown ? 'active' : 'attendance-known'} in this band).
             </p>
           </>
         )}
@@ -581,7 +713,9 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
         <div className="churn-tenure-table">
           <div className="churn-tenure-head">
             <span className="churn-tenure-col churn-tenure-col--band">Tenure</span>
-            <span className="churn-tenure-col churn-tenure-col--num">Active</span>
+            <span className="churn-tenure-col churn-tenure-col--num">
+              {includeUnknown ? 'Active' : 'Tracked'}
+            </span>
             <span className="churn-tenure-col churn-tenure-col--num">At risk</span>
             <span className="churn-tenure-col churn-tenure-col--num">Risk rate</span>
           </div>
@@ -592,9 +726,9 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
                 className={`churn-tenure-row${b.id === heroBandId ? ' churn-tenure-row--hero' : ''}`}
               >
                 <span className="churn-tenure-col churn-tenure-col--band">{b.label}</span>
-                <span className="churn-tenure-col churn-tenure-col--num">{b.activeTotal}</span>
+                <span className="churn-tenure-col churn-tenure-col--num">{bandActive(b)}</span>
                 <span className="churn-tenure-col churn-tenure-col--num">{b.atRisk}</span>
-                <span className="churn-tenure-col churn-tenure-col--num">{formatRate(b.riskRate)}</span>
+                <span className="churn-tenure-col churn-tenure-col--num">{formatRate(bandRate(b))}</span>
               </li>
             ))}
             {/* Dirty-data members (missing/invalid or future membershipStart) are
@@ -619,6 +753,20 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
             )}
           </ul>
         </div>
+
+        {unknownRecencyTotal > 0 && (
+          <p className="churn-tenure-base-note">
+            {includeUnknown
+              ? 'Rates over each cohort’s full active base.'
+              : 'Rates among attendance-known members in each cohort.'}
+          </p>
+        )}
+        <UnknownToggleNote
+          count={unknownRecencyTotal}
+          includeUnknown={includeUnknown}
+          setIncludeUnknown={setIncludeUnknown}
+          className="churn-tenure-unknown-note"
+        />
 
         {liveAsOf && (
           <p className="churn-tenure-caveat">
@@ -653,6 +801,8 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
 // A nonzero unknown-status count is surfaced (honesty parity with Attendance
 // Health's Unknown) rather than silently folded into either census bucket.
 function MemberMovementCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
+  const { includeUnknown, setIncludeUnknown } = useRetentionSettings();
+
   // Intake (joins-by-cohort) is ALWAYS sample: membershipStart isn't on /clients, so
   // the non-PII live aggregate can't carry a join timeline. The census
   // (active/inactive) DOES go live when the snapshot carries the §6 census column.
@@ -683,6 +833,12 @@ function MemberMovementCard({ snapshot }: { snapshot: RetentionAggregateSnapshot
   const { census } = view;
   const { cohorts, unknownJoin } = sample; // intake stays sample in both modes
 
+  // Option B: MM's unknown is unrecognized client_status (census.unknown). Default
+  // OFF drops it from the displayed base (active + inactive). Inert while it is 0
+  // live, but correct once a snapshot carries unmappable statuses. The active/
+  // inactive/unknown COUNTS are unchanged — only the base denominator moves.
+  const displayBase = includeUnknown ? census.total : census.active + census.inactive;
+
   return (
     <article className="card gym-card gym-card--full member-movement-card">
       <header className="gym-card-head">
@@ -706,7 +862,8 @@ function MemberMovementCard({ snapshot }: { snapshot: RetentionAggregateSnapshot
           </span>
         </div>
         <p className="member-movement-helper">
-          Current mix of a {census.total}-member base.
+          Current mix of a {displayBase}-member base
+          {includeUnknown && census.unknown > 0 ? ' (incl. unrecognized status)' : ''}.
         </p>
 
         <dl className="member-movement-census">
@@ -725,6 +882,15 @@ function MemberMovementCard({ snapshot }: { snapshot: RetentionAggregateSnapshot
             </div>
           )}
         </dl>
+
+        <UnknownToggleNote
+          count={census.unknown}
+          includeUnknown={includeUnknown}
+          setIncludeUnknown={setIncludeUnknown}
+          className="member-movement-unknown-note"
+          descriptor="unrecognized-status"
+          target="the member base"
+        />
 
         {/* Verified 2026-06-10 (Wodify admin UI): members with a running membership
             hold keep client status Active — they never appear under Inactive. The
