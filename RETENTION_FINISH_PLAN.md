@@ -666,10 +666,14 @@ run #2" below); its
 **join-cohort intake** plus **Churn Risk by Tenure** (#411) bands additionally need the
 `membershipStart` / join-date field — **now PROVEN SOURCEABLE as `member_since`** (discovery run +
 semantic confirm closed 2026-06-11; see "membershipStart field-discovery" below; the
-aggregate-extension build is a separate gated slice); (ii) Silent Churn **$-at-risk** needs a dues source (CSV
-import — the Wodify financials API is tier-blocked); (iii) Silent Churn **call-list / member
-names** stay blocked by the §4 PII / auth gate. **Live status:** Attendance Health + Silent Churn
-(count-only) + the **Member Movement census** + **Churn Risk by Tenure** are **LIVE** from the
+aggregate-extension build is a separate gated slice); (ii) Silent Churn **$-at-risk** needed a dues source (CSV
+import — the Wodify financials API is tier-blocked) — **now LIVE** via the locally-written
+`silent_dues_snapshot` (first live $ write 2026-06-12; see the "SC dues gated run" record below);
+(iii) Silent Churn **call-list / member names** — **RESOLVED by the Question-0 DEFER
+(2026-06-12): not auth-waiting.** ACTION routes OUT to Wodify via the shipped bridge (PR #469;
+see the "Silent Churn to Wodify bridge" record below); member-level ANALYTICS (Churn by Age /
+Segment Explorer) remain the §4-gated candidates. **Live status:** Attendance Health + Silent Churn
+(count + dues $) + the **Member Movement census** + **Churn Risk by Tenure** are **LIVE** from the
 aggregate (census since 2026-06-10; tenure since the 2026-06-11 aggregate-extension gated run —
 see "Tenure aggregate-extension gated run" below); the **MM join-cohort intake is the page's only
 remaining sample surface**.
@@ -941,6 +945,46 @@ honestly HIDE the dollar until a fresh dues write — so PAIR every future censu
 fresh weekly All Memberships export + dues write (this run's validated runbook is the
 template).
 
+**Question-0 — ACTION-tier verdict: DEFER auth (decided 2026-06-12; Reviewer DEFER +
+parity-check entries in the advisor log).** The app will NOT build its first auth/PII tier
+for the Silent Churn call-list. Retention finishes as an INSIGHT-complete surface; ACTION
+(who to contact, by name) routes OUT to Wodify, the system of record. Deciding reason: role
+boundary — the CFO scorecard sizes and prioritizes financial risk; member identity and the
+outreach workflow are Wodify's domain (cost/staleness arguments are secondary). The
+call-list is therefore NOT "auth-waiting" — it is Wodify's job, plausibly permanently. The
+real future authenticated-ANALYTICS candidates are Churn by Age / Segment Explorer ("Future
+gated cards" below), and they define the revisit trigger: reopen the auth question only when
+2–3 member-level analytics surfaces are genuinely wanted, never for the call-list alone.
+Foundation fact for any future tier (as of `2c01a7e`): the app has NO auth today — the
+bundle ships only the public anon key and the Settings "lock" is cosmetic — so member PII
+can never live in an anon-readable table (the §4 blocker holds by construction, not by
+policy).
+
+**Silent Churn to Wodify bridge — SHIPPED 2026-06-12 (PR #469, squash `9c3fc99`; Reviewer
+pre-merge APPROVE on head `e541eed`; deployed — live bundle rotated `index-DqxxekpV.js` to
+`index-Cuh3FFns.js`, grep-verified).** The card's first ACTION affordance, implementing the
+Question-0 DEFER above: a live-branch-only action line plus an outbound link to Wodify's
+standard "Most Recent Attendance" report (ReportId 36), plus a one-time-setup info tooltip
+(second `db-tooltip-*` instance on the card; the PR-3b nesting pattern — the panel is a div
+containing a ul, never inside a p). This is the app's FIRST external link — new tab,
+`noopener noreferrer`, auth-gated at Wodify (a session-less visitor lands on Wodify's login;
+the only disclosure is that the gym uses Wodify, non-sensitive). Copy/link/CSS only:
+`GymPage.tsx` plus `dashboard.css`, ZERO computation change, no schema/edge/auth/data; edge
+identities unmoved (sync-wodify-retention ezbr `3ae17000…` verify_jwt true, ai-proxy
+`3d392f3e…`). Honest framing is load-bearing: the card's count/$ stays the DATED snapshot
+estimate (the ~75-silent, $6,734/mo floor on record above) while the Wodify report is the
+LIVE list — the copy says they can differ and never promises a count match (exact-count
+parity is impossible by construction: the card measures days-absent against the snapshot
+as-of date, Wodify against live today). The setup tooltip states the three parity conditions
+that make the report reproduce our silent rule: Membership Status = Free + Paid + On Hold
+(on-hold counts as active — verified in Wodify admin 2026-06-10); sort "Days Since Last
+Class Sign In" descending with silent = the owner's resolved threshold (default 21) or more
+— the tooltip interpolates the live resolved threshold, never a hardcoded 21; and exclude
+members with a blank Last Attendance (never-attended is not silent — the classifier's
+`unknown` bucket). The report URL is stable (ReportId 36) but does NOT encode filter state,
+so the owner sets the filters once and saves them via Wodify's "Set As Default Filters"; the
+sample branch keeps its fixture call-list unchanged.
+
 **Prior-state facts (preserved).** The import-resolution sub-gate closed via Option A (#435 @ `b6bd9d6`); the
 **`deno.json` cleanup — DONE** (#437 @ `04cd034`, 2026-06-06) dropped the vestigial function-local `deno.json`
 and reconciled the README; a name-scoped redeploy from merged `main` (CLI 2.98.2) was **deno.json-free**
@@ -1017,7 +1061,10 @@ plaintext trigger file deleted); SPA/PR2 wiring has since shipped frontend-only 
    available from this source yet," never `$0`. A real dollar waits on a dues source — the §5 hybrid
    **monthly Wodify Admin CSV** (financials are API-tier-blocked), joined server-side by an internal key —
    deferred to its own slice. *(Slice DONE: the 2026-06-11 local dues preview measured the first honest
-   floor, and the first live dollar is now WRITTEN and shown — see the "SC dues gated run" record above.)*
+   floor, and the first live dollar is now WRITTEN and shown — see the "SC dues gated run" record above.
+   ACTION now bridges OUT as well: the card's live branch links to Wodify's Most Recent Attendance report
+   — see the "Silent Churn to Wodify bridge" record and the Question-0 DEFER above; the per-member
+   call-list stays out of the app, routed to the system of record.)*
 
 5. **Transport + PII safety (binds §4 + the member-PII anon-key blocker).**
    - **DECIDED (d):** the Supabase **Edge Function `sync-wodify-retention`** holds `WODIFY_API_KEY` via
