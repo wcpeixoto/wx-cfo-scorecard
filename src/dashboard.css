@@ -13134,6 +13134,54 @@ body {
 .attendance-health-stat--silent .attendance-health-stat-value { color: var(--negative); }
 .attendance-health-stat--unknown .attendance-health-stat-value { color: var(--text-secondary); }
 
+/* ── Option B — known-base rate lines + universal Unknown disclosure ──────────
+   Shared across the Retention cards. The rate line is a primary-weight context
+   line; the disclosure note is muted; the inline "include / show known-only"
+   affordance is a text button in the accent color that flips the shared toggle. */
+.attendance-health-rate,
+.silent-churn-rate,
+.churn-tenure-base-note {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.attendance-health-stat-rate {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.gym-unknown-note,
+.attendance-health-unknown-note,
+.silent-churn-unknown-note,
+.churn-tenure-unknown-note,
+.member-movement-unknown-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.gym-unknown-toggle {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.gym-unknown-toggle:hover {
+  color: var(--brand-600);
+}
+.gym-unknown-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 /* ── Churn Risk by Tenure — live (sample-data) tenure-band risk table ─────
    Full-width Patterns card. Card outer stays the locked white .card surface
    (UI_CARDS); only inner content is styled here, reusing the .silent-churn-*

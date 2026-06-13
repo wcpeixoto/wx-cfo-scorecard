@@ -283,6 +283,19 @@ conflict). **Read it before any CFO Assistant work.**
 
 ---
 
+## Retention cards — known-base rates contract (Option B)
+
+Every Retention card expresses rates over the attendance-known base by default
+and declares `{ knownBase, fullBase, unknown }` reading `includeUnknown` from
+RetentionSettingsContext — the toggle changes denominators only, never
+classification (absolute counts identical in both states); the "N unknown —
+include" disclosure always renders; the Silent Churn $ floor takes no
+rate/toggle. Unknown is an unresolved data state, not a business category —
+future work splits it into roles/no-show/data-quality; parked cards add this
+contract when they go live.
+
+---
+
 ## Gotchas
 
 **Supabase `max_rows` must be 10000.** Set in Supabase Dashboard →

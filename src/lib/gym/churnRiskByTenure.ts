@@ -36,11 +36,14 @@ const UNKNOWN_TENURE_LABEL = 'Unknown';
 export type TenureBandRisk = {
   id: string;
   label: string;
-  activeTotal: number; // active members whose tenure falls in this band
+  activeTotal: number; // active members whose tenure falls in this band (FULL base, incl. unknownRecency)
+  unknownRecency: number; // active-in-band with no usable check-in — held out of the known-base rate
+  knownActiveTotal: number; // activeTotal − unknownRecency: the attendance-known denominator (Option B default)
   watch: number; // active + on watch (drifting, below threshold)
   silent: number; // active + silent (>= threshold) — equals this band's Silent Churn slice
-  atRisk: number; // watch + silent
-  riskRate: number | null; // atRisk / activeTotal; null when the band has no active members
+  atRisk: number; // watch + silent — IDENTICAL in both bases; the toggle only re-bases the rate
+  riskRate: number | null; // FULL base: atRisk / activeTotal; null when the band has no active members
+  riskRateKnown: number | null; // KNOWN base: atRisk / knownActiveTotal; null when no attendance-known actives
 };
 
 export type ChurnRiskByTenureResult = {
@@ -48,7 +51,8 @@ export type ChurnRiskByTenureResult = {
   activeTotal: number; // total active members placed (== Σ band activeTotal + unknownTenure.activeTotal)
   bands: TenureBandRisk[]; // one per TENURE_BANDS entry, in band order
   unknownTenure: TenureBandRisk; // active members with no determinable tenure band (dirty data) — never dropped
-  heroBandId: string | null; // band with the highest risk rate (null when no active members)
+  heroBandId: string | null; // FULL-base hero: band with the highest full-base risk rate (null when no active members)
+  heroBandIdKnown: string | null; // KNOWN-base hero: band with the highest known-base rate — re-selects under Option B's default
 };
 
 // Hero = the band with the highest risk rate, considering only bands that have
@@ -56,17 +60,21 @@ export type ChurnRiskByTenureResult = {
 // at-risk count, then toward the earlier (shorter-tenure) band for stability.
 // ONE rule for both sources — the sample compute and the live-aggregate adapter
 // below both call this, so the hero can never differ by data source.
-function selectHeroBandId(bands: TenureBandRisk[]): string | null {
+//
+// `useKnownBase` selects which rate the hero is chosen by: the full-base rate
+// (toggle ON) or the attendance-known rate (Option B default, OFF). The hero can
+// LEGITIMATELY differ between the two — de-diluting promotes the cohort with the
+// most recency-unknowns — so each base gets its own hero id on the result.
+function selectHeroBandId(bands: TenureBandRisk[], useKnownBase: boolean): string | null {
   let heroBandId: string | null = null;
   let bestRate = -1;
   let bestAtRisk = -1;
   for (const band of bands) {
-    if (band.activeTotal === 0 || band.riskRate === null) continue;
-    if (
-      band.riskRate > bestRate ||
-      (band.riskRate === bestRate && band.atRisk > bestAtRisk)
-    ) {
-      bestRate = band.riskRate;
+    const denom = useKnownBase ? band.knownActiveTotal : band.activeTotal;
+    const rate = useKnownBase ? band.riskRateKnown : band.riskRate;
+    if (denom === 0 || rate === null) continue;
+    if (rate > bestRate || (rate === bestRate && band.atRisk > bestAtRisk)) {
+      bestRate = rate;
       bestAtRisk = band.atRisk;
       heroBandId = band.id;
     }
@@ -102,6 +110,7 @@ export function computeChurnRiskByTenure(
     id: band.id,
     label: band.label,
     activeTotal: 0,
+    unknownRecency: 0,
     watch: 0,
     silent: 0,
   }));
@@ -110,6 +119,7 @@ export function computeChurnRiskByTenure(
     id: UNKNOWN_TENURE_ID,
     label: UNKNOWN_TENURE_LABEL,
     activeTotal: 0,
+    unknownRecency: 0,
     watch: 0,
     silent: 0,
   };
@@ -132,25 +142,32 @@ export function computeChurnRiskByTenure(
     row.activeTotal += 1;
     if (classification.bucket === 'watch') row.watch += 1;
     else if (classification.bucket === 'silent') row.silent += 1;
-    // 'healthy' and 'unknown' (recency) are active but not at risk — counted in activeTotal only.
+    else if (classification.bucket === 'unknown') row.unknownRecency += 1;
+    // 'healthy' and 'unknown' (recency) are active but not at risk — counted in
+    // activeTotal only; unknownRecency is tracked so the known base can hold it out.
   }
 
   const toBandRisk = (row: {
     id: string;
     label: string;
     activeTotal: number;
+    unknownRecency: number;
     watch: number;
     silent: number;
   }): TenureBandRisk => {
     const atRisk = row.watch + row.silent;
+    const knownActiveTotal = row.activeTotal - row.unknownRecency;
     return {
       id: row.id,
       label: row.label,
       activeTotal: row.activeTotal,
+      unknownRecency: row.unknownRecency,
+      knownActiveTotal,
       watch: row.watch,
       silent: row.silent,
       atRisk,
       riskRate: row.activeTotal === 0 ? null : atRisk / row.activeTotal,
+      riskRateKnown: knownActiveTotal === 0 ? null : atRisk / knownActiveTotal,
     };
   };
 
@@ -165,7 +182,8 @@ export function computeChurnRiskByTenure(
     activeTotal,
     bands,
     unknownTenure,
-    heroBandId: selectHeroBandId(bands),
+    heroBandId: selectHeroBandId(bands, false),
+    heroBandIdKnown: selectHeroBandId(bands, true),
   };
 }
 
@@ -208,14 +226,20 @@ export function computeChurnRiskByTenureFromAggregate(
       resolvedThreshold,
     );
     const atRisk = derived.watch + derived.silent;
+    // deriveBuckets carries the per-band unknown-RECENCY straight through as
+    // `derived.unknown`, so the known base is healthy + watch + silent.
+    const knownActiveTotal = derived.activeTotal - derived.unknown;
     return {
       id,
       label,
       activeTotal: derived.activeTotal,
+      unknownRecency: derived.unknown,
+      knownActiveTotal,
       watch: derived.watch,
       silent: derived.silent,
       atRisk,
       riskRate: derived.activeTotal === 0 ? null : atRisk / derived.activeTotal,
+      riskRateKnown: knownActiveTotal === 0 ? null : atRisk / knownActiveTotal,
     };
   };
 
@@ -232,6 +256,7 @@ export function computeChurnRiskByTenureFromAggregate(
       bands.reduce((sum, band) => sum + band.activeTotal, 0) + unknownTenure.activeTotal,
     bands,
     unknownTenure,
-    heroBandId: selectHeroBandId(bands),
+    heroBandId: selectHeroBandId(bands, false),
+    heroBandIdKnown: selectHeroBandId(bands, true),
   };
 }
