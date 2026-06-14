@@ -91,6 +91,7 @@ import {
   computeMonthlyRollups,
   computeReserveCoverageDelta,
   projectScenario,
+  sentimentFromDelta,
   toMonthLabel,
 } from '../lib/kpis/compute';
 import { projectCategoryCadenceScenario } from '../lib/kpis/categoryCadence';
@@ -2588,6 +2589,7 @@ export default function Dashboard() {
         previousValue: metric.previous,
         deltaPercent: metric.percentChange,
         trend: Math.abs(delta) <= EPSILON ? 'flat' : delta > 0 ? 'up' : 'down',
+        sentiment: sentimentFromDelta(delta, id === 'expense'),
         format: id === 'savingsRate' ? 'percent' : 'currency',
       };
     };
