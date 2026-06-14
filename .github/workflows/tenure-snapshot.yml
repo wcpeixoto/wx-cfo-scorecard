@@ -1,0 +1,86 @@
+# Tenure Snapshot Clock — the cadence mechanism for the accepted Option-A
+# scheduled tenure pull (RETENTION_FINISH_PLAN.md §6). It POSTs the existing
+# `sync-wodify-retention` Edge Function on a weekly schedule so the threshold-free
+# `tenure_band_histogram` snapshot accumulates a fresh `(workspace_id, as_of)` row
+# each week — the second delta endpoint that a future Monthly Critical Groups card
+# needs (nearest ~30d-prior, 21–45d tolerance, else worst-now-only).
+#
+# ISOLATION (locked-file justification): this workflow shares NO trigger with and
+# never invokes the deploy pipeline. It runs ONLY on `schedule` + `workflow_dispatch`;
+# `deploy-pages.yml` runs on `push:main` + `workflow_dispatch`, and `ci.yml` on
+# `pull_request`. There is no `push` / `workflow_run` / `workflow_call` overlap, and
+# this job neither pushes nor `uses:` any deploy job.
+#
+# AUTH (least-privilege): the function is double-gated — platform `verify_jwt:true`
+# (the legacy anon JWT) PLUS the `x-sync-trigger-secret` header. The Action carries
+# ONLY the minimal invocation credentials below. The function holds WODIFY_API_KEY
+# and SUPABASE_SERVICE_ROLE_KEY internally; this workflow MUST NEVER reference them.
+#
+# REQUIRED GitHub Actions secrets (set separately — not by this PR):
+#   - SYNC_TRIGGER_SECRET    trigger-gate value; must match the function's env value
+#   - VITE_SUPABASE_ANON_KEY legacy anon JWT (the SPA-bundle key, NOT sb_publishable_…)
+#   - VITE_SUPABASE_URL      endpoint base (https://<ref>.supabase.co)
+
+name: Tenure Snapshot Clock
+
+# Quoted to keep YAML 1.1 parsers from coercing the `on` key to boolean true.
+"on":
+  schedule:
+    - cron: '0 12 * * 1' # Mondays 12:00 UTC (7am EST / 8am EDT — far from the gym-local midnight as_of boundary)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. INVOKE — POST the writer (no request body). --fail-with-body fails the
+      #    job on any non-2xx while still capturing the response for the asserts.
+      - name: Invoke tenure snapshot sync
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SYNC_TRIGGER_SECRET: ${{ secrets.SYNC_TRIGGER_SECRET }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body -sS -X POST \
+            "$VITE_SUPABASE_URL/functions/v1/sync-wodify-retention" \
+            -H "Authorization: Bearer $VITE_SUPABASE_ANON_KEY" \
+            -H "apikey: $VITE_SUPABASE_ANON_KEY" \
+            -H "x-sync-trigger-secret: $SYNC_TRIGGER_SECRET" \
+            -o response.json
+          echo "Invoke ok: $(jq -c '{ok, asOf, activeTotal}' response.json)"
+
+      # 2. ASSERT BODY — guard a green-but-degenerate pull. jq -e exits non-zero
+      #    (→ fails the job) when the expression is false or null. Paths match the
+      #    confirmed 200-body shape (camelCase): a wrong path reads null and would
+      #    false-BLOCK every good run, so these are exact.
+      - name: Assert response body
+        run: |
+          set -euo pipefail
+          jq -e '.ok == true and .activeTotal > 0 and .dataQuality.reachedPageCap == false' \
+            response.json > /dev/null
+          echo "Body asserts passed: $(jq -c '{ok, activeTotal, reachedPageCap: .dataQuality.reachedPageCap}' response.json)"
+
+      # 3. READ-BACK — prove the row actually LANDED and carries tenure (the delta
+      #    endpoint), not just that the function returned 200. Reuses the anon key,
+      #    no new credential. Table columns are snake_case (as_of / active_total /
+      #    tenure_band_histogram); workspace_id='default' is the writer's literal.
+      - name: Read back persisted snapshot
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          ASOF=$(jq -r '.asOf' response.json)
+          curl --fail-with-body -sS \
+            "$VITE_SUPABASE_URL/rest/v1/wodify_retention_aggregate?select=as_of,active_total,tenure_band_histogram&workspace_id=eq.default&order=as_of.desc&limit=1" \
+            -H "apikey: $VITE_SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $VITE_SUPABASE_ANON_KEY" \
+            -o readback.json
+          jq -e --arg asof "$ASOF" \
+            '.[0].as_of == $asof and .[0].active_total > 0 and .[0].tenure_band_histogram != null' \
+            readback.json > /dev/null
+          echo "Read-back confirmed: row as_of=$ASOF landed with a tenure histogram"

@@ -1083,6 +1083,13 @@ plaintext trigger file deleted); SPA/PR2 wiring has since shipped frontend-only 
    - **Refresh cadence (DECIDED d): manual / admin-triggered first** — the function runs on demand for the
      first live slice. A **scheduled refresh comes later, only after the first slice proves stable** — not
      part of this slice.
+     - **Snapshot Clock SHIPPED:** the "later" scheduled refresh is now `.github/workflows/tenure-snapshot.yml`
+       — a weekly **Mon 12:00 UTC** cron (+ `workflow_dispatch`) that invokes `sync-wodify-retention` and verifies
+       the new `(workspace_id='default', as_of)` row landed with a non-null `tenure_band_histogram` (the file
+       header documents the gating, the minimal secrets, and the stopped-clock guards). Builds the 2nd delta
+       endpoint beside the existing `2026-06-11` snapshot; the first in-band delta lands ~3–4 weekly runs out.
+     - **Monthly Critical Groups anchor lock:** the future MoM delta pairs each snapshot with the **nearest
+       ~30d-prior** within a **21–45 day** tolerance; no clean match → **worst-now-only, clearly labeled**.
 
 6. **Payload (IMPLEMENTED shape — exact-day `daysAbsent` histogram OBJECT; PR1 server-side slice).**
    ```ts
