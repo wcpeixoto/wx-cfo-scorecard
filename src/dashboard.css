@@ -937,11 +937,15 @@ body {
 }
 
 .kpi-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
   margin-bottom: 16px;
 }
 
 .kpi-label {
-  margin: 0 0 6px;
+  margin: 0;
   color: #344054;
   font-size: 16px;
   font-weight: 600;
@@ -1006,6 +1010,7 @@ body {
 }
 
 .kpi-vs-label {
+  margin-top: 8px;
   font-size: 14px;
   font-weight: 400;
   color: var(--text-secondary);
