@@ -678,6 +678,24 @@ aggregate (census since 2026-06-10; tenure since the 2026-06-11 aggregate-extens
 see "Tenure aggregate-extension gated run" below); the **MM join-cohort intake is the page's only
 remaining sample surface**.
 
+### Segment Explorer — corrected ground truth (2026-06-14, source-verified @ 700f563)
+
+The v1 spec failed the pre-build gate; the v2 spec must be written from these source facts:
+- **Reuse, don't reinvent.** The tenure×recency slice = a VIEW over `computeChurnRiskByTenureFromAggregate`
+  (`src/lib/gym/churnRiskByTenure.ts:208`) at the owner's resolved threshold. No per-member re-derivation;
+  no new rate math.
+- **Locked classifier vocabulary only.** healthy 0–7 / watch 8…T−1 / silent ≥ T / unknown; T
+  user-configurable, default 21 (`src/lib/gym/silentChurn.ts:9,104-108`); at-risk = watch + silent
+  (`src/lib/gym/churnRiskByTenure.ts:23`). **No fabricated thresholds** — there is no 60-day "silent"
+  line and no [21,59] "at-risk" band in the code.
+- **Known-base denominator is the rate convention.** Default rate = count / knownActiveTotal, where
+  knownActiveTotal = activeTotal − unknownRecency; the universal `includeUnknown` toggle flips to full
+  base (`src/lib/gym/churnRiskByTenure.ts:159,231`; `src/lib/gym/retentionRates.ts`). Do NOT use total_n.
+- **Preserve tenure banding.** `bandForTenure` (edges 90/180/365/730) + the `unknownTenure` bucket
+  (`src/lib/gym/tenureBands.ts`); never bin dirty/negative tenure into 2yr+.
+- **Build split:** 1a = view over the live aggregate (no pull, no gated write, no locked-file change);
+  1b = separate gated dues-pipeline slice, deferrable.
+
 **asOf timezone — permanent fix LIVE (2026-06-08, #445).** `asOf` was the **server-UTC** fetch
 date, which can shift the day boundary ±1 vs the gym's local day. The permanent fix is now **implemented in
 code**: `asOf` is derived gym-local (`America/New_York`) via the pure, dual-runtime `gymLocalDay(instant, tz)`
@@ -1182,11 +1200,23 @@ provides dated history.
   `lastCheckIn` alone. Off-page; tracked in Notion (P3 / Later).
 - **Churn by Age · `Parked`** — PII / data-minimization decision; use **age buckets only,
   never birthdates**.
-- **Segment Explorer · `Parked`** — PII / data-minimization decision; do not use sex, zip,
-  payment type, class time, or similar without policy. Highest-PII surface on the page.
-- **Churn by Belt · `Blocked`** — Wodify progressions/belt-rank API **reportedly unavailable
-  for public use** per Wodify support (chat-reported, not repo-verified) — an API-availability
-  limit, not merely a current-tier 403.
+- **Segment Explorer · `Re-scoped 2026-06-14`** — cross-sectional, aggregate-only, NO auth (the proven
+  §4 server→aggregate→SPA pattern — it is NOT the "highest-PII surface" the earlier Parked note assumed).
+  Split into two slices:
+  - **1a · tenure × recency — buildable now as a VIEW over the live aggregate.** Reuse
+    `computeChurnRiskByTenureFromAggregate(tenureBandHistogram, thresholdDays)` (`src/lib/gym/churnRiskByTenure.ts:208`)
+    — do NOT re-derive. No new Wodify pull, no gated write, no locked-file change.
+  - **1b · membership-type × tenure — separate gated dues-pipeline slice, deferrable.** Membership type
+    lives ONLY in the local All-Memberships dues CSV (`scripts/wodify/silentChurnDuesPreview.ts:464`),
+    never in Supabase — needs a local CSV→census join + a gated MCP write. It is PAYMENT STRUCTURE
+    ({Appointment Pack, Class Pack, Class Plan}), NOT the real BJJ program dimension — a weak proxy;
+    never relabel it as program identity.
+- **Churn by Belt · `Blocked (API) — Admin-UI export path identified 2026-06-14, columns pending verification`**
+  — NOT a hard product ceiling. The progressions/belt-rank **API remains 403-limited** (reportedly
+  unavailable for public use, chat-reported). An **Admin-UI export path appears feasible** via
+  People → Progressions (Current + Previous Levels, with Date Achieved) — *identified from a 2026-06-14
+  read-only Admin-UI inventory; columns pending schema verification.* Do NOT treat the belt build as
+  ready until columns are verified.
 
 ---
 
