@@ -1014,6 +1014,11 @@ body {
   font-size: 14px;
   font-weight: 400;
   color: var(--text-secondary);
+}
+
+/* Keep "vs $X" and the period label each intact; allow a wrap only between
+   them so a long comparison line breaks cleanly instead of mid-phrase. */
+.kpi-vs-part {
   white-space: nowrap;
 }
 
@@ -12037,9 +12042,15 @@ body {
   min-height: 44px;
 }
 
+.bp-overview-tray .kpi-value-col {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .bp-overview-tray .kpi-value-row .kpi-value {
   margin: 0;
-  flex: 1 1 auto;
   min-width: 0;
 }
 
