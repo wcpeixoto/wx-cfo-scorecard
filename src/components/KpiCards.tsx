@@ -257,7 +257,6 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
                   )}
                   <span className="kpi-change-percent">{percentDelta}</span>
                 </span>
-                <span className="kpi-vs-label">vs {formatPriorValue(card.previousValue, card.format)} {comparisonPeriodLabel}</span>
               </div>
             </div>
             <div className="kpi-value-row">
@@ -274,6 +273,7 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
                 </div>
               )}
             </div>
+            <span className="kpi-vs-label">vs {formatPriorValue(card.previousValue, card.format)} {comparisonPeriodLabel}</span>
           </article>
         );
       })}

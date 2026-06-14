@@ -1006,6 +1006,7 @@ body {
 }
 
 .kpi-vs-label {
+  margin-top: 8px;
   font-size: 14px;
   font-weight: 400;
   color: var(--text-secondary);
