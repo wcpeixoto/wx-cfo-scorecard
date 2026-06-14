@@ -263,7 +263,7 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
               <div className="kpi-value-col">
                 <h2 className={`kpi-value${valueColorClass}`}>{formatValue(card.value, card.format)}</h2>
                 <span className="kpi-vs-label">
-                  <span className="kpi-vs-part">vs {formatPriorValue(card.previousValue, card.format)}</span>{' '}
+                  <span className="kpi-vs-part">{formatPriorValue(card.previousValue, card.format)}</span>{' '}
                   <span className="kpi-vs-part">{comparisonPeriodLabel}</span>
                 </span>
               </div>
