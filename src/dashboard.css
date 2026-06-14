@@ -13277,6 +13277,87 @@ body {
    matching the Attendance Health "Unknown" tile. Only renders when present. */
 .churn-tenure-row--unknown .churn-tenure-col { color: var(--text-secondary); }
 
+/* ── Segment Explorer (1a) — tenure × recency cross-section grid ──────────
+   Full-width Patterns card. A NEW presentation view over the same
+   Churn-Risk-by-Tenure result; copies the .churn-tenure-* table idiom (not a
+   shared primitive — see the no-generalize rule) with a tenure-row × recency-col
+   grid and right-aligned numeric cells. Card outer stays the locked white .card
+   surface (UI_CARDS). No new hex values. */
+.segment-explorer-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.segment-explorer-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.segment-explorer-empty,
+.segment-explorer-suppression-note,
+.segment-explorer-survivorship {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.segment-explorer-head,
+.segment-explorer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  align-items: center;
+}
+.segment-explorer-head {
+  padding: 0 0 8px;
+  align-items: end;
+}
+.segment-explorer-colhead {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+.segment-explorer-colsub {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-secondary);
+}
+.segment-explorer-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.segment-explorer-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.segment-explorer-col--band {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.segment-explorer-col--num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.segment-explorer-masked {
+  color: var(--text-secondary);
+  cursor: help;
+}
+/* Unknown-tenure (dirty-data) row — muted so it reads as a data-quality note,
+   matching the Churn-Risk-by-Tenure unknown row. Always rendered. */
+.segment-explorer-row--unknown .segment-explorer-col { color: var(--text-secondary); }
+
 /* ── Member Movement — live (sample-data) census + join-cohort intake ─────
    Full-width Patterns card. Snapshot only: a RAW status census and intake by
    join half-year — no movement-over-time (the fixture carries no dated status

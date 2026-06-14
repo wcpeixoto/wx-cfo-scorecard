@@ -24,6 +24,11 @@ import {
   computeChurnRiskByTenureFromAggregate,
   type TenureBandRisk,
 } from '../lib/gym/churnRiskByTenure';
+import {
+  RECENCY_STAGES,
+  buildSegmentExplorerView,
+  type RecencyStageId,
+} from '../lib/gym/segmentExplorer';
 import { computeMemberMovement } from '../lib/gym/memberMovement';
 import { deriveBuckets } from '../lib/gym/retentionAggregateView';
 import { buildRetentionRateView, pickRateFacet } from '../lib/gym/retentionRates';
@@ -108,16 +113,7 @@ export function GymPage() {
                     'Needs an age-bucket data policy (age ranges only, never birthdates) before build.',
                 }}
               />
-              <GymCardShell
-                modifier="gym-card--full"
-                title="Segment Explorer"
-                subtitle="For any slice of members, what is the churn?"
-                gate={{
-                  status: 'parked',
-                  reason:
-                    'Highest-PII surface on the page — needs a data-minimization policy before build.',
-                }}
-              />
+              <SegmentExplorerCard snapshot={snapshot} />
               <GymCardShell
                 modifier="gym-card--full gym-card--recessed"
                 title="Churn by Belt"
@@ -776,6 +772,162 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
             accounts carry account-setup dates rather than member tenure.
           </p>
         )}
+      </div>
+    </article>
+  );
+}
+
+// Segment Explorer — Slice 1a (tenure × recency cross-section). A NEW presentation
+// view over the EXISTING Churn-Risk-by-Tenure result: it renders the per-band
+// aggregates as a grid of today's active members, tenure band (rows) × recency
+// stage (columns), with the locked classifier vocabulary. It adds NO computation —
+// the same dual-source gating as ChurnRiskByTenureCard (live aggregate when the
+// snapshot carries the tenure histogram, sample fixture otherwise), the same
+// threshold + includeUnknown from RetentionSettings, fed through the pure
+// buildSegmentExplorerView adapter (Healthy subtraction, per-row rate, <5 cell
+// suppression). Honest labels: it is a cross-SECTION of today's actives — not a
+// journey over time — and long-tenure rows show survivors only (footer).
+function SegmentExplorerCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
+  const { silentChurnThresholdDays, includeUnknown, setIncludeUnknown } = useRetentionSettings();
+
+  const tenureBands = snapshot?.tenureBands ?? null;
+  const result = useMemo(
+    () =>
+      tenureBands
+        ? computeChurnRiskByTenureFromAggregate(tenureBands, silentChurnThresholdDays)
+        : computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
+    [tenureBands, silentChurnThresholdDays],
+  );
+  // Live only when the snapshot actually carries a usable tenure histogram —
+  // exactly the ChurnRiskByTenureCard gate, so the two cards badge identically.
+  const liveAsOf = tenureBands && snapshot ? snapshot.asOf : null;
+
+  const view = useMemo(() => buildSegmentExplorerView(result, includeUnknown), [result, includeUnknown]);
+  const { thresholdDays, activeTotal, rows, unknownRecencyTotal } = view;
+
+  // Day ranges for the recency columns, composed from the resolved threshold and
+  // the locked WATCH_FLOOR_DAYS — the same edges classifyMember cuts at.
+  const stageRange = (stage: RecencyStageId): string => {
+    switch (stage) {
+      case 'healthy':
+        return `0–${WATCH_FLOOR_DAYS - 1} days`;
+      case 'watch':
+        return `${WATCH_FLOOR_DAYS}–${thresholdDays - 1} days`;
+      case 'silent':
+        return `${thresholdDays}+ days`;
+      case 'unknownRecency':
+        return 'no check-in on file';
+    }
+  };
+
+  // The survivorship footer is mandatory in BOTH states; sample mode has no live
+  // as-of, so it names the fixture date and flags itself as sample.
+  const asOfLabel = liveAsOf ?? '2026-06-02 (sample)';
+
+  return (
+    <article className="card gym-card gym-card--full segment-explorer-card">
+      <header className="gym-card-head">
+        <div className="segment-explorer-titlerow">
+          <h3 className="gym-card-title">Today&rsquo;s members by tenure &amp; risk stage</h3>
+          {liveAsOf ? (
+            <span className="gym-sample-badge gym-live-badge">Live · as of {liveAsOf}</span>
+          ) : (
+            <span className="gym-sample-badge">Sample data</span>
+          )}
+        </div>
+        <p className="gym-card-subtitle">
+          A cross-section of active members — tenure today by recency stage.
+        </p>
+      </header>
+
+      <div className="segment-explorer-body">
+        {activeTotal === 0 ? (
+          <p className="segment-explorer-empty">No active members to analyze right now.</p>
+        ) : (
+          <div
+            className="segment-explorer-table"
+            role="table"
+            aria-label="Active members by tenure and recency stage"
+          >
+            <div className="segment-explorer-head" role="row">
+              <span className="segment-explorer-col segment-explorer-col--band" role="columnheader">
+                Current tenure today
+              </span>
+              {RECENCY_STAGES.map((s) => (
+                <span
+                  key={s.id}
+                  className="segment-explorer-col segment-explorer-col--num"
+                  role="columnheader"
+                >
+                  <span className="segment-explorer-colhead">{s.label}</span>
+                  <span className="segment-explorer-colsub">{stageRange(s.id)}</span>
+                </span>
+              ))}
+              <span className="segment-explorer-col segment-explorer-col--num" role="columnheader">
+                <span className="segment-explorer-colhead">At-risk rate</span>
+                <span className="segment-explorer-colsub">
+                  {includeUnknown ? 'full base' : 'known base'}
+                </span>
+              </span>
+            </div>
+            <ul className="segment-explorer-rows">
+              {rows.map((row) => (
+                <li
+                  key={row.id}
+                  role="row"
+                  className={`segment-explorer-row${
+                    row.isUnknownTenure ? ' segment-explorer-row--unknown' : ''
+                  }`}
+                >
+                  <span className="segment-explorer-col segment-explorer-col--band" role="cell">
+                    {row.isUnknownTenure ? 'Unknown tenure' : row.label}
+                  </span>
+                  {row.cells.map((cell) => (
+                    <span
+                      key={cell.stage}
+                      className="segment-explorer-col segment-explorer-col--num"
+                      role="cell"
+                    >
+                      {cell.masked ? (
+                        <span
+                          className="segment-explorer-masked"
+                          title="Hidden to protect small groups (fewer than 5 members)"
+                        >
+                          &lt;5
+                        </span>
+                      ) : (
+                        cell.count
+                      )}
+                    </span>
+                  ))}
+                  <span className="segment-explorer-col segment-explorer-col--num" role="cell">
+                    {formatRate(row.rate)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <UnknownToggleNote
+          count={unknownRecencyTotal}
+          includeUnknown={includeUnknown}
+          setIncludeUnknown={setIncludeUnknown}
+          className="segment-explorer-unknown-note"
+          descriptor="unknown-recency"
+          target="the at-risk rates"
+        />
+
+        <p className="segment-explorer-suppression-note">
+          Cells with fewer than 5 members are hidden (shown as &ldquo;&lt;5&rdquo;) to protect
+          individuals.
+        </p>
+
+        <p className="segment-explorer-survivorship">
+          Snapshot as of {asOfLabel}. This is a cross-section of today&rsquo;s active members —
+          members who already left are not in this base, so long-tenure bands show survivors only
+          and can look healthier than the real experience.
+        </p>
       </div>
     </article>
   );

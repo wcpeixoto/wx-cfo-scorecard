@@ -45,8 +45,8 @@ census-populate run; tenure since the 2026-06-11 aggregate-extension run — see
   join-cohort intake stays sample, honestly labeled on the card). **No movement-over-time series by design** — the fixture carries no
   dated status changes, so a flow/cancellation trend would be invented history.
 - **Parked / blocked gate labels** (#415) — the three remaining shells show honest gate
-  notes via `GymCardShell`'s `gate` prop (still shells, no internals): Churn by Age +
-  Segment Explorer = `Parked` (PII), Churn by Belt = `Blocked` (API).
+  notes via `GymCardShell`'s `gate` prop (still shells, no internals): Churn by Age =
+  `Parked` (PII), Segment Explorer = `Re-scoped`, Churn by Belt = `Blocked` (API).
 
 All sample-data scope-gate boxes passed in #415 (recorded in git at `f9ded0a`). That
 gate certifies **scope/structure only — not numerical correctness** (see Phase 1 §2).
@@ -1223,7 +1223,7 @@ provides dated history.
 ## Open decisions
 
 - **Live-data safety architecture** (Phase 2 §4) — the gating decision for going live.
-- **PII / data-minimization policy** — unblocks Churn by Age + Segment Explorer.
+- **PII / data-minimization policy** — unblocks Churn by Age.
 - **Durable-rule migration timing + file retirement** — when to migrate (#1/#2/#4) and
   when to delete this file (only once fully live).
 - **Parked/blocked gate-note pattern** — decide later whether the convention introduced in
