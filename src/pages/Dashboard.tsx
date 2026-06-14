@@ -2638,15 +2638,17 @@ export default function Dashboard() {
     return computeExpenseSlicesWithRows(periodTxns, profitabilityCashFlowMode);
   }, [model.kpiYoYComparisonByTimeframe, topCategoriesTimeframe, baseTxns, profitabilityCashFlowMode]);
 
-  // Period phrase naming ONLY the prior comparison window. The literal
-  // "vs <prior value>" prefix is composed in the KPI footer (KpiCards.tsx),
-  // so this no longer carries a leading "vs ". Monthly frames resolve the
-  // actual prior month ("in May 2025"); custom names the prior range directly
-  // (never the current range); multi-month frames keep their existing wording.
+  // Period phrase naming ONLY the prior comparison window; the prior value
+  // ("$8,549") is composed alongside it in the KPI footer (KpiCards.tsx).
+  // Monthly frames resolve the actual prior month with a compact 2-digit
+  // year ("in May 25"); custom names the prior range directly (never the
+  // current range); multi-month frames keep their existing wording.
   const comparisonPeriodLabel = useMemo<string>(() => {
     if (kpiTimeframe === 'thisMonth' || kpiTimeframe === 'lastMonth') {
       const prevStart = model.kpiYoYComparisonByTimeframe[kpiTimeframe]?.previousStartMonth;
-      if (prevStart) return `in ${toMonthLabel(prevStart)}`;
+      // Shorten only the KPI subtitle's year (e.g. "Jun 2025" → "Jun 25");
+      // toMonthLabel stays full-year for every other surface that uses it.
+      if (prevStart) return `in ${toMonthLabel(prevStart).replace(/\d{4}$/, (year) => year.slice(2))}`;
     }
     if (kpiTimeframe === 'custom' && customPreviousDateRange) {
       return formatDateRangeLabel(

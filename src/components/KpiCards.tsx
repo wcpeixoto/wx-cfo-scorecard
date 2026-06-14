@@ -260,7 +260,13 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
               </div>
             </div>
             <div className="kpi-value-row">
-              <h2 className={`kpi-value${valueColorClass}`}>{formatValue(card.value, card.format)}</h2>
+              <div className="kpi-value-col">
+                <h2 className={`kpi-value${valueColorClass}`}>{formatValue(card.value, card.format)}</h2>
+                <span className="kpi-vs-label">
+                  <span className="kpi-vs-part">{formatPriorValue(card.previousValue, card.format)}</span>{' '}
+                  <span className="kpi-vs-part">{comparisonPeriodLabel}</span>
+                </span>
+              </div>
               {spark && spark.data.length > 1 && (
                 <div className="kpi-card-spark" aria-hidden="true">
                   <ReactApexChart
@@ -273,7 +279,6 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
                 </div>
               )}
             </div>
-            <span className="kpi-vs-label">vs {formatPriorValue(card.previousValue, card.format)} {comparisonPeriodLabel}</span>
           </article>
         );
       })}
