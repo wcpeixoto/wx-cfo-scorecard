@@ -72,6 +72,17 @@ function trendFromDelta(delta: number): TrendDirection {
   return delta > 0 ? 'up' : 'down';
 }
 
+/**
+ * Favorability of a change, for the KPI badge color. For most metrics a rise is
+ * favorable; pass `lowerIsBetter` for metrics like Expenses where a fall is good.
+ * Returns 'up' (favorable/green), 'down' (unfavorable/red), or 'flat' (neutral).
+ */
+export function sentimentFromDelta(delta: number, lowerIsBetter = false): TrendDirection {
+  if (Math.abs(delta) <= EPSILON) return 'flat';
+  const favorable = lowerIsBetter ? delta < 0 : delta > 0;
+  return favorable ? 'up' : 'down';
+}
+
 function pctDelta(current: number, previous: number): number | null {
   if (Math.abs(previous) <= EPSILON) {
     return null;
@@ -1483,6 +1494,7 @@ function buildKpis(current: KpiAggregate, previous: KpiAggregate): KpiCard[] {
       previousValue: round2(prevRevenue),
       deltaPercent: pctDelta(current.revenue, prevRevenue),
       trend: trendFromDelta(current.revenue - prevRevenue),
+      sentiment: sentimentFromDelta(current.revenue - prevRevenue),
       format: 'currency',
     },
     {
@@ -1492,6 +1504,7 @@ function buildKpis(current: KpiAggregate, previous: KpiAggregate): KpiCard[] {
       previousValue: round2(prevExpenses),
       deltaPercent: pctDelta(current.expenses, prevExpenses),
       trend: trendFromDelta(current.expenses - prevExpenses),
+      sentiment: sentimentFromDelta(current.expenses - prevExpenses, true),
       format: 'currency',
     },
     {
@@ -1501,6 +1514,7 @@ function buildKpis(current: KpiAggregate, previous: KpiAggregate): KpiCard[] {
       previousValue: round2(prevNetCashFlow),
       deltaPercent: pctDelta(current.netCashFlow, prevNetCashFlow),
       trend: trendFromDelta(current.netCashFlow - prevNetCashFlow),
+      sentiment: sentimentFromDelta(current.netCashFlow - prevNetCashFlow),
       format: 'currency',
     },
     {
@@ -1510,6 +1524,7 @@ function buildKpis(current: KpiAggregate, previous: KpiAggregate): KpiCard[] {
       previousValue: round2(prevSavingsRate),
       deltaPercent: pctDelta(current.savingsRate, prevSavingsRate),
       trend: trendFromDelta(current.savingsRate - prevSavingsRate),
+      sentiment: sentimentFromDelta(current.savingsRate - prevSavingsRate),
       format: 'percent',
     },
   ];

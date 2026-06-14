@@ -87,7 +87,14 @@ export type KpiCard = {
   value: number;
   previousValue: number;
   deltaPercent: number | null;
+  /** Direction of the change (sign of the delta) — drives the arrow glyph. */
   trend: TrendDirection;
+  /**
+   * Favorability of the change — drives the badge color. Usually equals `trend`,
+   * but inverts for lower-is-better metrics (e.g. Expenses, where a decrease is good).
+   * 'up' = favorable/green, 'down' = unfavorable/red, 'flat' = neutral.
+   */
+  sentiment: TrendDirection;
   format: 'currency' | 'percent' | 'number';
 };
 

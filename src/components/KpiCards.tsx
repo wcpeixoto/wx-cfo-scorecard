@@ -164,10 +164,19 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
     <section className="kpi-grid" aria-label="Key metrics">
       {cards.map((card) => {
         const hasComparablePercent = card.deltaPercent !== null && !Number.isNaN(card.deltaPercent);
-        const trendClass = hasComparablePercent
+        // Arrow glyph follows the direction of the change; badge color follows
+        // favorability (sentiment), so e.g. a fall in Expenses is a green ↓.
+        const directionClass = hasComparablePercent
           ? card.trend === 'up'
             ? 'is-up'
             : card.trend === 'down'
+              ? 'is-down'
+              : 'is-flat'
+          : 'is-flat';
+        const sentimentClass = hasComparablePercent
+          ? card.sentiment === 'up'
+            ? 'is-up'
+            : card.sentiment === 'down'
               ? 'is-down'
               : 'is-flat'
           : 'is-flat';
@@ -207,8 +216,8 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
                 )}
               </div>
               <div className="kpi-trend-marker">
-                <span className={`kpi-badge ${trendClass}`}>
-                  {trendClass === 'is-up' && (
+                <span className={`kpi-badge ${sentimentClass}`}>
+                  {directionClass === 'is-up' && (
                     <svg
                       aria-hidden="true"
                       className="kpi-change-arrow"
@@ -227,7 +236,7 @@ export default function KpiCards({ cards, comparisonPeriodLabel = 'prior period'
                       />
                     </svg>
                   )}
-                  {trendClass === 'is-down' && (
+                  {directionClass === 'is-down' && (
                     <svg
                       aria-hidden="true"
                       className="kpi-change-arrow"
