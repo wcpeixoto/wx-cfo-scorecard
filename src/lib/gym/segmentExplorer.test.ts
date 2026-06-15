@@ -1,0 +1,211 @@
+import { describe, expect, it } from 'vitest';
+import { FIXTURE_TODAY, SAMPLE_GYM_MEMBERS } from './memberFixture';
+import {
+  computeChurnRiskByTenure,
+  type ChurnRiskByTenureResult,
+  type TenureBandRisk,
+} from './churnRiskByTenure';
+import { TENURE_BANDS, UNKNOWN_TENURE_ID } from './tenureBands';
+import {
+  RECENCY_STAGES,
+  SUPPRESSION_FLOOR,
+  buildSegmentExplorerView,
+  suppressMatrix,
+} from './segmentExplorer';
+
+// The Segment Explorer (1a) is a PURE view over the SAME aggregates
+// computeChurnRiskByTenure(FromAggregate) returns. These tests lock the
+// presentation arithmetic the adapter is allowed to do — the Healthy subtraction
+// (MF-1), the per-row rate selection (SC-1), the <5 cell suppression + the
+// complementary guard, and the two distinct Unknown axes (SC-2) — so the grid can
+// never silently drift from its source.
+
+// Build a TenureBandRisk from the four leaf counts exactly the way the source
+// modules do, so test fixtures obey the same field relationships as real results.
+function mkBand(
+  id: string,
+  label: string,
+  { healthy = 0, watch = 0, silent = 0, unknownRecency = 0 } = {},
+): TenureBandRisk {
+  const knownActiveTotal = healthy + watch + silent;
+  const activeTotal = knownActiveTotal + unknownRecency;
+  const atRisk = watch + silent;
+  return {
+    id,
+    label,
+    activeTotal,
+    unknownRecency,
+    knownActiveTotal,
+    watch,
+    silent,
+    atRisk,
+    riskRate: activeTotal === 0 ? null : atRisk / activeTotal,
+    riskRateKnown: knownActiveTotal === 0 ? null : atRisk / knownActiveTotal,
+  };
+}
+
+function mkResult(
+  bands: TenureBandRisk[],
+  unknownTenure: TenureBandRisk,
+  thresholdDays = 21,
+): ChurnRiskByTenureResult {
+  const activeTotal =
+    bands.reduce((sum, b) => sum + b.activeTotal, 0) + unknownTenure.activeTotal;
+  return { thresholdDays, activeTotal, bands, unknownTenure, heroBandId: null, heroBandIdKnown: null };
+}
+
+const noUnknownTenure = () => mkBand(UNKNOWN_TENURE_ID, 'Unknown');
+
+describe('buildSegmentExplorerView — partition + Healthy subtraction (MF-1)', () => {
+  it('derives Healthy as knownActiveTotal − watch − silent over returned aggregates', () => {
+    const b = mkBand('lt3m', '< 3 mo', { healthy: 12, watch: 4, silent: 5, unknownRecency: 3 });
+    const view = buildSegmentExplorerView(mkResult([b], noUnknownTenure()), false);
+    const healthyCell = view.rows[0].cells.find((c) => c.stage === 'healthy')!;
+    // knownActiveTotal = 21; 21 − 4 − 5 = 12
+    expect(healthyCell.count).toBe(view.rows[0].knownActiveTotal - 4 - 5);
+    expect(healthyCell.count).toBe(12);
+  });
+
+  it('every row partitions: healthy + watch + silent + unknownRecency === activeTotal', () => {
+    const bands = [
+      mkBand('lt3m', '< 3 mo', { healthy: 10, watch: 3, silent: 2, unknownRecency: 4 }),
+      mkBand('3to6m', '3–6 mo', { healthy: 0, watch: 0, silent: 0, unknownRecency: 0 }),
+      mkBand('6to12m', '6–12 mo', { healthy: 30, watch: 6, silent: 7, unknownRecency: 0 }),
+      mkBand('1to2y', '1–2 yr', { healthy: 8, watch: 1, silent: 9, unknownRecency: 2 }),
+      mkBand('2yplus', '2 yr+', { healthy: 40, watch: 0, silent: 5, unknownRecency: 11 }),
+    ];
+    const unknown = mkBand(UNKNOWN_TENURE_ID, 'Unknown', { healthy: 1, watch: 1, silent: 0, unknownRecency: 1 });
+    const view = buildSegmentExplorerView(mkResult(bands, unknown), false);
+    for (const row of view.rows) {
+      const sum = row.cells.reduce((s, c) => s + c.count, 0);
+      expect(sum).toBe(row.activeTotal);
+    }
+  });
+
+  it('Healthy is never negative (known base = healthy + watch + silent by construction)', () => {
+    const b = mkBand('lt3m', '< 3 mo', { healthy: 0, watch: 3, silent: 2, unknownRecency: 5 });
+    const view = buildSegmentExplorerView(mkResult([b], noUnknownTenure()), false);
+    expect(view.rows[0].cells.find((c) => c.stage === 'healthy')!.count).toBe(0);
+  });
+});
+
+describe('buildSegmentExplorerView — per-row rate selection (SC-1)', () => {
+  it('uses riskRateKnown by default and riskRate when includeUnknown is ON — straight from the result', () => {
+    // knownActiveTotal 20, activeTotal 30, atRisk 10
+    const b = mkBand('lt3m', '< 3 mo', { healthy: 10, watch: 5, silent: 5, unknownRecency: 10 });
+    const known = buildSegmentExplorerView(mkResult([b], noUnknownTenure()), false);
+    expect(known.rows[0].rate).toBe(b.riskRateKnown);
+    expect(known.rows[0].rate).toBeCloseTo(10 / 20);
+
+    const full = buildSegmentExplorerView(mkResult([b], noUnknownTenure()), true);
+    expect(full.rows[0].rate).toBe(b.riskRate);
+    expect(full.rows[0].rate).toBeCloseTo(10 / 30);
+  });
+
+  it('reports a null rate for an empty band rather than dividing by zero', () => {
+    const empty = mkBand('3to6m', '3–6 mo');
+    const view = buildSegmentExplorerView(mkResult([empty], noUnknownTenure()), false);
+    expect(view.rows[0].rate).toBeNull();
+  });
+});
+
+describe('suppressMatrix — <5 suppression + complementary guard', () => {
+  it('locks the suppression floor at 5', () => {
+    expect(SUPPRESSION_FLOOR).toBe(5);
+  });
+
+  it('masks counts in [1,4], shows a true 0 and counts >= the floor', () => {
+    // Single row: complementary cannot fire (each column has only one cell), so
+    // this isolates the PRIMARY rule: 0 shown, 5 shown, 3 masked, 2 masked.
+    expect(suppressMatrix([[0, 5, 3, 2]])).toEqual([[false, false, true, true]]);
+  });
+
+  it('never masks a 0 by the primary rule (0 identifies no member)', () => {
+    expect(suppressMatrix([[0, 0, 0, 0]])).toEqual([[false, false, false, false]]);
+  });
+
+  it('adds a complementary mask so no row/column has exactly one masked cell', () => {
+    const counts = [
+      [20, 10, 3, 8], // the 3 is a primary mask → row would have exactly one masked
+      [9, 7, 6, 5],
+      [10, 11, 12, 13],
+    ];
+    const masked = suppressMatrix(counts);
+    const rowN = masked.length;
+    const colN = masked[0].length;
+    // Post-condition: no row and no column has exactly one masked cell.
+    for (let r = 0; r < rowN; r++) {
+      expect(masked[r].filter(Boolean).length).not.toBe(1);
+    }
+    for (let c = 0; c < colN; c++) {
+      let n = 0;
+      for (let r = 0; r < rowN; r++) if (masked[r][c]) n++;
+      expect(n).not.toBe(1);
+    }
+    // The primary small cell is masked, and at least one complementary cell joined it.
+    expect(masked[0][2]).toBe(true);
+    expect(masked[0].filter(Boolean).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('surfaces suppression through buildSegmentExplorerView cells', () => {
+    const bands = [
+      mkBand('lt3m', '< 3 mo', { healthy: 20, watch: 10, silent: 3, unknownRecency: 8 }),
+      mkBand('3to6m', '3–6 mo', { healthy: 9, watch: 7, silent: 6, unknownRecency: 5 }),
+      mkBand('6to12m', '6–12 mo', { healthy: 10, watch: 11, silent: 12, unknownRecency: 13 }),
+    ];
+    const view = buildSegmentExplorerView(mkResult(bands, noUnknownTenure()), false);
+    const silentCell = view.rows[0].cells.find((c) => c.stage === 'silent')!;
+    expect(silentCell.count).toBe(3);
+    expect(silentCell.masked).toBe(true);
+    // No published row leaves a single masked cell recoverable by subtraction.
+    for (const row of view.rows) {
+      expect(row.cells.filter((c) => c.masked).length).not.toBe(1);
+    }
+  });
+});
+
+describe('buildSegmentExplorerView — the two Unknown axes are distinct (SC-2)', () => {
+  it('keeps the unknown-tenure ROW and the unknown-recency COLUMN as separate things', () => {
+    const bands = [mkBand('lt3m', '< 3 mo', { healthy: 10, watch: 5, silent: 6, unknownRecency: 7 })];
+    const unknown = mkBand(UNKNOWN_TENURE_ID, 'Unknown', {
+      healthy: 2,
+      watch: 1,
+      silent: 1,
+      unknownRecency: 1,
+    });
+    const view = buildSegmentExplorerView(mkResult(bands, unknown), false);
+
+    // Unknown-tenure is its own (last) row, flagged, exactly once.
+    const last = view.rows[view.rows.length - 1];
+    expect(last.id).toBe(UNKNOWN_TENURE_ID);
+    expect(last.isUnknownTenure).toBe(true);
+    expect(view.rows.filter((r) => r.isUnknownTenure)).toHaveLength(1);
+
+    // Unknown-recency is its own column on EVERY row.
+    for (const row of view.rows) {
+      expect(row.cells.map((c) => c.stage)).toEqual(RECENCY_STAGES.map((s) => s.id));
+    }
+
+    // The toggle-note total counts BAND recency-unknowns only (7), never the
+    // unknown-tenure row's own recency-unknowns (1).
+    expect(view.unknownRecencyTotal).toBe(7);
+  });
+});
+
+describe('buildSegmentExplorerView — against the real sample compute', () => {
+  it('produces 5 tenure-band rows + the unknown-tenure row and holds the partition', () => {
+    const result = computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, 21, FIXTURE_TODAY);
+    const view = buildSegmentExplorerView(result, false);
+
+    expect(view.rows).toHaveLength(TENURE_BANDS.length + 1);
+    expect(view.rows.slice(0, TENURE_BANDS.length).map((r) => r.id)).toEqual(
+      TENURE_BANDS.map((b) => b.id),
+    );
+
+    for (const row of view.rows) {
+      expect(row.cells.reduce((s, c) => s + c.count, 0)).toBe(row.activeTotal);
+    }
+    const total = view.rows.reduce((s, r) => s + r.activeTotal, 0);
+    expect(total).toBe(result.activeTotal);
+  });
+});
