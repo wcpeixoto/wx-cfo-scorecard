@@ -21,3 +21,6 @@ supabase/.temp/
 
 # financial PII docs — never commit (e.g. docs/Accts.pdf account statements)
 docs/*.pdf
+
+# local Wodify recon docs — contain member names (real PII); keep local, never publish to this public repo
+/Wodify/
