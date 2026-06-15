@@ -46,7 +46,7 @@ census-populate run; tenure since the 2026-06-11 aggregate-extension run — see
   dated status changes, so a flow/cancellation trend would be invented history.
 - **Parked / blocked gate labels** (#415) — the three remaining shells show honest gate
   notes via `GymCardShell`'s `gate` prop (still shells, no internals): Churn by Age =
-  `Parked` (PII), Segment Explorer = `Re-scoped`, Churn by Belt = `Blocked` (API).
+  `Parked` (PII), Segment Explorer = `Re-scoped`, Churn by Belt = `Parked` (export-feasible; longitudinal pipeline deferred).
 
 All sample-data scope-gate boxes passed in #415 (recorded in git at `f9ded0a`). That
 gate certifies **scope/structure only — not numerical correctness** (see Phase 1 §2).
@@ -693,8 +693,14 @@ The v1 spec failed the pre-build gate; the v2 spec must be written from these so
   base (`src/lib/gym/churnRiskByTenure.ts:159,231`; `src/lib/gym/retentionRates.ts`). Do NOT use total_n.
 - **Preserve tenure banding.** `bandForTenure` (edges 90/180/365/730) + the `unknownTenure` bucket
   (`src/lib/gym/tenureBands.ts`); never bin dirty/negative tenure into 2yr+.
-- **Build split:** 1a = view over the live aggregate (no pull, no gated write, no locked-file change);
-  1b = separate gated dues-pipeline slice, deferrable.
+- **Build split (updated 2026-06-14):**
+  - **1a (tenure × recency): SHIPPED + LIVE** — squash #477, main @ `a6b16a5`. Cross-sectional,
+    aggregate-only, no auth.
+  - **1b (membership-type × tenure): DEAD / superseded — do NOT build.** Membership Type is pure
+    payment structure (Class Plan / Class Pack / Appointment Pack; *Wodify recon 2026-06-14,
+    read-only* split 89/7/4), not a cohort. NOTE the 1b *architecture* (local CSV → join by
+    Client ID → gated MCP write) is what the class-type cohort slice reuses — the plumbing is
+    repointed, not wasted.
 
 **asOf timezone — permanent fix LIVE (2026-06-08, #445).** `asOf` was the **server-UTC** fetch
 date, which can shift the day boundary ±1 vs the gym's local day. The permanent fix is now **implemented in
@@ -1203,20 +1209,63 @@ provides dated history.
 - **Segment Explorer · `Re-scoped 2026-06-14`** — cross-sectional, aggregate-only, NO auth (the proven
   §4 server→aggregate→SPA pattern — it is NOT the "highest-PII surface" the earlier Parked note assumed).
   Split into two slices:
-  - **1a · tenure × recency — buildable now as a VIEW over the live aggregate.** Reuse
-    `computeChurnRiskByTenureFromAggregate(tenureBandHistogram, thresholdDays)` (`src/lib/gym/churnRiskByTenure.ts:208`)
-    — do NOT re-derive. No new Wodify pull, no gated write, no locked-file change.
-  - **1b · membership-type × tenure — separate gated dues-pipeline slice, deferrable.** Membership type
-    lives ONLY in the local All-Memberships dues CSV (`scripts/wodify/silentChurnDuesPreview.ts:464`),
-    never in Supabase — needs a local CSV→census join + a gated MCP write. It is PAYMENT STRUCTURE
-    ({Appointment Pack, Class Pack, Class Plan}), NOT the real BJJ program dimension — a weak proxy;
-    never relabel it as program identity.
-- **Churn by Belt · `Blocked (API) — Admin-UI export path identified 2026-06-14, columns pending verification`**
-  — NOT a hard product ceiling. The progressions/belt-rank **API remains 403-limited** (reportedly
-  unavailable for public use, chat-reported). An **Admin-UI export path appears feasible** via
-  People → Progressions (Current + Previous Levels, with Date Achieved) — *identified from a 2026-06-14
-  read-only Admin-UI inventory; columns pending schema verification.* Do NOT treat the belt build as
-  ready until columns are verified.
+  - **1a · tenure × recency — SHIPPED + LIVE** (#477, main @ `a6b16a5`).
+  - **1b · membership-type × tenure — DEAD/superseded** (payment-structure proxy; see the §6
+    "corrected ground truth" Build-split note).
+  - **NEW: Class-type (cohort) × tenure — the REAL cohort dimension**, sourced from the
+    multi-valued `Programs` field, NOT Membership Type. *Wodify recon 2026-06-14, read-only:*
+    Membership Type is 3 payment-structure values only (89/7/4) = not cohort-bearing; plan NAMES
+    encode an approximate Kids/Adults prefix but are not normalized and miss
+    Teens/Adaptive/Women's = not a clean dimension; the real cohorts live in `Programs` (~20
+    distinct programs incl. Kids 3-6, Kids 7-9, Gi Kids/Teens 10-15, Adults Intro, Gi/No-Gi
+    Fundamentals & Advanced, Competition, Law Enforcement, Ginastica Natural, Adaptive Jiu Jitsu,
+    Womens GI, Womens NOGI). **SOURCING (source-verified):** `Programs` is present in the export
+    header (`scripts/wodify/silentChurnDuesPreview.ts:920` parser fixture) but unread by the dues
+    script (it reads Client ID / Start+Expiration Date / Commitment Total / Payment Plan Type /
+    Membership Autorenew / Membership Type only) → a new field read, ~1b-class architecture
+    (local → join by Client ID → gated write), NOT a free in-hand slice and NOT a view over the
+    existing aggregate.
+    - **(a) COHORT DERIVATION — RESOLVED** (Chrome recon 2026-06-14, read-only + owner direction):
+      `Programs` is multi-valued AND per-membership-row, not per-member — one Client ID holds
+      multiple active memberships (Class Plan + Camp + Appointment), each its own row with its own
+      Programs list → a ONE-TO-MANY join. Three structural facts: (i) adult Class Plans bundle the
+      FULL ~20-program suite → Programs does NOT distinguish cohort among adults (same list for
+      everyone); (ii) kids plans carry 1–3 overlapping age-band programs (Kids 3-6 / Kids 7-9 /
+      Teens 10-15); (iii) Appointment Pack rows are blank. RESOLUTION via owner 80/20: curate a
+      small allowlist of ~5–10 core ongoing Class Plans (the revenue bulk; owner-supplied domain
+      input, NOT an algorithm); drop Camp/Appointment/Guest/Pass noise. Select those rows, then
+      derive a BROAD cohort label — Kids / Teens / Adults / Adaptive / Womens — which the field CAN
+      support because non-adult cohorts (Adaptive, Womens, Kids age-bands) appear distinctly even
+      through the adult bundling. **HARD LIMIT:** adults carry the full suite, so Programs CANNOT
+      sub-split adults by program (e.g. Competition vs Fundamentals) — that needs ATTENDANCE data
+      (which classes a member actually attends), a separate later card. Do NOT claim adult-program
+      churn from Programs. Client ID confirmed present as join key (leftmost column, numeric, every
+      row — source-verified, `:920` fixture).
+    - **(b) k→1 is acute.** Adaptive Jiu Jitsu and Womens (GI/NOGI) are the smallest,
+      highest-journey-value cohorts → cohort×tenure×recency suppresses hard exactly there. Plan
+      coarser grain (cohort×tenure only, no recency split) for small cohorts; verify each cohort's
+      count before slicing. The k→1 suppression doctrine governs: `<5` masking is
+      non-recoverability ONLY when no sibling card publishes the partial sums AND cells can't
+      approach a single member — and the shipped Churn-by-Tenure card publishes EXACT per-band
+      counts, so account for cross-card recovery.
+  - **Class-type value frame (retention-side guardrail):** a class type's worth = retention
+    strength × ease of acquisition, NOT churn alone. Churn-by-cohort (from the Programs cohort
+    field) is ONE axis (retention). The cancel/keep decision needs a SECOND axis — conversion /
+    ease-of-acquisition by class type — which is NOT in Wodify or the repo. **DO NOT build a
+    cancel/keep recommendation on churn alone:** a class that churns fast but is trivial to fill
+    (a feeder) would be wrongly condemned; one that holds members but is hard to fill needs
+    protection — churn-only yields a confidently wrong verdict. The acquisition axis (conversion
+    CRM — GoHighLevel vs Google Ads, authoritative source TBD with the team) is PARKED under the
+    Growth-Levers thread (one-line pointer only; this doc is the retention roadmap, not a second
+    backlog).
+- **Churn by Belt · `Parked 2026-06-14 — export-feasible, needs a longitudinal pipeline`**
+  — belt is **EXPORT-FEASIBLE (not blocked)** via Admin UI → People → Progressions (Current +
+  Previous Levels, with Date Achieved) — *Wodify recon 2026-06-14, read-only.* The DESIRED card is
+  the **LONGITUDINAL / seasonal** version (churn history across belt levels → seasonal patterns),
+  which needs the dated Previous Levels data + accumulated history = a NEW pipeline, NOT a 1a-style
+  view over the live aggregate. **PARKED until the cross-sectional cards are shipped and stable;**
+  the Progressions column-verification intake is deferred too (no need to verify columns until belt
+  comes off the park).
 
 ---
 
