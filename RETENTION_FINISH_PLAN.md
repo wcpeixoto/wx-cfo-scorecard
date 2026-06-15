@@ -44,9 +44,10 @@ census-populate run; tenure since the 2026-06-11 aggregate-extension run — see
   rescope") — and is **LIVE since the 2026-06-10 census-populate run** (the
   join-cohort intake stays sample, honestly labeled on the card). **No movement-over-time series by design** — the fixture carries no
   dated status changes, so a flow/cancellation trend would be invented history.
-- **Parked / blocked gate labels** (#415) — the three remaining shells show honest gate
-  notes via `GymCardShell`'s `gate` prop (still shells, no internals): Churn by Age =
-  `Parked` (PII), Segment Explorer = `Re-scoped`, Churn by Belt = `Parked` (export-feasible; longitudinal pipeline deferred).
+- **Parked / blocked gate labels** (#415) — originally recorded the shell gate notes via
+  `GymCardShell`'s `gate` prop. Current state: **two remaining shells** — Churn by Age =
+  `Parked` (PII), Churn by Belt = `Parked` (export-feasible; longitudinal pipeline deferred).
+  Segment Explorer 1a is shipped/live (#477); its future work is the new class-type/cohort slice.
 
 All sample-data scope-gate boxes passed in #415 (recorded in git at `f9ded0a`). That
 gate certifies **scope/structure only — not numerical correctness** (see Phase 1 §2).
