@@ -1205,53 +1205,30 @@ provides dated history.
 
 - **Silent Churn Recovery · `Blocked`** — needs dated check-in history; do not build from
   `lastCheckIn` alone. Off-page; tracked in Notion (P3 / Later).
-- **Churn by Age · `Parked`** — PII / data-minimization decision; use **age buckets only,
-  never birthdates**.
+- **Cohort Retention Card · `Decided (rev. 2, 2026-06-16, Reviewer gate #2 cleared) — gated build, NOT yet built`**
+  — cohort retention read with **cohort derived from member AGE** (four cohorts: Kids 3-6 / Kids 7-9 /
+  Teens 10-15 / Adults 16+). **Supersedes** the former **Churn by Age · Parked** item and the
+  `Programs` cohort method below. Full decision record folded in the dedicated subsection at the end of
+  this section. The former Churn-by-Age PII block is **resolved for this card**: aggregate-only output,
+  age **buckets not birthdates**, exact ages / `Client ID` never leave the server/local layer
+  (rev. 2 §8).
 - **Segment Explorer · `Re-scoped 2026-06-14`** — cross-sectional, aggregate-only, NO auth (the proven
   §4 server→aggregate→SPA pattern — it is NOT the "highest-PII surface" the earlier Parked note assumed).
   Split into two slices:
   - **1a · tenure × recency — SHIPPED + LIVE** (#477, main @ `a6b16a5`).
   - **1b · membership-type × tenure — DEAD/superseded** (payment-structure proxy; see the §6
     "corrected ground truth" Build-split note).
-  - **NEW: Class-type (cohort) × tenure — the REAL cohort dimension**, sourced from the
-    multi-valued `Programs` field, NOT Membership Type. *Wodify recon 2026-06-14, read-only:*
-    Membership Type is 3 payment-structure values only (89/7/4) = not cohort-bearing; plan NAMES
-    encode an approximate Kids/Adults prefix but are not normalized and miss
-    Teens/Adaptive/Women's = not a clean dimension; the real cohorts live in `Programs` (~20
-    distinct programs incl. Kids 3-6, Kids 7-9, Gi Kids/Teens 10-15, Adults Intro, Gi/No-Gi
-    Fundamentals & Advanced, Competition, Law Enforcement, Ginastica Natural, Adaptive Jiu Jitsu,
-    Womens GI, Womens NOGI). **SOURCING (source-verified):** `Programs` is present in the export
-    header (`scripts/wodify/silentChurnDuesPreview.ts:920` parser fixture) but unread by the dues
-    script (it reads Client ID / Start+Expiration Date / Commitment Total / Payment Plan Type /
-    Membership Autorenew / Membership Type only) → a new field read, ~1b-class architecture
-    (local → join by Client ID → gated write), NOT a free in-hand slice and NOT a view over the
-    existing aggregate.
-    - **(a) COHORT DERIVATION — RESOLVED** (Chrome recon 2026-06-14, read-only + owner direction):
-      `Programs` is multi-valued AND per-membership-row, not per-member — one Client ID holds
-      multiple active memberships (Class Plan + Camp + Appointment), each its own row with its own
-      Programs list → a ONE-TO-MANY join. Three structural facts: (i) adult Class Plans bundle the
-      FULL ~20-program suite → Programs does NOT distinguish cohort among adults (same list for
-      everyone); (ii) kids plans carry 1–3 overlapping age-band programs (Kids 3-6 / Kids 7-9 /
-      Teens 10-15); (iii) Appointment Pack rows are blank. RESOLUTION via owner 80/20: curate a
-      small allowlist of ~5–10 core ongoing Class Plans (the revenue bulk; owner-supplied domain
-      input, NOT an algorithm); drop Camp/Appointment/Guest/Pass noise. Select those rows, then
-      derive a BROAD cohort label — Kids / Teens / Adults / Adaptive / Womens — which the field CAN
-      support because non-adult cohorts (Adaptive, Womens, Kids age-bands) appear distinctly even
-      through the adult bundling. **HARD LIMIT:** adults carry the full suite, so Programs CANNOT
-      sub-split adults by program (e.g. Competition vs Fundamentals) — that needs ATTENDANCE data
-      (which classes a member actually attends), a separate later card. Do NOT claim adult-program
-      churn from Programs. Client ID confirmed present as join key (leftmost column, numeric, every
-      row — source-verified, `:920` fixture).
-    - **(b) k→1 is acute.** Adaptive Jiu Jitsu and Womens (GI/NOGI) are the smallest,
-      highest-journey-value cohorts → cohort×tenure×recency suppresses hard exactly there. Plan
-      coarser grain (cohort×tenure only, no recency split) for small cohorts; verify each cohort's
-      count before slicing. The k→1 suppression doctrine governs: `<5` masking is
-      non-recoverability ONLY when no sibling card publishes the partial sums AND cells can't
-      approach a single member — and the shipped Churn-by-Tenure card publishes EXACT per-band
-      counts, so account for cross-card recovery.
-  - **Class-type value frame (retention-side guardrail):** a class type's worth = retention
-    strength × ease of acquisition, NOT churn alone. Churn-by-cohort (from the Programs cohort
-    field) is ONE axis (retention). The cancel/keep decision needs a SECOND axis — conversion /
+  - **Program/style splits (Gi vs No-Gi, etc.) · `Phase 2 — Attendance data only`** — cohort for the
+    new **Cohort Retention Card** is **age-derived** (see its decision-record subsection below), so
+    `Programs` is NO LONGER a cohort source: it is multi-valued and for adults lists plan ENTITLEMENT
+    not discipline (the full ~20-program bundle; 5-member proof 2026-06-15). Real program/style
+    discipline (Gi vs No-Gi, Competition vs Fundamentals) lives ONLY in Attendance check-ins → a
+    separate later card requiring the Attendance table. The prior Class-Plan-allowlist cohort
+    derivation is dropped.
+  - **Class-type value frame (retention-side guardrail, for the Phase-2 program/style card):** a
+    class type's worth = retention strength × ease of acquisition, NOT churn alone. Program/style
+    churn (the Phase-2 Attendance-based card above — NOT the age-derived Cohort Retention Card) is
+    ONE axis (retention). The cancel/keep decision needs a SECOND axis — conversion /
     ease-of-acquisition by class type — which is NOT in Wodify or the repo. **DO NOT build a
     cancel/keep recommendation on churn alone:** a class that churns fast but is trivial to fill
     (a feeder) would be wrongly condemned; one that holds members but is hard to fill needs
@@ -1268,12 +1245,168 @@ provides dated history.
   the Progressions column-verification intake is deferred too (no need to verify columns until belt
   comes off the park).
 
+### Cohort Retention Card — decision record (rev. 2) · `Folded 2026-06-16 (Reviewer gate #2 cleared) — gated build, NOT yet built`
+
+*Folded faithfully from the Strategist's "Cohort Retention Card — Decision Record (rev. 2)" (Reviewer
+gates #1 + #2 cleared, 2026-06-16). SUPERSEDES the prior `Programs`/Class-Plan cohort method (above)
+and the untracked `COHORT_CARD_DECISIONS.md` in full. Counts/rules only — no member PII. §1–§9 are
+LOCKED; the two build-source items at the end are OPEN and must clear before any gated build slice.*
+
+**What it is.** A cross-sectional retention read by member cohort — for each cohort, who is healthy
+vs. quietly leaving ("today's members at each stage," never a journey-over-time). **Four cohorts:
+Kids 3-6 / Kids 7-9 / Teens 10-15 / Adults 16+.**
+
+**§1 — Cohort source (LOCKED — supersedes the Programs method).** Cohort is derived from member
+**AGE**. `Programs` is rejected as the primary cohort source: it is multi-valued/concatenated and for
+adults lists plan ENTITLEMENT not discipline (the full ~20-program bundle; 5-member proof
+2026-06-15), whereas age-derived cohorts match the native Wodify Insights cohort counts cleanly.
+`Programs` is NOT dead — deferred to Phase 2 program/style analysis (Gi vs No-Gi, needs Attendance
+data). Class Plan is superseded (cannot separate Teens — E2; no dedicated Adaptive/Womens plan — E1).
+Why age works: Insights age-segments are age-rule segments (Wodify Segments docs); the `Age` field is
+exportable and **100% populated (404/404)** — deriving cohort from `Age` reproduces those segments
+from a field we control.
+
+**§2 — Cohort boundaries (LOCKED — with sentinel/outlier rule).** From the exportable `Age` field
+(100% populated; preferred over `Birthday` at 95%):
+
+| Cohort | Age rule | ~Count |
+|---|---|---|
+| **Kids 3-6** (incl. under-3) | `0 < age < 7` | ~79 |
+| **Kids 7-9** | `7 ≤ age ≤ 9` | ~50 |
+| **Teens 10-15** | `10 ≤ age ≤ 15` | ~51 |
+| **Adults 16+** | `16 ≤ age ≤ 80` | ~224 |
+| **Unknown** | `age = 0`, `age > 80`, or missing/sentinel | small |
+
+- **Adult line = 16** (consistent with Insights; a 16–17yo trains in Adults). Confirm vs the gym's
+  adult-class age.
+- **Under-3s fold into Kids 3-6** (youngest displayed band) — too few to stand alone.
+- **SENTINEL/OUTLIER RULE (B3):** the live export contains ages of **0** and **126**. `age = 0`,
+  `age > 80`, or any missing/sentinel routes to **Unknown** — never silently into Kids (age-0) or
+  Adults (age-126). §4's clean partition holds ONLY after outliers are removed to Unknown. Upper
+  bound 80 is an implementation default — confirm against the gym's actual oldest legitimate member.
+- **Kids 3-6 and Kids 7-9 are DISPLAYED separately** (staff requirement 2026-06-16 — distinct kid
+  class groups). All four cohorts clear the suppression floor (smallest ~50).
+
+**§3 — Source validation (LOCKED — reproduced cell-for-cell at gate #1).** Age-bucketing the live
+export reconciles with Insights segment counts:
+
+| Band | Insights | Age-derived (live CSV) | Delta |
+|---|---|---|---|
+| Kids 3-6 (strict 3–6) | 73 | 72 | −1 |
+| Kids 7-9 | 49 | 50 | +1 |
+| Kids/Teens 10-15 | 48 | 51 | +3 |
+
+Reviewer independently re-derived from the live client export: under-3 = 7, strict 3–6 = 72,
+7–9 = 50, 10–15 = 51, 16+ = 224 (sum **404**), Age 100% populated. Deltas of 1–3 are snapshot-timing
+artifacts; the four-band reconciliation is the proof and validates the four-cohort split.
+- Insights "Adult Students" = 82 is a curated/role segment, **NOT** the age-16+ adult denominator
+  (~224) — derive Adults from age, not that segment.
+- **B4 footnote (mandatory on the card):** displayed **Kids 3-6 = 79** (under-3 folded in) ≠ Insights
+  Kids 3-6 = **73**. That gap is the fold, not a defect — footnote it so it does not read as a
+  mismatch against Wodify.
+
+**§4 — Partition (LOCKED).** Age assigns exactly ONE cohort per member — no overlap, no precedence
+rule — **after** §2's outlier removal to Unknown. Clean partition by construction *given a valid age*;
+invalid ages are Unknown, never silently placed.
+
+**§5 — Dedupe-to-person (LOCKED).** Collapse all export rows per `Client ID` into ONE person-level
+record before cohort assignment and before status. (F4: the Member Retention table has no plan column
+and cannot replace this.) This dedupe is the rollup mechanism for §7's row-level → member-level
+lapsed.
+
+**§6 — Status model (LOCKED — `silentChurn.ts` UNTOUCHED).** Five buckets: Active/Healthy ·
+Active/Watch · Active/Silent · **Lapsed** · **Unknown** (no valid/derivable cohort — see §2; this is
+NOT ≈0, it absorbs age outliers). **Lapsed is membership-state, NOT attendance-recency** — it must
+NOT be folded into the locked `silentChurn.ts` classifier (this card does not modify it).
+Healthy/Watch/Silent = attendance recency among evaluable active members; Lapsed members have no
+active membership to evaluate against and stay inside their cohort (their churn signal — never
+dropped).
+
+**§7 — Active / lapsed rule (LOCKED — row vs. member grain).** Two grains, do not conflate:
+- **Row-level ended/lost signal** (per membership row; what Wodify's Lost Memberships report
+  captures): `Expiration Date` passed AND `Autorenew` = No, OR `Deactivation Date` set.
+- **Member-level active/lapsed** (per Client ID, after §5 dedupe): **Active** = ≥1 current active row
+  (`Start Date` ≤ report date AND `Expiration Date` blank/open OR ≥ report date); **Lapsed** =
+  cohort/age history but NO current active row.
+- **Autorenew, two roles:** at member-level active status it must NOT override the date window (no
+  false-active bug); at row-level lost signal, "expired AND autorenew = No" is a valid ended-row
+  component. Same field, two grains, no contradiction.
+- **Validation:** the row-level date/deactivation basis was confirmed at source against Wodify's
+  **Lost Memberships** report (date/deactivation-keyed, no payment column). The member-level rollup
+  is OURS (§5). We do NOT consume the payment-keyed Class Plan Member Retention chart.
+- **>>> DATA SOURCE — REQUIRED, NOT YET IN PIPELINE (B2):** this rule needs **per-membership-row**
+  `Client ID`, `Start Date`, `Expiration Date`, `Deactivation Date`, `Membership Autorenew` for the
+  **FULL non-active population**. The current pipeline does NOT carry this — the only client export we
+  pull (`active_client_data_table`, 404 rows) is **active-only** with a rolled-up `Membership Status`
+  enum (Paid/No Membership/On Hold/Free), none of the per-row date fields, and structurally cannot
+  hold lapsed members. **Before lapsed can be built, the Builder WO must FIRST:** (1) identify the
+  actual Wodify export carrying those per-row fields with the **`Membership Active: Active` filter
+  relaxed** (likely the All Memberships standard report / ReportId 19 exported with the filter off —
+  confirm at source); (2) confirm its column set, PII class, and gating; (3) treat ingesting it as a
+  **NET-NEW gated data feed** (new pull + persistence), NOT a slice of existing data. Until that feed
+  is confirmed and ingested, §9 Read 2 is **not buildable** and must not be specced as if the data
+  exists.
+- Implementation notes: blank `Expiration` = open-ended → active (don't coerce); sentinel expiration
+  (e.g. `1900-01-01`) = unknown (not "expired in 1900").
+
+**§8 — Reuse + honesty constraints (LOCKED — reuse claim CORRECTED, B1).**
+- **`computeChurnRiskByTenureFromAggregate` is TENURE-keyed and carries NO age/cohort dimension — it
+  CANNOT be reused as-is for cohort × recency.** The persisted Edge aggregate (`sync-wodify-retention`)
+  holds `active_total` / `days_absent_histogram` / `tenure_band_histogram` and **no age**; the
+  `/clients` pull never reads age. Reuse the risk *math/thresholds* (Healthy/Watch/Silent
+  definitions); the *aggregate they run over* is net-new (see §9 Read 1). Do NOT spec Read 1 as a view
+  over the live aggregate.
+- Reuse `bandForTenure` + `unknownTenure` ONLY where a tenure dimension is actually present — not for
+  the cohort dimension.
+- Known-base denominator (count / knownActiveTotal), never total_n. Cross-sectional copy only;
+  mandatory survivorship footer.
+- k→1 suppression: all four cohorts clear the floor (~79/50/51/224); re-apply if finer splits are
+  displayed; the Unknown bucket is also subject to suppression if small.
+- **Aggregate-only output. No member rows, names, IDs, exact ages/dates, or dues in the payload. PII
+  columns (Name, email, Birthday, exact Age, Client ID) never leave the server/local layer.** (This is
+  the resolution recorded against the Open-decisions PII / data-minimization item.)
+
+**§9 — Card display (RECOMMENDED: B) + build class per read.** Recommended: **B — two linked reads**
+(the 4×5 matrix is rejected for v1 — mixes attendance-risk and membership-state, analyst-heavy,
+against the calm/Nubank standard).
+- **Read 1 — cohort health bar (active members): Healthy / Watch / Silent per cohort.** BUILD CLASS:
+  **NET-NEW AGGREGATE (gated), NOT a render slice (B1)** — capture `age`, derive the cohort band
+  server-side, build an **age-band × attendance-recency** aggregate, new DB ALTER, gated write —
+  **this server-side path is CONTINGENT on must-confirm #1** (whether `/clients` exposes age/DOB); do
+  NOT lock this build class until that read-only shape-discovery runs. If `/clients` does not expose
+  age, the source path changes (demographics re-export carrying `Client ID`, or an Attendance pull).
+  Same build class as Segment Explorer 1b / the dues template. Reuses the thresholds, not the existing
+  tenure aggregate.
+- **Read 2 — lapsed count per cohort.** BUILD CLASS: **BLOCKED until §7's non-active Memberships feed
+  is confirmed and ingested (B2).** Net-new data feed; not buildable on current data.
+- **Sequencing implication:** both reads require a net-new feed/aggregate — neither is a slice of what
+  exists today. The Builder WO must scope both as **data-layer work first, render second** (the gap
+  that bit Segment Explorer). **v1 may ship Read 1 alone** if Read 2's feed isn't ready, provided the
+  card does not imply a lapsed number it can't compute.
+
+**Reviewer must-confirm BEFORE build (RECORDED, do NOT build until resolved):**
+1. **Read 1 source decider.** Recency lives only on `/clients` (keyed by `id`); age lives only on the
+   demographics export (no `Client ID`). Before Read 1's build class locks, run a **live read-only
+   `/clients` shape-discovery** to determine whether the wire payload exposes age/DOB → if yes, a
+   server-side age-band × recency aggregate (extend the pull); if no, a demographics re-export that
+   carries `Client ID` to join to recency, or an Attendance-table pull. This is the pivot — §9 Read 1
+   assumes age can be added to the `/clients` pull, which this probe confirms or refutes.
+2. **Read 2 deactivation source.** §7's "OR `Deactivation Date` set" branch has **no confirmed
+   source** — All Memberships (ReportId 19) carries no `Deactivation Date` and no status column
+   (repo-verified via the dues parser's read columns). Confirm deactivation is recoverable from
+   another export, or **drop that branch**, before Read 2 build.
+
+**Next step.** This fold IS the Reviewer-gate-#2 output. A Builder WO is drafted from §1–§9 + the two
+items above — data-layer first. Do not hand straight to a build slice until the two items clear.
+
 ---
 
 ## Open decisions
 
 - **Live-data safety architecture** (Phase 2 §4) — the gating decision for going live.
-- **PII / data-minimization policy** — unblocks Churn by Age.
+- **PII / data-minimization policy** — RESOLVED for the **Cohort Retention Card** (rev. 2 §8:
+  aggregate-only, age buckets not birthdates, exact ages / `Client ID` never leave the server/local
+  layer). Remains the governing open decision for any *other* future PII-class card.
 - **Durable-rule migration timing + file retirement** — when to migrate (#1/#2/#4) and
   when to delete this file (only once fully live).
 - **Parked/blocked gate-note pattern** — decide later whether the convention introduced in
