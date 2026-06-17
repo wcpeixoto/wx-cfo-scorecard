@@ -26,6 +26,8 @@
 // run it with the x-sync-trigger-secret header (README).
 
 import {
+  cohortActiveTotals,
+  cohortLapsedTotals,
   computeRetentionAggregate,
   tenureBandActiveTotals,
   type RawWodifyClient,
@@ -119,6 +121,9 @@ async function persistAggregate(
     // Churn-by-Tenure (§6 aggregate extension): per-band recency counts +
     // bandEdges contract. Counts only — non-PII like every other column.
     tenure_band_histogram: agg.tenureBandHistogram,
+    // Cohort Retention (§9 rev.3): per-age-cohort active recency + lapsed counts +
+    // cohortEdges contract. Counts only, age derived server-side from date_of_birth.
+    cohort_histogram: agg.cohortHistogram,
     unknown_count: agg.unknown,
     monthly_dues_at_risk: agg.silentChurn.monthlyDuesAtRisk,
     missing_monthly_dues: agg.silentChurn.missingMonthlyDues,
@@ -201,8 +206,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
       ok: true,
       asOf: aggregate.asOf,
       activeTotal: aggregate.activeTotal,
+      inactiveTotal: aggregate.inactiveTotal,
       unknown: aggregate.unknown,
       tenure: tenureBandActiveTotals(aggregate.tenureBandHistogram),
+      // Cohort split for the post-pull verify: Σ cohort === activeTotal, and
+      // Σ cohortLapsed === inactiveTotal (Member Movement parity) — eyeballable
+      // without reading the table. Counts only.
+      cohort: cohortActiveTotals(aggregate.cohortHistogram),
+      cohortLapsed: cohortLapsedTotals(aggregate.cohortHistogram),
       missingMonthlyDues: aggregate.silentChurn.missingMonthlyDues,
       diagnostics: aggregate.diagnostics,
       dataQuality: aggregate.dataQuality,

@@ -11,7 +11,7 @@
 -- the SPA reads it with the public anon key, which is safe ONLY because the row
 -- holds NO PII. There is structurally no member-level column here — every column
 -- is a snapshot-level date, a count, a counts-only histogram (days-absent /
--- tenure-band), or a snapshot-level dues AGGREGATE (silent_dues_snapshot: one
+-- tenure-band / cohort age-band), or a snapshot-level dues AGGREGATE (silent_dues_snapshot: one
 -- summed cohort dollar + coverage counts — never a per-member dues value). No id,
 -- name, or exact member date is ever stored. TWO write paths, both gated, neither
 -- anon: the Edge Function sync-wodify-retention (service-role key, bypasses RLS)
@@ -73,6 +73,17 @@ create table if not exists public.wodify_retention_aggregate (
   -- structure, and the SPA must tell "absent/null → Sample fallback" apart from
   -- a real value. NEVER NOT NULL / NEVER a default.
   tenure_band_histogram jsonb null,
+  -- Cohort Retention (§9 rev.3 — Read 1 + Read 2): the per-age-cohort partition,
+  -- each cohort's active-side recency histogram (countsByDaysAbsent / overflow365Plus
+  -- / unknownRecency) PLUS its lapsed (inactive) head-count, keyed by cohort id
+  -- (kids3to6 / kids7to9 / teens10to15 / adults16plus + unknownCohort), plus the
+  -- cohortEdges contract the SPA validates EXACTLY against its own COHORT_BANDS.
+  -- Counts only — no member-level data; age is derived server-side from
+  -- date_of_birth, which never leaves the normalize step. NULLABLE on purpose (same
+  -- rule as inactive_total / tenure_band_histogram): a pre-cohort row carries no
+  -- cohort structure, and the SPA must tell "absent/null → Sample fallback" apart
+  -- from a real value. NEVER NOT NULL / NEVER a default.
+  cohort_histogram jsonb null,
   unknown_count integer not null,                -- active, missing/sentinel/invalid lastCheckIn
   -- Silent Churn dues gap — the EDGE-SOURCED dollar: /clients carries no dues, so
   -- the Edge Function writes these two honesty flags on every pull (always null +
@@ -137,6 +148,14 @@ alter table public.wodify_retention_aggregate
 -- gated SC dues run (its Step A), never on merge.
 alter table public.wodify_retention_aggregate
   add column if not exists silent_dues_snapshot jsonb;
+
+-- Backfill the Cohort Retention column the same way (NULLABLE + no default, see the
+-- column def above): pre-cohort rows stay null and the SPA falls back to the sample
+-- histogram rather than rendering a fabricated empty cohort split. `add column if
+-- not exists` keeps this file safely re-appliable. The live apply happens only
+-- inside the gated Cohort build run (WO-2, via MCP apply_migration), never on merge.
+alter table public.wodify_retention_aggregate
+  add column if not exists cohort_histogram jsonb;
 
 -- Latest snapshot per workspace = order by fetched_at desc limit 1.
 create index if not exists wodify_retention_aggregate_workspace_fetched_at_idx

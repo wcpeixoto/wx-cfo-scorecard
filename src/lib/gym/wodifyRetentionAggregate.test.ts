@@ -12,6 +12,8 @@ import {
   normalizeClient,
   computeRetentionAggregate,
   tenureBandActiveTotals,
+  cohortActiveTotals,
+  cohortLapsedTotals,
   MAX_EXACT_DAYS,
   SENTINEL_NULL_DATE,
   type RawWodifyClient,
@@ -607,6 +609,23 @@ describe('payload shape (non-PII contract)', () => {
           unknownTenure: { countsByDaysAbsent: { '4': 1 }, overflow365Plus: 0, unknownRecency: 0 },
         },
       },
+      // §9 rev.3 cohort extension: per-cohort active recency + lapsed, counts only.
+      // The single row has no date_of_birth, so it bins under the unknown cohort.
+      cohortHistogram: {
+        cohortEdges: [
+          { id: 'kids3to6', minAge: 1, maxAge: 6 },
+          { id: 'kids7to9', minAge: 7, maxAge: 9 },
+          { id: 'teens10to15', minAge: 10, maxAge: 15 },
+          { id: 'adults16plus', minAge: 16, maxAge: 120 },
+        ],
+        cohorts: {
+          kids3to6: { active: { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 }, lapsed: 0 },
+          kids7to9: { active: { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 }, lapsed: 0 },
+          teens10to15: { active: { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 }, lapsed: 0 },
+          adults16plus: { active: { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 }, lapsed: 0 },
+          unknownCohort: { active: { countsByDaysAbsent: { '4': 1 }, overflow365Plus: 0, unknownRecency: 0 }, lapsed: 0 },
+        },
+      },
       unknown: 0,
       silentChurn: { monthlyDuesAtRisk: null, missingMonthlyDues: true },
       diagnostics: { wodifyAtRiskCount: 0 },
@@ -638,5 +657,86 @@ describe('payload shape (non-PII contract)', () => {
     expect(() => computeRetentionAggregate([], { ...OPTS, asOf: 'not-a-date' })).toThrow(
       /asOf/,
     );
+  });
+});
+
+describe('cohort histogram (Cohort Retention Card — Read 1 + Read 2)', () => {
+  const rawRow = (
+    client_status: string,
+    date_of_birth: string,
+    last_attendance: string,
+  ): RawWodifyClient => ({
+    client_status,
+    date_of_birth,
+    last_attendance,
+    member_since: '2024-01-01',
+  });
+
+  // OPTS.asOf = 2026-06-05. Ages: 2021-01-01→5 (kids3to6), 2017-01-01→9 (kids7to9),
+  // 1996-01-01→30 + 1986-01-01→40 (adults16plus).
+  const rows: RawWodifyClient[] = [
+    rawRow('Active', '2021-01-01', '2026-06-04'), // kids3to6, healthy
+    rawRow('Active', '2017-01-01', '2026-04-01'), // kids7to9, silent
+    rawRow('Active', '1996-01-01', '2026-05-20'), // adults16plus, watch
+    rawRow('Active', '', '2026-06-01'), // missing DOB → unknown cohort, active
+    rawRow('Inactive', '2021-01-01', '2026-01-01'), // kids3to6, lapsed
+    rawRow('Inactive', '1986-01-01', '2026-01-01'), // adults16plus, lapsed
+    rawRow('Inactive', SENTINEL_NULL_DATE, '2026-01-01'), // 1900-01-01 → unknown cohort, lapsed
+    rawRow('Trial', '1996-01-01', '2026-06-01'), // unknown STATUS → excluded from every bucket
+  ];
+
+  const agg = computeRetentionAggregate(rows, OPTS);
+
+  it('partitions ACTIVE members across cohorts: Σ cohort-active === activeTotal', () => {
+    const totals = cohortActiveTotals(agg.cohortHistogram);
+    const sum = Object.values(totals).reduce((a, b) => a + b, 0);
+    expect(agg.activeTotal).toBe(4); // 4 Active rows; the Trial row is unknown-status
+    expect(sum).toBe(agg.activeTotal);
+  });
+
+  it('holds Member Movement parity: Σ cohort-lapsed (incl. unknownCohort) === inactiveTotal', () => {
+    const lapsed = cohortLapsedTotals(agg.cohortHistogram);
+    const sum = Object.values(lapsed).reduce((a, b) => a + b, 0);
+    expect(agg.inactiveTotal).toBe(3);
+    expect(sum).toBe(agg.inactiveTotal);
+  });
+
+  it('routes the right members to each cohort (active + lapsed)', () => {
+    const active = cohortActiveTotals(agg.cohortHistogram);
+    expect(active.kids3to6).toBe(1);
+    expect(active.kids7to9).toBe(1);
+    expect(active.adults16plus).toBe(1);
+    expect(active.unknownCohort).toBe(1); // missing-DOB active member
+    const lapsed = cohortLapsedTotals(agg.cohortHistogram);
+    expect(lapsed.kids3to6).toBe(1);
+    expect(lapsed.adults16plus).toBe(1);
+    expect(lapsed.unknownCohort).toBe(1); // the 1900-01-01 sentinel DOB
+  });
+
+  it('routes a >120 outlier age to the unknown cohort, never Adults', () => {
+    const outlier = computeRetentionAggregate(
+      [rawRow('Active', '1850-01-01', '2026-06-04')], // age ~176 > 120 ceiling
+      OPTS,
+    );
+    const active = cohortActiveTotals(outlier.cohortHistogram);
+    expect(active.unknownCohort).toBe(1);
+    expect(active.adults16plus).toBe(0);
+  });
+
+  it('cohort and tenure partitions both cover exactly the active members', () => {
+    const cohortSum = Object.values(cohortActiveTotals(agg.cohortHistogram)).reduce((a, b) => a + b, 0);
+    const tenureSum = Object.values(tenureBandActiveTotals(agg.tenureBandHistogram)).reduce((a, b) => a + b, 0);
+    expect(cohortSum).toBe(agg.activeTotal);
+    expect(tenureSum).toBe(agg.activeTotal);
+    expect(cohortSum).toBe(tenureSum);
+  });
+
+  it('exposes the cohortEdges contract for this build', () => {
+    expect(agg.cohortHistogram.cohortEdges).toEqual([
+      { id: 'kids3to6', minAge: 1, maxAge: 6 },
+      { id: 'kids7to9', minAge: 7, maxAge: 9 },
+      { id: 'teens10to15', minAge: 10, maxAge: 15 },
+      { id: 'adults16plus', minAge: 16, maxAge: 120 },
+    ]);
   });
 });

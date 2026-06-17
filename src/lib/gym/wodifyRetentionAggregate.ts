@@ -34,6 +34,16 @@ import { parseYmdLocal, wholeDaysBetween } from './silentChurn.ts';
 // constants, so the Edge bundle gains band edges only — never the
 // threshold-coupled classifiers (the §6.1 reuse boundary is unchanged).
 import { TENURE_BANDS, UNKNOWN_TENURE_ID, bandForTenure } from './tenureBands.ts';
+// Cohort (age-band) edges + age derivation (Cohort Retention Card — "Retention by
+// Age Group"). Same explicit-`.ts` rule for the Edge deploy; cohortBands.ts is
+// dependency-light (only the locked parseYmdLocal), so the bundle gains age-band
+// constants + a pure age helper, never the threshold-coupled classifiers.
+import {
+  COHORT_BANDS,
+  UNKNOWN_COHORT_ID,
+  ageYearsAsOf,
+  cohortForAge,
+} from './cohortBands.ts';
 
 // Highest exact day-count bin. Days absent 0..364 get an exact bin; >= 365 rolls
 // into `overflow365Plus`. Bounding the histogram means it carries no exact dates
@@ -60,6 +70,12 @@ export type RawWodifyClient = {
   // confirmed by owner + Reviewer. Read for tenure BANDING only; the exact
   // date never leaves the normalize step.
   member_since?: unknown;
+  // Date of birth (Cohort Retention Card). PROVEN ON THE WIRE by the 2026-06-16
+  // read-only /clients probe (95% usable active / 100% inactive; 20 active
+  // 1900-01-01 sentinels → Unknown cohort); the typed read deliberately under-read
+  // it until this slice. Read for age-COHORT BANDING only — the exact date is
+  // sliced/validated in normalizeClient and never leaves the normalize step.
+  date_of_birth?: unknown;
 };
 
 export type NormalizedStatus = 'active' | 'inactive';
@@ -75,6 +91,11 @@ export type NormalizedMember = {
   status: NormalizedStatus | null;
   lastCheckIn: string; // 'YYYY-MM-DD' or ''
   membershipStart: string; // 'YYYY-MM-DD' or ''
+  // Date of birth for cohort banding (Cohort Retention Card). 'YYYY-MM-DD' or ''
+  // (missing/sentinel/invalid → '' → unknown cohort). Transient like
+  // membershipStart: the exact date lives only on this in-memory record and is
+  // never emitted — only the derived cohort-id counts cross the boundary.
+  dob: string;
   isAtRisk: boolean;
 };
 
@@ -118,6 +139,43 @@ export type TenureBandHistogram = {
   bands: Record<string, TenureBandRecency>;
 };
 
+// One cohort's ACTIVE-side recency counts (Cohort Retention Card, Read 1): the
+// same sparse exact-day bins + overflow + unknown-recency as a tenure band,
+// restricted to the active members in this age cohort. Counts only.
+export type CohortRecency = {
+  countsByDaysAbsent: Record<string, number>;
+  overflow365Plus: number;
+  unknownRecency: number;
+};
+
+// One cohort's full entry: the active-side recency histogram (Read 1 — the SPA
+// re-derives Healthy/Watch/Silent at any threshold) PLUS the lapsed head-count
+// (Read 2 — inactive members in this cohort). Both reads share ONE column so
+// Member Movement parity (Σ lapsed === inactiveTotal) is provable in-payload.
+export type CohortEntry = {
+  active: CohortRecency;
+  lapsed: number;
+};
+
+// Self-describing age-band edge contract persisted alongside the per-cohort
+// counts: the SPA validates these EXACTLY (length, order, id, minAge, maxAge)
+// against its own COHORT_BANDS and falls back to Sample on any mismatch — a
+// snapshot binned under different age windows is never rendered under the SPA's
+// labels. Labels are presentation-only and stay SPA-side.
+export type CohortBandEdge = { id: string; minAge: number; maxAge: number };
+
+// Per-cohort partition (Cohort Retention Card), keyed by COHORT_BANDS id plus the
+// synthetic unknown-cohort bucket (members whose DOB is missing/sentinel/invalid
+// or whose derived age is out of range — surfaced, never dropped). Every id is
+// always present (empty cohorts carry zero counts), so the SPA contract is
+// deterministic. Two invariants hold by construction (asserted in tests):
+//   Σ cohort.active (bins + overflow + unknownRecency) === activeTotal, and
+//   Σ cohort.lapsed === inactiveTotal (Member Movement parity).
+export type CohortHistogram = {
+  cohortEdges: CohortBandEdge[];
+  cohorts: Record<string, CohortEntry>;
+};
+
 // The non-PII aggregate snapshot — exactly what the Edge Function persists and
 // the SPA reads. No member rows, names, IDs, exact dates, or dues.
 export type RetentionAggregate = {
@@ -141,6 +199,10 @@ export type RetentionAggregate = {
   // daysAbsentHistogram + unknown, over the SAME active members. ACTIVE-ONLY by
   // design — inactive members are the census, not a tenure cohort.
   tenureBandHistogram: TenureBandHistogram;
+  // Cohort Retention (Read 1 + Read 2): the per-age-cohort partition — active-side
+  // recency histogram + lapsed head-count, over all scanned members. Derived from
+  // date_of_birth, which never leaves the normalize step. Counts only.
+  cohortHistogram: CohortHistogram;
   unknown: number; // active, missing/sentinel/invalid lastCheckIn (NOT Healthy)
   silentChurn: { monthlyDuesAtRisk: null; missingMonthlyDues: true };
   diagnostics: { wodifyAtRiskCount: number };
@@ -229,6 +291,10 @@ export function normalizeClient(raw: RawWodifyClient): NormalizedMember {
     status: normalizeStatus(raw.client_status),
     lastCheckIn: pickLastCheckIn(raw.last_attendance, raw.last_class_sign_in),
     membershipStart: sliceUsableDate(raw.member_since) ?? '',
+    // Same sliceUsableDate rule as the recency/tenure dates (ISO slice →
+    // 1900-01-01 sentinel → parseYmdLocal), so a wire sentinel can never reach the
+    // age math as a real ~126-year-old.
+    dob: sliceUsableDate(raw.date_of_birth) ?? '',
     isAtRisk: raw.is_at_risk === true,
   };
 }
@@ -270,6 +336,24 @@ export function computeRetentionAggregate(
   }
   tenureBands[UNKNOWN_TENURE_ID] = { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 };
 
+  // Per-cohort accumulators (Cohort Retention Card). Every cohort id plus the
+  // unknown-cohort bucket is present from the start, so empty cohorts emit zero
+  // counts. `active` mirrors the recency split (Read 1); `lapsed` tallies inactive
+  // members (Read 2). Both derive from date_of_birth in the SAME pass, so the
+  // active partition (Σ active === activeTotal) and Member Movement parity
+  // (Σ lapsed === inactiveTotal) hold by construction.
+  const cohorts: Record<string, CohortEntry> = {};
+  for (const band of COHORT_BANDS) {
+    cohorts[band.id] = {
+      active: { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 },
+      lapsed: 0,
+    };
+  }
+  cohorts[UNKNOWN_COHORT_ID] = {
+    active: { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 },
+    lapsed: 0,
+  };
+
   for (const raw of rawRows) {
     const member = normalizeClient(raw);
 
@@ -279,10 +363,22 @@ export function computeRetentionAggregate(
       unknownStatus += 1;
       continue; // unmappable status — excluded from every bucket
     }
+
+    // Resolve the age cohort ONCE, used by both the lapsed tally (inactive) and
+    // the active recency mirror below. A missing/sentinel/invalid dob, or a
+    // derived age outside every band window (<= 0 or > 120), routes to the
+    // unknown-cohort bucket — counted, never dropped (mirrors the unknown-tenure
+    // routing). Exact age is a loop local; only cohort-id counts are emitted.
+    const age = member.dob === '' ? null : ageYearsAsOf(member.dob, opts.asOf);
+    const cohortBand = age === null ? null : cohortForAge(age);
+    const cohortEntry = cohorts[cohortBand ? cohortBand.id : UNKNOWN_COHORT_ID];
+
     // Inactive is not the active recency signal, but it IS the Member Movement
-    // census — count it, then skip the active-only binning below.
+    // census AND the cohort lapsed count (Read 2) — count both, then skip the
+    // active-only binning below. Σ cohort lapsed === inactiveTotal by construction.
     if (member.status === 'inactive') {
       inactiveTotal += 1;
+      cohortEntry.lapsed += 1;
       continue;
     }
     // member.status === 'active' from here.
@@ -297,15 +393,22 @@ export function computeRetentionAggregate(
     const tenureBand = startDate === null ? null : bandForTenure(wholeDaysBetween(startDate, asOfDate));
     const bandRecency = tenureBands[tenureBand ? tenureBand.id : UNKNOWN_TENURE_ID];
 
+    // Every active recency increment mirrors into exactly one tenure band AND one
+    // cohort, so both per-band and per-cohort active histograms partition the
+    // global one by construction.
+    const cohortRecency = cohortEntry.active;
+
     if (member.lastCheckIn === '') {
       unknown += 1; // active but no usable date — NEVER folded into Healthy
       bandRecency.unknownRecency += 1;
+      cohortRecency.unknownRecency += 1;
       continue;
     }
     const lastCheckInDate = parseYmdLocal(member.lastCheckIn);
     if (lastCheckInDate === null) {
       unknown += 1; // defensive: sliceUsableDate already validated, but never drop a member
       bandRecency.unknownRecency += 1;
+      cohortRecency.unknownRecency += 1;
       continue;
     }
 
@@ -314,13 +417,16 @@ export function computeRetentionAggregate(
       futureLastCheckIn += 1;
       countsByDaysAbsent['0'] = (countsByDaysAbsent['0'] ?? 0) + 1; // day-0 = Healthy-compatible
       bandRecency.countsByDaysAbsent['0'] = (bandRecency.countsByDaysAbsent['0'] ?? 0) + 1;
+      cohortRecency.countsByDaysAbsent['0'] = (cohortRecency.countsByDaysAbsent['0'] ?? 0) + 1;
     } else if (daysAbsent <= MAX_EXACT_DAYS) {
       const key = String(daysAbsent);
       countsByDaysAbsent[key] = (countsByDaysAbsent[key] ?? 0) + 1;
       bandRecency.countsByDaysAbsent[key] = (bandRecency.countsByDaysAbsent[key] ?? 0) + 1;
+      cohortRecency.countsByDaysAbsent[key] = (cohortRecency.countsByDaysAbsent[key] ?? 0) + 1;
     } else {
       overflow365Plus += 1;
       bandRecency.overflow365Plus += 1;
+      cohortRecency.overflow365Plus += 1;
     }
   }
 
@@ -338,6 +444,10 @@ export function computeRetentionAggregate(
     tenureBandHistogram: {
       bandEdges: TENURE_BANDS.map(({ id, minDays }) => ({ id, minDays })),
       bands: tenureBands,
+    },
+    cohortHistogram: {
+      cohortEdges: COHORT_BANDS.map(({ id, minAge, maxAge }) => ({ id, minAge, maxAge })),
+      cohorts,
     },
     unknown,
     silentChurn: { monthlyDuesAtRisk: null, missingMonthlyDues: true },
@@ -363,6 +473,31 @@ export function tenureBandActiveTotals(
   for (const [id, band] of Object.entries(tenure.bands)) {
     const binSum = Object.values(band.countsByDaysAbsent).reduce((a, b) => a + b, 0);
     totals[id] = binSum + band.overflow365Plus + band.unknownRecency;
+  }
+  return totals;
+}
+
+// Per-cohort ACTIVE totals (counts only) — each cohort's active bin sum +
+// overflow + unknownRecency. Used by the Edge Function's 200 summary so a
+// post-pull verify can eyeball the cohort split without reading the table; Σ over
+// all cohorts === activeTotal.
+export function cohortActiveTotals(cohort: CohortHistogram): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const [id, entry] of Object.entries(cohort.cohorts)) {
+    const binSum = Object.values(entry.active.countsByDaysAbsent).reduce((a, b) => a + b, 0);
+    totals[id] = binSum + entry.active.overflow365Plus + entry.active.unknownRecency;
+  }
+  return totals;
+}
+
+// Per-cohort LAPSED totals (Read 2) — the inactive head-count per cohort. Σ over
+// all cohorts (incl. unknownCohort) === inactiveTotal by construction (Member
+// Movement parity), so the 200 summary lets a post-pull verify confirm parity
+// without reading the table.
+export function cohortLapsedTotals(cohort: CohortHistogram): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const [id, entry] of Object.entries(cohort.cohorts)) {
+    totals[id] = entry.lapsed;
   }
   return totals;
 }
