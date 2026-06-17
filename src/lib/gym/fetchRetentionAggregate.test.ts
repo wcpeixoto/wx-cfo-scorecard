@@ -40,6 +40,25 @@ const VALID_TENURE = {
   },
 };
 
+// A valid cohort_histogram jsonb (§9 rev.3): the exact cohortEdges contract this
+// build's COHORT_BANDS defines, every cohort key (incl. unknownCohort), each with
+// an active recency entry + a lapsed (Read 2) head-count.
+const VALID_COHORT = {
+  cohortEdges: [
+    { id: 'kids3to6', minAge: 1, maxAge: 6 },
+    { id: 'kids7to9', minAge: 7, maxAge: 9 },
+    { id: 'teens10to15', minAge: 10, maxAge: 15 },
+    { id: 'adults16plus', minAge: 16, maxAge: 120 },
+  ],
+  cohorts: {
+    kids3to6: { active: { countsByDaysAbsent: { '0': 1 }, overflow365Plus: 0, unknownRecency: 0 }, lapsed: 7 },
+    kids7to9: { active: { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 }, lapsed: 3 },
+    teens10to15: { active: { countsByDaysAbsent: { '21': 1 }, overflow365Plus: 0, unknownRecency: 0 }, lapsed: 2 },
+    adults16plus: { active: { countsByDaysAbsent: { '8': 1 }, overflow365Plus: 1, unknownRecency: 5 }, lapsed: 40 },
+    unknownCohort: { active: { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 }, lapsed: 1 },
+  },
+};
+
 // A valid silent_dues_snapshot jsonb (§6.4 SC dues slice): the six-key camelCase
 // contract the gated MCP write produces (values from the 2026-06-11 preview run).
 const VALID_DUES = {
@@ -112,6 +131,7 @@ describe('fetchLatestRetentionAggregate — mapping + failure modes', () => {
         overflow365Plus: 2,
       },
       tenureBands: null, // pre-tenure row (column absent) → null → sample Tenure card
+      cohorts: null, // pre-cohort row (column absent) → null → sample Cohort card
       dues: null, // no dues write yet (the routed default) → count-only dues line
     });
 
@@ -469,5 +489,115 @@ describe('fetchLatestRetentionAggregate — silent_dues_snapshot (isolated dues 
     const snap = await fetchLatestRetentionAggregate();
     expect(snap?.dues).toBeNull();
     expect(snap?.activeTotal).toBe(412);
+  });
+});
+
+describe('fetchLatestRetentionAggregate — cohort_histogram (Cohort Retention)', () => {
+  it('parses a valid cohort_histogram (active recency + lapsed per cohort)', async () => {
+    stubConfiguredEnv();
+    installFetch({ ok: true, body: [{ ...VALID_ROW, cohort_histogram: VALID_COHORT }] });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    expect((await fetchLatestRetentionAggregate())?.cohorts).toEqual(VALID_COHORT);
+  });
+
+  it('maps a SQL-null / absent cohort column to null (Cohort card → sample)', async () => {
+    stubConfiguredEnv();
+    installFetch({ ok: true, body: [{ ...VALID_ROW, cohort_histogram: null }] });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    expect((await fetchLatestRetentionAggregate())?.cohorts).toBeNull();
+  });
+
+  it('rejects cohort data binned under DIFFERENT edges (exact id/minAge/maxAge/order); snapshot survives', async () => {
+    stubConfiguredEnv();
+    const editedEdges = VALID_COHORT.cohortEdges.map((e, i) => (i === 3 ? { ...e, maxAge: 99 } : e));
+    installFetch({
+      ok: true,
+      body: [{ ...VALID_ROW, cohort_histogram: { ...VALID_COHORT, cohortEdges: editedEdges } }],
+    });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    const snap = await fetchLatestRetentionAggregate();
+    expect(snap?.cohorts).toBeNull();
+    // PER-FIELD degradation: a bad cohort payload never nulls the rest of the snapshot.
+    expect(snap?.asOf).toBe('2026-06-07');
+    expect(snap?.activeTotal).toBe(412);
+  });
+
+  it('rejects a wrong cohort-edge COUNT (extra or missing cohort)', async () => {
+    stubConfiguredEnv();
+    installFetch({
+      ok: true,
+      body: [{
+        ...VALID_ROW,
+        cohort_histogram: { ...VALID_COHORT, cohortEdges: VALID_COHORT.cohortEdges.slice(0, 3) },
+      }],
+    });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    expect((await fetchLatestRetentionAggregate())?.cohorts).toBeNull();
+  });
+
+  it('rejects cohort data missing an expected key (incl. the unknown-cohort bucket)', async () => {
+    stubConfiguredEnv();
+    const { unknownCohort: _dropped, ...cohortsWithoutUnknown } = VALID_COHORT.cohorts;
+    installFetch({
+      ok: true,
+      body: [{ ...VALID_ROW, cohort_histogram: { ...VALID_COHORT, cohorts: cohortsWithoutUnknown } }],
+    });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    expect((await fetchLatestRetentionAggregate())?.cohorts).toBeNull();
+  });
+
+  it('rejects a malformed entry (no active / non-integer lapsed) and coerces non-numeric active counts', async () => {
+    stubConfiguredEnv();
+    // Missing `active` → reject.
+    installFetch({
+      ok: true,
+      body: [{
+        ...VALID_ROW,
+        cohort_histogram: {
+          ...VALID_COHORT,
+          cohorts: { ...VALID_COHORT.cohorts, kids3to6: { lapsed: 7 } },
+        },
+      }],
+    });
+    let mod = await loadModule();
+    expect((await mod.fetchLatestRetentionAggregate())?.cohorts).toBeNull();
+
+    // Non-integer lapsed → reject.
+    installFetch({
+      ok: true,
+      body: [{
+        ...VALID_ROW,
+        cohort_histogram: {
+          ...VALID_COHORT,
+          cohorts: {
+            ...VALID_COHORT.cohorts,
+            kids3to6: { active: { countsByDaysAbsent: {}, overflow365Plus: 0, unknownRecency: 0 }, lapsed: 7.5 },
+          },
+        },
+      }],
+    });
+    mod = await loadModule();
+    expect((await mod.fetchLatestRetentionAggregate())?.cohorts).toBeNull();
+
+    // Non-numeric active jsonb counts coerce to 0 (structurally valid entry).
+    installFetch({
+      ok: true,
+      body: [{
+        ...VALID_ROW,
+        cohort_histogram: {
+          ...VALID_COHORT,
+          cohorts: {
+            ...VALID_COHORT.cohorts,
+            kids3to6: { active: { countsByDaysAbsent: { '0': 'x' }, overflow365Plus: 'y', unknownRecency: 2 }, lapsed: 7 },
+          },
+        },
+      }],
+    });
+    mod = await loadModule();
+    const snap = await mod.fetchLatestRetentionAggregate();
+    expect(snap?.cohorts?.cohorts.kids3to6).toEqual({
+      active: { countsByDaysAbsent: { '0': 0 }, overflow365Plus: 0, unknownRecency: 2 },
+      lapsed: 7,
+    });
   });
 });

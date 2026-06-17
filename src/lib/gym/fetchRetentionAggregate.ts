@@ -27,7 +27,11 @@ import type { DerivableAggregate } from './retentionAggregateView';
 import { parseYmdLocal } from './silentChurn';
 import type { SilentDuesSnapshot } from './silentChurnDuesView';
 import { TENURE_BANDS, UNKNOWN_TENURE_ID } from './tenureBands';
+import { COHORT_BANDS, UNKNOWN_COHORT_ID } from './cohortBands';
 import type {
+  CohortEntry,
+  CohortHistogram,
+  CohortRecency,
   TenureBandHistogram,
   TenureBandRecency,
 } from './wodifyRetentionAggregate';
@@ -62,6 +66,14 @@ export type RetentionAggregateSnapshot = DerivableAggregate & {
   // tenure payload never nulls the whole snapshot (AH / SC / MM keep their live
   // data), mirroring the inactiveTotal rule.
   tenureBands: TenureBandHistogram | null;
+  // Cohort Retention (Read 1 + Read 2): the per-age-cohort partition — active-side
+  // recency histogram + lapsed head-count. `null` when the column is absent
+  // (pre-cohort snapshot), SQL null, malformed, or binned under DIFFERENT cohort
+  // edges than this build's COHORT_BANDS (exact id/minAge/maxAge/order match
+  // required) — the Cohort card then falls back to its sample histogram. Same
+  // PER-FIELD degradation as tenureBands: a bad cohort payload never nulls the
+  // whole snapshot.
+  cohorts: CohortHistogram | null;
   // Silent Churn $-at-risk (§6.4 SC dues slice): the locally-written
   // silent_dues_snapshot aggregate, read by a SECOND, ISOLATED query for the
   // latest NON-NULL value (the figure persists across later edge pulls, which
@@ -83,6 +95,7 @@ type AggregateRow = {
   unknown_count?: unknown;
   days_absent_histogram?: unknown;
   tenure_band_histogram?: unknown;
+  cohort_histogram?: unknown;
 };
 
 // True only when the SPA build carries Supabase env. When false (e.g. local dev with
@@ -158,6 +171,79 @@ function parseTenureBandHistogram(value: unknown): TenureBandHistogram | null {
   return {
     bandEdges: TENURE_BANDS.map(({ id, minDays }) => ({ id, minDays })),
     bands,
+  };
+}
+
+// Coerce one cohort's active-side recency entry, or null when structurally
+// unusable. Same shape + rules as parseTenureBandRecency (counts only).
+function parseCohortRecency(value: unknown): CohortRecency | null {
+  if (!value || typeof value !== 'object') return null;
+  const entry = value as {
+    countsByDaysAbsent?: unknown;
+    overflow365Plus?: unknown;
+    unknownRecency?: unknown;
+  };
+  if (!entry.countsByDaysAbsent || typeof entry.countsByDaysAbsent !== 'object') return null;
+  const countsByDaysAbsent: Record<string, number> = {};
+  for (const [k, v] of Object.entries(entry.countsByDaysAbsent as Record<string, unknown>)) {
+    countsByDaysAbsent[k] = asCount(v);
+  }
+  return {
+    countsByDaysAbsent,
+    overflow365Plus: asCount(entry.overflow365Plus),
+    unknownRecency: asCount(entry.unknownRecency),
+  };
+}
+
+// Validate the Cohort Retention jsonb into the typed histogram, or null → the
+// cohort card falls back to its sample histogram. Mirrors parseTenureBandHistogram's
+// two fail-closed contract checks:
+//
+// 1. cohortEdges must EXACTLY equal this build's COHORT_BANDS — same length, order,
+//    id, minAge, maxAge. A snapshot binned under different age windows must never
+//    render under this build's labels.
+// 2. Every expected cohort key (each COHORT_BANDS id + the unknown-cohort bucket)
+//    must be present and well-formed: { active: <recency>, lapsed: non-negative
+//    integer }. Unexpected EXTRA keys are ignored — any semantic cohort change
+//    would also change cohortEdges and fail check 1.
+function parseCohortHistogram(value: unknown): CohortHistogram | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as { cohortEdges?: unknown; cohorts?: unknown };
+
+  if (!Array.isArray(v.cohortEdges) || v.cohortEdges.length !== COHORT_BANDS.length) return null;
+  for (let i = 0; i < COHORT_BANDS.length; i++) {
+    const edge = v.cohortEdges[i] as { id?: unknown; minAge?: unknown; maxAge?: unknown } | null;
+    if (!edge || typeof edge !== 'object') return null;
+    if (
+      edge.id !== COHORT_BANDS[i].id ||
+      edge.minAge !== COHORT_BANDS[i].minAge ||
+      edge.maxAge !== COHORT_BANDS[i].maxAge
+    ) {
+      return null;
+    }
+  }
+
+  if (!v.cohorts || typeof v.cohorts !== 'object') return null;
+  const rawCohorts = v.cohorts as Record<string, unknown>;
+  const cohorts: Record<string, CohortEntry> = {};
+  for (const id of [...COHORT_BANDS.map((b) => b.id), UNKNOWN_COHORT_ID]) {
+    const raw = rawCohorts[id];
+    if (!raw || typeof raw !== 'object') return null;
+    const active = parseCohortRecency((raw as { active?: unknown }).active);
+    const lapsedRaw = (raw as { lapsed?: unknown }).lapsed;
+    const lapsed =
+      typeof lapsedRaw === 'number' && Number.isInteger(lapsedRaw) && lapsedRaw >= 0
+        ? lapsedRaw
+        : null;
+    if (active === null || lapsed === null) return null;
+    cohorts[id] = { active, lapsed };
+  }
+
+  // Rebuild cohortEdges from this build's COHORT_BANDS (proven equal above) so no
+  // unvalidated extra properties ride through from the wire.
+  return {
+    cohortEdges: COHORT_BANDS.map(({ id, minAge, maxAge }) => ({ id, minAge, maxAge })),
+    cohorts,
   };
 }
 
@@ -338,6 +424,7 @@ export async function fetchLatestRetentionAggregate(
       overflow365Plus: asCount(histogram.overflow365Plus),
     },
     tenureBands: parseTenureBandHistogram(row.tenure_band_histogram),
+    cohorts: parseCohortHistogram(row.cohort_histogram),
     // Runs only after the main read produced a usable snapshot (no snapshot →
     // every card is Sample and dues is moot); isolated, never throws.
     dues: await fetchLatestDuesSnapshot(signal),

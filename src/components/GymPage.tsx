@@ -25,6 +25,11 @@ import {
   type TenureBandRisk,
 } from '../lib/gym/churnRiskByTenure';
 import {
+  SAMPLE_COHORT_HISTOGRAM,
+  computeChurnRiskByCohortFromAggregate,
+  type CohortRisk,
+} from '../lib/gym/churnRiskByCohort';
+import {
   RECENCY_STAGES,
   buildSegmentExplorerView,
   type RecencyStageId,
@@ -103,16 +108,7 @@ export function GymPage() {
             <div className="gym-card-grid">
               <MemberMovementCard snapshot={snapshot} />
               <ChurnRiskByTenureCard snapshot={snapshot} />
-              <GymCardShell
-                modifier="gym-card--half"
-                title="Churn by Age"
-                subtitle="Do kids, teens, and adults retain differently?"
-                gate={{
-                  status: 'parked',
-                  reason:
-                    'Needs an age-bucket data policy (age ranges only, never birthdates) before build.',
-                }}
-              />
+              <CohortRetentionCard snapshot={snapshot} />
               <SegmentExplorerCard snapshot={snapshot} />
               <GymCardShell
                 modifier="gym-card--full gym-card--recessed"
@@ -772,6 +768,183 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
             accounts carry account-setup dates rather than member tenure.
           </p>
         )}
+      </div>
+    </article>
+  );
+}
+
+// k→1 suppression for the Read-2 lapsed cells, with COMPLEMENTARY suppression: a
+// lone masked cell is recoverable as (the published Member Movement inactive total
+// − the visible cohort cells), so whenever ANY lapsed cell is masked, at least two
+// are — the lone small cell can't be backed out by subtraction. Returns the set of
+// cohort ids whose lapsed count must render as "<5". (Run-time ≈1 verification +
+// any further remedy is a WO-2 run concern.)
+const LAPSED_SUPPRESS_BELOW = 5;
+function maskedLapsedIds(cells: { id: string; lapsed: number }[]): Set<string> {
+  const masked = new Set<string>();
+  for (const c of cells) {
+    if (c.lapsed > 0 && c.lapsed < LAPSED_SUPPRESS_BELOW) masked.add(c.id);
+  }
+  if (masked.size === 1) {
+    const next = cells
+      .filter((c) => !masked.has(c.id) && c.lapsed > 0)
+      .sort((a, b) => a.lapsed - b.lapsed)[0];
+    if (next) masked.add(next.id);
+  }
+  return masked;
+}
+
+// Retention by Age Group (Cohort Retention Card — RETENTION_FINISH_PLAN.md §6–§9,
+// rev.3 client_status basis). Two reads in one card: Read 1 — cohort health
+// (Healthy/Watch/Silent + at-risk rate per age cohort, active members), re-derived
+// at the owner threshold via computeChurnRiskByCohortFromAggregate (same
+// deriveBuckets + known-base + hero rules as Churn-by-Tenure); Read 2 — lapsed
+// (inactive) members per cohort. Deterministic: copy only rephrases code-computed
+// counts/rates; it never authors the at-risk call.
+//
+// Dual-source: with a snapshot carrying cohort_histogram (validated against this
+// build's COHORT_BANDS — see fetchRetentionAggregate) it badges "Live · as of
+// {asOf}"; otherwise it renders the clearly-synthetic SAMPLE_COHORT_HISTOGRAM
+// through the SAME adapter (the shared member fixture has no DOB, so the sample is
+// a static histogram, not a fixture compute). The cohort flip is data-gated.
+//
+// §7 STRUCTURAL-HONESTY caveat (footer): client_status Inactive has no
+// never-membered guard — the never-membered (guardian/staff/legacy) population
+// skews into Adults 16+ — so cohort-lapsed must never be read as "memberships
+// ended." Copy over the deterministic numbers; the card never authors the call.
+function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
+  const { silentChurnThresholdDays, includeUnknown, setIncludeUnknown } = useRetentionSettings();
+
+  const cohorts = snapshot?.cohorts ?? null;
+  const result = useMemo(
+    () =>
+      computeChurnRiskByCohortFromAggregate(
+        cohorts ?? SAMPLE_COHORT_HISTOGRAM,
+        silentChurnThresholdDays,
+      ),
+    [cohorts, silentChurnThresholdDays],
+  );
+  // Live only when the snapshot actually carries a usable cohort histogram — other
+  // cards may already be live off this snapshot while this one is honestly Sample
+  // (pre-cohort row → cohorts null).
+  const liveAsOf = cohorts && snapshot ? snapshot.asOf : null;
+
+  const { thresholdDays, activeTotal, bands, unknownCohort } = result;
+
+  // Read 1 known-base toggle, identical to Churn-by-Tenure: the hero re-selects per
+  // base, atRisk is unchanged, only the denominator + rate move.
+  const heroBandId = includeUnknown ? result.heroBandId : result.heroBandIdKnown;
+  const heroBand = bands.find((b) => b.id === heroBandId) ?? null;
+  const bandActive = (b: CohortRisk) => (includeUnknown ? b.activeTotal : b.knownActiveTotal);
+  const bandRate = (b: CohortRisk) => (includeUnknown ? b.riskRate : b.riskRateKnown);
+  const unknownRecencyTotal = bands.reduce((sum, b) => sum + b.unknownRecency, 0);
+
+  // Read 2 lapsed cells with complementary k→1 suppression (see maskedLapsedIds).
+  const lapsedMasked = useMemo(
+    () => maskedLapsedIds([...bands, unknownCohort]),
+    [bands, unknownCohort],
+  );
+  const lapsedCell = (b: CohortRisk) => (lapsedMasked.has(b.id) ? '<5' : String(b.lapsed));
+
+  // The unknown-cohort row renders only when it carries members (active or lapsed),
+  // matching the unknown-tenure row's "surface, don't fabricate" rule.
+  const showUnknownRow = unknownCohort.activeTotal > 0 || unknownCohort.lapsed > 0;
+
+  return (
+    <article className="card gym-card gym-card--full cohort-age-card">
+      <header className="gym-card-head">
+        <div className="cohort-age-titlerow">
+          <h3 className="gym-card-title">Retention by Age Group</h3>
+          {liveAsOf ? (
+            <span className="gym-sample-badge gym-live-badge">Live · as of {liveAsOf}</span>
+          ) : (
+            <span className="gym-sample-badge">Sample data</span>
+          )}
+        </div>
+        <p className="gym-card-subtitle">Do kids, teens, and adults retain differently?</p>
+      </header>
+
+      <div className="cohort-age-body">
+        {activeTotal === 0 || !heroBand ? (
+          <p className="cohort-age-empty">No active members to analyze right now.</p>
+        ) : (
+          <>
+            <div className="cohort-age-hero">
+              <span className="cohort-age-hero-value">{formatRate(bandRate(heroBand))}</span>
+              <span className="cohort-age-hero-label">
+                at risk in {heroBand.label} — the highest by age group
+              </span>
+            </div>
+            <p className="cohort-age-helper">
+              At-risk = active members on watch or silent at the {thresholdDays}-day threshold
+              ({heroBand.atRisk} of {bandActive(heroBand)}{' '}
+              {includeUnknown ? 'active' : 'attendance-known'} in this group). Lapsed = members
+              whose membership is inactive today.
+            </p>
+          </>
+        )}
+
+        <div className="cohort-age-table">
+          <div className="cohort-age-head">
+            <span className="cohort-age-col cohort-age-col--band">Age group</span>
+            <span className="cohort-age-col cohort-age-col--num">
+              {includeUnknown ? 'Active' : 'Tracked'}
+            </span>
+            <span className="cohort-age-col cohort-age-col--num">At risk</span>
+            <span className="cohort-age-col cohort-age-col--num">Risk rate</span>
+            <span className="cohort-age-col cohort-age-col--num">Lapsed</span>
+          </div>
+          <ul className="cohort-age-rows">
+            {bands.map((b) => (
+              <li
+                key={b.id}
+                className={`cohort-age-row${b.id === heroBandId ? ' cohort-age-row--hero' : ''}`}
+              >
+                <span className="cohort-age-col cohort-age-col--band">{b.label}</span>
+                <span className="cohort-age-col cohort-age-col--num">{bandActive(b)}</span>
+                <span className="cohort-age-col cohort-age-col--num">{b.atRisk}</span>
+                <span className="cohort-age-col cohort-age-col--num">{formatRate(bandRate(b))}</span>
+                <span className="cohort-age-col cohort-age-col--num">{lapsedCell(b)}</span>
+              </li>
+            ))}
+            {/* Unknown-age members (missing/sentinel/invalid DOB) surfaced rather
+                than dropped — keeps the card honest against the Member Movement
+                census once live. Hidden while the sample data is clean. */}
+            {showUnknownRow && (
+              <li className="cohort-age-row cohort-age-row--unknown">
+                <span className="cohort-age-col cohort-age-col--band">{unknownCohort.label}</span>
+                <span className="cohort-age-col cohort-age-col--num">{bandActive(unknownCohort)}</span>
+                <span className="cohort-age-col cohort-age-col--num">{unknownCohort.atRisk}</span>
+                <span className="cohort-age-col cohort-age-col--num">
+                  {formatRate(bandRate(unknownCohort))}
+                </span>
+                <span className="cohort-age-col cohort-age-col--num">{lapsedCell(unknownCohort)}</span>
+              </li>
+            )}
+          </ul>
+        </div>
+
+        {unknownRecencyTotal > 0 && (
+          <p className="cohort-age-base-note">
+            {includeUnknown
+              ? 'At-risk rates over each group’s full active base.'
+              : 'At-risk rates among attendance-known members in each group.'}
+          </p>
+        )}
+        <UnknownToggleNote
+          count={unknownRecencyTotal}
+          includeUnknown={includeUnknown}
+          setIncludeUnknown={setIncludeUnknown}
+          className="cohort-age-unknown-note"
+        />
+
+        <p className="cohort-age-caveat">
+          Age groups come from each member&rsquo;s date of birth (age ranges only — birthdates
+          never leave our system). &ldquo;Lapsed&rdquo; counts everyone whose membership is
+          inactive today; because inactive profiles can include never-enrolled accounts (a
+          parent/guardian, staff, or a legacy profile) that skew into Adults 16+, read it as
+          &ldquo;inactive in this age group,&rdquo; not &ldquo;memberships ended.&rdquo;
+        </p>
       </div>
     </article>
   );
