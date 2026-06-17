@@ -32,7 +32,7 @@ does.
 
 **Shared protocols.** Repo docs are canonical, memory is cache (docs win on
 conflict). Two-AI gate for irreversible actions: Builder drafts → Reviewer
-*or* Advisor validates → Builder runs the final step → verify. Notion Backlog
+*or* Advisor validates → Builder runs the final step → verify. `BACKLOG.md`
 is the priority authority for "what's next." Direction decisions stay with
 Wesley; agents recommend, they don't auto-pick.
 
@@ -40,7 +40,7 @@ Wesley; agents recommend, they don't auto-pick.
 
 ## Task shape — three required fields
 
-Every Notion Backlog task — and every "what's next" recommendation in
+Every `BACKLOG.md` task — and every "what's next" recommendation in
 chat — uses the same three fields, in plain English an owner can grasp
 in one read. **Keep each field to 1–2 short sentences.**
 
@@ -81,7 +81,7 @@ new cards, existing cards during retrofit, and rescope passes before
 a card returns to the build queue. In-chat recommendations cap at
 **two options at a time**.
 
-For Notion cards, the field content can carry more evidence (PR
+For `BACKLOG.md` items, the field content can carry more evidence (PR
 numbers, file:line) where it helps a future builder; in chat, keep it
 brief.
 
