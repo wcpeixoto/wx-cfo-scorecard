@@ -30,10 +30,14 @@ export type SilentDuesSnapshot = {
   totalMonthly: number; // Σ monthly-equivalent over the N dues-known — an honest FLOOR
 };
 
-// One weekly-export cycle (the Monday 7:00 AM subscription cadence): a dues
-// figure and a snapshot more than this many days apart no longer describe the
-// same cohort closely enough to show side by side.
-export const DUES_STALE_AFTER_DAYS = 7;
+// Roughly one billing cycle (~30 days): a dues figure and a snapshot more than
+// this many days apart no longer describe the same cohort closely enough to show
+// side by side. Wide enough that the #474 weekly census-only cron — which advances
+// the snapshot as_of ~7 days/run without a paired dues write — no longer hides a
+// still-recent dues floor; only a genuinely month-stale aggregate does. (The gate
+// is snapshot-anchored, not today-anchored: a frozen census would not age the
+// dollar by wall-clock — the as-of badge discloses snapshot age. Out of scope here.)
+export const DUES_STALE_AFTER_DAYS = 30;
 
 export type SilentChurnDuesHiddenReason =
   | 'noDues' // column null/absent/malformed → the standing "not available" line

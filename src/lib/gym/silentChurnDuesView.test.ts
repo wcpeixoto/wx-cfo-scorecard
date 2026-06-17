@@ -2,7 +2,7 @@
 //
 // Pins the honesty rules that make the live dues dollar safe to show: it renders
 // ONLY when the locally-written aggregate still matches what the card displays —
-// threshold exact-match on the RESOLVED value, within one weekly-export cycle of
+// threshold exact-match on the RESOLVED value, within roughly one billing cycle of
 // the snapshot (in EITHER direction), with real coverage. Everything else hides
 // the dollar with an explicit reason; a hidden state never fabricates $0 and a
 // real $0 floor with coverage is shown honestly (dues KNOWN at zero ≠ missing).
@@ -49,34 +49,36 @@ describe('deriveSilentChurnDuesView', () => {
   });
 
   it('hides when the dues export is OLDER than the snapshot by more than the window', () => {
-    // duesAsOf 2026-06-11 vs snapshot 2026-06-19 → 8 days, dues older.
-    const view = deriveSilentChurnDuesView(DUES, '2026-06-19', 21);
+    // duesAsOf 2026-06-11 vs snapshot 2026-07-21 → 40 days, dues older.
+    const view = deriveSilentChurnDuesView(DUES, '2026-07-21', 21);
     expect(view).toEqual({ kind: 'hidden', reason: 'stale', dues: DUES });
   });
 
   it('hides when the dues export is NEWER than the snapshot by more than the window', () => {
-    // duesAsOf 2026-06-11 vs snapshot 2026-06-03 → 8 days, dues newer. The gap is
+    // duesAsOf 2026-06-11 vs snapshot 2026-05-02 → 40 days, dues newer. The gap is
     // absolute — copy for this state must stay direction-neutral, since "predates
     // this snapshot" would lie here.
-    const view = deriveSilentChurnDuesView(DUES, '2026-06-03', 21);
+    const view = deriveSilentChurnDuesView(DUES, '2026-05-02', 21);
     expect(view).toEqual({ kind: 'hidden', reason: 'stale', dues: DUES });
   });
 
-  it('shows at EXACTLY the window boundary, both directions (stale is > , not >=)', () => {
-    // 7 days either side of 2026-06-11.
-    expect(deriveSilentChurnDuesView(DUES, '2026-06-18', 21).kind).toBe('shown');
-    expect(deriveSilentChurnDuesView(DUES, '2026-06-04', 21).kind).toBe('shown');
-    expect(DUES_STALE_AFTER_DAYS).toBe(7); // one weekly-export cycle — copy cites it
+  it('shows at EXACTLY the window boundary and hides one day past it (stale is > , not >=)', () => {
+    // 30 days either side of 2026-06-11 → shown; 31 days → stale.
+    expect(deriveSilentChurnDuesView(DUES, '2026-07-11', 21).kind).toBe('shown'); // +30
+    expect(deriveSilentChurnDuesView(DUES, '2026-05-12', 21).kind).toBe('shown'); // −30
+    expect(deriveSilentChurnDuesView(DUES, '2026-07-12', 21).kind).toBe('hidden'); // +31
+    expect(deriveSilentChurnDuesView(DUES, '2026-05-11', 21).kind).toBe('hidden'); // −31
+    expect(DUES_STALE_AFTER_DAYS).toBe(30); // ~one billing cycle — copy cites it
   });
 
   it('crosses a month boundary correctly (whole-day diff, not date arithmetic)', () => {
     const juneDues = { ...DUES, duesAsOf: '2026-06-28' };
-    expect(deriveSilentChurnDuesView(juneDues, '2026-07-05', 21).kind).toBe('shown'); // 7 days
-    expect(deriveSilentChurnDuesView(juneDues, '2026-07-06', 21)).toEqual({
+    expect(deriveSilentChurnDuesView(juneDues, '2026-07-28', 21).kind).toBe('shown'); // 30 days
+    expect(deriveSilentChurnDuesView(juneDues, '2026-07-29', 21)).toEqual({
       kind: 'hidden',
       reason: 'stale',
       dues: juneDues,
-    }); // 8 days
+    }); // 31 days
   });
 
   it('fails closed to stale when either date is unparseable (freshness unprovable)', () => {
@@ -110,9 +112,10 @@ describe('deriveSilentChurnDuesView', () => {
   });
 
   it('reports thresholdMismatch before staleness (most actionable reason first)', () => {
-    // Both wrong: T mismatched AND 30 days apart — the threshold reason wins
-    // because the owner can fix it instantly from Settings.
-    const view = deriveSilentChurnDuesView(DUES, '2026-07-11', 30);
+    // Both wrong: T mismatched AND 40 days apart (clearly stale under the 30-day
+    // rule) — the threshold reason wins because the owner fixes it instantly from
+    // Settings.
+    const view = deriveSilentChurnDuesView(DUES, '2026-07-21', 30);
     expect(view).toEqual({ kind: 'hidden', reason: 'thresholdMismatch', dues: DUES });
   });
 });

@@ -962,13 +962,17 @@ and Tenure all unchanged; bundle held `index-DqxxekpV.js` (no merge inside the r
 identities byte-identical before/after: sync-wodify-retention
 `ezbr_sha256 3ae170006fa0ca27ed9bb23b9e4c7f8482b83cdd616ab2da245e5893cf6a2719`
 (`updated_at 1781183398586`, `verify_jwt:true`, DISARMED held); ai-proxy `3d392f3e…`
-(`updated_at 1778341247547`) untouched. **OPERATIONAL COUPLING RULE (forward-looking,
-Reviewer-required):** the card's staleness gate is |duesAsOf − snapshot.asOf| ≤ 7 days. With
-no new census pull the pair ages TOGETHER (the $ stays shown; the badge dates disclose age).
-Any future gated census pull that advances `as_of` more than 7 days past the dues export will
-honestly HIDE the dollar until a fresh dues write — so PAIR every future census pull with a
-fresh weekly All Memberships export + dues write (this run's validated runbook is the
-template).
+(`updated_at 1778341247547`) untouched. **OPERATIONAL COUPLING RULE (forward-looking; staleness gap WIDENED 7→30 days, durable fix
+2026-06-17):** the card's staleness gate is |duesAsOf − snapshot.asOf| ≤ 30 days (≈ one billing
+cycle). With no new census pull the pair ages TOGETHER (the $ stays shown; the badge dates
+disclose age). The #474 weekly census-only cron advances `as_of` ~7 days/run with NO paired
+dues write, so the dollar now survives ~4 weekly runs before the gap exceeds 30 — weekly dues
+pairing is **no longer required** while the dues snapshot stays within the 30-day window. Only
+a genuinely month-stale dues aggregate (or a gated pull that lands >30 days past the export)
+honestly HIDES the dollar; refresh the All Memberships export + dues write within the cycle to
+keep it shown. **Residual (accepted, not solved here):** a FROZEN census (cron stopped) would
+not age the dollar by wall-clock, since the gate is snapshot-anchored, not today-anchored — the
+live as-of badge discloses snapshot age.
 
 **Question-0 — ACTION-tier verdict: DEFER auth (decided 2026-06-12; Reviewer DEFER +
 parity-check entries in the advisor log).** The app will NOT build its first auth/PII tier
