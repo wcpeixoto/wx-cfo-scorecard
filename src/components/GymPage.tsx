@@ -938,6 +938,13 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
           className="cohort-age-unknown-note"
         />
 
+        <p className="cohort-age-suppression-note">
+          A &ldquo;Lapsed&rdquo; count under 5 is hidden (shown as &ldquo;&lt;5&rdquo;) to protect
+          individuals. Whenever one is hidden, at least one other cell is hidden too so the small
+          count can&rsquo;t be backed out, which means a &ldquo;&lt;5&rdquo; may stand for a larger
+          real value — not a near-zero.
+        </p>
+
         <p className="cohort-age-caveat">
           Age groups come from each member&rsquo;s date of birth (age ranges only — birthdates
           never leave our system). &ldquo;Lapsed&rdquo; counts everyone whose membership is

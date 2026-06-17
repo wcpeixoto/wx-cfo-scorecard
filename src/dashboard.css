@@ -13587,7 +13587,8 @@ body {
 }
 .cohort-age-helper,
 .cohort-age-empty,
-.cohort-age-caveat {
+.cohort-age-caveat,
+.cohort-age-suppression-note {
   margin: 0;
   font-size: 14px;
   color: var(--text-secondary);
