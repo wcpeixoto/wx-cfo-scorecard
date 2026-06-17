@@ -1316,51 +1316,60 @@ lapsed.
 
 **§6 — Status model (LOCKED — `silentChurn.ts` UNTOUCHED).** Five buckets: Active/Healthy ·
 Active/Watch · Active/Silent · **Lapsed** · **Unknown** (no valid/derivable cohort — see §2; this is
-NOT ≈0, it absorbs age outliers). **Lapsed is membership-state, NOT attendance-recency** — it must
-NOT be folded into the locked `silentChurn.ts` classifier (this card does not modify it).
+NOT ≈0, it absorbs age outliers). **Lapsed = `client_status` Inactive (see §7).** Still
+membership-state, still NOT folded into `silentChurn.ts`, still inside its cohort. Five-bucket
+structure and the classifier separation are UNCHANGED.
 Healthy/Watch/Silent = attendance recency among evaluable active members; Lapsed members have no
 active membership to evaluate against and stay inside their cohort (their churn signal — never
 dropped).
 
-**§7 — Active / lapsed rule (LOCKED — row vs. member grain).** Two grains, do not conflate:
-- **Row-level ended/lost signal** (per membership row; what Wodify's Lost Memberships report
-  captures): `Expiration Date` passed AND `Autorenew` = No, OR `Deactivation Date` set.
-- **Member-level active/lapsed** (per Client ID, after §5 dedupe): **Active** = ≥1 current active row
-  (`Start Date` ≤ report date AND `Expiration Date` blank/open OR ≥ report date); **Lapsed** =
-  cohort/age history but NO current active row.
-- **Autorenew, two roles:** at member-level active status it must NOT override the date window (no
-  false-active bug); at row-level lost signal, "expired AND autorenew = No" is a valid ended-row
-  component. Same field, two grains, no contradiction.
-- **Validation:** the row-level date/deactivation basis was confirmed at source against Wodify's
-  **Lost Memberships** report (date/deactivation-keyed, no payment column). The member-level rollup
-  is OURS (§5). We do NOT consume the payment-keyed Class Plan Member Retention chart.
-- **>>> DATA SOURCE — REQUIRED, NOT YET IN PIPELINE (B2):** this rule needs **per-membership-row**
-  `Client ID`, `Start Date`, `Expiration Date`, `Deactivation Date`, `Membership Autorenew` for the
-  **FULL non-active population**. The current pipeline does NOT carry this — the only client export we
-  pull (`active_client_data_table`, 404 rows) is **active-only** with a rolled-up `Membership Status`
-  enum (Paid/No Membership/On Hold/Free), none of the per-row date fields, and structurally cannot
-  hold lapsed members. **Before lapsed can be built, the Builder WO must FIRST:** (1) identify the
-  actual Wodify export carrying those per-row fields with the **`Membership Active: Active` filter
-  relaxed** (likely the All Memberships standard report / ReportId 19 exported with the filter off —
-  confirm at source); (2) confirm its column set, PII class, and gating; (3) treat ingesting it as a
-  **NET-NEW gated data feed** (new pull + persistence), NOT a slice of existing data. Until that feed
-  is confirmed and ingested, §9 Read 2 is **not buildable** and must not be specced as if the data
-  exists.
-- Implementation notes: blank `Expiration` = open-ended → active (don't coerce); sentinel expiration
-  (e.g. `1900-01-01`) = unknown (not "expired in 1900").
+**§7 — Active / lapsed rule (LOCKED — `client_status` basis).**
+- **BASIS:** Wodify `client_status`, member-level after §5 dedupe. **Active** = `client_status`
+  Active; **Lapsed** = `client_status` Inactive. No date arithmetic, no per-membership-row feed, no
+  autorenew/deactivation logic.
+- **SOURCE:** the existing `/clients` pull, extended to read `date_of_birth`. One sweep returns
+  active + inactive (Reviewer-verified probe: 960 clients = 404 active / 556 inactive; DOB usable
+  95% active [20 × `1900-01-01` sentinels → Unknown] / 100% inactive). No net-new feed.
+- **MEMBER MOVEMENT PARITY IS STRUCTURAL.** Lapsed and MM's `inactive_total` MUST derive from the
+  SAME pull/aggregate row, so Σ(cohort lapsed) + Unknown = MM inactive *by construction* — never a
+  coincidental tie. (Deployed MM shows an older inactive count, e.g. 549; the build-time pull
+  refreshes it to the live figure, e.g. 556 — both reads update together.)
+- **STRUCTURAL-HONESTY NOTE.** `client_status` Inactive has NO never-membered guard — probe-confirmed:
+  `/clients` carries no membership-history field, and `member_since` is account-level "client since,"
+  not a membership-start guard (`is_converted_from_lead` unverified + would break MM parity → not
+  used). So Inactive can include a never-membered population (guardian / staff / legacy) of
+  UNQUANTIFIED size, unfilterable from `/clients`. Because guardian/staff/legacy profiles skew adult,
+  this population DOB-cohorts predominantly into **Adults 16+** — so the Adult lapsed cohort carries
+  this caveat most heavily and must never be read as "adult memberships ended." This is the SAME
+  population already disclosed on the Member Movement census and the tenure card — carried forward,
+  not new. The record must NOT present cohort-lapsed as a clean "memberships ended" count; whether the
+  card copy surfaces it is a §9/UI call.
+- **SUPERSEDED (do not revive):** the row-level lost signal (`Expiration` + `Autorenew` No, OR
+  `Deactivation Date`), the member-level in-force date rule, the cross-check against Wodify's Lost
+  Memberships report, the "OR `Deactivation Date` set" branch, and the B2 net-new non-active
+  Memberships feed. Reason: `client_status` ties to MM and is buildable from the existing pull; the
+  date-based path needs a feed that does not exist and can disagree with MM. The Lost-Memberships
+  date-basis finding (Lost = date-based: `Expiration` passed AND `Autorenew` No, OR `Deactivation
+  Date` set; payment-basis refuted; source-confirmed at the gym's Wodify Lost Memberships report) is
+  preserved locally, reference-only, no longer load-bearing here.
+- **Probe B (deactivation export) is MOOT** under this basis and is dropped.
 
 **§8 — Reuse + honesty constraints (LOCKED — reuse claim CORRECTED, B1).**
 - **`computeChurnRiskByTenureFromAggregate` is TENURE-keyed and carries NO age/cohort dimension — it
   CANNOT be reused as-is for cohort × recency.** The persisted Edge aggregate (`sync-wodify-retention`)
-  holds `active_total` / `days_absent_histogram` / `tenure_band_histogram` and **no age**; the
-  `/clients` pull never reads age. Reuse the risk *math/thresholds* (Healthy/Watch/Silent
-  definitions); the *aggregate they run over* is net-new (see §9 Read 1). Do NOT spec Read 1 as a view
-  over the live aggregate.
+  holds `active_total` / `days_absent_histogram` / `tenure_band_histogram` and **no age** today. The
+  cohort card's aggregate is **net-new** and GAINS a cohort (age-band) dimension; the `/clients` pull
+  is extended to read `date_of_birth`, banded server-side (`1900-01-01` + age outliers per §2 →
+  Unknown). Exact DOB is PII → read server-side, band counts out only — same posture as `member_since`
+  tenure. Reuse the risk *math/thresholds* (Healthy/Watch/Silent definitions); the *aggregate they run
+  over* is net-new (see §9 Read 1). Do NOT spec Read 1 as a view over the live aggregate.
 - Reuse `bandForTenure` + `unknownTenure` ONLY where a tenure dimension is actually present — not for
   the cohort dimension.
 - Known-base denominator (count / knownActiveTotal), never total_n. Cross-sectional copy only;
   mandatory survivorship footer.
-- k→1 suppression: all four cohorts clear the floor (~79/50/51/224); re-apply if finer splits are
+- k→1 suppression: the listed floors (~79/50/51/224) were the **active** age buckets; the cohort
+  split now ALSO applies to the **lapsed (inactive)** side — re-run the floor check on the
+  lapsed-per-cohort cells at build and suppress any that approach it. Re-apply if finer splits are
   displayed; the Unknown bucket is also subject to suppression if small.
 - **Aggregate-only output. No member rows, names, IDs, exact ages/dates, or dues in the payload. PII
   columns (Name, email, Birthday, exact Age, Client ID) never leave the server/local layer.** (This is
@@ -1369,35 +1378,28 @@ dropped).
 **§9 — Card display (RECOMMENDED: B) + build class per read.** Recommended: **B — two linked reads**
 (the 4×5 matrix is rejected for v1 — mixes attendance-risk and membership-state, analyst-heavy,
 against the calm/Nubank standard).
-- **Read 1 — cohort health bar (active members): Healthy / Watch / Silent per cohort.** BUILD CLASS:
-  **NET-NEW AGGREGATE (gated), NOT a render slice (B1)** — capture `age`, derive the cohort band
-  server-side, build an **age-band × attendance-recency** aggregate, new DB ALTER, gated write —
-  **this server-side path is CONTINGENT on must-confirm #1** (whether `/clients` exposes age/DOB); do
-  NOT lock this build class until that read-only shape-discovery runs. If `/clients` does not expose
-  age, the source path changes (demographics re-export carrying `Client ID`, or an Attendance pull).
-  Same build class as Segment Explorer 1b / the dues template. Reuses the thresholds, not the existing
-  tenure aggregate.
-- **Read 2 — lapsed count per cohort.** BUILD CLASS: **BLOCKED until §7's non-active Memberships feed
-  is confirmed and ingested (B2).** Net-new data feed; not buildable on current data.
-- **Sequencing implication:** both reads require a net-new feed/aggregate — neither is a slice of what
-  exists today. The Builder WO must scope both as **data-layer work first, render second** (the gap
-  that bit Segment Explorer). **v1 may ship Read 1 alone** if Read 2's feed isn't ready, provided the
-  card does not imply a lapsed number it can't compute.
+- **Read 1 — cohort health bar (active members): Healthy / Watch / Silent per cohort.** Must-confirm
+  #1 RESOLVED — source = extend the existing `/clients` pull with `date_of_birth` and derive the
+  cohort band server-side. Reuses the thresholds, not the existing tenure aggregate.
+- **Read 2 — lapsed count per cohort.** Basis = `client_status` Inactive (§7), read from the SAME
+  `/clients` pull/aggregate. **No longer BLOCKED; no net-new feed.**
+- **One pull, one aggregate:** both reads = ONE `/clients` pull → ONE server-side aggregate (cohort ×
+  status, × recency on the active side) → ONE gated run. This **SUPERSEDES** rev.2's "each read is its
+  own gated feed / its own gated run."
+- **Build class:** net-new aggregate, new column (cohort × status histogram), gated write — same
+  proven census/tenure pattern. **v1 ships both reads together** (no longer gated on a missing feed).
 
-**Reviewer must-confirm BEFORE build (RECORDED, do NOT build until resolved):**
-1. **Read 1 source decider.** Recency lives only on `/clients` (keyed by `id`); age lives only on the
-   demographics export (no `Client ID`). Before Read 1's build class locks, run a **live read-only
-   `/clients` shape-discovery** to determine whether the wire payload exposes age/DOB → if yes, a
-   server-side age-band × recency aggregate (extend the pull); if no, a demographics re-export that
-   carries `Client ID` to join to recency, or an Attendance-table pull. This is the pivot — §9 Read 1
-   assumes age can be added to the `/clients` pull, which this probe confirms or refutes.
-2. **Read 2 deactivation source.** §7's "OR `Deactivation Date` set" branch has **no confirmed
-   source** — All Memberships (ReportId 19) carries no `Deactivation Date` and no status column
-   (repo-verified via the dues parser's read columns). Confirm deactivation is recoverable from
-   another export, or **drop that branch**, before Read 2 build.
+**Reviewer must-confirm — RESOLVED at the rev.3 fold:**
+1. **Read 1 source decider — RESOLVED.** The live read-only `/clients` shape-discovery ran; the wire
+   payload exposes `date_of_birth`. Source = extend the existing `/clients` pull with `date_of_birth`,
+   band the cohort server-side (per §7 SOURCE / §9 Read 1). No demographics re-export or Attendance
+   pull.
+2. **Read 2 deactivation source — REMOVED (moot).** Under the `client_status` basis (§7 SUPERSEDED)
+   there is no deactivation-date branch to source; `/clients` carries no deactivation field.
 
-**Next step.** This fold IS the Reviewer-gate-#2 output. A Builder WO is drafted from §1–§9 + the two
-items above — data-layer first. Do not hand straight to a build slice until the two items clear.
+**Next step.** This fold IS the Reviewer-gate output. Both must-confirm items are now closed (§9
+resolves the Read-1 source; the deactivation branch is moot), so the Builder WO can scope the gated
+build slice from §1–§9 + §9's one-pull/one-aggregate plan — data-layer first.
 
 ---
 
