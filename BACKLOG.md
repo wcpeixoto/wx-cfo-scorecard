@@ -63,7 +63,7 @@ Premise check: Appears still necessary. Card-shell padding/radius/height normali
 _No Result / Why / Premise recorded in the Notion export — name and status migrated as-is._
 
 
-## Later (45)
+## Later (48)
 
 ### Expand systematic test coverage
 
@@ -743,6 +743,38 @@ Before building the Recovery card, run a probe for the `Client Sign-ins` endpoin
 
 Finish the current Risk by Time as Member card first. File this backlog item now. Run the `Client Sign-ins` probe separately.
 
+### Monthly Critical Groups — month-over-month delta
+
+**Status / Priority:** Later
+
+Result: A retention read that shows month-over-month change in the critical (at-risk / silent) groups, pairing the current snapshot with the nearest ~30-day-prior snapshot within a 21–45 day tolerance. When no clean prior match exists it shows worst-now-only, clearly labeled — never a fabricated delta.
+
+Why: Turns the point-in-time retention snapshot into the first longitudinal signal — whether the critical groups are growing or shrinking month over month — instead of a single static reading.
+
+Premise / blocker: Blocked on accumulated dated snapshots. The Tenure Snapshot Clock (the weekly Mon 12:00 UTC GitHub Action that upserts a dated aggregate row) builds the second delta endpoint beside the existing 2026-06-11 snapshot; the first in-band delta lands ~3–4 weekly runs out. The anchor-lock rule is already decided (nearest ~30-day-prior, 21–45 day tolerance, else worst-now-only labeled); build waits on the snapshots accumulating.
+
+### Program/style retention — Gi vs No-Gi (Phase 2)
+
+**Status / Priority:** Later
+
+Result: A program/style retention card that splits churn by real training discipline (Gi vs No-Gi, Competition vs Fundamentals), sourced from Attendance check-ins.
+
+Why: Shows whether retention differs by what members actually train — a signal the current age-derived cohort reads don't capture.
+
+Premise / blocker: Phase 2 — Attendance data only. `Programs` is NOT a usable cohort source: it is multi-valued and, for adults, lists plan ENTITLEMENT (the full ~20-program bundle; 5-member proof 2026-06-15), not training discipline. Real program/style discipline lives ONLY in Attendance check-ins, so this needs the Attendance table — a separate later pipeline, not a view over the live aggregate.
+
+Guardrail (do not violate): a class type's worth = retention strength × ease of acquisition, NOT churn alone. Do NOT build a cancel/keep recommendation on churn alone — a class that churns fast but is trivial to fill (a feeder) would be wrongly condemned, and one that holds members but is hard to fill needs protection. The acquisition axis (conversion / ease-of-acquisition by class type, authoritative source TBD) is not in Wodify or the repo and is parked under the Growth-Levers thread.
+
+### Churn by Belt — longitudinal / seasonal
+
+**Status / Priority:** Later
+
+Result: A longitudinal Churn-by-Belt card — churn history across belt levels, surfacing seasonal patterns in how members progress and drop off by rank.
+
+Why: Belt progression is a core engagement signal in a BJJ gym; a seasonal churn-by-belt read shows where on the rank ladder members are most at risk over time.
+
+Premise / blocker: Belt data is EXPORT-FEASIBLE (not blocked) via Admin UI → People → Progressions (Current + Previous Levels, with Date Achieved) — Wodify recon 2026-06-14, read-only. But the desired card is the longitudinal/seasonal version, which needs the dated Previous Levels data plus accumulated history — a NEW pipeline, not a cross-sectional view over the live aggregate. PARKED until the cross-sectional retention cards are shipped and stable; the Progressions column-verification intake is deferred until belt comes off the park.
+
 
 ## Cleanup (5)
 
@@ -995,4 +1027,4 @@ CFO Assistant — paused 2026-05-23 (master)
 
 ---
 
-_Migrated from the Notion "Wx CFO Scorecard — Backlog" export, 2026-06-17. Statuses as-of export; a grooming/reconciliation pass against shipped state is pending (some Later items may already be done)._
+_Migrated from the Notion "Wx CFO Scorecard — Backlog" export, 2026-06-17 (Step 1). Three retention candidates appended to Later on 2026-06-17 (Step 2) from the retired retention plan doc. Statuses as-of migration; a grooming/reconciliation pass against shipped state is pending (some Later items may already be done)._

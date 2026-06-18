@@ -294,6 +294,14 @@ rate/toggle. Unknown is an unresolved data state, not a business category —
 future work splits it into roles/no-show/data-quality; parked cards add this
 contract when they go live.
 
+**Retention data integrity (governs every retention card, sample or live).**
+
+- **No fake history.** Without dated events in the data, do not infer trends,
+  recovery, cancellations, or net movement over time. An honest empty result
+  beats an invented one.
+- **`$ at risk` is active-only.** Paused/ended members carry `monthlyDues: 0`
+  and self-exclude — never sum dues across statuses.
+
 ---
 
 ## Gotchas
