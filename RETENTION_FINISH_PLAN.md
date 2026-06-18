@@ -1,3 +1,7 @@
+> **RETIRED 2026-06-17** — reference / decision-record archive only. Backlog → `BACKLOG.md` (single source); durable rules → `AGENTS.md` + `UI_RULES.md`. NOT deleted: 46 code references cite its §-anchors.
+
+---
+
 # Retention Finish Plan
 
 ## Purpose

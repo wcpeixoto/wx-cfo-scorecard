@@ -1206,6 +1206,15 @@ line-height: 1;
 Reconcile exactly with `src/dashboard.css`. Never encode the domain in
 color alone — the label is load-bearing.
 
+### Sample-data badge vs gate note
+
+**Fixture-backed cards show the `Sample data` badge.** A card with no data
+behind it (parked/blocked shell) must not — use the **gate note** instead.
+
+The badge means "real compute, sample numbers"; an empty parked/blocked shell
+has no numbers to label, so an explicit gate note (the parked/blocked reason in
+the card body) is the honest signal — never a `Sample data` badge over nothing.
+
 ---
 
 ## Icon implementation pattern
