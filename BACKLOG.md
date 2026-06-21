@@ -4,7 +4,7 @@
 
 Every item carries the canonical three fields — **Result** (what changes for the owner), **Why** (the problem / risk / friction it reduces), and **Premise** (whether it is still necessary or has been overtaken) — in its body below, exactly as migrated.
 
-**Status taxonomy:** `Now` · `Next` · `Later` · `Cleanup` · `Paused — CFO Assistant`. One section per status follows (no items are currently `Now`). A `Retention (priority)` focus band sits above `Next` (2026-06-20 reprioritization); items lifted into it keep their original status label.
+**Status taxonomy:** `Now` · `Next` · `Later` · `Cleanup` · `Paused — CFO Assistant`. One section per status follows (no items are currently `Now`). A `Retention (priority)` focus band sits above `Next` (2026-06-21 reprioritization).
 
 ---
 
@@ -28,7 +28,7 @@ Premise / blocker: GATED on the substrate probe (prior item). HARD rule — "No 
 
 ### Monthly Critical Groups — month-over-month delta
 
-**Status / Priority:** Later
+**Status / Priority:** Retention (priority)
 
 Result: A retention read that shows month-over-month change in the critical (at-risk / silent) groups, pairing the current snapshot with the nearest ~30-day-prior snapshot within a 21–45 day tolerance. When no clean prior match exists it shows worst-now-only, clearly labeled — never a fabricated delta.
 
@@ -38,7 +38,7 @@ Premise / blocker: Blocked on accumulated dated snapshots. The Tenure Snapshot C
 
 ### Churn by Belt — longitudinal / seasonal
 
-**Status / Priority:** Later
+**Status / Priority:** Retention (priority)
 
 Result: A longitudinal Churn-by-Belt card — churn history across belt levels, surfacing seasonal patterns in how members progress and drop off by rank.
 
@@ -48,7 +48,7 @@ Premise / blocker: Belt data is EXPORT-FEASIBLE (not blocked) via Admin UI → P
 
 ### Retention: Silent Churn split — Recovery card + Today polish
 
-**Status / Priority:** Later · P3
+**Status / Priority:** Retention (priority) · P3
 
 Separate "who is at risk now" (Today, exists) from "are we getting better at recovering at-risk members" (Recovery, performance-over-time). Recovery is blocked on dated check-in history. Do not interrupt the current Risk by Time as Member rotation.
 
@@ -113,7 +113,7 @@ Finish the current Risk by Time as Member card first. File this backlog item now
 
 ### Program/style retention — Gi vs No-Gi (Phase 2)
 
-**Status / Priority:** Later
+**Status / Priority:** Retention (priority)
 
 Result: A program/style retention card that splits churn by real training discipline (Gi vs No-Gi, Competition vs Fundamentals), sourced from Attendance check-ins.
 
@@ -1046,4 +1046,4 @@ CFO Assistant — paused 2026-05-23 (master)
 
 ---
 
-_Migrated from the Notion "Wx CFO Scorecard — Backlog" export, 2026-06-17 (Step 1). Three retention candidates appended to Later on 2026-06-17 (Step 2) from the retired retention plan doc. Statuses as-of migration; a grooming/reconciliation pass against shipped state is pending (some Later items may already be done). Reprioritized 2026-06-20: a `Retention (priority)` section was created above `Next` — 4 retention items lifted from Later (48→44) and 2 new items added (churn time-series substrate probe + churn-evolution-over-time chart), 6 total in dependency order._
+_Migrated from the Notion "Wx CFO Scorecard — Backlog" export, 2026-06-17 (Step 1). Three retention candidates appended to Later on 2026-06-17 (Step 2) from the retired retention plan doc. Statuses as-of migration; a grooming/reconciliation pass against shipped state is pending (some Later items may already be done). Reprioritized 2026-06-21: a `Retention (priority)` section was created above `Next` — 4 retention items lifted from Later (48→44) and 2 new items added (churn time-series substrate probe + churn-evolution-over-time chart), 6 total in dependency order._
