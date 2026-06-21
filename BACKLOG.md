@@ -4,9 +4,125 @@
 
 Every item carries the canonical three fields — **Result** (what changes for the owner), **Why** (the problem / risk / friction it reduces), and **Premise** (whether it is still necessary or has been overtaken) — in its body below, exactly as migrated.
 
-**Status taxonomy:** `Now` · `Next` · `Later` · `Cleanup` · `Paused — CFO Assistant`. One section per status follows (no items are currently `Now`).
+**Status taxonomy:** `Now` · `Next` · `Later` · `Cleanup` · `Paused — CFO Assistant`. One section per status follows (no items are currently `Now`). A `Retention (priority)` focus band sits above `Next` (2026-06-20 reprioritization); items lifted into it keep their original status label.
 
 ---
+
+## Retention (priority) (6)
+
+### Churn time-series substrate probe — reconstruction feasibility
+
+Result: A read-only, non-PII probe that determines whether a historical churn curve can be reconstructed from per-membership start + end/cancellation dates in the All-Memberships export — i.e. whether the churn-evolution chart can be backed by REAL history now, versus waiting on forward snapshots to accrue.
+
+Why: The churn-evolution chart is blocked on time-depth — the weekly Tenure Snapshot Clock (#474) only began accumulating 2026-06-11 (~weeks deep), so a 6-month / 1yr / 2yr window is near-empty until ~Dec 2026. If the All-Memberships export carries end-dates, a real multi-year curve is buildable immediately; if not, the chart waits on snapshot accrual. This probe is the cheap read-only test that picks the path.
+
+Premise / guardrail: §5 safe-output contract — emit ONLY field-name presence (boolean), populated coverage (counts/percent), and a feasibility verdict; NEVER member rows, names, dates, or dues. Export stays local (~/.config/wx-cfo/dues/), 0600, never committed (CFO repo is PUBLIC). Use the RAW export ("Keep the data formatted" UNCHECKED → ISO dates). Any eventual reconstruction is server-side → aggregate (§4), never member-level in the SPA. Builder drafts probe plan → Reviewer gates → then run.
+
+### Churn-evolution-over-time chart
+
+Result: A churn-evolution chart (follow the existing ProjectedCashBalanceChart.tsx rendering pattern + chartTokens) showing churn/retention over time, with two toggles: TIMEFRAME (6 months [default] / 1 year / 2 years / all / custom) and SEGMENT (age cohort: Kids 3–6, Kids 7–9, Teens 10–15, Adults 16+ — reuse cohortBands.ts + the per-snapshot cohort_histogram already written weekly by sync-wodify-retention).
+
+Why: Turns the point-in-time retention cards into the first true longitudinal view — whether churn is improving or worsening, by segment, over time. The north-star retention read.
+
+Premise / blocker: GATED on the substrate probe (prior item). HARD rule — "No fake history" (AGENTS.md:299): the time axis shows only real dated data; empty windows render honestly empty, never interpolated or fabricated. Segment axis reuses the shipped cohort bands + the weekly cohort_histogram (no schema change). Substrate = historical reconstruction IF the probe confirms end-dates, else forward snapshots (full 6-month view honest ~Dec 2026).
+
+### Monthly Critical Groups — month-over-month delta
+
+**Status / Priority:** Later
+
+Result: A retention read that shows month-over-month change in the critical (at-risk / silent) groups, pairing the current snapshot with the nearest ~30-day-prior snapshot within a 21–45 day tolerance. When no clean prior match exists it shows worst-now-only, clearly labeled — never a fabricated delta.
+
+Why: Turns the point-in-time retention snapshot into the first longitudinal signal — whether the critical groups are growing or shrinking month over month — instead of a single static reading.
+
+Premise / blocker: Blocked on accumulated dated snapshots. The Tenure Snapshot Clock (the weekly Mon 12:00 UTC GitHub Action that upserts a dated aggregate row) builds the second delta endpoint beside the existing 2026-06-11 snapshot; the first in-band delta lands ~3–4 weekly runs out. The anchor-lock rule is already decided (nearest ~30-day-prior, 21–45 day tolerance, else worst-now-only labeled); build waits on the snapshots accumulating.
+
+### Churn by Belt — longitudinal / seasonal
+
+**Status / Priority:** Later
+
+Result: A longitudinal Churn-by-Belt card — churn history across belt levels, surfacing seasonal patterns in how members progress and drop off by rank.
+
+Why: Belt progression is a core engagement signal in a BJJ gym; a seasonal churn-by-belt read shows where on the rank ladder members are most at risk over time.
+
+Premise / blocker: Belt data is EXPORT-FEASIBLE (not blocked) via Admin UI → People → Progressions (Current + Previous Levels, with Date Achieved) — Wodify recon 2026-06-14, read-only. But the desired card is the longitudinal/seasonal version, which needs the dated Previous Levels data plus accumulated history — a NEW pipeline, not a cross-sectional view over the live aggregate. PARKED until the cross-sectional retention cards are shipped and stable; the Progressions column-verification intake is deferred until belt comes off the park.
+
+### Retention: Silent Churn split — Recovery card + Today polish
+
+**Status / Priority:** Later · P3
+
+Separate "who is at risk now" (Today, exists) from "are we getting better at recovering at-risk members" (Recovery, performance-over-time). Recovery is blocked on dated check-in history. Do not interrupt the current Risk by Time as Member rotation.
+
+#### Context
+
+The current Silent Churn card answers: **Who is at risk right now?** That card is useful and already exists.
+
+The next improvement is to separate two different questions:
+
+1. **Silent Churn Today** — Who is currently at risk? Operational card. Buildable now.
+2. **Silent Churn Recovery** — Are we getting better at bringing at-risk members back? Performance-over-time card. Blocked until we confirm dated check-in history exists.
+
+This does **not** conflict with the current Risk by Time as Member card, which lives in the Patterns section and answers a different question: *which membership-duration group holds the most risk?*
+
+#### Priority
+
+Do not interrupt the current Patterns rotation. Finish **Risk by Time as Member** first, then revisit the Silent Churn split.
+
+#### Future work
+
+##### 1. Silent Churn Today polish
+
+Current card exists. Later polish:
+
+- Reduce prominence of member names.
+- Move names into a drawer or "View members" detail area.
+- Keep current risk count and monthly dues at risk visible.
+- Keep Sample data badge while using fixture data.
+
+##### 2. Silent Churn Recovery card
+
+**Blocked.** Do not build until we confirm dated attendance/check-in history. This card should eventually show:
+
+- Newly at-risk members
+- Recovered members
+- Still at-risk members
+- Recovery rate
+- Risk trend over time
+
+*Example takeaway: Recovered 7 of 12 at-risk members.*
+
+#### Data gate
+
+Before building the Recovery card, run a probe for the `Client Sign-ins` endpoint.
+
+- If it provides **dated check-in events**, the Recovery card becomes buildable.
+- If it only provides **latest check-in** data, Recovery stays parked.
+
+#### Guardrails
+
+- Do not fake recovery data.
+- Do not infer recovery from only `lastCheckIn`.
+- Do not add real member storage yet.
+- Do not add PII fields.
+- Do not add Wodify integration as part of this card.
+- Keep all member-risk definitions shared with the existing Retention classifier.
+- Future cards must use the same `classifyMember` logic so Silent Churn, Attendance Health, and Risk by Time as Member do not drift.
+
+#### Current decision
+
+Finish the current Risk by Time as Member card first. File this backlog item now. Run the `Client Sign-ins` probe separately.
+
+### Program/style retention — Gi vs No-Gi (Phase 2)
+
+**Status / Priority:** Later
+
+Result: A program/style retention card that splits churn by real training discipline (Gi vs No-Gi, Competition vs Fundamentals), sourced from Attendance check-ins.
+
+Why: Shows whether retention differs by what members actually train — a signal the current age-derived cohort reads don't capture.
+
+Premise / blocker: Phase 2 — Attendance data only. `Programs` is NOT a usable cohort source: it is multi-valued and, for adults, lists plan ENTITLEMENT (the full ~20-program bundle; 5-member proof 2026-06-15), not training discipline. Real program/style discipline lives ONLY in Attendance check-ins, so this needs the Attendance table — a separate later pipeline, not a view over the live aggregate.
+
+Guardrail (do not violate): a class type's worth = retention strength × ease of acquisition, NOT churn alone. Do NOT build a cancel/keep recommendation on churn alone — a class that churns fast but is trivial to fill (a feeder) would be wrongly condemned, and one that holds members but is hard to fill needs protection. The acquisition axis (conversion / ease-of-acquisition by class type, authoritative source TBD) is not in Wodify or the repo and is parked under the Growth-Levers thread.
+
 
 ## Next (6)
 
@@ -63,7 +179,7 @@ Premise check: Appears still necessary. Card-shell padding/radius/height normali
 _No Result / Why / Premise recorded in the Notion export — name and status migrated as-is._
 
 
-## Later (48)
+## Later (44)
 
 ### Expand systematic test coverage
 
@@ -678,103 +794,6 @@ Still needed, not urgent — forecast-only. Surfaced 2026-06-01 during the Event
 
 Either way, code and copy should move together. Reserve is unaffected by this decision.
 
-### Retention: Silent Churn split — Recovery card + Today polish
-
-**Status / Priority:** Later · P3
-
-Separate "who is at risk now" (Today, exists) from "are we getting better at recovering at-risk members" (Recovery, performance-over-time). Recovery is blocked on dated check-in history. Do not interrupt the current Risk by Time as Member rotation.
-
-#### Context
-
-The current Silent Churn card answers: **Who is at risk right now?** That card is useful and already exists.
-
-The next improvement is to separate two different questions:
-
-1. **Silent Churn Today** — Who is currently at risk? Operational card. Buildable now.
-2. **Silent Churn Recovery** — Are we getting better at bringing at-risk members back? Performance-over-time card. Blocked until we confirm dated check-in history exists.
-
-This does **not** conflict with the current Risk by Time as Member card, which lives in the Patterns section and answers a different question: *which membership-duration group holds the most risk?*
-
-#### Priority
-
-Do not interrupt the current Patterns rotation. Finish **Risk by Time as Member** first, then revisit the Silent Churn split.
-
-#### Future work
-
-##### 1. Silent Churn Today polish
-
-Current card exists. Later polish:
-
-- Reduce prominence of member names.
-- Move names into a drawer or "View members" detail area.
-- Keep current risk count and monthly dues at risk visible.
-- Keep Sample data badge while using fixture data.
-
-##### 2. Silent Churn Recovery card
-
-**Blocked.** Do not build until we confirm dated attendance/check-in history. This card should eventually show:
-
-- Newly at-risk members
-- Recovered members
-- Still at-risk members
-- Recovery rate
-- Risk trend over time
-
-*Example takeaway: Recovered 7 of 12 at-risk members.*
-
-#### Data gate
-
-Before building the Recovery card, run a probe for the `Client Sign-ins` endpoint.
-
-- If it provides **dated check-in events**, the Recovery card becomes buildable.
-- If it only provides **latest check-in** data, Recovery stays parked.
-
-#### Guardrails
-
-- Do not fake recovery data.
-- Do not infer recovery from only `lastCheckIn`.
-- Do not add real member storage yet.
-- Do not add PII fields.
-- Do not add Wodify integration as part of this card.
-- Keep all member-risk definitions shared with the existing Retention classifier.
-- Future cards must use the same `classifyMember` logic so Silent Churn, Attendance Health, and Risk by Time as Member do not drift.
-
-#### Current decision
-
-Finish the current Risk by Time as Member card first. File this backlog item now. Run the `Client Sign-ins` probe separately.
-
-### Monthly Critical Groups — month-over-month delta
-
-**Status / Priority:** Later
-
-Result: A retention read that shows month-over-month change in the critical (at-risk / silent) groups, pairing the current snapshot with the nearest ~30-day-prior snapshot within a 21–45 day tolerance. When no clean prior match exists it shows worst-now-only, clearly labeled — never a fabricated delta.
-
-Why: Turns the point-in-time retention snapshot into the first longitudinal signal — whether the critical groups are growing or shrinking month over month — instead of a single static reading.
-
-Premise / blocker: Blocked on accumulated dated snapshots. The Tenure Snapshot Clock (the weekly Mon 12:00 UTC GitHub Action that upserts a dated aggregate row) builds the second delta endpoint beside the existing 2026-06-11 snapshot; the first in-band delta lands ~3–4 weekly runs out. The anchor-lock rule is already decided (nearest ~30-day-prior, 21–45 day tolerance, else worst-now-only labeled); build waits on the snapshots accumulating.
-
-### Program/style retention — Gi vs No-Gi (Phase 2)
-
-**Status / Priority:** Later
-
-Result: A program/style retention card that splits churn by real training discipline (Gi vs No-Gi, Competition vs Fundamentals), sourced from Attendance check-ins.
-
-Why: Shows whether retention differs by what members actually train — a signal the current age-derived cohort reads don't capture.
-
-Premise / blocker: Phase 2 — Attendance data only. `Programs` is NOT a usable cohort source: it is multi-valued and, for adults, lists plan ENTITLEMENT (the full ~20-program bundle; 5-member proof 2026-06-15), not training discipline. Real program/style discipline lives ONLY in Attendance check-ins, so this needs the Attendance table — a separate later pipeline, not a view over the live aggregate.
-
-Guardrail (do not violate): a class type's worth = retention strength × ease of acquisition, NOT churn alone. Do NOT build a cancel/keep recommendation on churn alone — a class that churns fast but is trivial to fill (a feeder) would be wrongly condemned, and one that holds members but is hard to fill needs protection. The acquisition axis (conversion / ease-of-acquisition by class type, authoritative source TBD) is not in Wodify or the repo and is parked under the Growth-Levers thread.
-
-### Churn by Belt — longitudinal / seasonal
-
-**Status / Priority:** Later
-
-Result: A longitudinal Churn-by-Belt card — churn history across belt levels, surfacing seasonal patterns in how members progress and drop off by rank.
-
-Why: Belt progression is a core engagement signal in a BJJ gym; a seasonal churn-by-belt read shows where on the rank ladder members are most at risk over time.
-
-Premise / blocker: Belt data is EXPORT-FEASIBLE (not blocked) via Admin UI → People → Progressions (Current + Previous Levels, with Date Achieved) — Wodify recon 2026-06-14, read-only. But the desired card is the longitudinal/seasonal version, which needs the dated Previous Levels data plus accumulated history — a NEW pipeline, not a cross-sectional view over the live aggregate. PARKED until the cross-sectional retention cards are shipped and stable; the Progressions column-verification intake is deferred until belt comes off the park.
-
 
 ## Cleanup (5)
 
@@ -1027,4 +1046,4 @@ CFO Assistant — paused 2026-05-23 (master)
 
 ---
 
-_Migrated from the Notion "Wx CFO Scorecard — Backlog" export, 2026-06-17 (Step 1). Three retention candidates appended to Later on 2026-06-17 (Step 2) from the retired retention plan doc. Statuses as-of migration; a grooming/reconciliation pass against shipped state is pending (some Later items may already be done)._
+_Migrated from the Notion "Wx CFO Scorecard — Backlog" export, 2026-06-17 (Step 1). Three retention candidates appended to Later on 2026-06-17 (Step 2) from the retired retention plan doc. Statuses as-of migration; a grooming/reconciliation pass against shipped state is pending (some Later items may already be done). Reprioritized 2026-06-20: a `Retention (priority)` section was created above `Next` — 4 retention items lifted from Later (48→44) and 2 new items added (churn time-series substrate probe + churn-evolution-over-time chart), 6 total in dependency order._
