@@ -24,3 +24,8 @@ docs/*.pdf
 
 # local Wodify recon docs — contain member names (real PII); keep local, never publish to this public repo
 /Wodify/
+
+# local Wodify "Member Retention Rates" CSV — monthly member counts/churn are business-sensitive and
+# the repo is PUBLIC. Seed Supabase from it (scripts/wodify/seedMemberRetentionRates.ts); never commit.
+wodify_*retention*.csv
+*member_retention*.csv

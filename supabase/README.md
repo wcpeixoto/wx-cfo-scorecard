@@ -127,3 +127,20 @@ For a first controlled test, policies should ensure:
 Avoid broad anonymous read/write policies in production.
 
 For this branch's first real test, the provided policy file is intentionally narrower than fully-open anon access, but it is still only a temporary staging policy because it allows anon access inside one workspace.
+
+## member_retention_rates (Class Plan Member Retention)
+
+`member_retention_rates_schema.sql` adds the anon-readable, **non-PII** monthly aggregate behind the
+Retention page's churn-evolution chart (monthly member counts + a renewal-retention rate — never
+member rows). Apply it in the SQL Editor like the other schema files; it is order-independent and
+self-contained (DDL + grants + RLS in one file).
+
+Seeding is **manual and human-gated** (no edge writer for this table yet):
+
+1. Export Wodify Analytics → Custom Reports Beta → "Member Retention Rates" to a local CSV.
+2. `npx tsx scripts/wodify/seedMemberRetentionRates.ts <csv>` — prints idempotent upsert SQL to
+   stdout (the earliest month is flagged `is_seed_boundary=true`). The script writes nothing.
+3. Run that SQL via an authorized Supabase MCP `execute_sql` (the `silent_dues_snapshot` precedent).
+
+The CSV is gitignored — the repo is public and the monthly counts are business-sensitive. Re-running
+the export + reseed refreshes the series (upsert on `(workspace_id, period_month)`).
