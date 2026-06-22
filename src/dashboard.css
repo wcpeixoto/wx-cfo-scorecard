@@ -13648,6 +13648,15 @@ body {
 }
 
 /* Class Plan Member Retention — churn-evolution chart card (Patterns section). */
+.retention-evolution-body {
+  /* Real-content body: a vertical stack (controls → full-width chart → caption),
+     NOT the centered-row placeholder shell from .gym-card-body. Mirrors the
+     sibling Patterns cards (.churn-tenure-body, .member-movement-body) so the
+     chart fills the card width instead of collapsing to its 300px default. */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
 .retention-evolution-titlerow {
   display: flex;
   align-items: center;
