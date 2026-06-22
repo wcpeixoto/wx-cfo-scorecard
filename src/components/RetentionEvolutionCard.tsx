@@ -115,7 +115,7 @@ export function RetentionEvolutionCard() {
         </p>
       </header>
 
-      <div className="gym-card-body retention-evolution-body">
+      <div className="retention-evolution-body">
         <div className="retention-evolution-controls">
           <PeriodDropdown
             value={timeframe}
