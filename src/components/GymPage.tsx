@@ -46,6 +46,7 @@ import {
   fetchLatestRetentionAggregate,
   type RetentionAggregateSnapshot,
 } from '../lib/gym/fetchRetentionAggregate';
+import { RetentionEvolutionCard } from './RetentionEvolutionCard';
 
 export function GymPage() {
   // RETENTION_FINISH_PLAN.md §6: fetch the live Wodify aggregate ONCE here at page
@@ -106,6 +107,7 @@ export function GymPage() {
               <p className="gym-section-helper">Monthly trends that explain where churn is happening.</p>
             </div>
             <div className="gym-card-grid">
+              <RetentionEvolutionCard />
               <MemberMovementCard snapshot={snapshot} />
               <ChurnRiskByTenureCard snapshot={snapshot} />
               <CohortRetentionCard snapshot={snapshot} />

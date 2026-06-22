@@ -13646,3 +13646,44 @@ body {
   font-size: 13px;
   color: var(--text-secondary);
 }
+
+/* Class Plan Member Retention — churn-evolution chart card (Patterns section). */
+.retention-evolution-titlerow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.retention-evolution-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.retention-evolution-controls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.retention-evolution-custom-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.retention-evolution-range-sep {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.retention-evolution-caption {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.retention-evolution-empty {
+  margin: 16px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
