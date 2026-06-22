@@ -52,7 +52,7 @@ export default function RetentionEvolutionChart({ points, height = 300 }: Retent
         type: 'gradient',
         gradient: { shade: 'light', type: 'vertical', opacityFrom: 0.5, opacityTo: 0, stops: [0, 100] },
       },
-      stroke: { width: 2, curve: 'smooth', lineCap: 'butt', dashArray: 0 },
+      stroke: { width: 2, curve: 'straight', lineCap: 'butt', dashArray: 0 },
       dataLabels: { enabled: false },
       markers: {
         size: 0,
