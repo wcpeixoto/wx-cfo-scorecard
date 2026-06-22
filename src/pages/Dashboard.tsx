@@ -575,15 +575,15 @@ function daysBetweenDateTokens(startDate: string, endDate: string): number | nul
   return Math.round((end.getTime() - start.getTime()) / 86400000);
 }
 
-function formatRelativeUpdatedLabel(lastUpdatedDate: string | null): string {
-  if (!lastUpdatedDate) return 'Updated recently';
+// The header pill reports when the dataset was last *synced* (imported), not the
+// date of the newest transaction — re-importing always reflects "today" even when
+// the bank/model data tails off a couple days back. Shows the literal synced day,
+// with a friendly same-day form.
+function formatLastSyncedLabel(lastSyncedDate: string | null): string {
+  if (!lastSyncedDate) return 'Not synced yet';
   const today = toISODateOnly(new Date());
-  if (!today) return `Updated ${formatDateLabel(lastUpdatedDate)}`;
-  const dayDiff = daysBetweenDateTokens(lastUpdatedDate, today);
-  if (dayDiff === null || dayDiff < 0) return `Updated ${formatDateLabel(lastUpdatedDate)}`;
-  if (dayDiff === 0) return 'Updated Today';
-  if (dayDiff === 1) return 'Updated 1 day ago';
-  return `Updated ${dayDiff} days ago`;
+  if (today && daysBetweenDateTokens(lastSyncedDate, today) === 0) return 'Synced today';
+  return `Synced ${formatDateLabel(lastSyncedDate)}`;
 }
 
 function formatMonthRangeLabel(startMonth: string, endMonth: string): string {
@@ -1268,15 +1268,20 @@ export default function Dashboard() {
     [previousCalendarMonth]
   );
   const latestAvailableTxnDate = useMemo(() => getLatestTxnDate(baseTxns), [baseTxns]);
-  const lastUpdatedDate = useMemo(() => {
-    if (latestAvailableTxnDate) return latestAvailableTxnDate;
-    if (lastImportSummary?.importedAtIso) return toISODateOnly(lastImportSummary.importedAtIso);
-    if (activeDataSet?.fetchedAtIso) return toISODateOnly(activeDataSet.fetchedAtIso);
-    return null;
+  const lastSyncedDate = useMemo(() => {
+    // Prefer when the dataset was last imported (its sync moment). Wrap the ISO
+    // timestamp in new Date() so it resolves to the local calendar day, not the
+    // UTC date written in the string. Fall back to the newest transaction date.
+    const syncedIso = lastImportSummary?.importedAtIso ?? activeDataSet?.fetchedAtIso ?? null;
+    if (syncedIso) {
+      const localSyncedDate = toISODateOnly(new Date(syncedIso));
+      if (localSyncedDate) return localSyncedDate;
+    }
+    return latestAvailableTxnDate;
   }, [activeDataSet?.fetchedAtIso, lastImportSummary?.importedAtIso, latestAvailableTxnDate]);
-  const lastUpdatedLabel = useMemo(
-    () => formatRelativeUpdatedLabel(lastUpdatedDate),
-    [lastUpdatedDate]
+  const lastSyncedLabel = useMemo(
+    () => formatLastSyncedLabel(lastSyncedDate),
+    [lastSyncedDate]
   );
   const discoveredAccountRecords = useMemo(() => discoverAccountRecords(baseTxns), [baseTxns]);
 
@@ -2899,7 +2904,7 @@ export default function Dashboard() {
       <div className="app-main-column">
         <AppHeader
           onOpenTransactions={() => setIsTxnDrawerOpen(true)}
-          updatedLabel={lastUpdatedLabel}
+          updatedLabel={lastSyncedLabel}
           onUpdatedClick={() => navigateToTab('settings')}
         />
         {isTxnDrawerOpen && (
