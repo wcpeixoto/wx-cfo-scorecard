@@ -13647,58 +13647,42 @@ body {
   color: var(--text-secondary);
 }
 
-/* Class Plan Member Retention — churn-evolution chart card (Patterns section). */
-.retention-evolution-body {
-  /* 2/3 chart + 1/3 cohort-composition rail on desktop; stacks on narrow widths.
-     Real-content body (NOT the centered-row .gym-card-body placeholder shell). */
-  flex: 1;
+/* Class Plan Member Churn/Retention chart card + "Active members by age group" card
+   (Patterns section), laid out 2/3 + 1/3 as two separate cards via .retention-split. */
+.retention-split {
+  grid-column: 1 / -1; /* full grid width, then split below */
   display: flex;
-  flex-direction: row;
-  gap: 24px;
+  gap: 16px;
   align-items: stretch;
 }
-.retention-evolution-main {
-  /* Chart column (2/3): controls (top-right) → full-width chart → caption.
-     min-width:0 lets the ApexChart shrink to the column instead of forcing its
-     intrinsic width. */
+.retention-split > * {
+  min-width: 0; /* let the chart card shrink so ApexChart sizes to its column */
+}
+.retention-split .retention-evolution-card {
   flex: 2 1 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
 }
-.retention-evolution-segments {
-  /* Cohort rail (1/3) — TailAdmin "Traffic Source" style: each age group as a
-     labelled row with a proportional bar. */
+.retention-split .members-by-age-card {
   flex: 1 1 0;
-  min-width: 0;
+}
+.retention-evolution-body {
+  /* Chart column: controls (top-right) → full-width chart → caption. */
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding-left: 24px;
-  border-left: 1px solid var(--line);
 }
-.retention-evolution-segments-head {
+/* "Active members by age group" card — TailAdmin "Traffic Source" style: each age
+   group as a labelled row with a proportional bar (house .eff-bar track). */
+.members-by-age-body {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
-.retention-evolution-segments-title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-.retention-evolution-segments-sub {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.retention-evolution-segments-empty {
+.members-by-age-empty {
   margin: 0;
   font-size: 13px;
   color: var(--text-secondary);
 }
-.retention-evolution-segment-list {
+.members-by-age-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -13706,47 +13690,41 @@ body {
   flex-direction: column;
   gap: 14px;
 }
-.retention-evolution-segment {
+.members-by-age-row {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.retention-evolution-segment-meta {
+.members-by-age-meta {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
 }
-.retention-evolution-segment-label {
+.members-by-age-label {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
 }
-.retention-evolution-segment-value {
+.members-by-age-value {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary);
 }
-.retention-evolution-segment-bar {
+.members-by-age-bar {
   /* Mirrors the house .eff-bar progress track. */
   height: 8px;
   border-radius: 4px;
   background: #f2f4f7;
   overflow: hidden;
 }
-.retention-evolution-segment-bar-fill {
+.members-by-age-bar-fill {
   height: 100%;
   border-radius: 4px;
 }
 @media (max-width: 900px) {
-  .retention-evolution-body {
+  .retention-split {
     flex-direction: column;
-  }
-  .retention-evolution-segments {
-    padding-left: 0;
-    border-left: none;
-    padding-top: 20px;
-    border-top: 1px solid var(--line);
   }
 }
 .retention-evolution-titlerow {
