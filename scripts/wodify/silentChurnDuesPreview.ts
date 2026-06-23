@@ -84,9 +84,22 @@
  *       ~/.config/wx-cfo/dues/all_memberships_2026-06-11T21_09_23.892773466Z.csv
  *   Gated-run emit mode (adds the leak-gated write payload + UPDATE statement):
  *     ... silentChurnDuesPreview.ts <csv path> --emit-write-payload --csv-export-date YYYY-MM-DD
+ *   Guided mode (LOCAL ergonomics — emit mode + a clean AGGREGATE-ONLY preview, a "LEAK-GATE PASS"
+ *   line, and the six-key payload + UPDATE in clearly-delimited copy blocks; same leak gate, same
+ *   no-write posture; the report prints ONLY after the gate passes):
+ *     ... silentChurnDuesPreview.ts <csv path> --guided --csv-export-date YYYY-MM-DD
+ *   Read-back verify (run AFTER a human applies the gated UPDATE — anon READ-ONLY, no /clients pull,
+ *   no WODIFY_API_KEY; confirms the persisted six-key snapshot == the emitted payload AND the export
+ *   date; PASS/FAIL naming the drifted key — never a raw value). Reads the latest row WHERE
+ *   silent_dues_snapshot IS NOT NULL — the SAME row the SPA card reads and the gated UPDATE wrote, so
+ *   a newer #474 tenure-cron row (dues null) can't cause a false FAIL):
+ *     ... silentChurnDuesPreview.ts --verify --expect-payload-file <payload.json> --csv-export-date YYYY-MM-DD
+ *     (Supabase URL + anon key come from the SAME --env-file: VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY.)
  *
- * Call budget — GET `/clients` pages only (the same request the edge makes); no per-client
- * calls, no writes, no Supabase calls, no Wodify mutation of any kind.
+ * Call budget — GET `/clients` pages only (the same request the edge makes), plus ONE anon
+ * read-only Supabase SELECT in --verify (silent_dues_snapshot, latest row). No per-client calls,
+ * no writes, no Supabase mutation, no Wodify mutation of any kind. --verify NEVER holds a
+ * service_role key and NEVER writes; the only mutation stays the human-gated MCP apply.
  */
 
 import { readFileSync } from 'node:fs';
@@ -786,6 +799,261 @@ function buildUpdateStatement(payload: SilentDuesWritePayload): string {
   ].join('\n');
 }
 
+// ═══ Guided assistant + read-back verify (NEW; LOCAL-ONLY, additive) ═══════════════════════════════
+// All of this is local operator ergonomics over the SAME audited pipeline above — no member data, no
+// write path (the only mutation stays the human-gated Supabase apply). Two pure presenters + a pure
+// comparator (network-free, self-tested) + one anon READ (live only). The leak gate stays the single
+// chokepoint: the guided report is printed ONLY after the full result passes the gate, and every field
+// it shows is a strict subset of that already-gated result.
+
+const SNAPSHOT_KEYS: ReadonlyArray<keyof SilentDuesWritePayload> = [
+  'duesAsOf',
+  'computedAsOf',
+  'thresholdDays',
+  'silentMembers',
+  'duesKnownCount',
+  'totalMonthly',
+];
+
+interface VerifyOutcome {
+  pass: boolean;
+  mismatches: string[]; // key NAMES only (or a sentinel) — never raw values; all six keys are aggregate anyway.
+}
+
+// Validate that a parsed object is exactly the six-key payload (types enforced) — used to read the
+// operator-supplied "expected" payload (the block the guided/emit run printed). Throws on any drift.
+function coerceExpectedPayload(v: unknown): SilentDuesWritePayload {
+  if (!isPlainObject(v)) throw new Error('not an object');
+  const duesAsOf = v['duesAsOf'];
+  const computedAsOf = v['computedAsOf'];
+  const thresholdDays = v['thresholdDays'];
+  const silentMembers = v['silentMembers'];
+  const duesKnownCount = v['duesKnownCount'];
+  const totalMonthly = v['totalMonthly'];
+  if (
+    typeof duesAsOf !== 'string' ||
+    typeof computedAsOf !== 'string' ||
+    typeof thresholdDays !== 'number' ||
+    typeof silentMembers !== 'number' ||
+    typeof duesKnownCount !== 'number' ||
+    typeof totalMonthly !== 'number'
+  ) {
+    throw new Error('missing/invalid six-key payload');
+  }
+  return { duesAsOf, computedAsOf, thresholdDays, silentMembers, duesKnownCount, totalMonthly };
+}
+
+// Dates compare as strings; numbers compare as numbers (a string "279" is a real mismatch vs 279).
+function snapshotValueEquals(key: keyof SilentDuesWritePayload, expected: unknown, actual: unknown): boolean {
+  if (key === 'duesAsOf' || key === 'computedAsOf') return String(expected) === String(actual);
+  return typeof expected === 'number' && typeof actual === 'number' && expected === actual;
+}
+
+// Pure: does the anon-read snapshot semantically equal the EMITTED payload, anchored to the run's
+// export date? Six-key match + explicit freshness (snapshot.duesAsOf == csvExportDate). No network.
+function verifySnapshot(
+  expected: SilentDuesWritePayload,
+  snapshot: Record<string, unknown> | null,
+  csvExportDate: string,
+): VerifyOutcome {
+  if (snapshot === null) return { pass: false, mismatches: ['no-snapshot-found'] };
+  const mismatches: string[] = [];
+  for (const key of SNAPSHOT_KEYS) {
+    if (!snapshotValueEquals(key, expected[key], snapshot[key])) mismatches.push(key);
+  }
+  // Explicit freshness: the PERSISTED figure must anchor to the run's export date (not just to the
+  // expected payload). Caught above as a 'duesAsOf' key mismatch only if expected.duesAsOf already
+  // equals csvExportDate — so assert it directly too.
+  if (String(snapshot['duesAsOf'] ?? '') !== csvExportDate && !mismatches.includes('duesAsOf')) {
+    mismatches.push('duesAsOf');
+  }
+  return { pass: mismatches.length === 0, mismatches };
+}
+
+function fmtPct(n: number): string {
+  return `${round1(n).toFixed(1)}%`;
+}
+function fmtUsd(n: number): string {
+  return `$${n.toFixed(2)}`;
+}
+
+// Aggregate-ONLY guided presentation. Printed only after the leak gate passes, so it inherits the
+// gate's guarantee (no name/email/id/member-date/member-dollar). Clearly delimits the six-key payload
+// and the gated UPDATE for the operator to copy into the human-gated Supabase apply.
+function renderGuidedReport(result: SilentChurnDuesPreviewResult): string {
+  const s = result.buckets.silent;
+  const w = result.buckets.watch;
+  const h = result.buckets.healthy;
+  const u = result.buckets.unknown;
+  const payload = result.writePayload;
+  const stmt = result.updateStatement;
+  const lines: string[] = [];
+  lines.push('SILENT-CHURN DUES IMPORT — GUIDED (LOCAL; this tool never writes — it emits for a human-gated apply)');
+  lines.push('LEAK-GATE PASS — aggregates only; no member name / email / id / per-member date or dollar below.');
+  lines.push('');
+  lines.push(`Freshness   dues export ${payload?.duesAsOf ?? '—'} · classified asOf ${result.asOf} · threshold ${result.thresholdDays}d`);
+  lines.push(`Coverage    /clients ${result.coverageComplete ? 'COMPLETE' : 'INCOMPLETE'} · ${result.activeTotal} active members scanned`);
+  lines.push('');
+  lines.push('Silent (the deliverable)');
+  lines.push(`  members ${s.members} · dues-known ${s.duesKnownCount} (${fmtPct(s.duesKnownCoveragePct)}) · floor ${fmtUsd(s.totalMonthly)}/mo`);
+  lines.push('Comparators');
+  lines.push(`  watch    members ${w.members} · dues-known ${w.duesKnownCount} · ${fmtUsd(w.totalMonthly)}/mo`);
+  lines.push(`  healthy  members ${h.members} · dues-known ${h.duesKnownCount} · ${fmtUsd(h.totalMonthly)}/mo`);
+  lines.push(`  unknown  members ${u.members}`);
+  if (payload && stmt) {
+    lines.push('');
+    lines.push('───── COPY 1/2 · silent_dues_snapshot payload (six keys) ─────');
+    lines.push(JSON.stringify(payload, null, 2));
+    lines.push('───── COPY 2/2 · gated UPDATE — apply via Supabase MCP execute_sql ─────');
+    lines.push(stmt);
+    lines.push('─────────────────────────────────────────────────────────────────────');
+    lines.push('');
+    lines.push('After a human applies the UPDATE, verify the persisted snapshot (anon read-back):');
+    lines.push('  1) save the COPY 1/2 payload above to a local file, e.g. /tmp/silent_dues_payload.json');
+    lines.push('  2) npx tsx --env-file=<abs .env.local> scripts/wodify/silentChurnDuesPreview.ts \\');
+    lines.push(`       --verify --expect-payload-file /tmp/silent_dues_payload.json --csv-export-date ${payload.duesAsOf}`);
+  }
+  return lines.join('\n');
+}
+
+// Aggregate-only verify report: PASS, or FAIL naming the mismatched KEY(S) (names only, never the
+// snapshot's raw values — so a wrong date can't ride into output past the gate). Dates printed are the
+// EXPECTED payload's (allowlisted), never the snapshot's.
+function renderVerifyReport(
+  outcome: VerifyOutcome,
+  expected: SilentDuesWritePayload,
+  csvExportDate: string,
+): string {
+  const lines: string[] = [];
+  lines.push('SILENT-CHURN DUES SNAPSHOT — READ-BACK VERIFY (anon, read-only)');
+  lines.push(`Freshness anchor (export date)  ${csvExportDate}`);
+  lines.push(`Classified asOf ${expected.computedAsOf} · threshold ${expected.thresholdDays}d`);
+  if (outcome.mismatches.includes('no-snapshot-found')) {
+    lines.push('RESULT  FAIL — no silent_dues_snapshot row readable via anon (was the gated UPDATE applied?).');
+  } else if (outcome.pass) {
+    lines.push('RESULT  PASS — persisted six-key snapshot matches the emitted payload and the export date.');
+  } else {
+    lines.push(`RESULT  FAIL — mismatched key(s): ${outcome.mismatches.join(', ')} (re-emit + re-apply).`);
+  }
+  return lines.join('\n');
+}
+
+// Anon READ of the persisted dues snapshot (read-only; the table is anon-readable). MIRRORS the SPA's
+// fetchLatestDuesSnapshot (src/lib/gym/fetchRetentionAggregate.ts) BYTE-FOR-BYTE in targeting: the
+// latest row WHERE silent_dues_snapshot IS NOT NULL — NOT plain max(as_of). This matters because the
+// #474 weekly tenure-cron inserts NEWER wodify_retention_aggregate rows whose dues column is null (the
+// edge never writes dues), so a max(as_of) read could land on a cron row and false-FAIL. The not-null
+// filter reads the SAME row the gated UPDATE wrote and the SAME row the card shows. Live only — never
+// called by --selftest.
+async function readSilentDuesSnapshotViaAnon(
+  supabaseUrl: string,
+  anonKey: string,
+): Promise<Record<string, unknown> | null> {
+  const base = supabaseUrl.trim().replace(/\/+$/, '');
+  const path =
+    'wodify_retention_aggregate' +
+    '?select=silent_dues_snapshot,as_of' +
+    '&workspace_id=eq.default' +
+    '&silent_dues_snapshot=not.is.null' +
+    '&order=as_of.desc&limit=1';
+  let res: Response;
+  try {
+    res = await fetch(`${base}/rest/v1/${path}`, {
+      method: 'GET',
+      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}`, accept: 'application/json' },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    return null; // unreachable / aborted
+  }
+  if (!res.ok) return null;
+  let body: unknown;
+  try {
+    body = JSON.parse(await res.text());
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(body) || body.length === 0) return null;
+  const row = body[0];
+  if (!isPlainObject(row)) return null;
+  const snap = row['silent_dues_snapshot'];
+  return isPlainObject(snap) ? snap : null;
+}
+
+// --verify entry: anon read-back + semantic compare against the EMITTED payload. No /clients pull, no
+// WODIFY_API_KEY, no CSV — reads only the anon snapshot + the operator-supplied expected payload.
+async function runVerify(args: string[]): Promise<void> {
+  const dIdx = args.indexOf('--csv-export-date');
+  const csvExportDate = dIdx !== -1 ? (args[dIdx + 1] ?? '') : '';
+  if (!csvExportDate || strictYmdToUtcMs(csvExportDate) === null) {
+    console.error('--verify requires --csv-export-date YYYY-MM-DD (a real calendar date). No read was made.');
+    process.exit(1);
+    return;
+  }
+
+  let expectedRaw: string | null = null;
+  const fIdx = args.indexOf('--expect-payload-file');
+  const pIdx = args.indexOf('--expect-payload');
+  if (fIdx !== -1) {
+    try {
+      expectedRaw = readFileSync(args[fIdx + 1] ?? '', 'utf8');
+    } catch {
+      console.error('Could not read --expect-payload-file. No read was made.');
+      process.exit(1);
+      return;
+    }
+  } else if (pIdx !== -1) {
+    expectedRaw = args[pIdx + 1] ?? '';
+  }
+  if (!expectedRaw) {
+    console.error(
+      '--verify requires --expect-payload-file <path> or --expect-payload \'<json>\' ' +
+        '(the six-key payload the guided/emit run printed). No read was made.',
+    );
+    process.exit(1);
+    return;
+  }
+  let expected: SilentDuesWritePayload;
+  try {
+    expected = coerceExpectedPayload(JSON.parse(expectedRaw));
+  } catch {
+    console.error('--expect-payload is not the six-key silent_dues_snapshot JSON. No read was made.');
+    process.exit(1);
+    return;
+  }
+  if (expected.duesAsOf !== csvExportDate) {
+    console.error(
+      `--csv-export-date ${csvExportDate} does not match the payload duesAsOf ${expected.duesAsOf}. ` +
+        'Pass the export’s own date. No read was made.',
+    );
+    process.exit(1);
+    return;
+  }
+
+  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim();
+  const anonKey = (process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '').trim();
+  if (!supabaseUrl || !anonKey) {
+    console.error(
+      'VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set (provide via the same --env-file). No read was made.',
+    );
+    process.exit(1);
+    return;
+  }
+
+  const snapshot = await readSilentDuesSnapshotViaAnon(supabaseUrl, anonKey);
+  const outcome = verifySnapshot(expected, snapshot, csvExportDate);
+  const report = renderVerifyReport(outcome, expected, csvExportDate);
+  // Defense in depth: gate the verify output too (allowlist = the expected payload's two dates).
+  const violations = leakGateViolations(report, expected.computedAsOf, expected.duesAsOf);
+  if (violations.length > 0) {
+    console.error(`LEAK GATE FAILED on verify output — withheld (${violations.length}).`);
+    process.exit(1);
+    return;
+  }
+  console.log(report);
+  process.exit(outcome.pass ? 0 : 1);
+}
+
 // ─── Leak gate (live AND selftest; the result is withheld on any hit) ─────────────────────────────
 // The date allowlist is EXACTLY {run-day asOf} — in emit mode EXACTLY {run-day asOf, duesAsOf}
 // (PR-4's one deliberate gate change). Any other YYYY-MM-DD still withholds the result.
@@ -1085,6 +1353,65 @@ function runSelfTest(): void {
     // 'other', and the fixture result's key set stays inside the closed set.
     ['whitelist: known categories pass, stray folds to other', membershipTypeKey('Class Plan') === 'Class Plan' && membershipTypeKey('Class Pack') === 'Class Pack' && membershipTypeKey('Appointment Pack') === 'Appointment Pack' && membershipTypeKey('Mystery Plan') === 'other' && membershipTypeKey('') === 'other'],
     ['whitelist: result membershipTypes keys ⊆ whitelist ∪ {other}', Object.keys(result.csv.membershipTypes).every((k) => k === 'other' || MEMBERSHIP_TYPE_WHITELIST.has(k))],
+    // ── NEW: guided presentation + read-back verify (pure; no network / env / file) ──
+    // Guided report is AGGREGATE-ONLY: no planted PII token reaches it, it passes the same leak gate,
+    // it affirms the gate, and it carries the six-key payload + the gated UPDATE for copy-out.
+    ['guided report: aggregate-only, leak-gate clean, carries payload + UPDATE', (() => {
+      const r2 = { ...result } as SilentChurnDuesPreviewResult;
+      r2.writePayload = buildWritePayload(result, '2026-06-12');
+      r2.updateStatement = buildUpdateStatement(r2.writePayload);
+      const report = renderGuidedReport(r2);
+      const noPii = PII.every((tok) => !report.includes(tok));
+      const gateClean = leakGateViolations(report, ASOF, '2026-06-12').length === 0;
+      const affirmsGate = report.includes('LEAK-GATE PASS');
+      const hasKeys = ['duesAsOf', 'computedAsOf', 'thresholdDays', 'silentMembers', 'duesKnownCount', 'totalMonthly'].every((k) => report.includes(k));
+      const hasUpdate = report.includes('update public.wodify_retention_aggregate');
+      return noPii && gateClean && affirmsGate && hasKeys && hasUpdate;
+    })()],
+    ['verify: PASS when snapshot == emitted payload AND export date matches', (() => {
+      const p = buildWritePayload(result, '2026-06-12');
+      const snap = { ...p } as unknown as Record<string, unknown>;
+      const out = verifySnapshot(p, snap, '2026-06-12');
+      return out.pass && out.mismatches.length === 0;
+    })()],
+    ['verify: FAIL names ONLY the drifted key (totalMonthly)', (() => {
+      const p = buildWritePayload(result, '2026-06-12');
+      const snap = { ...p, totalMonthly: p.totalMonthly + 1 } as unknown as Record<string, unknown>;
+      const out = verifySnapshot(p, snap, '2026-06-12');
+      return !out.pass && out.mismatches.includes('totalMonthly') && !out.mismatches.includes('silentMembers');
+    })()],
+    ['verify: FAIL on a stale snapshot (duesAsOf != csv-export-date)', (() => {
+      const p = buildWritePayload(result, '2026-06-12');
+      const snap = { ...p, duesAsOf: '2026-05-01' } as unknown as Record<string, unknown>;
+      const out = verifySnapshot(p, snap, '2026-06-12');
+      return !out.pass && out.mismatches.includes('duesAsOf');
+    })()],
+    ['verify: FAIL (no-snapshot-found) when the read returns nothing', (() => {
+      const p = buildWritePayload(result, '2026-06-12');
+      const out = verifySnapshot(p, null, '2026-06-12');
+      return !out.pass && out.mismatches.includes('no-snapshot-found');
+    })()],
+    ['verify report: aggregate-only, leak-gate clean (key names only on FAIL)', (() => {
+      const p = buildWritePayload(result, '2026-06-12');
+      const out = verifySnapshot(p, { ...p, totalMonthly: p.totalMonthly + 1 } as unknown as Record<string, unknown>, '2026-06-12');
+      const report = renderVerifyReport(out, p, '2026-06-12');
+      return PII.every((tok) => !report.includes(tok)) && leakGateViolations(report, p.computedAsOf, p.duesAsOf).length === 0 && report.includes('FAIL');
+    })()],
+    ['coerceExpectedPayload: accepts the six-key payload, rejects a missing/typed key', (() => {
+      const p = buildWritePayload(result, '2026-06-12');
+      let okRoundTrip = false;
+      try { okRoundTrip = JSON.stringify(coerceExpectedPayload(JSON.parse(JSON.stringify(p)))) === JSON.stringify(p); } catch { okRoundTrip = false; }
+      let rejects = false;
+      try { coerceExpectedPayload({ ...p, totalMonthly: 'x' }); } catch { rejects = true; }
+      return okRoundTrip && rejects;
+    })()],
+    // Planted-PII ABORT: an email '@' and a 7-digit id-like run in serialized output BOTH trip the
+    // gate → main() withholds and exits non-zero (no payload). This is the same gate guarding the
+    // guided + verify outputs, so a leak in any of them aborts the run.
+    ['gate: planted PII (email + 7-digit id) trips the gate → output withheld', (() => {
+      const v = leakGateViolations('{"a":"leak@example.com","b":"9000001"}', ASOF);
+      return v.length >= 2 && v.some((m) => m.includes('@')) && v.some((m) => m.includes('id-like'));
+    })()],
   ];
   const failed = expectations.filter(([, ok]) => !ok).map(([name]) => name);
   if (failed.length > 0) {
@@ -1107,6 +1434,38 @@ function runSelfTest(): void {
     return;
   }
 
+  // Visible GUIDED SAMPLE (fixture; synthetic, leak-gated) — demonstrates the operator-facing guided
+  // output end-to-end on the stubbed /clients source. To stderr, and only if it passes the gate.
+  // Non-authoritative: the real run is gated + live; this just shows the shape.
+  {
+    const sample = { ...result } as SilentChurnDuesPreviewResult;
+    sample.writePayload = buildWritePayload(result, '2026-06-12');
+    sample.updateStatement = buildUpdateStatement(sample.writePayload);
+    const guidedReport = renderGuidedReport(sample);
+    if (leakGateViolations(guidedReport, ASOF, '2026-06-12').length === 0) {
+      console.error('\n──────── GUIDED SAMPLE (fixture; synthetic; --csv-export-date 2026-06-12) ────────');
+      console.error(guidedReport);
+      console.error('──────── end GUIDED SAMPLE ────────\n');
+    }
+  }
+
+  // Visible VERIFY SAMPLE (synthetic snapshots; NO network) — PASS on a matching snapshot, FAIL
+  // naming the drifted key on a mismatch. The RESULT line carries the verdict.
+  {
+    const p = buildWritePayload(result, '2026-06-12');
+    const passReport = renderVerifyReport(verifySnapshot(p, { ...p } as unknown as Record<string, unknown>, '2026-06-12'), p, '2026-06-12');
+    const failReport = renderVerifyReport(verifySnapshot(p, { ...p, totalMonthly: p.totalMonthly + 1 } as unknown as Record<string, unknown>, '2026-06-12'), p, '2026-06-12');
+    if (
+      leakGateViolations(passReport, p.computedAsOf, p.duesAsOf).length === 0 &&
+      leakGateViolations(failReport, p.computedAsOf, p.duesAsOf).length === 0
+    ) {
+      console.error('──────── VERIFY SAMPLE (synthetic; no network) ────────');
+      console.error('[applied snapshot matches] ' + (passReport.split('\n').pop() ?? ''));
+      console.error('[snapshot drifted]         ' + (failReport.split('\n').pop() ?? ''));
+      console.error('──────── end VERIFY SAMPLE ────────\n');
+    }
+  }
+
   console.error(
     'SELFTEST PASS: locked-classifier buckets + conservation, multi-membership sum, $0 comp known-at-zero, ' +
       'PiF 12-month and fractional proration, 30-day Monthly snap, open-ended/future/expired/degenerate ' +
@@ -1115,7 +1474,9 @@ function runSelfTest(): void {
       'at member level); PR-4 emit-mode pins: gate allowlist exactly {asOf, duesAsOf} (third date trips; ' +
       'non-emit gate unchanged), write payload six-keys key-for-key vs the SPA contract, UPDATE date-literal-' +
       'free outside the jsonb with max(as_of) subselect targeting, membershipTypes whitelist-or-other; ' +
-      'no network call, no env read, no file read.',
+      'guided report aggregate-only + leak-gate-clean carrying the six-key payload + UPDATE; read-back ' +
+      'verify PASS on match, FAIL naming the drifted key / stale duesAsOf / no-snapshot, coerce rejects ' +
+      'a bad payload; no network call, no env read, no file read.',
   );
 }
 
@@ -1125,12 +1486,21 @@ async function main(): Promise<void> {
     runSelfTest();
     return;
   }
+  // --verify: anon read-back of the persisted snapshot vs the emitted payload. Needs NO /clients pull,
+  // NO WODIFY_API_KEY, NO CSV — so it short-circuits before any of that.
+  if (process.argv.includes('--verify')) {
+    await runVerify(process.argv.slice(2));
+    return;
+  }
 
   const args = process.argv.slice(2);
   let thresholdRaw: unknown;
   const tIdx = args.indexOf('--threshold');
   if (tIdx !== -1) thresholdRaw = args[tIdx + 1];
-  const emitWritePayload = args.includes('--emit-write-payload');
+  // Guided mode IS emit mode with a clean aggregate-only presentation — it needs the payload, so it
+  // implies --emit-write-payload (and therefore requires --csv-export-date).
+  const guided = args.includes('--guided');
+  const emitWritePayload = args.includes('--emit-write-payload') || guided;
   const dIdx = args.indexOf('--csv-export-date');
   const csvExportDate = dIdx !== -1 ? (args[dIdx + 1] ?? '') : null;
   // Value-flag positions are excluded from positionals (the CSV path is the one positional).
@@ -1141,7 +1511,9 @@ async function main(): Promise<void> {
     console.error(
       'Usage: npx tsx --env-file=<abs path to .env.local> scripts/wodify/silentChurnDuesPreview.ts ' +
         '<path to All Memberships CSV> [--threshold N] ' +
-        '[--emit-write-payload --csv-export-date YYYY-MM-DD]   (or --selftest). No request was made.',
+        '[--emit-write-payload --csv-export-date YYYY-MM-DD] ' +
+        '[--guided --csv-export-date YYYY-MM-DD]   ' +
+        '(or --selftest; or --verify --expect-payload-file <p> --csv-export-date YYYY-MM-DD). No request was made.',
     );
     process.exit(1);
     return;
@@ -1152,7 +1524,9 @@ async function main(): Promise<void> {
   // The two flags are strictly paired: --csv-export-date is required by emit mode (explicit
   // beats inference) and meaningless without it (fail closed on operator confusion).
   if (emitWritePayload && (csvExportDate === null || csvExportDate === '')) {
-    console.error('--emit-write-payload requires --csv-export-date YYYY-MM-DD. No request was made.');
+    console.error(
+      `${guided ? '--guided' : '--emit-write-payload'} requires --csv-export-date YYYY-MM-DD. No request was made.`,
+    );
     process.exit(1);
     return;
   }
@@ -1222,9 +1596,13 @@ async function main(): Promise<void> {
     if (!result.coverageComplete) {
       const serialized = JSON.stringify(result, null, 2);
       const violations = leakGateViolations(serialized, asOfYmd, csvExportDate);
-      if (violations.length === 0) console.log(serialized);
+      // Guided keeps the console clean on abort (no raw JSON dump); non-guided emit keeps the
+      // gated diagnostic dump for the operator. Either way: NO payload, exit non-zero.
+      if (!guided && violations.length === 0) console.log(serialized);
       console.error(
-        'WRITE PAYLOAD WITHHELD: the run is not coverage-complete — no payload or UPDATE was emitted.',
+        guided
+          ? 'GUIDED IMPORT ABORTED: /clients is not coverage-complete — no payload or UPDATE was emitted.'
+          : 'WRITE PAYLOAD WITHHELD: the run is not coverage-complete — no payload or UPDATE was emitted.',
       );
       process.exit(1);
       return;
@@ -1244,7 +1622,13 @@ async function main(): Promise<void> {
     process.exit(1);
     return;
   }
-  console.log(serialized);
+  // Reached ONLY after the leak gate passed — so the guided report (a strict subset of `result`) is
+  // leak-safe by construction.
+  if (guided) {
+    console.log(renderGuidedReport(result));
+  } else {
+    console.log(serialized);
+  }
 }
 
 main().catch(() => {
