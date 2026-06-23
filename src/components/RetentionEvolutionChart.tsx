@@ -9,10 +9,21 @@ import {
   type RetentionEvolutionPoint,
 } from '../lib/gym/memberRetentionSeries';
 
+type RetentionMetric = 'retention' | 'churn';
+
 type RetentionEvolutionChartProps = {
   points: RetentionEvolutionPoint[];
+  metric: RetentionMetric;
   height?: number;
 };
+
+// Churn is the complement of retention, straight from the report's own counts: lost ÷ prior
+// (returning = prior − lost is a hard identity, so this equals 1 − retention). One decimal,
+// matching retentionPct.
+function churnPctOf(p: RetentionEvolutionPoint): number {
+  if (p.priorMembers <= 0) return 0;
+  return Math.round((p.lostMembers / p.priorMembers) * 1000) / 10;
+}
 
 // Retention sits in a tight 85–100% band; zero-basing the y-axis would flatten the line. Floor to
 // the nearest 5% below the data min (clamped), cap at 100% (retention can't exceed 100%).
@@ -23,17 +34,32 @@ function retentionYDomain(values: number[]): { min: number; max: number } {
   return { min, max: 100 };
 }
 
+// Churn sits low (~5–12%); base at 0 and cap a touch above the peak (next 5%, min 10%) so the
+// month-to-month movement stays legible instead of flattening on the floor.
+function churnYDomain(values: number[]): { min: number; max: number } {
+  if (values.length === 0) return { min: 0, max: 15 };
+  const hi = Math.max(...values);
+  return { min: 0, max: Math.min(100, Math.max(10, Math.ceil((hi + 1) / 5) * 5)) };
+}
+
 function tickAmountFor(count: number): number {
   if (count <= 6) return Math.max(1, count - 1);
   if (count <= 12) return 6;
   return 8;
 }
 
-export default function RetentionEvolutionChart({ points, height = 300 }: RetentionEvolutionChartProps) {
+export default function RetentionEvolutionChart({ points, metric, height = 300 }: RetentionEvolutionChartProps) {
+  const isChurn = metric === 'churn';
   const categories = useMemo(() => points.map((p) => formatMonthShort(p.periodMonth)), [points]);
   const tooltipLabels = useMemo(() => points.map((p) => formatMonthLong(p.periodMonth)), [points]);
-  const values = useMemo(() => points.map((p) => p.retentionPct), [points]);
-  const { min: yMin, max: yMax } = useMemo(() => retentionYDomain(values), [values]);
+  const values = useMemo(
+    () => points.map((p) => (isChurn ? churnPctOf(p) : p.retentionPct)),
+    [points, isChurn],
+  );
+  const { min: yMin, max: yMax } = useMemo(
+    () => (isChurn ? churnYDomain(values) : retentionYDomain(values)),
+    [values, isChurn],
+  );
 
   const options = useMemo<ApexOptions>(
     () => ({
@@ -124,17 +150,22 @@ export default function RetentionEvolutionChart({ points, height = 300 }: Retent
             const idx = opts?.dataPointIndex ?? -1;
             const p = idx >= 0 ? points[idx] : undefined;
             if (!p) return `${value}%`;
-            return `${value}% retained (${p.returningMembers} of ${p.priorMembers}; ${p.lostMembers} lost, ${p.newMembers} new)`;
+            return isChurn
+              ? `${value}% churned (${p.lostMembers} of ${p.priorMembers} lapsed; ${p.returningMembers} stayed, ${p.newMembers} new)`
+              : `${value}% retained (${p.returningMembers} of ${p.priorMembers}; ${p.lostMembers} lost, ${p.newMembers} new)`;
           },
         },
         marker: { show: true },
       },
       legend: { show: false },
     }),
-    [categories, tooltipLabels, points, values, yMin, yMax, height],
+    [categories, tooltipLabels, points, values, yMin, yMax, height, isChurn],
   );
 
-  const series = useMemo(() => [{ name: 'Retention', data: values }], [values]);
+  const series = useMemo(
+    () => [{ name: isChurn ? 'Churn' : 'Retention', data: values }],
+    [values, isChurn],
+  );
 
   return <ReactApexChart options={options} series={series} type="area" height={height} />;
 }

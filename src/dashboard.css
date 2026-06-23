@@ -13765,9 +13765,15 @@ body {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 8px;
+}
+.retention-evolution-timeframe {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .retention-evolution-custom-range {
   display: flex;

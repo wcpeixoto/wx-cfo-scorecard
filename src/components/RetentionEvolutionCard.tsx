@@ -34,6 +34,8 @@ const TIMEFRAME_DROPDOWN_OPTIONS = RETENTION_TIMEFRAME_OPTIONS.map((o) => ({
 export function RetentionEvolutionCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const [live, setLive] = useState<RetentionMonth[] | null>(null);
   const [timeframe, setTimeframe] = useState<RetentionTimeframeId>(DEFAULT_RETENTION_TIMEFRAME);
+  // Churn is the default view; the toggle flips to retention (its complement).
+  const [metric, setMetric] = useState<'retention' | 'churn'>('churn');
   const [customStart, setCustomStart] = useState<string | null>(null);
   const [customEnd, setCustomEnd] = useState<string | null>(null);
 
@@ -109,21 +111,24 @@ export function RetentionEvolutionCard({ snapshot }: { snapshot: RetentionAggreg
       <header className="gym-card-head">
         <div className="retention-evolution-titlerow">
           <h3 className="gym-card-title retention-evolution-title">
-            Class Plan Member Retention
+            Class Plan Member {metric === 'churn' ? 'Churn' : 'Retention'}
             <span className="cashflow-help">
               <button
                 type="button"
                 className="cashflow-tooltip"
-                aria-label="Class Plan Member Retention explanation"
+                aria-label={`Class Plan Member ${metric === 'churn' ? 'Churn' : 'Retention'} explanation`}
               >
                 &#9432;
               </button>
               <div role="tooltip" className="cashflow-tooltip-panel retention-evolution-tooltip-panel">
                 <ul className="cashflow-tooltip-list">
                   <li className="cashflow-tooltip-body">
-                    Month-over-month <strong>membership / renewal</strong> retention from Wodify's
-                    "Member Retention Rates" report: of the members active at the start of a month, the
-                    share still active at month-end.
+                    Month-over-month <strong>membership / renewal</strong>{' '}
+                    {metric === 'churn' ? 'churn' : 'retention'} from Wodify's "Member Retention Rates"
+                    report: of the members active at the start of a month, the share{' '}
+                    {metric === 'churn'
+                      ? 'whose membership lapsed by month-end (the complement of retention).'
+                      : 'still active at month-end.'}
                   </li>
                   <li className="cashflow-tooltip-body">
                     This is a different metric from the attendance-based Silent Churn and Attendance
@@ -148,33 +153,51 @@ export function RetentionEvolutionCard({ snapshot }: { snapshot: RetentionAggreg
       <div className="retention-evolution-body">
         <div className="retention-evolution-main">
           <div className="retention-evolution-controls">
-            <PeriodDropdown
-              value={timeframe}
-              options={TIMEFRAME_DROPDOWN_OPTIONS}
-              onChange={(v) => setTimeframe(v as RetentionTimeframeId)}
-            />
-            {timeframe === 'custom' && monthOptions.length > 0 ? (
-              <div className="retention-evolution-custom-range">
-                <PeriodDropdown
-                  value={startSel ?? ''}
-                  options={monthOptions}
-                  onChange={(v) => setCustomStart(v)}
-                />
-                <span className="retention-evolution-range-sep">to</span>
-                <PeriodDropdown
-                  value={endSel ?? ''}
-                  options={monthOptions}
-                  onChange={(v) => setCustomEnd(v)}
-                />
-              </div>
-            ) : null}
+            <div className="segmented-toggle" role="group" aria-label="Retention or churn">
+              <button
+                type="button"
+                className={`segmented-toggle-btn${metric === 'retention' ? ' is-active' : ''}`}
+                onClick={() => setMetric('retention')}
+              >
+                Retention
+              </button>
+              <button
+                type="button"
+                className={`segmented-toggle-btn${metric === 'churn' ? ' is-active' : ''}`}
+                onClick={() => setMetric('churn')}
+              >
+                Churn
+              </button>
+            </div>
+            <div className="retention-evolution-timeframe">
+              <PeriodDropdown
+                value={timeframe}
+                options={TIMEFRAME_DROPDOWN_OPTIONS}
+                onChange={(v) => setTimeframe(v as RetentionTimeframeId)}
+              />
+              {timeframe === 'custom' && monthOptions.length > 0 ? (
+                <div className="retention-evolution-custom-range">
+                  <PeriodDropdown
+                    value={startSel ?? ''}
+                    options={monthOptions}
+                    onChange={(v) => setCustomStart(v)}
+                  />
+                  <span className="retention-evolution-range-sep">to</span>
+                  <PeriodDropdown
+                    value={endSel ?? ''}
+                    options={monthOptions}
+                    onChange={(v) => setCustomEnd(v)}
+                  />
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {view.isEmpty || !view.dataBeginsMonth ? (
             <p className="retention-evolution-empty">No tracked retention history in this range yet.</p>
           ) : (
             <>
-              <RetentionEvolutionChart points={view.points} />
+              <RetentionEvolutionChart points={view.points} metric={metric} />
               <p className="retention-evolution-caption">
                 {view.windowExceedsData
                   ? `Requested window exceeds tracked history — showing all available data. Membership tracking began ${formatMonthLong(view.dataBeginsMonth)}; earlier months aren't tracked and are never fabricated.`
