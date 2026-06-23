@@ -12776,20 +12776,6 @@ body {
 /* Watch / Patterns section headers (uppercase eyebrow + helper line) */
 .gym-section { margin-bottom: 24px; }
 .gym-section:last-child { margin-bottom: 0; }
-.gym-section-header { margin-bottom: 16px; }
-.gym-section-title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-primary);
-}
-.gym-section-helper {
-  margin: 4px 0 0;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
 
 /* Card grid — two columns on desktop. Source order is the mobile stack order:
    full-width cards span both columns, half-width cards pair on one row. */
@@ -13664,6 +13650,25 @@ body {
 .retention-split .members-by-age-card {
   flex: 1 1 0;
 }
+.retention-split .retention-split-placeholder {
+  flex: 2 1 0; /* reserved-empty 2/3 where the Churn chart used to sit (fill later) */
+}
+/* Watch hero row — Silent Churn (1/3) + Churn chart (2/3), side by side. */
+.retention-hero-split {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+.retention-hero-split > * {
+  min-width: 0;
+}
+.retention-hero-split > :first-child {
+  flex: 1 1 0; /* Silent Churn — 1/3 */
+}
+.retention-hero-split > :nth-child(2) {
+  flex: 2 1 0; /* Churn chart — 2/3 */
+}
 .retention-evolution-body {
   /* Chart column: controls (top-right) → full-width chart → caption. */
   flex: 1;
@@ -13723,7 +13728,8 @@ body {
   border-radius: 4px;
 }
 @media (max-width: 900px) {
-  .retention-split {
+  .retention-split,
+  .retention-hero-split {
     flex-direction: column;
   }
 }

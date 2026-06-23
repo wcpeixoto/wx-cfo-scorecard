@@ -79,22 +79,15 @@ export function GymPage() {
     <div className="stack-grid">
       <div className="ta-page">
         <div className="gym-retention">
-          <div className="ta-page-header">
-            <h1 className="ta-page-title">Retention</h1>
-            <p className="ta-page-subtitle">
-              Where are we losing members, how much money is at risk, and what patterns explain the loss?
-            </p>
-          </div>
-
-          {/* WATCH — live signals; Silent Churn is the dominant hero, Attendance
-              Health a full-width secondary below it. */}
+          {/* WATCH — live signals. Top row: Silent Churn (1/3) + Churn chart (2/3)
+              via .retention-hero-split; Attendance Health full-width below. (Page +
+              section headers removed per owner — only card-level titles remain.) */}
           <section className="gym-section">
-            <div className="gym-section-header">
-              <h2 className="gym-section-title">Watch</h2>
-              <p className="gym-section-helper">Live signals to act on this week.</p>
-            </div>
             <div className="gym-card-grid">
-              <SilentChurnCard snapshot={snapshot} />
+              <div className="retention-hero-split">
+                <SilentChurnCard snapshot={snapshot} />
+                <RetentionEvolutionCard />
+              </div>
               <AttendanceHealthCard snapshot={snapshot} />
             </div>
           </section>
@@ -103,13 +96,11 @@ export function GymPage() {
               paired on desktop, Segment Explorer full width, Churn by Belt a
               recessed full-width card at the bottom (data not connected yet). */}
           <section className="gym-section">
-            <div className="gym-section-header">
-              <h2 className="gym-section-title">Patterns</h2>
-              <p className="gym-section-helper">Monthly trends that explain where churn is happening.</p>
-            </div>
             <div className="gym-card-grid">
+              {/* Churn chart moved up to the Watch hero row; its 2/3 slot here is
+                  reserved empty per owner (to be filled later). Active members stays 1/3. */}
               <div className="retention-split">
-                <RetentionEvolutionCard />
+                <div className="retention-split-placeholder" aria-hidden="true" />
                 <MembersByAgeGroupCard snapshot={snapshot} />
               </div>
               <MemberMovementCard snapshot={snapshot} />
