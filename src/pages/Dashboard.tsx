@@ -59,6 +59,14 @@ import { computePriorYearActuals } from '../lib/kpis/priorYearActuals';
 import { runDataSanityChecks } from '../lib/dataSanity';
 import { clearImportedTransactions, getImportedTransactionsSnapshot, importQuickenReportCsv } from '../lib/data/importedTransactions';
 import {
+  buildRetentionImportPreview,
+  parseWodifyRetentionCsv,
+  upsertMemberRetentionRates,
+  type RetentionImportPreview,
+} from '../lib/gym/memberRetentionImport';
+import { fetchMemberRetentionRates } from '../lib/gym/fetchMemberRetentionRates';
+import type { RetentionMonth } from '../lib/gym/memberRetentionSeries';
+import {
   clearPossibleDuplicateReview,
   isPossibleDuplicateReviewed,
   readPossibleDuplicateReview,
@@ -800,6 +808,14 @@ export default function Dashboard() {
   const [importedDataSet, setImportedDataSet] = useState<DataSet | null>(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  // Wodify "Member Retention Rates" click-only import (Settings → Data) — separate from the
+  // financial-transactions import above. Preview-before-write: nothing persists until "Confirm import".
+  const retentionImportFileInputRef = useRef<HTMLInputElement>(null);
+  const [retentionImportRows, setRetentionImportRows] = useState<RetentionMonth[] | null>(null);
+  const [retentionImportPreview, setRetentionImportPreview] = useState<RetentionImportPreview | null>(null);
+  const [retentionImportBusy, setRetentionImportBusy] = useState(false);
+  const [retentionImportError, setRetentionImportError] = useState<string | null>(null);
+  const [retentionImportDone, setRetentionImportDone] = useState<{ count: number; firstMonth: string; lastMonth: string } | null>(null);
   const [bootLoadError, setBootLoadError] = useState<string | null>(null);
   const [lastImportSummary, setLastImportSummary] = useState<TransactionImportSummary | null>(null);
   const [importExamples, setImportExamples] = useState<{
@@ -2769,6 +2785,74 @@ export default function Dashboard() {
     [loadImportedState]
   );
 
+  // Wodify retention import — STEP 1: pick a file → parse the RAW export, read the months already in
+  // the table, and build a preview. Nothing is written here.
+  const handleRetentionFileSelected = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+
+      setRetentionImportBusy(true);
+      setRetentionImportError(null);
+      setRetentionImportDone(null);
+      setRetentionImportPreview(null);
+      setRetentionImportRows(null);
+      try {
+        const text = await file.text();
+        const parsed = parseWodifyRetentionCsv(text);
+        // Existing months drive insert-vs-update. A null fetch (unconfigured / empty / unreachable)
+        // means "nothing there yet" → all inserts.
+        let existingMonths: string[] = [];
+        try {
+          const existing = await fetchMemberRetentionRates();
+          if (existing) existingMonths = existing.map((m) => m.periodMonth);
+        } catch {
+          existingMonths = [];
+        }
+        const preview = buildRetentionImportPreview(file.name, parsed, existingMonths);
+        setRetentionImportPreview(preview);
+        setRetentionImportRows(parsed.issues.length === 0 ? parsed.rows : null);
+      } catch {
+        setRetentionImportError('Could not read that file. Export the Wodify "Member Retention Rates" report as CSV and try again.');
+      } finally {
+        setRetentionImportBusy(false);
+      }
+    },
+    []
+  );
+
+  // STEP 2: confirm → anon upsert. Only reachable when the preview has zero validation issues.
+  const handleConfirmRetentionImport = useCallback(async () => {
+    const preview = retentionImportPreview;
+    const rows = retentionImportRows;
+    if (!preview || !rows || preview.issues.length > 0 || rows.length === 0) return;
+
+    setRetentionImportBusy(true);
+    setRetentionImportError(null);
+    try {
+      await upsertMemberRetentionRates(rows);
+      setRetentionImportDone({
+        count: rows.length,
+        firstMonth: preview.firstMonth ?? rows[0].periodMonth,
+        lastMonth: preview.lastMonth ?? rows[rows.length - 1].periodMonth,
+      });
+      setRetentionImportPreview(null);
+      setRetentionImportRows(null);
+    } catch (confirmError) {
+      const message = confirmError instanceof Error ? confirmError.message : 'Could not save the retention import.';
+      setRetentionImportError(message);
+    } finally {
+      setRetentionImportBusy(false);
+    }
+  }, [retentionImportPreview, retentionImportRows]);
+
+  const handleCancelRetentionImport = useCallback(() => {
+    setRetentionImportPreview(null);
+    setRetentionImportRows(null);
+    setRetentionImportError(null);
+  }, []);
+
   const handleClearImportedData = useCallback(async () => {
     setImportLoading(true);
     setImportError(null);
@@ -4066,6 +4150,136 @@ export default function Dashboard() {
                               </ul>
                             </div>
                           ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* Member Retention Rates import card — click-only RAW Wodify export → anon upsert.
+                      Separate from the financial-transactions import above; preview before write. */}
+                  <div className="ta-card">
+                    <div className="ta-card-header">
+                      <h3 className="ta-card-title">Member Retention Rates</h3>
+                    </div>
+                    <div className="ta-card-body">
+                      <div className="card-head">
+                        <p className="subtle">
+                          Import the raw Wodify "Member Retention Rates" export to update the gym-wide
+                          churn / retention chart. No editing needed — the original export works as-is.
+                          You'll see a preview before anything is saved.
+                        </p>
+                      </div>
+
+                      <input
+                        ref={retentionImportFileInputRef}
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="sr-only"
+                        onChange={(event) => void handleRetentionFileSelected(event)}
+                      />
+
+                      <div className="settings-actions">
+                        <button
+                          type="button"
+                          onClick={() => retentionImportFileInputRef.current?.click()}
+                          disabled={retentionImportBusy}
+                        >
+                          {retentionImportBusy && !retentionImportPreview ? 'Reading...' : 'Import Wodify retention report'}
+                        </button>
+                      </div>
+
+                      {retentionImportError ? <p className="settings-error">{retentionImportError}</p> : null}
+
+                      {retentionImportDone ? (
+                        <div className="settings-meta">
+                          <p>
+                            Imported <strong>{retentionImportDone.count}</strong> month{retentionImportDone.count === 1 ? '' : 's'}{' '}
+                            (<strong>{toMonthLabel(retentionImportDone.firstMonth)} – {toMonthLabel(retentionImportDone.lastMonth)}</strong>).
+                            Open the Retention page to see the updated chart.
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {retentionImportPreview ? (
+                        <div className="import-summary">
+                          <p className="subtle">Preview — nothing is saved until you press "Confirm import".</p>
+                          <div className="import-summary-grid">
+                            <div>
+                              <span className="import-summary-label">Source file</span>
+                              <strong>{retentionImportPreview.fileName}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">Months in file</span>
+                              <strong>{retentionImportPreview.rowCount}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">First month</span>
+                              <strong>{retentionImportPreview.firstMonth ? toMonthLabel(retentionImportPreview.firstMonth) : '—'}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">Last month</span>
+                              <strong>{retentionImportPreview.lastMonth ? toMonthLabel(retentionImportPreview.lastMonth) : '—'}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">To add</span>
+                              <strong>{retentionImportPreview.toInsert}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">To update</span>
+                              <strong>{retentionImportPreview.toUpdate}</strong>
+                            </div>
+                          </div>
+
+                          {retentionImportPreview.boundaryMonth ? (
+                            <p className="subtle">
+                              {toMonthLabel(retentionImportPreview.boundaryMonth)} is the earliest tracked month — the
+                              tracking-onboarding boundary, excluded from the churn trend (no fake history). Re-check it
+                              matches when tracking began; a partial export would shift it.
+                            </p>
+                          ) : null}
+
+                          {retentionImportPreview.duplicateMonths.length > 0 ? (
+                            <div className="import-summary-section">
+                              <h4>Duplicate months in file</h4>
+                              <p className="subtle">{retentionImportPreview.duplicateMonths.map((m) => toMonthLabel(m)).join(', ')}</p>
+                            </div>
+                          ) : null}
+
+                          {retentionImportPreview.issues.length > 0 ? (
+                            <div className="import-summary-section">
+                              <h4>Validation errors — fix the export, then re-import</h4>
+                              <ul className="import-issue-list">
+                                {retentionImportPreview.issues.map((issue, idx) => (
+                                  <li key={`ret-issue-${issue.line ?? 'file'}-${idx}`}>
+                                    {issue.line ? <strong>Line {issue.line}. </strong> : null}
+                                    {issue.message}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+
+                          <div className="settings-actions">
+                            <button
+                              type="button"
+                              onClick={() => void handleConfirmRetentionImport()}
+                              disabled={
+                                retentionImportBusy ||
+                                retentionImportPreview.issues.length > 0 ||
+                                retentionImportPreview.rowCount === 0
+                              }
+                            >
+                              {retentionImportBusy ? 'Saving...' : 'Confirm import'}
+                            </button>
+                            <button
+                              type="button"
+                              className="ghost-btn"
+                              onClick={handleCancelRetentionImport}
+                              disabled={retentionImportBusy}
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         </div>
                       ) : null}
                     </div>
