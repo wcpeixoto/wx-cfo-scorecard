@@ -13650,6 +13650,25 @@ body {
 .retention-split .members-by-age-card {
   flex: 1 1 0;
 }
+.retention-split .retention-split-placeholder {
+  flex: 2 1 0; /* reserved-empty 2/3 where the Churn chart used to sit (fill later) */
+}
+/* Watch hero row — Silent Churn (1/3) + Churn chart (2/3), side by side. */
+.retention-hero-split {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+.retention-hero-split > * {
+  min-width: 0;
+}
+.retention-hero-split > :first-child {
+  flex: 1 1 0; /* Silent Churn — 1/3 */
+}
+.retention-hero-split > :nth-child(2) {
+  flex: 2 1 0; /* Churn chart — 2/3 */
+}
 .retention-evolution-body {
   /* Chart column: controls (top-right) → full-width chart → caption. */
   flex: 1;
@@ -13709,7 +13728,8 @@ body {
   border-radius: 4px;
 }
 @media (max-width: 900px) {
-  .retention-split {
+  .retention-split,
+  .retention-hero-split {
     flex-direction: column;
   }
 }

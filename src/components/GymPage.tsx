@@ -79,12 +79,15 @@ export function GymPage() {
     <div className="stack-grid">
       <div className="ta-page">
         <div className="gym-retention">
-          {/* WATCH — live signals; Silent Churn is the dominant hero, Attendance
-              Health a full-width secondary below it. (Page + section headers removed
-              per owner — only card-level titles remain.) */}
+          {/* WATCH — live signals. Top row: Silent Churn (1/3) + Churn chart (2/3)
+              via .retention-hero-split; Attendance Health full-width below. (Page +
+              section headers removed per owner — only card-level titles remain.) */}
           <section className="gym-section">
             <div className="gym-card-grid">
-              <SilentChurnCard snapshot={snapshot} />
+              <div className="retention-hero-split">
+                <SilentChurnCard snapshot={snapshot} />
+                <RetentionEvolutionCard />
+              </div>
               <AttendanceHealthCard snapshot={snapshot} />
             </div>
           </section>
@@ -94,8 +97,10 @@ export function GymPage() {
               recessed full-width card at the bottom (data not connected yet). */}
           <section className="gym-section">
             <div className="gym-card-grid">
+              {/* Churn chart moved up to the Watch hero row; its 2/3 slot here is
+                  reserved empty per owner (to be filled later). Active members stays 1/3. */}
               <div className="retention-split">
-                <RetentionEvolutionCard />
+                <div className="retention-split-placeholder" aria-hidden="true" />
                 <MembersByAgeGroupCard snapshot={snapshot} />
               </div>
               <MemberMovementCard snapshot={snapshot} />
