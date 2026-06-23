@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  averageMetricPct,
   buildRetentionEvolutionView,
+  churnPctOf,
   formatMonthLong,
   formatMonthShort,
   realRetentionMonths,
   selectionFor,
+  type RetentionEvolutionPoint,
   type RetentionMonth,
 } from './memberRetentionSeries';
 
@@ -122,5 +125,48 @@ describe('month formatters', () => {
   it('formats short + long', () => {
     expect(formatMonthShort('2025-07')).toBe('Jul 25');
     expect(formatMonthLong('2026-06')).toBe('Jun 2026');
+  });
+});
+
+const point = (priorMembers: number, lostMembers: number): RetentionEvolutionPoint => ({
+  periodMonth: '2026-01',
+  retentionPct: Math.round(((priorMembers - lostMembers) / priorMembers) * 1000) / 10,
+  returningMembers: priorMembers - lostMembers,
+  priorMembers,
+  lostMembers,
+  newMembers: 0,
+  currentMembers: priorMembers - lostMembers,
+});
+
+describe('churnPctOf', () => {
+  it('is lost ÷ prior to one decimal', () => {
+    expect(churnPctOf(point(200, 18))).toBe(9);
+    expect(churnPctOf(point(243, 24))).toBe(9.9);
+  });
+
+  it('guards a zero prior (no NaN)', () => {
+    expect(churnPctOf(point(0, 5))).toBe(0);
+  });
+
+  it('is the complement of retentionPct across the real series', () => {
+    const v = buildRetentionEvolutionView(MONTHS, selectionFor('1y'));
+    for (const p of v.points) {
+      expect(churnPctOf(p)).toBeCloseTo(100 - p.retentionPct, 1);
+    }
+  });
+});
+
+describe('averageMetricPct', () => {
+  it('returns null for an empty window', () => {
+    expect(averageMetricPct([], 'churn')).toBeNull();
+  });
+
+  it('averages the per-month rate over the window, and churn ≈ 100 − retention', () => {
+    const v = buildRetentionEvolutionView(MONTHS, selectionFor('6m'));
+    const meanChurn = v.points.reduce((a, p) => a + churnPctOf(p), 0) / v.points.length;
+    const churn = averageMetricPct(v.points, 'churn');
+    const retention = averageMetricPct(v.points, 'retention');
+    expect(churn).toBeCloseTo(meanChurn, 5);
+    expect((churn ?? 0) + (retention ?? 0)).toBeCloseTo(100, 0);
   });
 });

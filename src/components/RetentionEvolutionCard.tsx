@@ -12,11 +12,13 @@ import { SAMPLE_MEMBER_RETENTION_MONTHS } from '../lib/gym/memberRetentionFixtur
 import {
   DEFAULT_RETENTION_TIMEFRAME,
   RETENTION_TIMEFRAME_OPTIONS,
+  averageMetricPct,
   buildRetentionEvolutionView,
   formatMonthLong,
   formatMonthShort,
   realRetentionMonths,
   selectionFor,
+  type RetentionMetric,
   type RetentionMonth,
   type RetentionTimeframeId,
 } from '../lib/gym/memberRetentionSeries';
@@ -35,7 +37,7 @@ export function RetentionEvolutionCard({ snapshot }: { snapshot: RetentionAggreg
   const [live, setLive] = useState<RetentionMonth[] | null>(null);
   const [timeframe, setTimeframe] = useState<RetentionTimeframeId>(DEFAULT_RETENTION_TIMEFRAME);
   // Churn is the default view; the toggle flips to retention (its complement).
-  const [metric, setMetric] = useState<'retention' | 'churn'>('churn');
+  const [metric, setMetric] = useState<RetentionMetric>('churn');
   const [customStart, setCustomStart] = useState<string | null>(null);
   const [customEnd, setCustomEnd] = useState<string | null>(null);
 
@@ -79,7 +81,11 @@ export function RetentionEvolutionCard({ snapshot }: { snapshot: RetentionAggreg
     return buildRetentionEvolutionView(months, selectionFor(timeframe));
   }, [months, timeframe, startSel, endSel]);
 
-  const asOf = isLive && view.points.length > 0 ? view.points[view.points.length - 1].periodMonth : null;
+  // Headline stat: the mean of the visible metric across the selected timeframe — so the subtitle
+  // reads e.g. "Average Churn 8%" and tracks both the toggle and the timeframe.
+  const metricLabel = metric === 'churn' ? 'Churn' : 'Retention';
+  const avgPct = useMemo(() => averageMetricPct(view.points, metric), [view.points, metric]);
+  const avgLabel = avgPct != null ? `${Math.round(avgPct)}%` : '—';
 
   // Cohort composition rail (right 1/3): the per-age-group ACTIVE split from the
   // retention aggregate's cohort_histogram (counts only — non-PII), shown as a
@@ -111,12 +117,12 @@ export function RetentionEvolutionCard({ snapshot }: { snapshot: RetentionAggreg
       <header className="gym-card-head">
         <div className="retention-evolution-titlerow">
           <h3 className="gym-card-title retention-evolution-title">
-            Class Plan Member {metric === 'churn' ? 'Churn' : 'Retention'}
+            {metricLabel}
             <span className="cashflow-help">
               <button
                 type="button"
                 className="cashflow-tooltip"
-                aria-label={`Class Plan Member ${metric === 'churn' ? 'Churn' : 'Retention'} explanation`}
+                aria-label={`${metricLabel} explanation`}
               >
                 &#9432;
               </button>
@@ -139,34 +145,33 @@ export function RetentionEvolutionCard({ snapshot }: { snapshot: RetentionAggreg
               </div>
             </span>
           </h3>
-          {isLive && asOf ? (
-            <span className="gym-sample-badge gym-live-badge">Live · through {formatMonthLong(asOf)}</span>
-          ) : (
-            <span className="gym-sample-badge">Sample data</span>
-          )}
+          {/* No "Live" pill — owner asked to drop it. The "Sample data" flag stays so
+              fixture/unseeded states are never mistaken for real numbers (dev-only;
+              never shows in the live view). */}
+          {!isLive && <span className="gym-sample-badge">Sample data</span>}
         </div>
         <p className="gym-card-subtitle">
-          Membership renewal retention over time — is churn improving or worsening?
+          Average {metricLabel} {avgLabel}
         </p>
       </header>
 
       <div className="retention-evolution-body">
         <div className="retention-evolution-main">
           <div className="retention-evolution-controls">
-            <div className="segmented-toggle" role="group" aria-label="Retention or churn">
-              <button
-                type="button"
-                className={`segmented-toggle-btn${metric === 'retention' ? ' is-active' : ''}`}
-                onClick={() => setMetric('retention')}
-              >
-                Retention
-              </button>
+            <div className="segmented-toggle" role="group" aria-label="Churn or retention">
               <button
                 type="button"
                 className={`segmented-toggle-btn${metric === 'churn' ? ' is-active' : ''}`}
                 onClick={() => setMetric('churn')}
               >
                 Churn
+              </button>
+              <button
+                type="button"
+                className={`segmented-toggle-btn${metric === 'retention' ? ' is-active' : ''}`}
+                onClick={() => setMetric('retention')}
+              >
+                Retention
               </button>
             </div>
             <div className="retention-evolution-timeframe">

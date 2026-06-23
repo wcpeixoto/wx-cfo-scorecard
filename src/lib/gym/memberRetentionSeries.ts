@@ -41,7 +41,7 @@ export const RETENTION_TIMEFRAME_OPTIONS: readonly RetentionTimeframeOption[] = 
   { value: 'custom', label: 'Custom range', months: 0 },
 ];
 
-export const DEFAULT_RETENTION_TIMEFRAME: RetentionTimeframeId = '6m';
+export const DEFAULT_RETENTION_TIMEFRAME: RetentionTimeframeId = '1y';
 
 export type RetentionEvolutionPoint = {
   periodMonth: string;
@@ -52,6 +52,30 @@ export type RetentionEvolutionPoint = {
   newMembers: number;
   currentMembers: number;
 };
+
+// The two views of the same series — churn is retention's complement.
+export type RetentionMetric = 'retention' | 'churn';
+
+// Churn for one point — the report's own lost ÷ prior. returning = prior − lost is a hard
+// identity, so this equals 1 − retention. One decimal, matching retentionPct.
+export function churnPctOf(p: RetentionEvolutionPoint): number {
+  if (p.priorMembers <= 0) return 0;
+  return Math.round((p.lostMembers / p.priorMembers) * 1000) / 10;
+}
+
+// Mean of the per-month metric across the points in view (the timeframe window) — the headline
+// "Average Churn/Retention X%" stat. null when the window is empty.
+export function averageMetricPct(
+  points: RetentionEvolutionPoint[],
+  metric: RetentionMetric,
+): number | null {
+  if (points.length === 0) return null;
+  const sum = points.reduce(
+    (acc, p) => acc + (metric === 'churn' ? churnPctOf(p) : p.retentionPct),
+    0,
+  );
+  return sum / points.length;
+}
 
 export type TimeframeSelection =
   | { kind: 'preset'; months: number }
