@@ -81,8 +81,6 @@ export function RetentionEvolutionCard({ snapshot }: { snapshot: RetentionAggreg
     return buildRetentionEvolutionView(months, selectionFor(timeframe));
   }, [months, timeframe, startSel, endSel]);
 
-  const asOf = isLive && view.points.length > 0 ? view.points[view.points.length - 1].periodMonth : null;
-
   // Headline stat: the mean of the visible metric across the selected timeframe — so the subtitle
   // reads e.g. "Average Churn 8%" and tracks both the toggle and the timeframe.
   const metricLabel = metric === 'churn' ? 'Churn' : 'Retention';
@@ -147,11 +145,10 @@ export function RetentionEvolutionCard({ snapshot }: { snapshot: RetentionAggreg
               </div>
             </span>
           </h3>
-          {isLive && asOf ? (
-            <span className="gym-sample-badge gym-live-badge">Live · through {formatMonthLong(asOf)}</span>
-          ) : (
-            <span className="gym-sample-badge">Sample data</span>
-          )}
+          {/* No "Live" pill — owner asked to drop it. The "Sample data" flag stays so
+              fixture/unseeded states are never mistaken for real numbers (dev-only;
+              never shows in the live view). */}
+          {!isLive && <span className="gym-sample-badge">Sample data</span>}
         </div>
         <p className="gym-card-subtitle">
           Average {metricLabel} {avgLabel}
