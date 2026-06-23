@@ -13763,11 +13763,17 @@ body {
 }
 .retention-evolution-controls {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 8px;
+}
+.retention-evolution-timeframe {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .retention-evolution-custom-range {
   display: flex;
