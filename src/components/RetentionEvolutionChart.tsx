@@ -4,26 +4,18 @@ import type { ApexOptions } from 'apexcharts';
 
 import { chartTokens } from '../lib/ui/chartTokens';
 import {
+  churnPctOf,
   formatMonthLong,
   formatMonthShort,
   type RetentionEvolutionPoint,
+  type RetentionMetric,
 } from '../lib/gym/memberRetentionSeries';
-
-type RetentionMetric = 'retention' | 'churn';
 
 type RetentionEvolutionChartProps = {
   points: RetentionEvolutionPoint[];
   metric: RetentionMetric;
   height?: number;
 };
-
-// Churn is the complement of retention, straight from the report's own counts: lost ÷ prior
-// (returning = prior − lost is a hard identity, so this equals 1 − retention). One decimal,
-// matching retentionPct.
-function churnPctOf(p: RetentionEvolutionPoint): number {
-  if (p.priorMembers <= 0) return 0;
-  return Math.round((p.lostMembers / p.priorMembers) * 1000) / 10;
-}
 
 // Retention sits in a tight 85–100% band; zero-basing the y-axis would flatten the line. Floor to
 // the nearest 5% below the data min (clamped), cap at 100% (retention can't exceed 100%).
