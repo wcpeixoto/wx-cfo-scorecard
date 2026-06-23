@@ -146,14 +146,9 @@ export default function RetentionEvolutionChart({ points, metric, height = 300 }
           },
         },
         y: {
-          formatter: (value: number, opts?: { dataPointIndex?: number }) => {
-            const idx = opts?.dataPointIndex ?? -1;
-            const p = idx >= 0 ? points[idx] : undefined;
-            if (!p) return `${value}%`;
-            return isChurn
-              ? `${value}% churned (${p.lostMembers} of ${p.priorMembers} lapsed; ${p.returningMembers} stayed, ${p.newMembers} new)`
-              : `${value}% retained (${p.returningMembers} of ${p.priorMembers}; ${p.lostMembers} lost, ${p.newMembers} new)`;
-          },
+          // Just the metric percentage — the series name ("Churn" / "Retention") is the label,
+          // so the tooltip reads e.g. "Churn: 9.9%". No counts (they overflowed/clipped the panel).
+          formatter: (value: number) => `${value}%`,
         },
         marker: { show: true },
       },
