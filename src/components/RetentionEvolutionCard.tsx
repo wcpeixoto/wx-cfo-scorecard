@@ -85,48 +85,47 @@ export function RetentionEvolutionCard() {
 
   return (
     <article className="card gym-card gym-card--full retention-evolution-card">
-      <header className="gym-card-head">
-        <div className="retention-evolution-titlerow">
-          <h3 className="gym-card-title retention-evolution-title">
-            {metricLabel}
-            <span className="cashflow-help">
-              <button
-                type="button"
-                className="cashflow-tooltip"
-                aria-label={`${metricLabel} explanation`}
-              >
-                &#9432;
-              </button>
-              <div role="tooltip" className="cashflow-tooltip-panel retention-evolution-tooltip-panel">
-                <ul className="cashflow-tooltip-list">
-                  <li className="cashflow-tooltip-body">
-                    Month-over-month <strong>membership / renewal</strong>{' '}
-                    {metric === 'churn' ? 'churn' : 'retention'} from Wodify's "Member Retention Rates"
-                    report: of the members active at the start of a month, the share{' '}
-                    {metric === 'churn'
-                      ? 'whose membership lapsed by month-end (the complement of retention).'
-                      : 'still active at month-end.'}
-                  </li>
-                  <li className="cashflow-tooltip-body">
-                    This is a different metric from the attendance-based Silent Churn and Attendance
-                    Health cards, which measure who has stopped showing up — not whether their
-                    membership renewed.
-                  </li>
-                </ul>
-              </div>
-            </span>
-          </h3>
-          {/* No "Live" pill — owner asked to drop it. The "Sample data" flag stays so
-              fixture/unseeded states are never mistaken for real numbers (dev-only;
-              never shows in the live view). */}
-          {!isLive && <span className="gym-sample-badge">Sample data</span>}
+      <header className="gym-card-head retention-evolution-head">
+        <div className="retention-evolution-heading">
+          <div className="retention-evolution-titlerow">
+            <h3 className="gym-card-title retention-evolution-title">
+              {metricLabel}
+              <span className="cashflow-help">
+                <button
+                  type="button"
+                  className="cashflow-tooltip"
+                  aria-label={`${metricLabel} explanation`}
+                >
+                  &#9432;
+                </button>
+                <div role="tooltip" className="cashflow-tooltip-panel retention-evolution-tooltip-panel">
+                  <ul className="cashflow-tooltip-list">
+                    <li className="cashflow-tooltip-body">
+                      Month-over-month <strong>membership / renewal</strong>{' '}
+                      {metric === 'churn' ? 'churn' : 'retention'} from Wodify's "Member Retention Rates"
+                      report: of the members active at the start of a month, the share{' '}
+                      {metric === 'churn'
+                        ? 'whose membership lapsed by month-end (the complement of retention).'
+                        : 'still active at month-end.'}
+                    </li>
+                    <li className="cashflow-tooltip-body">
+                      This is a different metric from the attendance-based Silent Churn and Attendance
+                      Health cards, which measure who has stopped showing up — not whether their
+                      membership renewed.
+                    </li>
+                  </ul>
+                </div>
+              </span>
+            </h3>
+            {/* No "Live" pill — owner asked to drop it. The "Sample data" flag stays so
+                fixture/unseeded states are never mistaken for real numbers (dev-only;
+                never shows in the live view). */}
+            {!isLive && <span className="gym-sample-badge">Sample data</span>}
+          </div>
+          <p className="gym-card-subtitle">
+            Average {metricLabel} {avgLabel}
+          </p>
         </div>
-        <p className="gym-card-subtitle">
-          Average {metricLabel} {avgLabel}
-        </p>
-      </header>
-
-      <div className="retention-evolution-body">
         <div className="retention-evolution-controls">
           <div className="segmented-toggle" role="group" aria-label="Churn or retention">
             <button
@@ -167,7 +166,9 @@ export function RetentionEvolutionCard() {
             ) : null}
           </div>
         </div>
+      </header>
 
+      <div className="retention-evolution-body">
         {view.isEmpty || !view.dataBeginsMonth ? (
           <p className="retention-evolution-empty">No tracked retention history in this range yet.</p>
         ) : (
