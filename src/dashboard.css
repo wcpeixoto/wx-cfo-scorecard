@@ -12776,20 +12776,6 @@ body {
 /* Watch / Patterns section headers (uppercase eyebrow + helper line) */
 .gym-section { margin-bottom: 24px; }
 .gym-section:last-child { margin-bottom: 0; }
-.gym-section-header { margin-bottom: 16px; }
-.gym-section-title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-primary);
-}
-.gym-section-helper {
-  margin: 4px 0 0;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
 
 /* Card grid — two columns on desktop. Source order is the mobile stack order:
    full-width cards span both columns, half-width cards pair on one row. */

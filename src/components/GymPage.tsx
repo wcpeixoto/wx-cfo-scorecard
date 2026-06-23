@@ -79,20 +79,10 @@ export function GymPage() {
     <div className="stack-grid">
       <div className="ta-page">
         <div className="gym-retention">
-          <div className="ta-page-header">
-            <h1 className="ta-page-title">Retention</h1>
-            <p className="ta-page-subtitle">
-              Where are we losing members, how much money is at risk, and what patterns explain the loss?
-            </p>
-          </div>
-
           {/* WATCH — live signals; Silent Churn is the dominant hero, Attendance
-              Health a full-width secondary below it. */}
+              Health a full-width secondary below it. (Page + section headers removed
+              per owner — only card-level titles remain.) */}
           <section className="gym-section">
-            <div className="gym-section-header">
-              <h2 className="gym-section-title">Watch</h2>
-              <p className="gym-section-helper">Live signals to act on this week.</p>
-            </div>
             <div className="gym-card-grid">
               <SilentChurnCard snapshot={snapshot} />
               <AttendanceHealthCard snapshot={snapshot} />
@@ -103,10 +93,6 @@ export function GymPage() {
               paired on desktop, Segment Explorer full width, Churn by Belt a
               recessed full-width card at the bottom (data not connected yet). */}
           <section className="gym-section">
-            <div className="gym-section-header">
-              <h2 className="gym-section-title">Patterns</h2>
-              <p className="gym-section-helper">Monthly trends that explain where churn is happening.</p>
-            </div>
             <div className="gym-card-grid">
               <div className="retention-split">
                 <RetentionEvolutionCard />
