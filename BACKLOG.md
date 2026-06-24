@@ -10,21 +10,17 @@ Every item carries the canonical three fields — **Result** (what changes for t
 
 ## Retention (priority) (6)
 
-### Churn time-series substrate probe — reconstruction feasibility
+### Churn-evolution chart — SEGMENT (age-cohort) toggle (Phase 2)
 
-Result: A read-only, non-PII probe that determines whether a historical churn curve can be reconstructed from per-membership start + end/cancellation dates in the All-Memberships export — i.e. whether the churn-evolution chart can be backed by REAL history now, versus waiting on forward snapshots to accrue.
+**Status / Priority:** Retention (priority)
 
-Why: The churn-evolution chart is blocked on time-depth — the weekly Tenure Snapshot Clock (#474) only began accumulating 2026-06-11 (~weeks deep), so a 6-month / 1yr / 2yr window is near-empty until ~Dec 2026. If the All-Memberships export carries end-dates, a real multi-year curve is buildable immediately; if not, the chart waits on snapshot accrual. This probe is the cheap read-only test that picks the path.
+Result: Add a SEGMENT toggle (age cohort: Kids 3–6, Kids 7–9, Teens 10–15, Adults 16+ — reuse cohortBands.ts) to the live churn-evolution chart, so the longitudinal churn/retention view can be read per age group, not just gym-wide.
 
-Premise / guardrail: §5 safe-output contract — emit ONLY field-name presence (boolean), populated coverage (counts/percent), and a feasibility verdict; NEVER member rows, names, dates, or dues. Export stays local (~/.config/wx-cfo/dues/), 0600, never committed (CFO repo is PUBLIC). Use the RAW export ("Keep the data formatted" UNCHECKED → ISO dates). Any eventual reconstruction is server-side → aggregate (§4), never member-level in the SPA. Builder drafts probe plan → Reviewer gates → then run.
+Why: Phase 1 — gym-wide churn/retention over time with the TIMEFRAME toggle — SHIPPED via #487 (the live "Class Plan Member Retention" card) and refinements #488–494 (split into a Churn chart + an Active-members-by-age card). The SEGMENT toggle is the remaining north-star read: whether churn is improving or worsening *by cohort* over time.
 
-### Churn-evolution-over-time chart
+Premise / blocker: BLOCKED on the net-new auth boundary — shares that keystone with Gi-vs-No-Gi (Phase 2, below) and the dues-write Edge Function (below). The shipped substrate is the click-imported `member_retention_rates` table (#495): a gym-wide aggregate with NO age dimension, so the segment toggle is NOT a view over current data — it is a new PII-gated pipeline (client-grain Member Retention.Client ID → /clients DOB → server-side cohort aggregation = member-level PII, which a public SPA + anon key cannot hold). HARD rule still applies — "No fake history" (AGENTS.md): the time axis shows only real dated data; empty windows render honestly empty, never fabricated.
 
-Result: A churn-evolution chart (follow the existing ProjectedCashBalanceChart.tsx rendering pattern + chartTokens) showing churn/retention over time, with two toggles: TIMEFRAME (6 months [default] / 1 year / 2 years / all / custom) and SEGMENT (age cohort: Kids 3–6, Kids 7–9, Teens 10–15, Adults 16+ — reuse cohortBands.ts + the per-snapshot cohort_histogram already written weekly by sync-wodify-retention).
-
-Why: Turns the point-in-time retention cards into the first true longitudinal view — whether churn is improving or worsening, by segment, over time. The north-star retention read.
-
-Premise / blocker: GATED on the substrate probe (prior item). HARD rule — "No fake history" (AGENTS.md:299): the time axis shows only real dated data; empty windows render honestly empty, never interpolated or fabricated. Segment axis reuses the shipped cohort bands + the weekly cohort_histogram (no schema change). Substrate = historical reconstruction IF the probe confirms end-dates, else forward snapshots (full 6-month view honest ~Dec 2026).
+Note — substrate-probe gate (Phase 1) RESOLVED 2026-06-23: the All-Memberships export has NO cancellation/termination/status column (only Expiration Date + Autorenew), so historical churn reconstruction from that export is dead. Real monthly history is the Wodify "Member Retention Rates" report, now click-imported into `member_retention_rates` (#495) — which is what Phase 1 ships on.
 
 ### Monthly Critical Groups — month-over-month delta
 
@@ -34,7 +30,7 @@ Result: A retention read that shows month-over-month change in the critical (at-
 
 Why: Turns the point-in-time retention snapshot into the first longitudinal signal — whether the critical groups are growing or shrinking month over month — instead of a single static reading.
 
-Premise / blocker: Blocked on accumulated dated snapshots. The Tenure Snapshot Clock (the weekly Mon 12:00 UTC GitHub Action that upserts a dated aggregate row) builds the second delta endpoint beside the existing 2026-06-11 snapshot; the first in-band delta lands ~3–4 weekly runs out. The anchor-lock rule is already decided (nearest ~30-day-prior, 21–45 day tolerance, else worst-now-only labeled); build waits on the snapshots accumulating.
+Premise / blocker: Blocked on accumulated dated snapshots. The Tenure Snapshot Clock (the weekly Mon 12:00 UTC GitHub Action that upserts a dated aggregate row) builds the second delta endpoint beside the existing 2026-06-11 snapshot; the first in-band delta lands ~3–4 weekly runs out. The anchor-lock rule is already decided (nearest ~30-day-prior, 21–45 day tolerance, else worst-now-only labeled); build waits on the snapshots accumulating. (Grooming 2026-06-24: on track, no action — the #474 cron began 2026-06-11; first in-band delta ~mid-July.)
 
 ### Churn by Belt — longitudinal / seasonal
 
@@ -44,13 +40,13 @@ Result: A longitudinal Churn-by-Belt card — churn history across belt levels, 
 
 Why: Belt progression is a core engagement signal in a BJJ gym; a seasonal churn-by-belt read shows where on the rank ladder members are most at risk over time.
 
-Premise / blocker: Belt data is EXPORT-FEASIBLE (not blocked) via Admin UI → People → Progressions (Current + Previous Levels, with Date Achieved) — Wodify recon 2026-06-14, read-only. But the desired card is the longitudinal/seasonal version, which needs the dated Previous Levels data plus accumulated history — a NEW pipeline, not a cross-sectional view over the live aggregate. PARKED until the cross-sectional retention cards are shipped and stable; the Progressions column-verification intake is deferred until belt comes off the park.
+Premise / blocker: Belt data is EXPORT-FEASIBLE (not blocked) via Admin UI → People → Progressions (Current + Previous Levels, with Date Achieved) — Wodify recon 2026-06-14, read-only. Unparked 2026-06-24 (the park condition — cross-sectional retention cards shipped + stable: Silent Churn / Attendance Health / Member Movement / Tenure / Cohort all live — is MET); ready to scope. Not blocked — just unbuilt. Still needs the new longitudinal pipeline (Wodify Admin → People → Progressions, dated Previous Levels) plus accumulated history — a NEW pipeline, not a cross-sectional view over the live aggregate; the Progressions column-verification intake now comes off the park.
 
 ### Retention: Silent Churn split — Recovery card + Today polish
 
 **Status / Priority:** Retention (priority) · P3
 
-Separate "who is at risk now" (Today, exists) from "are we getting better at recovering at-risk members" (Recovery, performance-over-time). Recovery is blocked on dated check-in history. Do not interrupt the current Risk by Time as Member rotation.
+Separate "who is at risk now" (Today, exists) from "are we getting better at recovering at-risk members" (Recovery, performance-over-time). Sequencing gate MET 2026-06-24 — Risk by Time as Member is shipped + live, so Silent Churn Today polish is buildable now. Recovery stays independently blocked on dated check-in history.
 
 #### Context
 
@@ -65,13 +61,13 @@ This does **not** conflict with the current Risk by Time as Member card, which l
 
 #### Priority
 
-Do not interrupt the current Patterns rotation. Finish **Risk by Time as Member** first, then revisit the Silent Churn split.
+Sequencing gate MET 2026-06-24 — **Risk by Time as Member** is shipped + live, so the "finish it first" gate is satisfied. The Silent Churn split is now unblocked for sequencing: **Silent Churn Today polish** is buildable; **Silent Churn Recovery** stays independently blocked on dated check-in history (run the `Client Sign-ins` probe to unblock).
 
 #### Future work
 
 ##### 1. Silent Churn Today polish
 
-Current card exists. Later polish:
+Buildable now (sequencing gate met 2026-06-24). Current card exists. Polish:
 
 - Reduce prominence of member names.
 - Move names into a drawer or "View members" detail area.
@@ -109,7 +105,7 @@ Before building the Recovery card, run a probe for the `Client Sign-ins` endpoin
 
 #### Current decision
 
-Finish the current Risk by Time as Member card first. File this backlog item now. Run the `Client Sign-ins` probe separately.
+Risk by Time as Member is shipped + live (sequencing gate met 2026-06-24) — Silent Churn Today polish is buildable now. Silent Churn Recovery stays blocked on dated check-in history; run the `Client Sign-ins` probe separately to unblock it.
 
 ### Program/style retention — Gi vs No-Gi (Phase 2)
 
@@ -122,6 +118,16 @@ Why: Shows whether retention differs by what members actually train — a signal
 Premise / blocker: Phase 2 — Attendance data only. `Programs` is NOT a usable cohort source: it is multi-valued and, for adults, lists plan ENTITLEMENT (the full ~20-program bundle; 5-member proof 2026-06-15), not training discipline. Real program/style discipline lives ONLY in Attendance check-ins, so this needs the Attendance table — a separate later pipeline, not a view over the live aggregate.
 
 Guardrail (do not violate): a class type's worth = retention strength × ease of acquisition, NOT churn alone. Do NOT build a cancel/keep recommendation on churn alone — a class that churns fast but is trivial to fill (a feeder) would be wrongly condemned, and one that holds members but is hard to fill needs protection. The acquisition axis (conversion / ease-of-acquisition by class type, authoritative source TBD) is not in Wodify or the repo and is parked under the Growth-Levers thread.
+
+### Dues write via authenticated Edge Function (post-auth-boundary)
+
+**Status / Priority:** Retention (priority)
+
+Result: An in-app path to refresh the `silent_dues_snapshot` figure — a narrow authenticated Edge Function that holds the six-key dues-snapshot contract and a server-side `WODIFY_API_KEY`, so the owner can refresh dues from the app instead of running a local script.
+
+Why: Dues refresh today is the LOCAL, human-gated `--guided` / `--verify` assistant (#496, shipped) — correct and safe, but it lives on Wesley's machine, not in the app. The Edge Function is the in-app successor (path "c").
+
+Premise / blocker: BLOCKED on the net-new auth boundary — the SAME keystone as the churn segment toggle (above) and Gi-vs-No-Gi (Phase 2, above). An in-app **anon-write** dues button was REJECTED: the All-Memberships CSV is PII, and the aggregate needs a live `/clients` pull plus a `WODIFY_API_KEY` that cannot enter the public bundle. `wodify_retention_aggregate` stays anon-READ-only. The write path only becomes safe behind authenticated access (login) that can hold the server-side key and member-level data off the public SPA.
 
 
 ## Next (6)
@@ -795,7 +801,9 @@ Still needed, not urgent — forecast-only. Surfaced 2026-06-01 during the Event
 Either way, code and copy should move together. Reserve is unaffected by this decision.
 
 
-## Cleanup (5)
+## Cleanup (4)
+
+_Resolved 2026-06-24 — **gh pr merge --delete-branch non-atomic** (was Cleanup · P2): mitigation (d) is in place. The repo setting "Automatically delete head branches" is ENABLED (`delete_branch_on_merge: true`, verified via `gh api` 2026-06-24), so head branches are deleted server-side after merge and the worktree-switch hazard is sidestepped. Confirmed live this session: #494's merge from primary-on-main auto-deleted the remote branch with NO manual `gh api -X DELETE` fallback. Residual (benign, untracked): `--delete-branch` can still leave the LOCAL branch behind (one-line `git branch -D`) — distinct from the former remote-survival hazard._
 
 ### Audit and tokenize warning-tinted legacy CSS surfaces (.error-banner and .forecast-warning-callout)
 
@@ -803,34 +811,11 @@ Either way, code and copy should move together. Reserve is unaffected by this de
 
 Pattern existed before PR #30. Same violation class Codex caught on .dashboard-load-error (#7a3b00, #fff, 14px/10px). Two surfaces confirmed: (1) .error-banner at src/dashboard.css:724 uses #f2c8d4, #fff0f4, #8f2f48, 14px. (2) .forecast-warning-callout (used as the .dashboard-load-error round-2 reference precedent) uses color-mix(in srgb, var(--warning) 8%, #fff) — #fff literal inside the mix, text token correct. Lesson from PR #30 round-2: copying a precedent in full is not safe; verify token compliance per element. Both surfaces should fold to color-mix(--warning N%, var(--bg-panel)) with var(--text-primary) and UI_http://RULES.md alert/input radii. Flagged during PR #30 round-2 review and narrative-entry drafting; out of scope for the merge gate.
 
-### gh pr merge --delete-branch non-atomic when invoked outside primary-on-main
-
-**Status / Priority:** Cleanup · P2
-
-Promoted to P2 on 2026-05-12 after 5 confirmed occurrences crossed the self-set threshold ("consider P2 promotion if a fourth occurrence surfaces").
-
-Pattern: gh pr merge --delete-branch is non-atomic across remote-merge and remote-branch-delete when invoked from anywhere other than primary-on-main. Remote merge succeeds; --delete-branch short-circuits on the post-merge worktree-switch step ('fatal: main is already used by worktree at primary'); remote branch survives until manual gh api DELETE fallback.
-
-Occurrences:
-(1) 2026-05-11 PR #29 — remote branch delete failed, branch held by harness worktree.
-(2) 2026-05-11 PR #30 — worktree-switch short-circuit; manual fallback.
-(3) 2026-05-12 PR #31 (squash 932c03d) — same mechanic; manual fallback.
-(4) 2026-05-12 PR #38 — forecast compare; manual fallback.
-(5) 2026-05-12 PR #39 (squash 5177456) — 6mo seasonality flip; manual fallback.
-
-Mitigation candidates (pick when scheduling):
-(a) invoke gh pr merge from primary clone only.
-(b) always follow with explicit gh api -X DELETE fallback.
-(c) check exit code and run fallback unconditionally.
-(d) PREFERRED — enable GitHub repo-setting "Automatically delete head branches" (Settings → General → Pull Requests). Fires server-side after merge, sidesteps the worktree-switch hazard entirely. May obsolete this whole class of issue — verify after enabling. Only covers merged PRs; closed-without-merge branches still need manual delete (rare).
-
-Related: path case-mismatch hazard (35ead957-9339-8176-a43d-f1a412e03290) — both stem from multi-worktree workflows interacting badly with gh's assumptions about repo state.
-
 ### Handoff template: state-only, no pre-picked next move
 
 **Status / Priority:** Cleanup · P2
 
-Handoff docs that say Recommended: X or Next move: X create anchoring — the next agent reads them as authority and skips the Notion Now lookup. The opening handoff this session pre-picked Finding #3 from PR #34, which is the bias we identified mid-chat. Rule to encode in the handoff template: handoffs describe state (what shipped, what is loose, what is in flight) but never recommend a next move. The Now-column lookup is the recommendation step.
+Handoff docs that say Recommended: X or Next move: X create anchoring — the next agent reads them as authority and skips the priority lookup. Rule to encode in the handoff template: handoffs describe state (what shipped, what is loose, what is in flight) but never recommend a next move. The BACKLOG.md priority order (Retention priority → Next → Later) is the recommendation step (Notion retired 2026-06-17). Still OPEN — not yet encoded in any template (no handoff template exists in-repo as of 2026-06-24), and the bias recurred: a handoff this session pre-declared "clean boundary / nothing in-flight" and missed open PR #494 — exactly the anchoring this rule warns against. (Original 2026-05 instance: the opening handoff pre-picked Finding #3 from PR #34.)
 
 ### Remove dead .cth-placeholder CSS and stale comment in CashTrendHero.tsx
 
@@ -1046,4 +1031,4 @@ CFO Assistant — paused 2026-05-23 (master)
 
 ---
 
-_Migrated from the Notion "Wx CFO Scorecard — Backlog" export, 2026-06-17 (Step 1). Three retention candidates appended to Later on 2026-06-17 (Step 2) from the retired retention plan doc. Statuses as-of migration; a grooming/reconciliation pass against shipped state is pending (some Later items may already be done). Reprioritized 2026-06-21: a `Retention (priority)` section was created above `Next` — 4 retention items lifted from Later (48→44) and 2 new items added (churn time-series substrate probe + churn-evolution-over-time chart), 6 total in dependency order._
+_Migrated from the Notion "Wx CFO Scorecard — Backlog" export, 2026-06-17 (Step 1). Three retention candidates appended to Later on 2026-06-17 (Step 2) from the retired retention plan doc. Statuses as-of migration; a grooming/reconciliation pass against shipped state was pending (some Later items may already be done). Reprioritized 2026-06-21: a `Retention (priority)` section was created above `Next` — 4 retention items lifted from Later (48→44) and 2 new items added (churn time-series substrate probe + churn-evolution-over-time chart), 6 total in dependency order. Grooming/reconciliation pass completed 2026-06-24 — Retention band reconciled vs shipped #487–496 (substrate-probe resolved, Phase-1 chart shipped, belt + SC-split unparked, dues (c) added); Notion residue swept; Cleanup gh-delete item resolved._
