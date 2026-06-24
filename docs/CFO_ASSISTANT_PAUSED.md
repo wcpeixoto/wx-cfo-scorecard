@@ -2,7 +2,7 @@
 
 **Date paused:** 2026-05-23
 **Canonical reference:** This file
-**Notion lane:** CFO Assistant column (see Notion card drafts below)
+**Backlog:** the "Paused — CFO Assistant" section in `BACKLOG.md` (Notion retired 2026-06-17)
 
 ---
 

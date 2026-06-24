@@ -143,6 +143,6 @@ override.
 - JWT verification, signed requests, or any auth beyond CORS
   allowlist (V1 threat model: cost protection and secret isolation,
   not access control)
-- Caching (browser-side, separate Notion item)
+- Caching (browser-side, separate backlog item)
 - Retry logic (one upstream attempt; failures forwarded)
 
