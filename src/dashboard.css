@@ -13733,6 +13733,20 @@ body {
     flex-direction: column;
   }
 }
+/* Card header as a TailAdmin-style row: title block (left) + chart controls (right),
+   aligned on the same line as the title. */
+.retention-evolution-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.retention-evolution-heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
 .retention-evolution-titlerow {
   display: flex;
   align-items: center;
@@ -13751,7 +13765,6 @@ body {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
 }
 .retention-evolution-timeframe {
   display: flex;
