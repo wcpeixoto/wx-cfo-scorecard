@@ -14,11 +14,10 @@
 
 import type { ChurnRiskByTenureResult, TenureBandRisk } from './churnRiskByTenure';
 
-// Locked suppression policy: any PUBLISHED cell with a count in
-// [1, SUPPRESSION_FLOOR − 1] is masked — small positive groups are never shown as
-// a number. A true 0 is shown (it identifies no member, and masking it as "<5"
-// would falsely imply 1–4 real members), and a count >= the floor is shown.
-export const SUPPRESSION_FLOOR = 5;
+// Owner-dashboard aggregate-count policy (AGENTS.md — "Retention page data policy"):
+// these tenure × recency cells are aggregate counts of active members, with no
+// identity-level data behind them, so every cell renders its real number —
+// including small counts and counts of 1. There is no <5 cell suppression here.
 
 export type RecencyStageId = 'healthy' | 'watch' | 'silent' | 'unknownRecency';
 
@@ -34,8 +33,7 @@ export const RECENCY_STAGES: readonly { id: RecencyStageId; label: string }[] = 
 
 export type SegmentCell = {
   stage: RecencyStageId;
-  count: number; // the true count (kept for tests + the complementary guard)
-  masked: boolean; // true => render the "<5" marker, never the number
+  count: number; // the aggregate count for this tenure × recency cell
 };
 
 export type SegmentRow = {
@@ -73,64 +71,6 @@ function cellCountsOf(b: TenureBandRisk): Record<RecencyStageId, number> {
   };
 }
 
-// Locked <5 suppression with the complementary-suppression guard. Operates on the
-// count matrix (rows = bands, columns = RECENCY_STAGES).
-//
-// Primary: mask any cell in [1, floor−1]. Complementary: a single masked cell in
-// a row OR column can be recovered by subtracting the others from a total — and
-// the per-band active total IS published un-suppressed by the shipped
-// Churn-by-Tenure card — so whenever a row or column has exactly one masked cell,
-// mask the next-smallest cell in that line too. Repeated to a fixed point.
-//
-// Post-condition (asserted in tests): no row and no column has exactly one masked
-// cell, so no suppressed value is recoverable by single-cell subtraction. The
-// loop only ever ADDS masks (bounded by rows × columns), so it terminates.
-export function suppressMatrix(counts: number[][]): boolean[][] {
-  const rowCount = counts.length;
-  const colCount = rowCount > 0 ? counts[0].length : 0;
-  const masked = counts.map((row) => row.map((v) => v >= 1 && v < SUPPRESSION_FLOOR));
-
-  // Index of the smallest unmasked value among the given cells (−1 if none left).
-  const smallestUnmasked = (cells: { v: number; m: boolean }[]): number => {
-    let idx = -1;
-    let best = Infinity;
-    cells.forEach((cell, i) => {
-      if (!cell.m && cell.v < best) {
-        best = cell.v;
-        idx = i;
-      }
-    });
-    return idx;
-  };
-
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (let r = 0; r < rowCount; r++) {
-      if (masked[r].filter(Boolean).length === 1) {
-        const idx = smallestUnmasked(counts[r].map((v, c) => ({ v, m: masked[r][c] })));
-        if (idx >= 0) {
-          masked[r][idx] = true;
-          changed = true;
-        }
-      }
-    }
-    for (let c = 0; c < colCount; c++) {
-      let maskedInCol = 0;
-      for (let r = 0; r < rowCount; r++) if (masked[r][c]) maskedInCol++;
-      if (maskedInCol === 1) {
-        const col = counts.map((row, r) => ({ v: row[c], m: masked[r][c] }));
-        const idx = smallestUnmasked(col);
-        if (idx >= 0) {
-          masked[idx][c] = true;
-          changed = true;
-        }
-      }
-    }
-  }
-  return masked;
-}
-
 // Build the grid view-model. `result` comes from EITHER computeChurnRiskByTenure
 // (sample) or computeChurnRiskByTenureFromAggregate (live) — both return the same
 // shape, so the adapter is source-agnostic.
@@ -147,8 +87,6 @@ export function buildSegmentExplorerView(
     return RECENCY_STAGES.map((s) => cc[s.id]);
   });
 
-  const masked = suppressMatrix(counts);
-
   const rows: SegmentRow[] = orderedBands.map((b, r) => ({
     id: b.id,
     label: b.label,
@@ -156,7 +94,6 @@ export function buildSegmentExplorerView(
     cells: RECENCY_STAGES.map((s, c) => ({
       stage: s.id,
       count: counts[r][c],
-      masked: masked[r][c],
     })),
     activeTotal: b.activeTotal,
     knownActiveTotal: b.knownActiveTotal,

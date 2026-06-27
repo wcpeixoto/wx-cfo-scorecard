@@ -1379,6 +1379,10 @@ dropped).
   split now ALSO applies to the **lapsed (inactive)** side — re-run the floor check on the
   lapsed-per-cohort cells at build and suppress any that approach it. Re-apply if finer splits are
   displayed; the Unknown bucket is also subject to suppression if small.
+  - **SUPERSEDED 2026-06-27 →** the `<5` / k→1 owner-dashboard cell-masking described here is no
+    longer the rule. See the **"Retention page data policy"** section in `AGENTS.md`: owner-dashboard
+    Retention cards now show all aggregate counts (including counts of 1) with NO `<5` masking; the
+    identity-level prohibition (no member rows/names/IDs/DOBs/exact ages) below still stands.
 - **Aggregate-only output. No member rows, names, IDs, exact ages/dates, or dues in the payload. PII
   columns (Name, email, Birthday, exact Age, Client ID) never leave the server/local layer.** (This is
   the resolution recorded against the Open-decisions PII / data-minimization item.)
