@@ -103,9 +103,10 @@ export default function RetentionEvolutionChart({
       },
       colors: byAge ? [ALL_COLOR, YOUTH_COLOR, ADULTS_COLOR] : [ALL_COLOR],
       // Area fill only in the single-line All view; the By-age view is clean lines (no stacked
-      // translucent fills).
+      // translucent fills). For a `type: 'line'` series ApexCharts maps fill.opacity onto the line
+      // STROKE's alpha, so this must be opacity:1 — opacity:0 renders all three lines invisible.
       fill: byAge
-        ? { type: 'solid', opacity: 0 }
+        ? { type: 'solid', opacity: 1 }
         : {
             type: 'gradient',
             gradient: { shade: 'light', type: 'vertical', opacityFrom: 0.5, opacityTo: 0, stops: [0, 100] },
