@@ -15,7 +15,18 @@ type RetentionEvolutionChartProps = {
   points: RetentionEvolutionPoint[];
   metric: RetentionMetric;
   height?: number;
+  // By-age overlay — Youth / Adults points aligned 1:1 to `points` (the All axis). A null slot is a
+  // line GAP. When BOTH are supplied the chart renders three distinguishable lines (All + Youth +
+  // Adults); when absent it renders the gym-wide All line as the current area.
+  youth?: (RetentionEvolutionPoint | null)[];
+  adults?: (RetentionEvolutionPoint | null)[];
 };
+
+// Distinct categorical line colors from the chart-token palette (UI_RULES §Chart Token File — no
+// invented hex). Blue / green / amber read as three different hues; the legend labels carry meaning.
+const ALL_COLOR = chartTokens.brand;
+const YOUTH_COLOR = chartTokens.success;
+const ADULTS_COLOR = chartTokens.warning;
 
 // Retention sits in a tight 85–100% band; zero-basing the y-axis would flatten the line. Floor to
 // the nearest 5% below the data min (clamped), cap at 100% (retention can't exceed 100%).
@@ -40,23 +51,48 @@ function tickAmountFor(count: number): number {
   return 8;
 }
 
-export default function RetentionEvolutionChart({ points, metric, height = 300 }: RetentionEvolutionChartProps) {
+export default function RetentionEvolutionChart({
+  points,
+  metric,
+  height = 300,
+  youth,
+  adults,
+}: RetentionEvolutionChartProps) {
   const isChurn = metric === 'churn';
+  const byAge = youth != null && adults != null;
+
   const categories = useMemo(() => points.map((p) => formatMonthShort(p.periodMonth)), [points]);
   const tooltipLabels = useMemo(() => points.map((p) => formatMonthLong(p.periodMonth)), [points]);
-  const values = useMemo(
-    () => points.map((p) => (isChurn ? churnPctOf(p) : p.retentionPct)),
-    [points, isChurn],
+
+  // Metric value for a point (or null gap) — the SAME selector drives every line, so the metric and
+  // timeframe controls move all of them together.
+  const valueOf = useMemo(
+    () => (p: RetentionEvolutionPoint | null): number | null =>
+      p === null ? null : isChurn ? churnPctOf(p) : p.retentionPct,
+    [isChurn],
   );
+
+  const allValues = useMemo(() => points.map((p) => valueOf(p) as number), [points, valueOf]);
+  const youthValues = useMemo(() => (youth ? youth.map(valueOf) : null), [youth, valueOf]);
+  const adultsValues = useMemo(() => (adults ? adults.map(valueOf) : null), [adults, valueOf]);
+
+  // Y-domain spans every VISIBLE line so a segment line is never clipped (nulls excluded).
+  const domainValues = useMemo(() => {
+    const vals = [...allValues];
+    if (youthValues) for (const v of youthValues) if (v != null) vals.push(v);
+    if (adultsValues) for (const v of adultsValues) if (v != null) vals.push(v);
+    return vals;
+  }, [allValues, youthValues, adultsValues]);
+
   const { min: yMin, max: yMax } = useMemo(
-    () => (isChurn ? churnYDomain(values) : retentionYDomain(values)),
-    [values, isChurn],
+    () => (isChurn ? churnYDomain(domainValues) : retentionYDomain(domainValues)),
+    [domainValues, isChurn],
   );
 
   const options = useMemo<ApexOptions>(
     () => ({
       chart: {
-        type: 'area',
+        type: byAge ? 'line' : 'area',
         height,
         fontFamily: 'Outfit, sans-serif',
         toolbar: { show: false },
@@ -65,11 +101,15 @@ export default function RetentionEvolutionChart({ points, metric, height = 300 }
         sparkline: { enabled: false },
         animations: { enabled: true },
       },
-      colors: [chartTokens.brand],
-      fill: {
-        type: 'gradient',
-        gradient: { shade: 'light', type: 'vertical', opacityFrom: 0.5, opacityTo: 0, stops: [0, 100] },
-      },
+      colors: byAge ? [ALL_COLOR, YOUTH_COLOR, ADULTS_COLOR] : [ALL_COLOR],
+      // Area fill only in the single-line All view; the By-age view is clean lines (no stacked
+      // translucent fills).
+      fill: byAge
+        ? { type: 'solid', opacity: 0 }
+        : {
+            type: 'gradient',
+            gradient: { shade: 'light', type: 'vertical', opacityFrom: 0.5, opacityTo: 0, stops: [0, 100] },
+          },
       stroke: { width: 2, curve: 'straight', lineCap: 'butt', dashArray: 0 },
       dataLabels: { enabled: false },
       markers: {
@@ -78,7 +118,7 @@ export default function RetentionEvolutionChart({ points, metric, height = 300 }
         strokeColors: '#FFFFFF',
         strokeWidth: 2,
         fillOpacity: 1,
-        colors: [chartTokens.brand],
+        colors: byAge ? [ALL_COLOR, YOUTH_COLOR, ADULTS_COLOR] : [ALL_COLOR],
       },
       grid: {
         borderColor: chartTokens.gridBorder,
@@ -138,21 +178,49 @@ export default function RetentionEvolutionChart({ points, metric, height = 300 }
           },
         },
         y: {
-          // Just the metric percentage — the series name ("Churn" / "Retention") is the label,
-          // so the tooltip reads e.g. "Churn: 9.9%". No counts (they overflowed/clipped the panel).
-          formatter: (value: number) => `${value}%`,
+          // Series name ("All" / "Youth" / "Adults" or "Churn" / "Retention") is the label; the
+          // value is the metric percent. Suppressed/absent cohort cells are gaps → render an em dash.
+          formatter: (value: number | null) => (value == null ? '—' : `${value}%`),
         },
         marker: { show: true },
       },
-      legend: { show: false },
+      // Legend distinguishes the three lines in By-age view; the single All line needs none.
+      legend: byAge
+        ? {
+            show: true,
+            position: 'bottom',
+            horizontalAlign: 'left',
+            fontFamily: 'Outfit, sans-serif',
+            fontSize: '12px',
+            labels: { colors: chartTokens.chartTextStrong },
+            markers: { size: 6, shape: 'circle' },
+            itemMargin: { horizontal: 10, vertical: 4 },
+          }
+        : { show: false },
     }),
-    [categories, tooltipLabels, points, values, yMin, yMax, height, isChurn],
+    [byAge, categories, tooltipLabels, yMin, yMax, height],
   );
 
-  const series = useMemo(
-    () => [{ name: isChurn ? 'Churn' : 'Retention', data: values }],
-    [values, isChurn],
-  );
+  const series = useMemo(() => {
+    if (byAge && youthValues && adultsValues) {
+      return [
+        { name: 'All', data: allValues },
+        { name: 'Youth', data: youthValues },
+        { name: 'Adults', data: adultsValues },
+      ];
+    }
+    return [{ name: isChurn ? 'Churn' : 'Retention', data: allValues }];
+  }, [byAge, isChurn, allValues, youthValues, adultsValues]);
 
-  return <ReactApexChart options={options} series={series} type="area" height={height} />;
+  return (
+    // Remount on mode change — ApexCharts does not cleanly switch an existing instance between
+    // `area` and `line`; a fresh key forces a clean redraw with the new series set.
+    <ReactApexChart
+      key={byAge ? 'byAge' : 'all'}
+      options={options}
+      series={series}
+      type={byAge ? 'line' : 'area'}
+      height={height}
+    />
+  );
 }
