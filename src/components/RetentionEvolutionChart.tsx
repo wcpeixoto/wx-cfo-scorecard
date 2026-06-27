@@ -89,6 +89,19 @@ export default function RetentionEvolutionChart({
     [domainValues, isChurn],
   );
 
+  // Per-series mean of the visible metric (nulls excluded) for the By-age legend labels, indexed by
+  // seriesIndex [All, Youth, Adults]. null ⇒ no non-null values in the window ⇒ legend shows the
+  // bare name. Tracks the Churn↔Retention toggle because the value arrays already do (via valueOf).
+  const legendAverages = useMemo<(number | null)[]>(() => {
+    const mean = (vals: (number | null)[] | null): number | null => {
+      if (!vals) return null;
+      const present = vals.filter((v): v is number => v != null);
+      if (present.length === 0) return null;
+      return Math.round(present.reduce((sum, v) => sum + v, 0) / present.length);
+    };
+    return [mean(allValues), mean(youthValues), mean(adultsValues)];
+  }, [allValues, youthValues, adultsValues]);
+
   const options = useMemo<ApexOptions>(
     () => ({
       chart: {
@@ -189,17 +202,23 @@ export default function RetentionEvolutionChart({
       legend: byAge
         ? {
             show: true,
-            position: 'bottom',
+            position: 'top',
             horizontalAlign: 'left',
             fontFamily: 'Outfit, sans-serif',
             fontSize: '12px',
             labels: { colors: chartTokens.chartTextStrong },
             markers: { size: 6, shape: 'circle' },
             itemMargin: { horizontal: 10, vertical: 4 },
+            // Append the per-series mean (e.g. "Adults (Avg 7%)") without renaming the series — the
+            // series name is the tooltip row label, so renaming would pollute hover tooltips.
+            formatter: (seriesName: string, opts?: { seriesIndex?: number }) => {
+              const avg = legendAverages[opts?.seriesIndex ?? -1];
+              return avg == null ? seriesName : `${seriesName} (Avg ${avg}%)`;
+            },
           }
         : { show: false },
     }),
-    [byAge, categories, tooltipLabels, yMin, yMax, height],
+    [byAge, categories, tooltipLabels, yMin, yMax, height, legendAverages],
   );
 
   const series = useMemo(() => {

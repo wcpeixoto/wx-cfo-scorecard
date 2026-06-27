@@ -158,6 +158,11 @@ export function RetentionEvolutionCard() {
                       Health cards, which measure who has stopped showing up — not whether their
                       membership renewed.
                     </li>
+                    {view.dataBeginsMonth && (
+                      <li className="cashflow-tooltip-body">
+                        Membership tracking began {formatMonthLong(view.dataBeginsMonth)}.
+                      </li>
+                    )}
                   </ul>
                 </div>
               </span>
@@ -244,18 +249,14 @@ export function RetentionEvolutionCard() {
               youth={overlay?.youth}
               adults={overlay?.adults}
             />
-            <p className="retention-evolution-caption">
-              {view.windowExceedsData
-                ? `Requested window exceeds tracked history — showing all available data. Membership tracking began ${formatMonthLong(view.dataBeginsMonth)}; earlier months aren't tracked and are never fabricated.`
-                : `Membership tracking began ${formatMonthLong(view.dataBeginsMonth)}.`}
-            </p>
+            {view.windowExceedsData && (
+              <p className="retention-evolution-caption">
+                {`Requested window exceeds tracked history — showing all available data. Membership tracking began ${formatMonthLong(view.dataBeginsMonth)}; earlier months aren't tracked and are never fabricated.`}
+              </p>
+            )}
             {byAge && (
               <ul className="retention-evolution-footnote">
                 <li>Unknown-age members are excluded from Youth and Adults, but counted in All.</li>
-                <li>
-                  Aggregate monthly cohort counts only. No member names, IDs, DOBs, exact ages, or
-                  individual records are stored or shown.
-                </li>
               </ul>
             )}
           </>
