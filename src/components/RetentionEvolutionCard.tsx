@@ -253,8 +253,8 @@ export function RetentionEvolutionCard() {
               <ul className="retention-evolution-footnote">
                 <li>Unknown-age members are excluded from Youth and Adults, but counted in All.</li>
                 <li>
-                  A gap month means there isn't enough published data after privacy suppression — not
-                  zero.
+                  Aggregate monthly cohort counts only. No member names, IDs, DOBs, exact ages, or
+                  individual records are stored or shown.
                 </li>
               </ul>
             )}
