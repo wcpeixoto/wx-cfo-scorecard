@@ -6,19 +6,15 @@ import {
   type TenureBandRisk,
 } from './churnRiskByTenure';
 import { TENURE_BANDS, UNKNOWN_TENURE_ID } from './tenureBands';
-import {
-  RECENCY_STAGES,
-  SUPPRESSION_FLOOR,
-  buildSegmentExplorerView,
-  suppressMatrix,
-} from './segmentExplorer';
+import { RECENCY_STAGES, buildSegmentExplorerView } from './segmentExplorer';
 
 // The Segment Explorer (1a) is a PURE view over the SAME aggregates
 // computeChurnRiskByTenure(FromAggregate) returns. These tests lock the
 // presentation arithmetic the adapter is allowed to do — the Healthy subtraction
-// (MF-1), the per-row rate selection (SC-1), the <5 cell suppression + the
-// complementary guard, and the two distinct Unknown axes (SC-2) — so the grid can
-// never silently drift from its source.
+// (MF-1), the per-row rate selection (SC-1), and the two distinct Unknown axes
+// (SC-2) — so the grid can never silently drift from its source. Per the
+// owner-dashboard aggregate-count policy (AGENTS.md), cells render their real
+// count including small counts; there is no <5 suppression.
 
 // Build a TenureBandRisk from the four leaf counts exactly the way the source
 // modules do, so test fixtures obey the same field relationships as real results.
@@ -109,58 +105,34 @@ describe('buildSegmentExplorerView — per-row rate selection (SC-1)', () => {
   });
 });
 
-describe('suppressMatrix — <5 suppression + complementary guard', () => {
-  it('locks the suppression floor at 5', () => {
-    expect(SUPPRESSION_FLOOR).toBe(5);
-  });
-
-  it('masks counts in [1,4], shows a true 0 and counts >= the floor', () => {
-    // Single row: complementary cannot fire (each column has only one cell), so
-    // this isolates the PRIMARY rule: 0 shown, 5 shown, 3 masked, 2 masked.
-    expect(suppressMatrix([[0, 5, 3, 2]])).toEqual([[false, false, true, true]]);
-  });
-
-  it('never masks a 0 by the primary rule (0 identifies no member)', () => {
-    expect(suppressMatrix([[0, 0, 0, 0]])).toEqual([[false, false, false, false]]);
-  });
-
-  it('adds a complementary mask so no row/column has exactly one masked cell', () => {
-    const counts = [
-      [20, 10, 3, 8], // the 3 is a primary mask → row would have exactly one masked
-      [9, 7, 6, 5],
-      [10, 11, 12, 13],
-    ];
-    const masked = suppressMatrix(counts);
-    const rowN = masked.length;
-    const colN = masked[0].length;
-    // Post-condition: no row and no column has exactly one masked cell.
-    for (let r = 0; r < rowN; r++) {
-      expect(masked[r].filter(Boolean).length).not.toBe(1);
-    }
-    for (let c = 0; c < colN; c++) {
-      let n = 0;
-      for (let r = 0; r < rowN; r++) if (masked[r][c]) n++;
-      expect(n).not.toBe(1);
-    }
-    // The primary small cell is masked, and at least one complementary cell joined it.
-    expect(masked[0][2]).toBe(true);
-    expect(masked[0].filter(Boolean).length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('surfaces suppression through buildSegmentExplorerView cells', () => {
+describe('buildSegmentExplorerView — small aggregate counts render as real numbers (no <5 suppression)', () => {
+  it('keeps a small positive cell (including 1) as its real count, with no masked flag', () => {
     const bands = [
       mkBand('lt3m', '< 3 mo', { healthy: 20, watch: 10, silent: 3, unknownRecency: 8 }),
-      mkBand('3to6m', '3–6 mo', { healthy: 9, watch: 7, silent: 6, unknownRecency: 5 }),
+      mkBand('3to6m', '3–6 mo', { healthy: 9, watch: 7, silent: 1, unknownRecency: 5 }),
       mkBand('6to12m', '6–12 mo', { healthy: 10, watch: 11, silent: 12, unknownRecency: 13 }),
     ];
     const view = buildSegmentExplorerView(mkResult(bands, noUnknownTenure()), false);
-    const silentCell = view.rows[0].cells.find((c) => c.stage === 'silent')!;
-    expect(silentCell.count).toBe(3);
-    expect(silentCell.masked).toBe(true);
-    // No published row leaves a single masked cell recoverable by subtraction.
+
+    const silent1 = view.rows[0].cells.find((c) => c.stage === 'silent')!;
+    expect(silent1.count).toBe(3); // a 3 shows as 3, not "<5"
+    const silentOne = view.rows[1].cells.find((c) => c.stage === 'silent')!;
+    expect(silentOne.count).toBe(1); // a count of 1 shows as 1
+
+    // No cell carries a masked flag any more — the property is gone from the shape.
     for (const row of view.rows) {
-      expect(row.cells.filter((c) => c.masked).length).not.toBe(1);
+      for (const cell of row.cells) {
+        expect(cell).not.toHaveProperty('masked');
+      }
     }
+  });
+
+  it('renders a true 0 as 0 and a large count as itself', () => {
+    const b = mkBand('lt3m', '< 3 mo', { healthy: 0, watch: 0, silent: 12, unknownRecency: 0 });
+    const view = buildSegmentExplorerView(mkResult([b], noUnknownTenure()), false);
+    const cells = view.rows[0].cells;
+    expect(cells.find((c) => c.stage === 'healthy')!.count).toBe(0);
+    expect(cells.find((c) => c.stage === 'silent')!.count).toBe(12);
   });
 });
 

@@ -302,6 +302,26 @@ contract when they go live.
 - **`$ at risk` is active-only.** Paused/ended members carry `monthlyDues: 0`
   and self-exclude — never sum dues across statuses.
 
+## Retention page data policy
+
+Owner-dashboard Retention cards may display **aggregate counts** at
+month / age-band / tenure-band / recency-stage / status level, **including
+small counts** (counts of 1 are shown). Identity-level member data must never
+be persisted or exposed in Supabase or the browser.
+
+- **Forbidden:** names, client IDs, membership IDs, DOBs, exact ages, emails,
+  phone numbers, individual member rows.
+- **Allowed:** aggregate month / cohort / tenure / recency / status counts and
+  rates.
+
+The SPA reads these aggregate tables with the **public anon key**, so the
+counts are effectively public. This policy explicitly accepts that gym-wide
+age/tenure/recency aggregate counts are low-sensitivity (Wesley accepted the
+public aggregate-count risk, 2026-06-27). It is **not** a claim that the owner
+dashboard is access-gated. There is no `<5` cell suppression on
+owner-dashboard aggregate cards; this policy supersedes the earlier small-cell
+masking rule described in `RETENTION_FINISH_PLAN.md`.
+
 ---
 
 ## Gotchas
