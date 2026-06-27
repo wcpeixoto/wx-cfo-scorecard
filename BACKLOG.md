@@ -8,11 +8,13 @@ Every item carries the canonical three fields — **Result** (what changes for t
 
 ---
 
-## Retention (priority) (6)
+## Retention (priority) (6 active + 1 shipped)
 
 ### Churn-evolution chart — SEGMENT (age-cohort) toggle (Phase 2)
 
-**Status / Priority:** Retention (priority)
+**Status / Priority:** ✅ SHIPPED 2026-06-27 — #498 (Youth/Adults age-segment overlay) + #499 (paint-fix), merged + deployed (main `3b704f4`). OVERTAKEN.
+
+Shipped resolution: the original "BLOCKED on a net-new auth boundary" premise was a MISDIAGNOSIS — the segment toggle shipped on the SAME public anon-aggregate pattern as every other Retention card, no login/auth boundary required. The DOB join + cohort aggregation runs in a GATED build/import (Supabase MCP), landing only per-cohort COUNTS in the anon-readable `member_retention_by_cohort` table (no member-level PII in the browser). Re-banded from the 4-band Kids 3–6 / 7–9 / Teens / Adults plan to **Youth (1–15) / Adults 16+ / Unknown** for sparsity; `cohortBands.ts` untouched (banding is build-local). The All line stays sourced only from #495 `member_retention_rates`; suppressed cohort cells render as line gaps. (Historical Result/Why/Premise below kept as the record.)
 
 Result: Add a SEGMENT toggle (age cohort: Kids 3–6, Kids 7–9, Teens 10–15, Adults 16+ — reuse cohortBands.ts) to the live churn-evolution chart, so the longitudinal churn/retention view can be read per age group, not just gym-wide.
 
@@ -21,6 +23,16 @@ Why: Phase 1 — gym-wide churn/retention over time with the TIMEFRAME toggle �
 Premise / blocker: BLOCKED on the net-new auth boundary — shares that keystone with Gi-vs-No-Gi (Phase 2, below) and the dues-write Edge Function (below). The shipped substrate is the click-imported `member_retention_rates` table (#495): a gym-wide aggregate with NO age dimension, so the segment toggle is NOT a view over current data — it is a new PII-gated pipeline (client-grain Member Retention.Client ID → /clients DOB → server-side cohort aggregation = member-level PII, which a public SPA + anon key cannot hold). HARD rule still applies — "No fake history" (AGENTS.md): the time axis shows only real dated data; empty windows render honestly empty, never fabricated.
 
 Note — substrate-probe gate (Phase 1) RESOLVED 2026-06-23: the All-Memberships export has NO cancellation/termination/status column (only Expiration Date + Autorenew), so historical churn reconstruction from that export is dead. Real monthly history is the Wodify "Member Retention Rates" report, now click-imported into `member_retention_rates` (#495) — which is what Phase 1 ships on.
+
+### Retention page aggregate-count policy — remove `<5` masking (Slice 2 pending)
+
+**Status / Priority:** Retention (priority) · Slice 1 IN PROGRESS (this PR)
+
+Result: Adopt the owner-dashboard aggregate-count policy (AGENTS.md "Retention page data policy") across Retention surfaces — show all aggregate month/age-band/tenure-band/recency-stage/status counts, including counts of 1, with no `<5` cell masking; never persist or expose identity-level member data. **Slice 1 (this PR):** docs/policy + remove the two UI masks (Retention by Age Group lapsed cells; Segment Explorer cells), copy sweep, tests. **Slice 2 (pending):** the Retention Evolution chart data path + its privacy-gap footnote (currently renders suppressed cohort months as line gaps) is intentionally OUT OF SCOPE here and reconciled separately.
+
+Why: The earlier `<5` complementary suppression hid real, useful aggregate numbers (e.g. a lapsed count of 1–4 shown as "<5") to defend against reconstruction. Wesley accepted the public aggregate-count risk on 2026-06-27 (gym-wide age/tenure/recency aggregate counts are low-sensitivity), so the masking now costs owner insight for no commensurate benefit.
+
+Premise: Still needed for Slice 2. Slice 1 ships the policy doc + the two UI masking removals; Slice 2 (Retention Evolution chart gap path / footnote reconciliation) remains open and is not addressed by this PR.
 
 ### Monthly Critical Groups — month-over-month delta
 

@@ -770,27 +770,6 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
   );
 }
 
-// k→1 suppression for the Read-2 lapsed cells, with COMPLEMENTARY suppression: a
-// lone masked cell is recoverable as (the published Member Movement inactive total
-// − the visible cohort cells), so whenever ANY lapsed cell is masked, at least two
-// are — the lone small cell can't be backed out by subtraction. Returns the set of
-// cohort ids whose lapsed count must render as "<5". (Run-time ≈1 verification +
-// any further remedy is a WO-2 run concern.)
-const LAPSED_SUPPRESS_BELOW = 5;
-function maskedLapsedIds(cells: { id: string; lapsed: number }[]): Set<string> {
-  const masked = new Set<string>();
-  for (const c of cells) {
-    if (c.lapsed > 0 && c.lapsed < LAPSED_SUPPRESS_BELOW) masked.add(c.id);
-  }
-  if (masked.size === 1) {
-    const next = cells
-      .filter((c) => !masked.has(c.id) && c.lapsed > 0)
-      .sort((a, b) => a.lapsed - b.lapsed)[0];
-    if (next) masked.add(next.id);
-  }
-  return masked;
-}
-
 // Retention by Age Group (Cohort Retention Card — RETENTION_FINISH_PLAN.md §6–§9,
 // rev.3 client_status basis). Two reads in one card: Read 1 — cohort health
 // (Healthy/Watch/Silent + at-risk rate per age cohort, active members), re-derived
@@ -836,12 +815,8 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
   const bandRate = (b: CohortRisk) => (includeUnknown ? b.riskRate : b.riskRateKnown);
   const unknownRecencyTotal = bands.reduce((sum, b) => sum + b.unknownRecency, 0);
 
-  // Read 2 lapsed cells with complementary k→1 suppression (see maskedLapsedIds).
-  const lapsedMasked = useMemo(
-    () => maskedLapsedIds([...bands, unknownCohort]),
-    [bands, unknownCohort],
-  );
-  const lapsedCell = (b: CohortRisk) => (lapsedMasked.has(b.id) ? '<5' : String(b.lapsed));
+  // Read 2 lapsed cells render the real aggregate count (owner-dashboard
+  // aggregate-count policy — AGENTS.md "Retention page data policy"; no <5 mask).
 
   // The unknown-cohort row renders only when it carries members (active or lapsed),
   // matching the unknown-tenure row's "surface, don't fabricate" rule.
@@ -901,7 +876,7 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
                 <span className="cohort-age-col cohort-age-col--num">{bandActive(b)}</span>
                 <span className="cohort-age-col cohort-age-col--num">{b.atRisk}</span>
                 <span className="cohort-age-col cohort-age-col--num">{formatRate(bandRate(b))}</span>
-                <span className="cohort-age-col cohort-age-col--num">{lapsedCell(b)}</span>
+                <span className="cohort-age-col cohort-age-col--num">{b.lapsed}</span>
               </li>
             ))}
             {/* Unknown-age members (missing/sentinel/invalid DOB) surfaced rather
@@ -915,7 +890,7 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
                 <span className="cohort-age-col cohort-age-col--num">
                   {formatRate(bandRate(unknownCohort))}
                 </span>
-                <span className="cohort-age-col cohort-age-col--num">{lapsedCell(unknownCohort)}</span>
+                <span className="cohort-age-col cohort-age-col--num">{unknownCohort.lapsed}</span>
               </li>
             )}
           </ul>
@@ -936,10 +911,8 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
         />
 
         <p className="cohort-age-suppression-note">
-          A &ldquo;Lapsed&rdquo; count under 5 is hidden (shown as &ldquo;&lt;5&rdquo;) to protect
-          individuals. Whenever one is hidden, at least one other cell is hidden too so the small
-          count can&rsquo;t be backed out, which means a &ldquo;&lt;5&rdquo; may stand for a larger
-          real value — not a near-zero.
+          Counts are aggregate age-group totals. No member names, IDs, DOBs, exact ages, or
+          individual records are stored or shown.
         </p>
 
         <p className="cohort-age-caveat">
@@ -961,9 +934,9 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
 // the same dual-source gating as ChurnRiskByTenureCard (live aggregate when the
 // snapshot carries the tenure histogram, sample fixture otherwise), the same
 // threshold + includeUnknown from RetentionSettings, fed through the pure
-// buildSegmentExplorerView adapter (Healthy subtraction, per-row rate, <5 cell
-// suppression). Honest labels: it is a cross-SECTION of today's actives — not a
-// journey over time — and long-tenure rows show survivors only (footer).
+// buildSegmentExplorerView adapter (Healthy subtraction, per-row rate; aggregate
+// counts shown as real numbers). Honest labels: it is a cross-SECTION of today's
+// actives — not a journey over time — and long-tenure rows show survivors only (footer).
 function SegmentExplorerCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays, includeUnknown, setIncludeUnknown } = useRetentionSettings();
 
@@ -1065,16 +1038,7 @@ function SegmentExplorerCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
                       className="segment-explorer-col segment-explorer-col--num"
                       role="cell"
                     >
-                      {cell.masked ? (
-                        <span
-                          className="segment-explorer-masked"
-                          title="Hidden to protect small groups (fewer than 5 members)"
-                        >
-                          &lt;5
-                        </span>
-                      ) : (
-                        cell.count
-                      )}
+                      {cell.count}
                     </span>
                   ))}
                   <span className="segment-explorer-col segment-explorer-col--num" role="cell">
@@ -1096,8 +1060,8 @@ function SegmentExplorerCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
         />
 
         <p className="segment-explorer-suppression-note">
-          Cells with fewer than 5 members are hidden (shown as &ldquo;&lt;5&rdquo;) to protect
-          individuals.
+          Cells are aggregate counts of active members by tenure and recency stage. No member
+          identities or individual records are stored or shown.
         </p>
 
         <p className="segment-explorer-survivorship">
