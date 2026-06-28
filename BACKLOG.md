@@ -8,7 +8,7 @@ Every item carries the canonical three fields — **Result** (what changes for t
 
 ---
 
-## Retention (priority) (6 active + 1 shipped)
+## Retention (priority) (5 active + 2 shipped)
 
 ### Churn-evolution chart — SEGMENT (age-cohort) toggle (Phase 2)
 
@@ -24,9 +24,11 @@ Premise / blocker: BLOCKED on the net-new auth boundary — shares that keystone
 
 Note — substrate-probe gate (Phase 1) RESOLVED 2026-06-23: the All-Memberships export has NO cancellation/termination/status column (only Expiration Date + Autorenew), so historical churn reconstruction from that export is dead. Real monthly history is the Wodify "Member Retention Rates" report, now click-imported into `member_retention_rates` (#495) — which is what Phase 1 ships on.
 
-### Retention page aggregate-count policy — remove `<5` masking (Slice 2 pending)
+### Retention page aggregate-count policy — remove `<5` masking ✅ SHIPPED
 
-**Status / Priority:** Retention (priority) · Slice 1 IN PROGRESS (this PR)
+**Status / Priority:** Retention (priority) · ✅ SHIPPED/COMPLETE (Slice 1 `3432d9f` #500 + Slice 2 `80e49c7` #501, both live)
+
+Shipped resolution: BOTH slices landed and are live. Slice 1 (#500, `3432d9f`) shipped the policy doc + removed the two UI masks (Retention by Age Group lapsed cells; Segment Explorer cells) + copy sweep + tests. Slice 2 (#501, `80e49c7`) rebuilt the cohort flow-table with no `<5` suppression behind a gated re-import and added the footnote — Youth/Adults now render 12/12 continuous (no suppressed-month line gaps). Follow-up chart polish shipped separately as #502 (`baef30b`): churn-evolution legend → top, per-slice averages in the legend, and footnote/tracking-began note relocation. (Historical Result/Why/Premise below kept as the record.)
 
 Result: Adopt the owner-dashboard aggregate-count policy (AGENTS.md "Retention page data policy") across Retention surfaces — show all aggregate month/age-band/tenure-band/recency-stage/status counts, including counts of 1, with no `<5` cell masking; never persist or expose identity-level member data. **Slice 1 (this PR):** docs/policy + remove the two UI masks (Retention by Age Group lapsed cells; Segment Explorer cells), copy sweep, tests. **Slice 2 (pending):** the Retention Evolution chart data path + its privacy-gap footnote (currently renders suppressed cohort months as line gaps) is intentionally OUT OF SCOPE here and reconciled separately.
 
@@ -58,7 +60,7 @@ Premise / blocker: Belt data is EXPORT-FEASIBLE (not blocked) via Admin UI → P
 
 **Status / Priority:** Retention (priority) · P3
 
-Separate "who is at risk now" (Today, exists) from "are we getting better at recovering at-risk members" (Recovery, performance-over-time). Sequencing gate MET 2026-06-24 — Risk by Time as Member is shipped + live, so Silent Churn Today polish is buildable now. Recovery stays independently blocked on dated check-in history.
+Separate "who is at risk now" (Today, exists) from "are we getting better at recovering at-risk members" (Recovery, performance-over-time). **Silent Churn Today polish is ✅ COMPLETE/OVERTAKEN** — the live card already shows no member names (list bridged to Wodify), with count + $/mo + Sample badge present. Recovery stays independently blocked on dated check-in history (`Client Sign-ins` probe).
 
 #### Context
 
@@ -73,18 +75,20 @@ This does **not** conflict with the current Risk by Time as Member card, which l
 
 #### Priority
 
-Sequencing gate MET 2026-06-24 — **Risk by Time as Member** is shipped + live, so the "finish it first" gate is satisfied. The Silent Churn split is now unblocked for sequencing: **Silent Churn Today polish** is buildable; **Silent Churn Recovery** stays independently blocked on dated check-in history (run the `Client Sign-ins` probe to unblock).
+Sequencing gate MET 2026-06-24 — **Risk by Time as Member** is shipped + live, so the "finish it first" gate is satisfied. **Silent Churn Today polish** is now ✅ COMPLETE/OVERTAKEN (the live card already shows no names; list bridged to Wodify). **Silent Churn Recovery** stays independently blocked on dated check-in history (run the `Client Sign-ins` probe to unblock).
 
 #### Future work
 
-##### 1. Silent Churn Today polish
+##### 1. Silent Churn Today polish ✅ COMPLETE
 
-Buildable now (sequencing gate met 2026-06-24). Current card exists. Polish:
+✅ COMPLETE / OVERTAKEN — the live card already satisfies every polish goal. The live Silent Churn branch (`GymPage.tsx`, `SilentChurnCard` on the Wodify snapshot) shows **no member names at all** — the per-member list is bridged out to Wodify ("Open Wodify report"), so there is nothing to demote into a drawer. Risk count + $/mo at risk + the Sample data badge are all present. Member names exist only in the synthetic, anonymized sample fixture (`memberFixture.ts`, dev-only) — never in the live render.
 
-- Reduce prominence of member names.
-- Move names into a drawer or "View members" detail area.
-- Keep current risk count and monthly dues at risk visible.
-- Keep Sample data badge while using fixture data.
+Original polish goals (kept as the record), all now met or moot:
+
+- ~~Reduce prominence of member names.~~ → live render shows no names.
+- ~~Move names into a drawer or "View members" detail area.~~ → list bridged to Wodify instead.
+- Keep current risk count and monthly dues at risk visible. → present.
+- Keep Sample data badge while using fixture data. → present.
 
 ##### 2. Silent Churn Recovery card
 
@@ -117,7 +121,7 @@ Before building the Recovery card, run a probe for the `Client Sign-ins` endpoin
 
 #### Current decision
 
-Risk by Time as Member is shipped + live (sequencing gate met 2026-06-24) — Silent Churn Today polish is buildable now. Silent Churn Recovery stays blocked on dated check-in history; run the `Client Sign-ins` probe separately to unblock it.
+Silent Churn Today polish is ✅ COMPLETE/OVERTAKEN — the live card already shows no member names (list bridged to Wodify), count + $/mo + Sample badge present. Silent Churn Recovery stays blocked on dated check-in history; run the `Client Sign-ins` probe separately to unblock it.
 
 ### Program/style retention — Gi vs No-Gi (Phase 2)
 
