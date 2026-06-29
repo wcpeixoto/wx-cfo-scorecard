@@ -48,6 +48,7 @@ import {
 } from '../lib/gym/fetchRetentionAggregate';
 import { RetentionEvolutionCard } from './RetentionEvolutionCard';
 import { MembersByAgeGroupCard } from './MembersByAgeGroupCard';
+import { MemberRetentionByBeltCard } from './MemberRetentionByBeltCard';
 
 export function GymPage() {
   // RETENTION_FINISH_PLAN.md §6: fetch the live Wodify aggregate ONCE here at page
@@ -107,16 +108,7 @@ export function GymPage() {
               <ChurnRiskByTenureCard snapshot={snapshot} />
               <CohortRetentionCard snapshot={snapshot} />
               <SegmentExplorerCard snapshot={snapshot} />
-              <GymCardShell
-                modifier="gym-card--full gym-card--recessed"
-                title="Churn by Belt"
-                subtitle="Data not connected yet."
-                gate={{
-                  status: 'blocked',
-                  reason:
-                    'Belt/rank data is API-gated at the current Wodify tier (403) — not a sample-data gap.',
-                }}
-              />
+              <MemberRetentionByBeltCard />
             </div>
           </section>
         </div>
@@ -1239,45 +1231,6 @@ function MemberMovementCard({ snapshot }: { snapshot: RetentionAggregateSnapshot
             </p>
           )}
         </div>
-      </div>
-    </article>
-  );
-}
-
-// Empty card shell — title + subtitle + a single placeholder body. Deliberately
-// has no internals (no charts, tables, filters, metrics, or state logic).
-// An optional `gate` swaps the generic "not built yet" placeholder for an honest
-// parked/blocked note naming why the card isn't built. It stays a shell — still
-// no internals — and the muted note is deliberately NOT the amber "Sample data"
-// badge, because these cards have no fixture data behind them.
-function GymCardShell({
-  title,
-  subtitle,
-  modifier,
-  gate,
-}: {
-  title: string;
-  subtitle: string;
-  modifier?: string;
-  gate?: { status: 'parked' | 'blocked'; reason: string };
-}) {
-  return (
-    <article className={`card gym-card${modifier ? ` ${modifier}` : ''}`}>
-      <header className="gym-card-head">
-        <h3 className="gym-card-title">{title}</h3>
-        <p className="gym-card-subtitle">{subtitle}</p>
-      </header>
-      <div className="gym-card-body">
-        {gate ? (
-          <div className="gym-card-gate">
-            <span className={`gym-card-gate-badge gym-card-gate-badge--${gate.status}`}>
-              {gate.status === 'parked' ? 'Parked' : 'Blocked'}
-            </span>
-            <p className="gym-card-gate-reason">{gate.reason}</p>
-          </div>
-        ) : (
-          <p className="gym-card-placeholder">Card content — not built yet</p>
-        )}
       </div>
     </article>
   );
