@@ -46,15 +46,15 @@ Why: Turns the point-in-time retention snapshot into the first longitudinal sign
 
 Premise / blocker: Blocked on accumulated dated snapshots. The Tenure Snapshot Clock (the weekly Mon 12:00 UTC GitHub Action that upserts a dated aggregate row) builds the second delta endpoint beside the existing 2026-06-11 snapshot; the first in-band delta lands ~3–4 weekly runs out. The anchor-lock rule is already decided (nearest ~30-day-prior, 21–45 day tolerance, else worst-now-only labeled); build waits on the snapshots accumulating. (Grooming 2026-06-24: on track, no action — the #474 cron began 2026-06-11; first in-band delta ~mid-July.)
 
-### Churn by Belt — longitudinal / seasonal
+### Churn by Belt — longitudinal / seasonal ✅ SHIPPED
 
-**Status / Priority:** Retention (priority)
+**Status / Priority:** Retention (priority) · ✅ SHIPPED 2026-06-29 — #504 (Churn-by-Belt Phase B card; live, reads anon `member_retention_by_belt`; Phase A data layer conservation-tied to #501), merged + deployed (main `95891de`).
 
 Result: A longitudinal Churn-by-Belt card — churn history across belt levels, surfacing seasonal patterns in how members progress and drop off by rank.
 
 Why: Belt progression is a core engagement signal in a BJJ gym; a seasonal churn-by-belt read shows where on the rank ladder members are most at risk over time.
 
-Premise / blocker: Belt data is EXPORT-FEASIBLE (not blocked) via Admin UI → People → Progressions (Current + Previous Levels, with Date Achieved) — Wodify recon 2026-06-14, read-only. Unparked 2026-06-24 (the park condition — cross-sectional retention cards shipped + stable: Silent Churn / Attendance Health / Member Movement / Tenure / Cohort all live — is MET); ready to scope. Not blocked — just unbuilt. Still needs the new longitudinal pipeline (Wodify Admin → People → Progressions, dated Previous Levels) plus accumulated history — a NEW pipeline, not a cross-sectional view over the live aggregate; the Progressions column-verification intake now comes off the park.
+Shipped: ✅ #504 (merged main `95891de`, deployed; passed the native live-render gate) — the Churn-by-Belt Phase B SPA card. Belt data sourced via Admin UI → People → Progressions (Current + Previous Levels, with Date Achieved) — Wodify recon 2026-06-14, read-only — built build-side into the anon-readable `member_retention_by_belt` aggregate (Phase A data layer; conservation-tied to the #501 client-grain retention source, no member PII in the anon table). The card plots a trailing-3-month membership churn rate per belt band with an Adults/Kids segment toggle. Phase A build/probe/DDL committed for reproducibility alongside the #501 cohort precedent.
 
 ### Retention: Silent Churn split — Recovery card + Today polish
 
