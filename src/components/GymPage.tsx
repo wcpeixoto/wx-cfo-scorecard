@@ -47,7 +47,6 @@ import {
   type RetentionAggregateSnapshot,
 } from '../lib/gym/fetchRetentionAggregate';
 import { RetentionEvolutionCard } from './RetentionEvolutionCard';
-import { MembersByAgeGroupCard } from './MembersByAgeGroupCard';
 import { MemberRetentionByBeltCard } from './MemberRetentionByBeltCard';
 
 export function GymPage() {
@@ -93,17 +92,11 @@ export function GymPage() {
             </div>
           </section>
 
-          {/* PATTERNS — monthly trends. Member Movement full width, Tenure + Age
-              paired on desktop, Segment Explorer full width, Churn by Belt a
+          {/* PATTERNS — monthly trends. Member Movement full width, then Churn Risk
+              by Tenure / Retention by Age Group / Segment Explorer, Churn by Belt a
               recessed full-width card at the bottom (data not connected yet). */}
           <section className="gym-section">
             <div className="gym-card-grid">
-              {/* Churn chart moved up to the Watch hero row; its 2/3 slot here is
-                  reserved empty per owner (to be filled later). Active members stays 1/3. */}
-              <div className="retention-split">
-                <div className="retention-split-placeholder" aria-hidden="true" />
-                <MembersByAgeGroupCard snapshot={snapshot} />
-              </div>
               <MemberMovementCard snapshot={snapshot} />
               <ChurnRiskByTenureCard snapshot={snapshot} />
               <CohortRetentionCard snapshot={snapshot} />
