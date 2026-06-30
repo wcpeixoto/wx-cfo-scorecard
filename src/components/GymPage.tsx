@@ -34,7 +34,6 @@ import {
   buildSegmentExplorerView,
   type RecencyStageId,
 } from '../lib/gym/segmentExplorer';
-import { computeMemberMovement } from '../lib/gym/memberMovement';
 import { deriveBuckets } from '../lib/gym/retentionAggregateView';
 import { buildRetentionRateView } from '../lib/gym/retentionRates';
 import {
@@ -92,12 +91,11 @@ export function GymPage() {
             </div>
           </section>
 
-          {/* PATTERNS — monthly trends. Member Movement full width, then Churn Risk
-              by Tenure / Retention by Age Group / Segment Explorer, Churn by Belt a
-              recessed full-width card at the bottom (data not connected yet). */}
+          {/* PATTERNS — monthly trends. Churn Risk by Tenure / Retention by Age
+              Group / Segment Explorer, Churn by Belt a recessed full-width card at
+              the bottom (data not connected yet). */}
           <section className="gym-section">
             <div className="gym-card-grid">
-              <MemberMovementCard snapshot={snapshot} />
               <ChurnRiskByTenureCard snapshot={snapshot} />
               <CohortRetentionCard snapshot={snapshot} />
               <SegmentExplorerCard snapshot={snapshot} />
@@ -938,167 +936,6 @@ function SegmentExplorerCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
           members who already left are not in this base, so long-tenure bands show survivors only
           and can look healthier than the real experience.
         </p>
-      </div>
-    </article>
-  );
-}
-
-// Member Movement — the Patterns card that turns the member layer into a
-// snapshot of the base: a current status CENSUS (active / inactive) and INTAKE
-// by join half-year. The census is BINARY (§6 rescope 2026-06-10): the vocab
-// gate proved Wodify's client_status is exactly Active/Inactive, and the
-// field-discovery probe proved no other /clients field separates paused from
-// ended — so a 3-way active/paused/ended census is unsourceable and was RETIRED,
-// not deferred. Deliberately NOT a movement-over-time card — the fixture carries
-// only a current status and a membershipStart, with no dated status changes, so
-// any net-flow / cancellation trend would be invented history
-// (RETENTION_FINISH_PLAN items 5–6). This card classifies no risk: it uses no
-// threshold and no classifyMember, so it has no asOf and no anti-drift check.
-// Deterministic — the copy only rephrases code-computed counts.
-//
-// §6 live wiring: the CENSUS reads the live aggregate's active/inactive counts
-// when the snapshot carries them; the INTAKE stays
-// sample (membershipStart isn't on /clients). A pre-census live row (inactive_total
-// null/absent) falls back to the sample census — never a fabricated zero census.
-// A nonzero unknown-status count is surfaced (honesty parity with Attendance
-// Health's Unknown) rather than silently folded into either census bucket.
-function MemberMovementCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
-  // DECOUPLED from the "Exclude parent/guardian accounts" toggle (it does NOT read
-  // RetentionSettings): MM's unknown is unrecognized client_status — a different
-  // population from the attendance-recency unknown that toggle governs — so the
-  // toggle must never move this card. The census always shows its known base
-  // (active + inactive) plus its own status-unknown count as informational.
-
-  // Intake (joins-by-cohort) is ALWAYS sample: membershipStart isn't on /clients, so
-  // the non-PII live aggregate can't carry a join timeline. The census
-  // (active/inactive) DOES go live when the snapshot carries the §6 census column.
-  const sample = useMemo(() => computeMemberMovement(SAMPLE_GYM_MEMBERS), []);
-
-  // Live census only when the census column is present (not null) on the snapshot.
-  // A pre-census live row (inactive_total absent → null) falls back to the sample
-  // census, so we never render a fabricated zero census off a live-but-pre-census row.
-  // `unknown` joins the total so the rendered mix always sums to the scanned base.
-  const view = useMemo(() => {
-    if (snapshot && snapshot.inactiveTotal !== null) {
-      const { activeTotal, inactiveTotal, unknownStatus, asOf } = snapshot;
-      return {
-        live: true as const,
-        asOf,
-        census: {
-          active: activeTotal,
-          inactive: inactiveTotal,
-          unknown: unknownStatus,
-          total: activeTotal + inactiveTotal + unknownStatus,
-        },
-      };
-    }
-    // Sample fixture statuses are all recognized, so its census has no unknown.
-    return { live: false as const, census: { ...sample.census, unknown: 0 } };
-  }, [snapshot, sample]);
-
-  const { census } = view;
-  const { cohorts, unknownJoin } = sample; // intake stays sample in both modes
-
-  // MM's unknown is unrecognized client_status (census.unknown), always held out of
-  // the displayed base (active + inactive) and surfaced separately. Inert while it is
-  // 0 live, but correct once a snapshot carries unmappable statuses.
-  const displayBase = census.active + census.inactive;
-
-  return (
-    <article className="card gym-card gym-card--full member-movement-card">
-      <header className="gym-card-head">
-        <div className="member-movement-titlerow">
-          <h3 className="gym-card-title">Member Movement</h3>
-          {!view.live && (
-            <span className="gym-sample-badge">Sample data</span>
-          )}
-        </div>
-        <p className="gym-card-subtitle">Current member mix and when they joined.</p>
-      </header>
-
-      <div className="member-movement-body">
-        {/* Census — raw current status tally (active / inactive, §6 binary rescope). */}
-        <div className="member-movement-hero">
-          <span className="member-movement-hero-value">{census.active}</span>
-          <span className="member-movement-hero-label">
-            {census.active === 1 ? 'active member today' : 'active members today'}
-          </span>
-        </div>
-        <p className="member-movement-helper">
-          Current mix of a {displayBase}-member base.
-        </p>
-
-        <dl className="member-movement-census">
-          <div className="member-movement-stat member-movement-stat--active">
-            <dt className="member-movement-stat-label">Active</dt>
-            <dd className="member-movement-stat-value">{census.active}</dd>
-          </div>
-          <div className="member-movement-stat member-movement-stat--inactive">
-            <dt className="member-movement-stat-label">Inactive</dt>
-            <dd className="member-movement-stat-value">{census.inactive}</dd>
-          </div>
-          {census.unknown > 0 && (
-            <div className="member-movement-stat member-movement-stat--unknown">
-              <dt className="member-movement-stat-label">Unknown</dt>
-              <dd className="member-movement-stat-value">{census.unknown}</dd>
-            </div>
-          )}
-        </dl>
-
-        {/* Verified 2026-06-10 (Wodify admin UI): members with a running membership
-            hold keep client status Active — they never appear under Inactive. The
-            "On hold" badge is Wodify-UI-only (no /clients field carries it, per the
-            field-discovery probe), so the binary census can assert this safely. */}
-        <p className="member-movement-census-note">
-          Counts reflect Wodify&rsquo;s client status: members with a membership on
-          hold stay Active in Wodify, so Active includes them — Inactive is members
-          whose membership has ended or lapsed.
-        </p>
-
-        {census.unknown > 0 && (
-          <p className="member-movement-dataquality">
-            Unknown = members whose Wodify status isn&rsquo;t a recognized Active /
-            Inactive value — a data-quality gap, held out of the census rather than
-            guessed into a bucket.
-          </p>
-        )}
-
-        {/* Intake by join half-year — ALL members by membershipStart. A join
-            timeline (honestly computable from one field), not a status-movement
-            series. */}
-        <div className="member-movement-intake">
-          <p className="member-movement-intake-title">Joins by cohort</p>
-          {view.live && (
-            <p className="member-movement-helper">
-              Join history isn&rsquo;t in the live data source yet — sample shown.
-            </p>
-          )}
-          {cohorts.length === 0 ? (
-            <p className="member-movement-empty">No recorded join dates to chart right now.</p>
-          ) : (
-            <div className="member-movement-table">
-              <div className="member-movement-head">
-                <span className="member-movement-col member-movement-col--cohort">Joined</span>
-                <span className="member-movement-col member-movement-col--num">Joins</span>
-              </div>
-              <ul className="member-movement-rows">
-                {cohorts.map((cohort) => (
-                  <li key={cohort.id} className="member-movement-row">
-                    <span className="member-movement-col member-movement-col--cohort">{cohort.label}</span>
-                    <span className="member-movement-col member-movement-col--num">{cohort.count}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {unknownJoin > 0 && (
-            <p className="member-movement-helper">
-              {unknownJoin === 1
-                ? '1 member with no recorded join date.'
-                : `${unknownJoin} members with no recorded join date.`}
-            </p>
-          )}
-        </div>
       </div>
     </article>
   );
