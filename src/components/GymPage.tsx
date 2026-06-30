@@ -125,27 +125,6 @@ const usd = (amount: number) => `$${Math.round(amount).toLocaleString('en-US')}`
 // (which would imply low risk where there is simply no data).
 const formatRate = (rate: number | null) => (rate === null ? '—' : `${Math.round(rate * 100)}%`);
 
-// Informational unknown disclosure — a static count line with NO action control.
-// The recency-unknown population is ALWAYS held out of every rate denominator; this
-// note only states the count when the "Exclude parent/guardian accounts" Settings
-// toggle is OFF (when ON, the count is hidden and the single Silent-Churn audit line
-// discloses the total instead). Renders nothing when the card has no unknowns.
-function UnknownInfoNote({
-  count,
-  className = 'gym-unknown-note',
-  descriptor = 'unknown',
-  target = 'these rates',
-}: {
-  count: number;
-  className?: string;
-  descriptor?: string; // how to name the bucket, e.g. 'unknown' / 'unrecognized-status'
-  target?: string; // what they are held out of, e.g. 'these rates' / 'the member base'
-}) {
-  if (count <= 0) return null;
-  const noun = count === 1 ? 'member' : 'members';
-  return <p className={className}>{count} {descriptor} {noun} held out of {target}.</p>;
-}
-
 // Copy for the live card's dues-hidden states — deterministic, only rephrasing
 // the view's computed reason and the dues snapshot's OWN dates/threshold; the $
 // itself is never fabricated in any hidden state. The stale line is
@@ -189,7 +168,7 @@ const WODIFY_ATTENDANCE_REPORT_URL =
 // mirroring Attendance Health: with a live aggregate snapshot it shows the real
 // silent COUNT (deriveBuckets' silent bucket === computeSilentChurn count by
 // construction, so it can never disagree with the live Attendance Health "Silent"
-// tally on the same snapshot) and badges "Live · as of {asOf}". The live DOLLAR
+// tally on the same snapshot). The live DOLLAR
 // (§6.4 SC dues slice) renders only when deriveSilentChurnDuesView says the
 // locally-written dues aggregate still matches what the card shows (threshold
 // exact-match, within the staleness window, with real coverage) — every other
@@ -201,9 +180,8 @@ const WODIFY_ATTENDANCE_REPORT_URL =
 // Deterministic: the copy only rephrases computed numbers; it never authors the
 // at-risk call. Re-renders whenever the threshold or snapshot changes.
 function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
-  const { silentChurnThresholdDays, excludeUnknownRecency } = useRetentionSettings();
-  const duesTooltipId = useId();
-  const setupTooltipId = useId();
+  const { silentChurnThresholdDays } = useRetentionSettings();
+  const titleTooltipId = useId();
 
   // One render path for both sources (mirrors AttendanceHealthCard). Live: derive
   // the silent COUNT from the non-PII histogram, plus the dues view gated against
@@ -261,9 +239,62 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
       <header className="gym-card-head">
         <div className="silent-churn-titlerow">
           <h3 className="gym-card-title">Silent Churn</h3>
-          {view.live ? (
-            <span className="gym-sample-badge gym-live-badge">Live · as of {view.asOf}</span>
-          ) : (
+          <div className="db-tooltip-wrap">
+            <button
+              type="button"
+              className="db-tooltip-btn"
+              aria-label="What counts as silent churn"
+              aria-describedby={titleTooltipId}
+            >
+              &#9432;
+            </button>
+            <div
+              id={titleTooltipId}
+              role="tooltip"
+              className="db-tooltip-panel is-left silent-churn-title-tooltip-panel"
+            >
+              <ul className="db-tooltip-list">
+                <li>
+                  <strong>What counts as silent</strong>
+                </li>
+                <li className="db-tooltip-body">
+                  Active members with no check-ins for {thresholdDays}+ days.
+                </li>
+                <li>
+                  <strong>Set up the Wodify report</strong>
+                </li>
+                <li className="db-tooltip-body">
+                  One-time setup — set these in the report, then use Wodify&rsquo;s
+                  &ldquo;Set As Default Filters&rdquo; so this link lands
+                  pre-configured:
+                </li>
+                <li className="db-tooltip-body">
+                  Membership Status: Free, Paid, and On Hold — on-hold members
+                  still count as active.
+                </li>
+                <li className="db-tooltip-body">
+                  Sort &ldquo;Days Since Last Class Sign In&rdquo; descending;
+                  silent = {thresholdDays}+ days.
+                </li>
+                <li className="db-tooltip-body">
+                  Ignore members with a blank Last Attendance — never-attended
+                  isn&rsquo;t silent.
+                </li>
+                {view.unknown > 0 && (
+                  <>
+                    <li>
+                      <strong>Excluded from these rates</strong>
+                    </li>
+                    <li className="db-tooltip-body">
+                      Parent/guardian or other active accounts with no class
+                      check-ins ({view.unknown}) are excluded from these rates.
+                    </li>
+                  </>
+                )}
+              </ul>
+            </div>
+          </div>
+          {!view.live && (
             <span className="gym-sample-badge">Sample data</span>
           )}
         </div>
@@ -271,10 +302,6 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
       </header>
 
       <div className="silent-churn-body">
-        <p className="silent-churn-helper">
-          Active members with no check-ins for {thresholdDays}+ days.
-        </p>
-
         <div className="silent-churn-metrics">
           <div className="silent-churn-metric">
             <span className="silent-churn-metric-value">{count}</span>
@@ -301,57 +328,10 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
             {formatRate(silentFacet.rate)} of {silentFacet.base} attendance-known actives
           </p>
         )}
-        {/* The single Retention-wide audit disclosure (Settings toggle ON): names the
-            recency-unknown population excluded from every card. When OFF, the count is
-            shown per-card as an informational note instead. */}
-        {excludeUnknownRecency
-          ? view.unknown > 0 && (
-              <p className="silent-churn-unknown-note gym-unknown-note">
-                {view.unknown} parent/guardian (no class check-in){' '}
-                {view.unknown === 1 ? 'account' : 'accounts'} excluded from retention.
-              </p>
-            )
-          : (
-              <UnknownInfoNote count={view.unknown} className="silent-churn-unknown-note" />
-            )}
 
         {view.live ? (
           <>
-            {view.dues.kind === 'shown' ? (
-              // A <div>, not <p>: the tooltip panel inside is a <div> with a <ul>,
-              // which is invalid HTML inside a paragraph (PR-3b nesting fix; the
-              // CSS targets the class, tag-agnostic).
-              <div className="silent-churn-dues-meta">
-                Dues known for {view.dues.duesKnownCount} of {view.dues.silentMembers} silent
-                members · dues from {view.dues.duesAsOf} export
-                <span className="db-tooltip-wrap silent-churn-dues-tipwrap">
-                  <button
-                    type="button"
-                    className="db-tooltip-btn"
-                    aria-label="How monthly dues at risk is computed"
-                    aria-describedby={duesTooltipId}
-                  >
-                    &#9432;
-                  </button>
-                  <div
-                    id={duesTooltipId}
-                    role="tooltip"
-                    className="db-tooltip-panel is-left silent-churn-dues-tooltip-panel"
-                  >
-                    <ul className="db-tooltip-list">
-                      <li className="db-tooltip-body">
-                        A floor, not a ceiling — memberships whose monthly value can&rsquo;t be
-                        derived are excluded.
-                      </li>
-                      <li className="db-tooltip-body">
-                        Computed at the {view.dues.thresholdDays}-day threshold against the{' '}
-                        {view.dues.duesAsOf} dues export.
-                      </li>
-                    </ul>
-                  </div>
-                </span>
-              </div>
-            ) : (
+            {view.dues.kind !== 'shown' && (
               <p className="silent-churn-dues-na">{duesHiddenLine(view.dues, thresholdDays)}</p>
             )}
             {count === 0 && (
@@ -359,17 +339,12 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
                 No active members have been away for {thresholdDays}+ days right now.
               </p>
             )}
-            {/* Wodify bridge (live only): the per-member list the non-PII aggregate
-                can't carry lives in Wodify, the system of record. Copy frames the
-                report as LIVE vs this card's dated snapshot — never a count-equality
-                promise. Rendered in every live dues state and at count 0: the
-                snapshot doesn't govern Wodify. The sample branch keeps its fixture
-                call-list instead. */}
+            {/* Wodify bridge (live only): the per-member list the non-PII
+                aggregate can't carry lives in Wodify, the system of record. The
+                outbound link is shown in every live dues state and at count 0
+                (the snapshot doesn't govern Wodify); the sample branch keeps its
+                fixture call-list instead. Setup steps live in the title tooltip. */}
             <div className="silent-churn-action">
-              <p className="silent-churn-action-line">
-                See the current silent-member list in Wodify — it&rsquo;s live, so it can
-                differ from this card&rsquo;s {view.asOf} snapshot.
-              </p>
               <div className="silent-churn-action-row">
                 <a
                   className="silent-churn-action-btn"
@@ -380,41 +355,6 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
                 >
                   Open Wodify report
                 </a>
-                <span className="db-tooltip-wrap silent-churn-setup-tipwrap">
-                  <button
-                    type="button"
-                    className="db-tooltip-btn"
-                    aria-label="How to set up the Wodify report"
-                    aria-describedby={setupTooltipId}
-                  >
-                    &#9432;
-                  </button>
-                  <div
-                    id={setupTooltipId}
-                    role="tooltip"
-                    className="db-tooltip-panel is-left silent-churn-setup-tooltip-panel"
-                  >
-                    <ul className="db-tooltip-list">
-                      <li className="db-tooltip-body">
-                        One-time setup — set these in the report, then use Wodify&rsquo;s
-                        &ldquo;Set As Default Filters&rdquo; so this link lands
-                        pre-configured:
-                      </li>
-                      <li className="db-tooltip-body">
-                        Membership Status: Free, Paid, and On Hold — on-hold members
-                        still count as active.
-                      </li>
-                      <li className="db-tooltip-body">
-                        Sort &ldquo;Days Since Last Class Sign In&rdquo; descending;
-                        silent = {thresholdDays}+ days.
-                      </li>
-                      <li className="db-tooltip-body">
-                        Ignore members with a blank Last Attendance — never-attended
-                        isn&rsquo;t silent.
-                      </li>
-                    </ul>
-                  </div>
-                </span>
               </div>
             </div>
           </>
@@ -453,7 +393,7 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
 //
 // RETENTION_FINISH_PLAN.md §6: derives its buckets from the non-PII
 // daysAbsentHistogram via deriveBuckets (same WATCH_FLOOR_DAYS + threshold rule,
-// precedence-correct at every threshold) and badges "Live · as of {asOf}". The
+// precedence-correct at every threshold). The
 // `snapshot` is fetched ONCE at page level (GymPage) and passed to both Watch
 // cards, so this card's live "Silent" bucket and the live Silent Churn count read
 // the SAME snapshot and agree by construction. Loading / error / empty /
@@ -510,9 +450,7 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
       <header className="gym-card-head">
         <div className="attendance-health-titlerow">
           <h3 className="gym-card-title">Attendance Health</h3>
-          {snapshot ? (
-            <span className="gym-sample-badge gym-live-badge">Live · as of {snapshot.asOf}</span>
-          ) : (
+          {!snapshot && (
             <span className="gym-sample-badge">Sample data</span>
           )}
         </div>
@@ -577,10 +515,6 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
           </p>
         )}
 
-        {!excludeUnknownRecency && (
-          <UnknownInfoNote count={unknown} className="attendance-health-unknown-note" />
-        )}
-
         {watch > 0 && (
           <p className="attendance-health-takeaway">
             Drifting, but haven&rsquo;t crossed the Silent Churn threshold yet.
@@ -602,8 +536,8 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
 // Dual-source (§6 aggregate extension): with a snapshot carrying the per-band
 // tenure histogram (validated against this build's band edges — see
 // fetchRetentionAggregate), the card derives the SAME result shape live via
-// computeChurnRiskByTenureFromAggregate (deriveBuckets per band, one hero rule)
-// and badges "Live · as of {asOf}". Σ band silent here === the live Silent Churn
+// computeChurnRiskByTenureFromAggregate (deriveBuckets per band, one hero rule).
+// Σ band silent here === the live Silent Churn
 // count at the same threshold by construction. A snapshot without tenure data
 // (pre-migration row, or a contract mismatch) falls back to the sample fixture —
 // the tenure flip is data-gated, not deploy-gated. The live caveat note carries
@@ -644,9 +578,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
       <header className="gym-card-head">
         <div className="churn-tenure-titlerow">
           <h3 className="gym-card-title">Churn Risk by Tenure</h3>
-          {liveAsOf ? (
-            <span className="gym-sample-badge gym-live-badge">Live · as of {liveAsOf}</span>
-          ) : (
+          {!liveAsOf && (
             <span className="gym-sample-badge">Sample data</span>
           )}
         </div>
@@ -718,15 +650,6 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
             Rates among attendance-known members in each cohort.
           </p>
         )}
-        {!excludeUnknownRecency && (
-          <UnknownInfoNote
-            count={unknownRecencyTotal}
-            className="churn-tenure-unknown-note"
-            descriptor="unknown-recency"
-            target="the cohort rates"
-          />
-        )}
-
         {liveAsOf && (
           <p className="churn-tenure-caveat">
             Tenure counts from each member&rsquo;s start date in our current records
@@ -749,8 +672,8 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
 // counts/rates; it never authors the at-risk call.
 //
 // Dual-source: with a snapshot carrying cohort_histogram (validated against this
-// build's COHORT_BANDS — see fetchRetentionAggregate) it badges "Live · as of
-// {asOf}"; otherwise it renders the clearly-synthetic SAMPLE_COHORT_HISTOGRAM
+// build's COHORT_BANDS — see fetchRetentionAggregate) it reads the live
+// snapshot; otherwise it renders the clearly-synthetic SAMPLE_COHORT_HISTOGRAM
 // through the SAME adapter (the shared member fixture has no DOB, so the sample is
 // a static histogram, not a fixture compute). The cohort flip is data-gated.
 //
@@ -797,9 +720,7 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
       <header className="gym-card-head">
         <div className="cohort-age-titlerow">
           <h3 className="gym-card-title">Retention by Age Group</h3>
-          {liveAsOf ? (
-            <span className="gym-sample-badge gym-live-badge">Live · as of {liveAsOf}</span>
-          ) : (
+          {!liveAsOf && (
             <span className="gym-sample-badge">Sample data</span>
           )}
         </div>
@@ -868,15 +789,6 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
             At-risk rates among attendance-known members in each group.
           </p>
         )}
-        {!excludeUnknownRecency && (
-          <UnknownInfoNote
-            count={unknownRecencyTotal}
-            className="cohort-age-unknown-note"
-            descriptor="unknown-recency"
-            target="the at-risk rates"
-          />
-        )}
-
         <p className="cohort-age-suppression-note">
           Counts are aggregate age-group totals. No member names, IDs, DOBs, exact ages, or
           individual records are stored or shown.
@@ -954,9 +866,7 @@ function SegmentExplorerCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
       <header className="gym-card-head">
         <div className="segment-explorer-titlerow">
           <h3 className="gym-card-title">Today&rsquo;s members by tenure &amp; risk stage</h3>
-          {liveAsOf ? (
-            <span className="gym-sample-badge gym-live-badge">Live · as of {liveAsOf}</span>
-          ) : (
+          {!liveAsOf && (
             <span className="gym-sample-badge">Sample data</span>
           )}
         </div>
@@ -1025,15 +935,6 @@ function SegmentExplorerCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
           </div>
         )}
 
-        {!excludeUnknownRecency && (
-          <UnknownInfoNote
-            count={unknownRecencyTotal}
-            className="segment-explorer-unknown-note"
-            descriptor="unknown-recency"
-            target="the at-risk rates"
-          />
-        )}
-
         <p className="segment-explorer-suppression-note">
           Cells are aggregate counts of active members by tenure and recency stage. No member
           identities or individual records are stored or shown.
@@ -1063,7 +964,7 @@ function SegmentExplorerCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
 // Deterministic — the copy only rephrases code-computed counts.
 //
 // §6 live wiring: the CENSUS reads the live aggregate's active/inactive counts
-// when the snapshot carries them (badging "Live · as of {asOf}"); the INTAKE stays
+// when the snapshot carries them; the INTAKE stays
 // sample (membershipStart isn't on /clients). A pre-census live row (inactive_total
 // null/absent) falls back to the sample census — never a fabricated zero census.
 // A nonzero unknown-status count is surfaced (honesty parity with Attendance
@@ -1115,9 +1016,7 @@ function MemberMovementCard({ snapshot }: { snapshot: RetentionAggregateSnapshot
       <header className="gym-card-head">
         <div className="member-movement-titlerow">
           <h3 className="gym-card-title">Member Movement</h3>
-          {view.live ? (
-            <span className="gym-sample-badge gym-live-badge">Live · as of {view.asOf}</span>
-          ) : (
+          {!view.live && (
             <span className="gym-sample-badge">Sample data</span>
           )}
         </div>
