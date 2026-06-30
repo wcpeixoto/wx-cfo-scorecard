@@ -12831,23 +12831,17 @@ body {
   background: var(--bg-main);
   white-space: nowrap;
 }
-/* PR2: live-aggregate variant of the amber sample pill. Green (--positive) marks a
-   card reading the real Wodify snapshot; the badge text still discloses the as-of
-   date, so "live" never over-promises freshness. Pairs with .gym-sample-badge. */
-.gym-live-badge {
-  border-color: var(--positive);
-  color: var(--positive);
-}
 .silent-churn-body {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-.silent-churn-helper {
-  margin: 0;
-  font-size: 14px;
-  color: var(--text-secondary);
+/* Silent Churn title tooltip: the silent-churn rule + one-time Wodify report
+   setup steps + (when present) the recency-unknown methodology line. Trigger
+   sits on the card's top-left, so the panel opens rightward via .is-left. */
+.db-tooltip-panel.silent-churn-title-tooltip-panel {
+  width: 300px;
 }
 .silent-churn-metrics {
   display: flex;
@@ -12883,38 +12877,16 @@ body {
   font-size: 13px;
   color: var(--text-secondary);
 }
-/* SC dues slice: live dues coverage sub-line ("Dues known for N of M silent
-   members · dues from {date} export") under the $ metric, with the floor-caveat
-   info tooltip riding the shared .db-tooltip-* pattern. */
-.silent-churn-dues-meta {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-.silent-churn-dues-meta .silent-churn-dues-tipwrap {
-  margin-left: 6px;
-  vertical-align: -1px;
-}
-/* The trigger sits at the line's end on the card's LEFT half, so the panel uses
-   the shared .is-left modifier (opens rightward) with a per-tooltip width. */
-.db-tooltip-panel.silent-churn-dues-tooltip-panel {
-  width: 280px;
-}
-/* Wodify bridge (live branch only): action line + outbound report link + the
-   one-time-setup tooltip. The anchor follows the 40px SECONDARY card-level
-   button spec (UI_RULES button taxonomy: #D0D5DD trigger border, 8px radius,
-   14px text) — mirrors .forecast-compare-btn, as an <a> since it navigates. */
+/* Wodify bridge (live branch only): outbound report link. The anchor follows the
+   40px SECONDARY card-level button spec (UI_RULES button taxonomy: #D0D5DD trigger
+   border, 8px radius, 14px text) — mirrors .forecast-compare-btn, as an <a> since
+   it navigates. */
 .silent-churn-action {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
-}
-.silent-churn-action-line {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-secondary);
 }
 .silent-churn-action-row {
   display: flex;
@@ -12941,11 +12913,6 @@ body {
 .silent-churn-action-btn:hover {
   background: #F9FAFB;
   color: #101828;
-}
-/* Trigger sits on the card's left half (like the dues tooltip), so the panel
-   opens rightward via the shared .is-left modifier. */
-.db-tooltip-panel.silent-churn-setup-tooltip-panel {
-  width: 300px;
 }
 .silent-churn-calllist-head,
 .silent-churn-row {
@@ -13086,16 +13053,6 @@ body {
   font-weight: 500;
   color: var(--text-secondary);
 }
-.gym-unknown-note,
-.attendance-health-unknown-note,
-.silent-churn-unknown-note,
-.churn-tenure-unknown-note,
-.member-movement-unknown-note {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
 /* ── Churn Risk by Tenure — live (sample-data) tenure-band risk table ─────
    Full-width Patterns card. Card outer stays the locked white .card surface
    (UI_CARDS); only inner content is styled here, reusing the .silent-churn-*
@@ -13543,12 +13500,6 @@ body {
   font-weight: 500;
   color: var(--text-primary);
 }
-.cohort-age-unknown-note {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
 /* Class Plan Member Churn/Retention chart card + "Active members by age group" card
    (Patterns section), laid out 2/3 + 1/3 as two separate cards via .retention-split. */
 .retention-split {
