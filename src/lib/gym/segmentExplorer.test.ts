@@ -55,7 +55,7 @@ const noUnknownTenure = () => mkBand(UNKNOWN_TENURE_ID, 'Unknown');
 describe('buildSegmentExplorerView — partition + Healthy subtraction (MF-1)', () => {
   it('derives Healthy as knownActiveTotal − watch − silent over returned aggregates', () => {
     const b = mkBand('lt3m', '< 3 mo', { healthy: 12, watch: 4, silent: 5, unknownRecency: 3 });
-    const view = buildSegmentExplorerView(mkResult([b], noUnknownTenure()), false);
+    const view = buildSegmentExplorerView(mkResult([b], noUnknownTenure()));
     const healthyCell = view.rows[0].cells.find((c) => c.stage === 'healthy')!;
     // knownActiveTotal = 21; 21 − 4 − 5 = 12
     expect(healthyCell.count).toBe(view.rows[0].knownActiveTotal - 4 - 5);
@@ -71,7 +71,7 @@ describe('buildSegmentExplorerView — partition + Healthy subtraction (MF-1)', 
       mkBand('2yplus', '2 yr+', { healthy: 40, watch: 0, silent: 5, unknownRecency: 11 }),
     ];
     const unknown = mkBand(UNKNOWN_TENURE_ID, 'Unknown', { healthy: 1, watch: 1, silent: 0, unknownRecency: 1 });
-    const view = buildSegmentExplorerView(mkResult(bands, unknown), false);
+    const view = buildSegmentExplorerView(mkResult(bands, unknown));
     for (const row of view.rows) {
       const sum = row.cells.reduce((s, c) => s + c.count, 0);
       expect(sum).toBe(row.activeTotal);
@@ -80,27 +80,23 @@ describe('buildSegmentExplorerView — partition + Healthy subtraction (MF-1)', 
 
   it('Healthy is never negative (known base = healthy + watch + silent by construction)', () => {
     const b = mkBand('lt3m', '< 3 mo', { healthy: 0, watch: 3, silent: 2, unknownRecency: 5 });
-    const view = buildSegmentExplorerView(mkResult([b], noUnknownTenure()), false);
+    const view = buildSegmentExplorerView(mkResult([b], noUnknownTenure()));
     expect(view.rows[0].cells.find((c) => c.stage === 'healthy')!.count).toBe(0);
   });
 });
 
 describe('buildSegmentExplorerView — per-row rate selection (SC-1)', () => {
-  it('uses riskRateKnown by default and riskRate when includeUnknown is ON — straight from the result', () => {
+  it('always uses riskRateKnown (the attendance-known base) — there is no full-base view', () => {
     // knownActiveTotal 20, activeTotal 30, atRisk 10
     const b = mkBand('lt3m', '< 3 mo', { healthy: 10, watch: 5, silent: 5, unknownRecency: 10 });
-    const known = buildSegmentExplorerView(mkResult([b], noUnknownTenure()), false);
-    expect(known.rows[0].rate).toBe(b.riskRateKnown);
-    expect(known.rows[0].rate).toBeCloseTo(10 / 20);
-
-    const full = buildSegmentExplorerView(mkResult([b], noUnknownTenure()), true);
-    expect(full.rows[0].rate).toBe(b.riskRate);
-    expect(full.rows[0].rate).toBeCloseTo(10 / 30);
+    const view = buildSegmentExplorerView(mkResult([b], noUnknownTenure()));
+    expect(view.rows[0].rate).toBe(b.riskRateKnown);
+    expect(view.rows[0].rate).toBeCloseTo(10 / 20); // known base, NOT 10/30 full base
   });
 
   it('reports a null rate for an empty band rather than dividing by zero', () => {
     const empty = mkBand('3to6m', '3–6 mo');
-    const view = buildSegmentExplorerView(mkResult([empty], noUnknownTenure()), false);
+    const view = buildSegmentExplorerView(mkResult([empty], noUnknownTenure()));
     expect(view.rows[0].rate).toBeNull();
   });
 });
@@ -112,7 +108,7 @@ describe('buildSegmentExplorerView — small aggregate counts render as real num
       mkBand('3to6m', '3–6 mo', { healthy: 9, watch: 7, silent: 1, unknownRecency: 5 }),
       mkBand('6to12m', '6–12 mo', { healthy: 10, watch: 11, silent: 12, unknownRecency: 13 }),
     ];
-    const view = buildSegmentExplorerView(mkResult(bands, noUnknownTenure()), false);
+    const view = buildSegmentExplorerView(mkResult(bands, noUnknownTenure()));
 
     const silent1 = view.rows[0].cells.find((c) => c.stage === 'silent')!;
     expect(silent1.count).toBe(3); // a 3 shows as 3, not "<5"
@@ -129,7 +125,7 @@ describe('buildSegmentExplorerView — small aggregate counts render as real num
 
   it('renders a true 0 as 0 and a large count as itself', () => {
     const b = mkBand('lt3m', '< 3 mo', { healthy: 0, watch: 0, silent: 12, unknownRecency: 0 });
-    const view = buildSegmentExplorerView(mkResult([b], noUnknownTenure()), false);
+    const view = buildSegmentExplorerView(mkResult([b], noUnknownTenure()));
     const cells = view.rows[0].cells;
     expect(cells.find((c) => c.stage === 'healthy')!.count).toBe(0);
     expect(cells.find((c) => c.stage === 'silent')!.count).toBe(12);
@@ -145,7 +141,7 @@ describe('buildSegmentExplorerView — the two Unknown axes are distinct (SC-2)'
       silent: 1,
       unknownRecency: 1,
     });
-    const view = buildSegmentExplorerView(mkResult(bands, unknown), false);
+    const view = buildSegmentExplorerView(mkResult(bands, unknown));
 
     // Unknown-tenure is its own (last) row, flagged, exactly once.
     const last = view.rows[view.rows.length - 1];
@@ -167,7 +163,7 @@ describe('buildSegmentExplorerView — the two Unknown axes are distinct (SC-2)'
 describe('buildSegmentExplorerView — against the real sample compute', () => {
   it('produces 5 tenure-band rows + the unknown-tenure row and holds the partition', () => {
     const result = computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, 21, FIXTURE_TODAY);
-    const view = buildSegmentExplorerView(result, false);
+    const view = buildSegmentExplorerView(result);
 
     expect(view.rows).toHaveLength(TENURE_BANDS.length + 1);
     expect(view.rows.slice(0, TENURE_BANDS.length).map((r) => r.id)).toEqual(
