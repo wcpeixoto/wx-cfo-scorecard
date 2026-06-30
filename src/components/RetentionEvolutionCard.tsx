@@ -1,8 +1,7 @@
-// Class Plan Member Churn/Retention — gym-wide churn-evolution chart (Retention page, Patterns
-// section). Reads the live "Member Retention Rates" monthly aggregate from Supabase; falls back to a
-// synthetic sample fixture until the table is seeded. GYM-WIDE only — the per-cohort split lives in
-// the sibling MembersByAgeGroupCard (composition only; a segmented retention TREND is still the
-// gated client-grain + DOB-join slice). The two render side by side via .retention-split.
+// Class Plan Member Churn/Retention — gym-wide churn-evolution chart (Retention page, Watch hero
+// row). Reads the live "Member Retention Rates" monthly aggregate from Supabase; falls back to a
+// synthetic sample fixture until the table is seeded. GYM-WIDE only — a segmented retention TREND is
+// still the gated client-grain + DOB-join slice. Renders beside Silent Churn via .retention-hero-split.
 
 import { useEffect, useMemo, useState } from 'react';
 
