@@ -890,8 +890,12 @@ export default function Dashboard() {
   // separate from the CFO financial settings (NOT WorkspaceSettings/Supabase).
   // The Settings control sits inside the edit-lock fieldset with the other
   // panes, so it freezes alongside them when Settings is locked.
-  const { silentChurnThresholdDays, setSilentChurnThresholdDays, includeUnknown, setIncludeUnknown } =
-    useRetentionSettings();
+  const {
+    silentChurnThresholdDays,
+    setSilentChurnThresholdDays,
+    excludeUnknownRecency,
+    setExcludeUnknownRecency,
+  } = useRetentionSettings();
 
   // Settings edit lock — partner-walkthrough protection.
   // Default LOCKED on mount; React state (no sessionStorage) so refresh re-locks.
@@ -5020,24 +5024,25 @@ export default function Dashboard() {
                               </div>
                             </div>
                           </div>
-                          {/* Option B universal toggle. A native checkbox switch so the
+                          {/* Retention-wide display toggle. A native checkbox switch so the
                               edit-lock <fieldset disabled> cascade freezes it for free. */}
                           <div className="rules-row">
                             <div className="rules-row-info">
                               <span className="rules-row-label">
-                                Include Unknown members in Retention rates
+                                Exclude parent/guardian accounts
                               </span>
                               <span className="rules-row-sub">
-                                Off = rates use attendance-known members only (default).
+                                On = hides parent/guardian (no class check-in) accounts from the
+                                Retention cards (default). Rates always exclude them either way.
                               </span>
                             </div>
                             <div className="rules-row-control">
                               <label className="settings-switch">
-                                <span className="sr-only">Include Unknown members in Retention rates</span>
+                                <span className="sr-only">Exclude parent/guardian accounts from Retention cards</span>
                                 <input
                                   type="checkbox"
-                                  checked={includeUnknown}
-                                  onChange={(event) => setIncludeUnknown(event.target.checked)}
+                                  checked={excludeUnknownRecency}
+                                  onChange={(event) => setExcludeUnknownRecency(event.target.checked)}
                                 />
                                 <span className="track" aria-hidden="true" />
                               </label>

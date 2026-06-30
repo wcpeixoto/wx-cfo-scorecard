@@ -8,7 +8,9 @@
 //   1. the sanctioned Healthy subtraction (MF-1): healthy = knownActiveTotal −
 //      watch − silent, over values the function already returned; and
 //   2. picking the per-row at-risk rate the existing Churn-by-Tenure card already
-//      exposes (SC-1): riskRateKnown (default) or riskRate (includeUnknown ON).
+//      exposes (SC-1): always riskRateKnown (the attendance-known base). The
+//      full-base rate is no longer surfaced anywhere — recency-unknown members are
+//      never in a denominator.
 // It never re-derives counts, never calls the classifier, never touches
 // deriveBuckets. Pure + unit-tested so the grid can never drift from its source.
 
@@ -44,15 +46,14 @@ export type SegmentRow = {
   activeTotal: number; // full-base active in this tenure band
   knownActiveTotal: number;
   atRisk: number; // watch + silent — straight from the result
-  rate: number | null; // includeUnknown ? riskRate : riskRateKnown — straight from the result
+  rate: number | null; // riskRateKnown (attendance-known base) — straight from the result
 };
 
 export type SegmentExplorerView = {
   thresholdDays: number;
   activeTotal: number;
-  includeUnknown: boolean;
   rows: SegmentRow[]; // the 5 tenure bands, then the unknown-tenure row (always last)
-  unknownRecencyTotal: number; // Σ band unknownRecency (NOT the unknown-tenure row) — for the toggle note
+  unknownRecencyTotal: number; // Σ band unknownRecency (NOT the unknown-tenure row) — for the disclosure
 };
 
 // MF-1: the source function does not return `healthy`. Derive it by the single
@@ -76,7 +77,6 @@ function cellCountsOf(b: TenureBandRisk): Record<RecencyStageId, number> {
 // shape, so the adapter is source-agnostic.
 export function buildSegmentExplorerView(
   result: ChurnRiskByTenureResult,
-  includeUnknown: boolean,
 ): SegmentExplorerView {
   // The 5 tenure bands, then the unknown-tenure bucket as its own row (SC-2:
   // unknown TENURE is a distinct population from unknown RECENCY — never merged).
@@ -98,7 +98,7 @@ export function buildSegmentExplorerView(
     activeTotal: b.activeTotal,
     knownActiveTotal: b.knownActiveTotal,
     atRisk: b.atRisk,
-    rate: includeUnknown ? b.riskRate : b.riskRateKnown,
+    rate: b.riskRateKnown,
   }));
 
   // Recency-unknowns held out of the known base, summed across the REAL bands
@@ -109,7 +109,6 @@ export function buildSegmentExplorerView(
   return {
     thresholdDays: result.thresholdDays,
     activeTotal: result.activeTotal,
-    includeUnknown,
     rows,
     unknownRecencyTotal,
   };
