@@ -12843,6 +12843,26 @@ body {
 .db-tooltip-panel.silent-churn-title-tooltip-panel {
   width: 300px;
 }
+/* Mobile: the title-row trigger sits mid-card, so anchoring the 300px panel to
+   the button (the default offsetParent .db-tooltip-wrap) overflows the viewport
+   at any readable width — left:0 clips off the right edge, right:0 off the left.
+   Re-root the panel to the title row instead so it spans the card width and
+   stays on-screen. Scoped to THIS card's title tooltip (the wrap is its only
+   child here) — the shared .db-tooltip-panel base rule is untouched, so no other
+   tooltip changes. Desktop (≥481px) keeps the is-left rightward 300px behavior. */
+@media (max-width: 480px) {
+  .silent-churn-titlerow {
+    position: relative;
+  }
+  .silent-churn-titlerow > .db-tooltip-wrap {
+    position: static;
+  }
+  .db-tooltip-panel.silent-churn-title-tooltip-panel {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+}
 .silent-churn-metrics {
   display: flex;
   flex-wrap: wrap;

@@ -254,8 +254,14 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
               className="db-tooltip-panel is-left silent-churn-title-tooltip-panel"
             >
               <ul className="db-tooltip-list">
+                <li>
+                  <strong>What counts as silent</strong>
+                </li>
                 <li className="db-tooltip-body">
                   Active members with no check-ins for {thresholdDays}+ days.
+                </li>
+                <li>
+                  <strong>Set up the Wodify report</strong>
                 </li>
                 <li className="db-tooltip-body">
                   One-time setup — set these in the report, then use Wodify&rsquo;s
@@ -275,10 +281,15 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
                   isn&rsquo;t silent.
                 </li>
                 {view.unknown > 0 && (
-                  <li className="db-tooltip-body">
-                    Parent/guardian or other active accounts with no class
-                    check-ins ({view.unknown}) are excluded from these rates.
-                  </li>
+                  <>
+                    <li>
+                      <strong>Excluded from these rates</strong>
+                    </li>
+                    <li className="db-tooltip-body">
+                      Parent/guardian or other active accounts with no class
+                      check-ins ({view.unknown}) are excluded from these rates.
+                    </li>
+                  </>
                 )}
               </ul>
             </div>
