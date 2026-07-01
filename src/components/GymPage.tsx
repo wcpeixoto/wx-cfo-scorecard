@@ -80,15 +80,18 @@ export function GymPage() {
     <div className="stack-grid">
       <div className="ta-page">
         <div className="gym-retention">
-          {/* WATCH — live signals. Attendance Health (full-width donut) first, then
-              the Churn chart (RetentionEvolutionCard, full-width) below. Silent Churn
-              is HIDDEN — its card + helpers stay defined in this file (not rendered),
-              so this is a reversible hide, not a delete. (Page + section headers
-              removed per owner — only card-level titles remain.) */}
+          {/* WATCH — live signals. Top row: Attendance Health (1/3, donut) in line
+              with the Churn chart (RetentionEvolutionCard, 2/3) via
+              .retention-hero-split. Silent Churn is HIDDEN — its card + helpers stay
+              defined in this file (not rendered), so this is a reversible hide, not a
+              delete. (Page + section headers removed per owner — only card-level
+              titles remain.) */}
           <section className="gym-section">
             <div className="gym-card-grid">
-              <AttendanceHealthCard snapshot={snapshot} />
-              <RetentionEvolutionCard />
+              <div className="retention-hero-split">
+                <AttendanceHealthCard snapshot={snapshot} />
+                <RetentionEvolutionCard />
+              </div>
             </div>
           </section>
 
@@ -501,7 +504,6 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
             <span className="gym-sample-badge">Sample data</span>
           )}
         </div>
-        <p className="gym-card-subtitle">Early warning before churn risk.</p>
       </header>
 
       <div className="attendance-health-body">

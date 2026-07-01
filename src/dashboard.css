@@ -13009,12 +13009,17 @@ body {
    --positive / --warning / --negative tokens at runtime. Center readout + legend
    are plain DOM. Colors via tokens + color-mix — no new hex values. */
 .attendance-donut-layout {
+  /* Stacked (donut on top, legend below) — the TailAdmin "API Token Usages"
+     vertical idiom. The card lives in the 1/3 column of .retention-hero-split,
+     too narrow for a side-by-side donut + legend. */
   display: flex;
-  align-items: center;
-  gap: 24px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 20px;
 }
 .attendance-donut-wrap {
   position: relative;
+  align-self: center;
   flex: 0 0 200px;
   width: 200px;
 }
@@ -13046,16 +13051,22 @@ body {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
+/* Rows separated by a subtle divider (TailAdmin "API Token Usages" list) —
+   no per-row box/background; a thin line between messages, none after the last. */
 .attendance-donut-legend-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--bg-main);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.attendance-donut-legend-row:first-child {
+  padding-top: 0;
+}
+.attendance-donut-legend-row:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
 }
 .attendance-donut-legend-icon {
   display: inline-flex;
@@ -13119,17 +13130,6 @@ body {
   font-weight: 500;
   color: var(--text-primary);
 }
-/* Stack the donut above the legend on narrow viewports. */
-@media (max-width: 640px) {
-  .attendance-donut-layout {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .attendance-donut-wrap {
-    align-self: center;
-  }
-}
-
 /* ── Option B — known-base rate lines (shared across the Retention cards) ──────
    Primary-weight context line paired with a muted disclosure note. */
 .silent-churn-rate,
@@ -13459,6 +13459,29 @@ body {
   color: var(--text-primary);
 }
 /* Watch hero row — Silent Churn (1/3) + Churn chart (2/3), side by side. */
+/* WATCH top row — Attendance Health (1/3) in line with the Churn chart (2/3).
+   The wrapper is the grid item (spans full width); its two cards are flex
+   children in a 1 : 2 ratio. Stacks to one column on narrow viewports. */
+.retention-hero-split {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+.retention-hero-split > * {
+  min-width: 0;
+}
+.retention-hero-split > :first-child {
+  flex: 1 1 0; /* Attendance Health — 1/3 */
+}
+.retention-hero-split > :nth-child(2) {
+  flex: 2 1 0; /* Churn chart — 2/3 */
+}
+@media (max-width: 900px) {
+  .retention-hero-split {
+    flex-direction: column;
+  }
+}
 .retention-evolution-body {
   /* Chart column: controls (top-right) → full-width chart → caption. */
   flex: 1;
