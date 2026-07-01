@@ -12,6 +12,8 @@
 // Overview / Membership / Classes are hidden for now.
 
 import { useEffect, useId, useMemo, useState } from 'react';
+import ReactApexChart from 'react-apexcharts';
+import { FiAlertTriangle, FiCheck, FiPhone } from 'react-icons/fi';
 import { useRetentionSettings } from '../context/RetentionSettingsContext';
 import { FIXTURE_TODAY, SAMPLE_GYM_MEMBERS } from '../lib/gym/memberFixture';
 import {
@@ -397,7 +399,8 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
 
   // One render path for both sources: deriveBuckets (live histogram) and
   // computeAttendanceHealth (sample fixture) return the SAME H/W/S/unknown shape,
-  // re-cut at the owner's CURRENT threshold whenever it changes.
+  // re-cut at the owner's CURRENT threshold whenever it changes. UNCHANGED data path
+  // — the donut layout is a pure presentation adapter over these code-computed counts.
   const result = useMemo(
     () =>
       snapshot
@@ -408,33 +411,87 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
 
   const { thresholdDays, healthy, watch, silent, unknown } = result;
 
-  // Option B rates — known base = healthy + watch + silent (activeTotal − unknown).
-  // Counts above are unchanged; these only add a denominator/rate view.
+  // Known-active base excludes Unknown (structural blanks) — the same Option-B
+  // denominator the card already used. Donut segments, center %, and every row %
+  // read this base, so they always sum to 100%. Divide-by-zero guarded: an all-zero
+  // known base yields a null center % (line omitted) and 0 row %s (never NaN).
   const knownActive = healthy + watch + silent;
-  const atRiskFacet = buildRetentionRateView(
-    watch + silent,
-    knownActive,
-    unknown,
-    'attendance-known actives',
-  ).knownBase;
-  const silentFacet = buildRetentionRateView(
-    silent,
-    knownActive,
-    unknown,
-    'attendance-known actives',
-  ).knownBase;
+  const highRiskPct = knownActive > 0 ? Math.round((silent / knownActive) * 100) : null;
+  const rowPct = (n: number): number => (knownActive > 0 ? Math.round((n / knownActive) * 100) : 0);
 
-  // Copy reads the RESOLVED threshold (result.thresholdDays), never the raw
-  // setting. The Watch band is [WATCH_FLOOR_DAYS, thresholdDays − 1]. When the
-  // threshold is at/below the watch floor the band is empty by construction
-  // (watch is always 0), so guard the helper to never render an inverted "8–7".
+  // Legend day-bands reuse the resolved-threshold logic that drove the old `helper`
+  // line — NEVER hardcoded (the threshold is Settings-adjustable). Reconnect (watch)
+  // = [WATCH_FLOOR_DAYS, thresholdDays − 1]; High Risk (silent) = [thresholdDays, ∞).
+  // When the threshold is at/below the watch floor the Reconnect band is empty by
+  // construction (watch === 0), so avoid an inverted "8–7".
   const watchUpper = thresholdDays - 1;
-  const helper =
+  const reconnectDesc =
     thresholdDays <= WATCH_FLOOR_DAYS
-      ? `Active members nearing the ${thresholdDays}-day Silent Churn threshold.`
+      ? `Nearing the ${thresholdDays}-day threshold`
       : watchUpper === WATCH_FLOOR_DAYS
-        ? `Active members at ${WATCH_FLOOR_DAYS} days since last check-in.`
-        : `Active members ${WATCH_FLOOR_DAYS}–${watchUpper} days since last check-in.`;
+        ? `${WATCH_FLOOR_DAYS} days since last check-in`
+        : `${WATCH_FLOOR_DAYS}–${watchUpper} days since last check-in`;
+  const highRiskDesc = `${thresholdDays}+ days since last check-in`;
+
+  // Segment colors come from the CSS design tokens at RUNTIME — the tokens stay the
+  // single source of truth and nothing here hardcodes a palette hex. ApexCharts needs
+  // concrete color strings (it can't resolve var() inside its SVG fills), so we read
+  // the resolved :root values once. The commented fallbacks are the DOCUMENTED token
+  // values (not new hex) — a belt-and-braces guard so a missing var can't paint an
+  // empty ring.
+  const segmentColors = useMemo(() => {
+    const root = getComputedStyle(document.documentElement);
+    return {
+      healthy: root.getPropertyValue('--positive').trim() || '#12B76A', // var(--positive)
+      reconnect: root.getPropertyValue('--warning').trim() || '#F79009', // var(--warning)
+      highRisk: root.getPropertyValue('--negative').trim() || '#F04438', // var(--negative)
+    };
+  }, []);
+
+  // Bottom insight (req 8): no prior-year attendance composition exists in the
+  // snapshot (RetentionAggregateSnapshot carries no YoY field), so this is null and
+  // the insight renders the honest "unavailable" branch. Wired through
+  // attendanceYoYInsight so a real prior-year source would light the ↑/↓/→ branches
+  // automatically — never fabricated.
+  const priorYearHighRiskPct: number | null = null;
+  const insight = attendanceYoYInsight(highRiskPct, priorYearHighRiskPct);
+
+  // Mirrors the shipped ApexCharts donut in TopCategoriesCard (type:'donut', white
+  // separator stroke, custom .ec-donut-tooltip, no built-in labels — center text is
+  // an overlay below for exact "big number / sub-line" control).
+  const donutOptions: ApexCharts.ApexOptions = {
+    chart: {
+      type: 'donut',
+      fontFamily: 'Outfit, sans-serif',
+      toolbar: { show: false },
+      accessibility: { keyboard: { enabled: false, navigation: { enabled: false } } },
+      animations: { enabled: false },
+      background: 'transparent',
+      sparkline: { enabled: false },
+    },
+    colors: [segmentColors.healthy, segmentColors.reconnect, segmentColors.highRisk],
+    labels: ['Healthy', 'Reconnect', 'High Risk'],
+    dataLabels: { enabled: false },
+    legend: { show: false },
+    stroke: { width: 2, colors: ['#FFFFFF'] },
+    plotOptions: { pie: { donut: { size: '72%', labels: { show: false } } } },
+    tooltip: {
+      custom: ({ seriesIndex }: { seriesIndex: number }) => {
+        const names = ['Healthy', 'Reconnect', 'High Risk'];
+        const counts = [healthy, watch, silent];
+        const name = names[seriesIndex];
+        if (name === undefined) return '';
+        const count = counts[seriesIndex];
+        return `
+          <div class="ec-donut-tooltip">
+            <div class="ec-donut-tooltip__title">${name} · ${rowPct(count)}%</div>
+            <div class="ec-donut-tooltip__value">${count}</div>
+          </div>
+        `;
+      },
+    },
+    states: { hover: { filter: { type: 'lighten' } }, active: { filter: { type: 'none' } } },
+  };
 
   return (
     <article className="card gym-card gym-card--full attendance-health-card">
@@ -445,56 +502,85 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
             <span className="gym-sample-badge">Sample data</span>
           )}
         </div>
-        <p className="gym-card-subtitle">Early warning before silent churn.</p>
+        <p className="gym-card-subtitle">Early warning before churn risk.</p>
       </header>
 
       <div className="attendance-health-body">
-        {watch === 0 ? (
+        {knownActive === 0 ? (
           <p className="attendance-health-empty">
-            No active members are drifting toward the {thresholdDays}-day threshold right now.
+            No attendance-known active members at the {thresholdDays}-day threshold right now.
           </p>
         ) : (
-          <>
-            <div className="attendance-health-hero">
-              <span className="attendance-health-hero-value">{watch}</span>
-              <span className="attendance-health-hero-label">
-                {watch === 1 ? 'member on watch' : 'members on watch'}
-              </span>
+          <div className="attendance-donut-layout">
+            <div className="attendance-donut-wrap">
+              <ReactApexChart
+                type="donut"
+                series={[healthy, watch, silent]}
+                options={donutOptions}
+                height={200}
+              />
+              <div className="attendance-donut-center" aria-hidden="true">
+                <span className="attendance-donut-center-value">{silent}</span>
+                {highRiskPct !== null && (
+                  <span className="attendance-donut-center-label">{highRiskPct}% at High Risk</span>
+                )}
+              </div>
             </div>
-            <p className="attendance-health-helper">{helper}</p>
-          </>
+
+            <ul className="attendance-donut-legend">
+              <li className="attendance-donut-legend-row">
+                <span
+                  className="attendance-donut-legend-icon attendance-donut-legend-icon--healthy"
+                  aria-hidden="true"
+                >
+                  <FiCheck />
+                </span>
+                <span className="attendance-donut-legend-text">
+                  <span className="attendance-donut-legend-label">Healthy</span>
+                  <span className="attendance-donut-legend-desc">Checked in recently</span>
+                </span>
+                <span className="attendance-donut-legend-metrics">
+                  <span className="attendance-donut-legend-count">{healthy}</span>
+                  <span className="attendance-donut-legend-pct">{rowPct(healthy)}%</span>
+                </span>
+              </li>
+              <li className="attendance-donut-legend-row">
+                <span
+                  className="attendance-donut-legend-icon attendance-donut-legend-icon--reconnect"
+                  aria-hidden="true"
+                >
+                  <FiPhone />
+                </span>
+                <span className="attendance-donut-legend-text">
+                  <span className="attendance-donut-legend-label">Reconnect</span>
+                  <span className="attendance-donut-legend-desc">{reconnectDesc}</span>
+                </span>
+                <span className="attendance-donut-legend-metrics">
+                  <span className="attendance-donut-legend-count">{watch}</span>
+                  <span className="attendance-donut-legend-pct">{rowPct(watch)}%</span>
+                </span>
+              </li>
+              <li className="attendance-donut-legend-row">
+                <span
+                  className="attendance-donut-legend-icon attendance-donut-legend-icon--highrisk"
+                  aria-hidden="true"
+                >
+                  <FiAlertTriangle />
+                </span>
+                <span className="attendance-donut-legend-text">
+                  <span className="attendance-donut-legend-label">High Risk</span>
+                  <span className="attendance-donut-legend-desc">{highRiskDesc}</span>
+                </span>
+                <span className="attendance-donut-legend-metrics">
+                  <span className="attendance-donut-legend-count">{silent}</span>
+                  <span className="attendance-donut-legend-pct">{rowPct(silent)}%</span>
+                </span>
+              </li>
+            </ul>
+          </div>
         )}
 
-        {atRiskFacet.base > 0 && (
-          <p className="attendance-health-rate">
-            {formatRate(atRiskFacet.rate)} of {atRiskFacet.base} attendance-known actives are
-            drifting or silent.
-          </p>
-        )}
-
-        <dl className="attendance-health-breakdown">
-          <div className="attendance-health-stat attendance-health-stat--healthy">
-            <dt className="attendance-health-stat-label">Healthy</dt>
-            <dd className="attendance-health-stat-value">{healthy}</dd>
-          </div>
-          <div className="attendance-health-stat attendance-health-stat--watch">
-            <dt className="attendance-health-stat-label">Watch</dt>
-            <dd className="attendance-health-stat-value">{watch}</dd>
-          </div>
-          <div className="attendance-health-stat attendance-health-stat--silent">
-            <dt className="attendance-health-stat-label">Silent</dt>
-            <dd className="attendance-health-stat-value">
-              {silent}
-              <span className="attendance-health-stat-rate"> · {formatRate(silentFacet.rate)}</span>
-            </dd>
-          </div>
-          {!excludeUnknownRecency && unknown > 0 && (
-            <div className="attendance-health-stat attendance-health-stat--unknown">
-              <dt className="attendance-health-stat-label">Unknown</dt>
-              <dd className="attendance-health-stat-value">{unknown}</dd>
-            </div>
-          )}
-        </dl>
+        <p className="attendance-health-insight">{insight}</p>
 
         {!excludeUnknownRecency && unknown > 0 && (
           <p className="attendance-health-dataquality">
@@ -502,18 +588,26 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
             on record — typically guardian/parent billing accounts (the child
             trains; the paying adult never signs in), staff accounts, or legacy
             members from before digital check-in. Structural blanks, not churn —
-            held out of Healthy / Watch / Silent rather than mislabeled.
-          </p>
-        )}
-
-        {watch > 0 && (
-          <p className="attendance-health-takeaway">
-            Drifting, but haven&rsquo;t crossed the Silent Churn threshold yet.
+            held out of Healthy / Reconnect / High Risk rather than mislabeled.
           </p>
         )}
       </div>
     </article>
   );
+}
+
+// Bottom insight (RETENTION_FINISH_PLAN req 8) — deterministic and prior-year-gated.
+// The ↑/↓/→ branches light up ONLY from a REAL prior-year High-Risk % (`prior`);
+// `prior === null` (the current reality — the snapshot has no prior-year attendance
+// composition) yields the honest "unavailable" branch. High-Risk % is a BAD metric,
+// so a LOWER current value is an improvement (↑ better). Never fabricates a YoY delta.
+function attendanceYoYInsight(current: number | null, prior: number | null): string {
+  if (current === null || prior === null) return 'Prior-year comparison unavailable';
+  const deltaPct = Math.abs(current - prior);
+  if (deltaPct === 0) return '→ About the same as this month last year';
+  return current < prior
+    ? `↑ ${deltaPct}% better than this month last year`
+    : `↓ ${deltaPct}% worse than this month last year`;
 }
 
 // Churn Risk by Tenure — the first Patterns card to turn the member layer into a
