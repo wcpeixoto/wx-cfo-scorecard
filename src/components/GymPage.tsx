@@ -521,10 +521,12 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
                 height={200}
               />
               <div className="attendance-donut-center" aria-hidden="true">
-                <span className="attendance-donut-center-value">{silent}</span>
-                {highRiskPct !== null && (
-                  <span className="attendance-donut-center-label">{highRiskPct}% at High Risk</span>
-                )}
+                <span className="attendance-donut-center-value">{highRiskPct ?? 0}%</span>
+                <span className="attendance-donut-center-label">
+                  {silent} {silent === 1 ? 'client' : 'clients'}
+                  <br />
+                  at high risk
+                </span>
               </div>
             </div>
 
