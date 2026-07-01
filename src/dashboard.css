@@ -13129,9 +13129,12 @@ body {
 }
 .attendance-health-insight {
   margin: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
   font-size: 14px;
   font-weight: 500;
   color: var(--text-primary);
+  text-align: center;
 }
 /* ── Option B — known-base rate lines (shared across the Retention cards) ──────
    Primary-weight context line paired with a muted disclosure note. */
