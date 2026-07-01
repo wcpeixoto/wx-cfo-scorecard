@@ -34,6 +34,15 @@ export const chartTokens = {
   // (e.g. Cash Trend straight result line when t6mMargin is near zero).
   neutral:         '#98A2B3',
 
+  // Churn-by-Belt line hues — semantic belt colors so each line/legend reads as
+  // its belt. White belt has no drawable color on a white card, so it uses
+  // `neutral` as a placeholder (the legend label carries the "White" meaning);
+  // Blue reuses `brand`, Yellow+Orange reuses `warning`. These three are the
+  // belt-specific additions with no existing token.
+  beltPurple:      '#7A5AF8',  // Purple belt (adults)
+  beltBrownBlack:  '#1D2939',  // Brown+Black belt (adults) — near-black
+  beltGrey:        '#667085',  // Grey-family belt (kids) — darker than the White placeholder
+
   // Structural
   gridBorder:      '#e0e0e0',
   crosshairStroke: '#b6b6b6',

@@ -12,16 +12,19 @@ type MemberRetentionByBeltChartProps = {
   height?: number;
 };
 
-// Distinct categorical line hues from the chart-token palette (UI_RULES §Chart Token File — no
-// invented hex; there is no White/Purple/Brown token, so the LEGEND labels carry the belt meaning,
-// exactly as RetentionEvolutionChart's three lines do). Sliced to the series count: adults uses all
-// four, kids the first three. Order is locked to the band order in memberRetentionByBeltSeries.
-const BELT_LINE_COLORS = [
-  chartTokens.brand, // White
-  chartTokens.success, // Blue / Grey-family
-  chartTokens.warning, // Purple / Yellow+Orange
-  chartTokens.info, // Brown+Black
-];
+// Belt-semantic line hues keyed by band NAME, so Adults and Kids each get true belt colors (a
+// position-based palette can't — the two segments have different bands). Colors drive both the line
+// stroke and its legend marker. White belt has no drawable color on a white card, so it uses the
+// neutral grey placeholder (the legend label carries the "White" meaning). All hexes come from the
+// chart-token file (UI_RULES §Chart Token File — no inline hex).
+const BELT_BAND_COLORS: Record<string, string> = {
+  White: chartTokens.neutral, // placeholder — no drawable white on a white card
+  Blue: chartTokens.brand,
+  Purple: chartTokens.beltPurple,
+  'Brown+Black': chartTokens.beltBrownBlack,
+  'Grey-family': chartTokens.beltGrey,
+  'Yellow+Orange': chartTokens.warning,
+};
 
 // Churn sits low and base at 0 so month-to-month movement stays legible; cap a touch above the peak
 // (next 5%, min 10%). Mirrors RetentionEvolutionChart.churnYDomain.
@@ -45,7 +48,10 @@ export default function MemberRetentionByBeltChart({
   const categories = useMemo(() => months.map((m) => formatMonthShort(m)), [months]);
   const tooltipLabels = useMemo(() => months.map((m) => formatMonthLong(m)), [months]);
 
-  const colors = useMemo(() => BELT_LINE_COLORS.slice(0, series.length), [series.length]);
+  const colors = useMemo(
+    () => series.map((s) => BELT_BAND_COLORS[s.band] ?? chartTokens.neutral),
+    [series],
+  );
 
   // Y-domain spans every visible line so no band line is clipped (nulls excluded).
   const domainValues = useMemo(() => {
