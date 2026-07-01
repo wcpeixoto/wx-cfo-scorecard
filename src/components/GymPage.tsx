@@ -504,7 +504,6 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
             <span className="gym-sample-badge">Sample data</span>
           )}
         </div>
-        <p className="gym-card-subtitle">Early warning before churn risk.</p>
       </header>
 
       <div className="attendance-health-body">
