@@ -80,16 +80,15 @@ export function GymPage() {
     <div className="stack-grid">
       <div className="ta-page">
         <div className="gym-retention">
-          {/* WATCH — live signals. Top row: Silent Churn (1/3) + Churn chart (2/3)
-              via .retention-hero-split; Attendance Health full-width below. (Page +
-              section headers removed per owner — only card-level titles remain.) */}
+          {/* WATCH — live signals. Attendance Health (full-width donut) first, then
+              the Churn chart (RetentionEvolutionCard, full-width) below. Silent Churn
+              is HIDDEN — its card + helpers stay defined in this file (not rendered),
+              so this is a reversible hide, not a delete. (Page + section headers
+              removed per owner — only card-level titles remain.) */}
           <section className="gym-section">
             <div className="gym-card-grid">
-              <div className="retention-hero-split">
-                <SilentChurnCard snapshot={snapshot} />
-                <RetentionEvolutionCard />
-              </div>
               <AttendanceHealthCard snapshot={snapshot} />
+              <RetentionEvolutionCard />
             </div>
           </section>
 
