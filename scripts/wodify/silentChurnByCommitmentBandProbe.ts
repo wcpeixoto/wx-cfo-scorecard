@@ -21,6 +21,21 @@
  * `resolveSilentChurnThresholdDays`. It does NOT modify silentChurn.ts and does NOT reimplement any
  * Silent Churn date / status / threshold logic — the single source of truth decides who is silent.
  *
+ * CALIBRATED to the live `/memberships` shape (#518 field-shape discovery, 2018 rows). The first live
+ * run (#517) read VOID — an instrument artifact, not a data gap. Fixes here:
+ *   1. UNIT VOCAB: `payment_plan.initial_commitment_time_unit` values are literally "Month(s)" / "Year(s)"
+ *      / "Week(s)" (parenthetical plural). The old `unitToMonths` (`/^mo(nth)?s?$/`) could not match them,
+ *      so every len>=1 row fell to `unclassified`. `unitToMonths` now strips non-letters before matching.
+ *   2. PACKS: non-commitment is detected from the STRUCTURED `membership_type` field (Class Pack /
+ *      Appointment Pack) first; the plan-name regex is a fallback only.
+ *   3. HOLDS: `/memberships` exposes NO hold field (#518: holdFields == []). Hold detection is dropped;
+ *      `holdSignalExposed` is honestly false. (Holds live on the client side / are not on this endpoint.)
+ *   4. DUAL ACTIVE SIGNAL (Reviewer-required discovery comparison): only 273/2018 rows are `is_active` —
+ *      implausibly low. Active-membership coverage is reported under BOTH the `is_active` signal AND an
+ *      expiration-derived "currently in force" signal (`does_membership_expire` / `expiration_date` not
+ *      past vs the gym-local asOf), plus their intersection. `is_active` is NOT hardcoded as truth; when
+ *      the two signals disagree on the coverage gate the verdict flags it rather than blocking.
+ *
  * Denominator doctrine (matches the shipped app — no new base is invented here): ALL FOUR classifier
  * buckets are preserved per active client (healthy / watch / silent / unknown). The attendance-known base
  * (healthy + watch + silent) is the PRIMARY rate denominator; `unknown` — active but no usable attendance
@@ -90,18 +105,21 @@ const RENEWAL_UNIT_FIELDS = ['renewal_commitment_time_unit', 'renewalCommitmentT
 const PLAN_NAME_FIELDS = ['payment_plan_name', 'paymentPlanName', 'name'];
 const AUTO_RENEW_FIELDS = ['is_auto_renew', 'isAutoRenew', 'auto_renew', 'autoRenew'];
 
-// Membership-level context (read in memory ONLY; never emitted).
+// Membership-level context (read in memory ONLY; never emitted). Confirmed against the live shape (#518).
 const MEMBERSHIP_NAME_FIELDS = ['name', 'membership', 'membership_name', 'membershipName'];
 const MEMBERSHIP_TYPE_FIELDS = ['membership_type', 'membershipType', 'MembershipType', 'type'];
 const IS_ACTIVE_FIELDS = ['is_active', 'isActive', 'IsActive', 'active'];
 const IS_DELETED_FIELDS = ['is_deleted', 'isDeleted', 'IsDeleted', 'deleted'];
+const DOES_EXPIRE_FIELDS = ['does_membership_expire', 'doesMembershipExpire']; // #518: boolean, false×1932 / true×86.
+const EXPIRATION_DATE_FIELDS = ['expiration_date', 'expirationDate', 'ExpirationDate', 'original_expiration_date'];
 const START_DATE_FIELDS = ['start_date', 'startDate', 'StartDate'];
 const END_DATE_FIELDS = ['end_date', 'endDate', 'EndDate', 'expiration_date', 'expirationDate', 'ExpirationDate'];
-const HOLD_FLAG_FIELDS = ['is_on_hold', 'isOnHold', 'on_hold', 'onHold', 'is_frozen', 'isFrozen', 'is_paused', 'isPaused'];
 
-// Name patterns. Non-commitment plans have no meaningful commitment length even if one is present.
+// Pack / non-commitment detection. PRIMARY: the structured `membership_type` field (#518 vocab: Class Plan
+// ×1809 / Class Pack ×113 / Appointment Pack ×96 — the two "Pack" types carry no commitment). FALLBACK: a
+// plan/membership-name regex, for robustness if membership_type is ever absent.
+const NON_COMMITMENT_TYPE = /\bpack\b|\bpass(es)?\b|punch|class ?card|drop.?in|day ?pass/i;
 const NON_COMMITMENT_NAME = /pack|pass|punch|class ?card|drop.?in|day ?pass|camp|clinic|private ?lesson|semiprivate|seminar|open ?mat|trial|intro|guest/i;
-const HOLD_NAME = /\bhold\b|freeze|frozen|paus|suspend/i;
 
 // Wodify error-envelope markers (matched case-insensitively; values NEVER emitted).
 const ERROR_ENVELOPE_MARKER_KEYS = ['developermessage', 'errorcode', 'httpcode', 'usermessage'];
@@ -135,6 +153,18 @@ const RATE_BASIS_NOTE =
   'primary rate denominator and from the coverage-skew comparison, matching the shipped Attendance Health ' +
   'known-base doctrine. silentRateFullBaseAdvisory fields are advisory only and require explicit Reviewer ' +
   'acceptance before any surface uses full-base rates.';
+
+// States the dual active-signal comparison so the coverage numbers cannot be misread. #518: only 273/2018
+// membership rows are is_active — implausibly low — so active-membership coverage is reported under is_active
+// AND an expiration-derived in-force signal AND their intersection. is_active is NOT assumed correct: when the
+// two signals disagree on the coverage gate the verdict flags 'active_membership_signal_ambiguous' instead of
+// blocking. Band assignment still uses is_active (the clean single-current-membership signal); the in-force
+// band tally (bandsActiveOnlyInForce) is provided for comparison only.
+const ACTIVE_SIGNAL_NOTE =
+  'Active-membership coverage is a DISCOVERY COMPARISON across two signals: is_active (Wodify flag) and ' +
+  'in-force (does_membership_expire is false, OR expiration_date is today-or-later vs the gym-local asOf), ' +
+  'plus their intersection. is_active is NOT hardcoded as truth. Band assignment uses is_active; ' +
+  'bandsActiveOnlyInForce shows the same bands under the in-force lens for comparison.';
 
 // ─── Safe output contract ───────────────────────────────────────────────────────────────────────────
 type HttpStatusClass = '2xx' | '4xx' | '5xx' | 'network_error';
@@ -170,7 +200,8 @@ type ReadinessReason =
   | 'high_unclassified_share'
   | 'unstable_active_only_vs_fallback'
   | 'silent_vs_known_nonsilent_coverage_skew' // skew compares silent vs attendance-KNOWN non-silent only.
-  | 'no_band_meets_rate_denominator_minimum'; // structure clean, but no band clears the per-band rate gate.
+  | 'no_band_meets_rate_denominator_minimum' // structure clean, but no band clears the per-band rate gate.
+  | 'active_membership_signal_ambiguous'; // is_active and in-force disagree on the coverage gate — pick a signal.
 
 // Per-band rate-gating reasons (count-based; the band's counts always emit regardless).
 type BandRateReason =
@@ -228,11 +259,18 @@ interface ProbeResult {
   attendanceKnownNonSilentTotal: number; // healthy + watch.
   rateBasisNote: string; // states the denominator doctrine in-band so the numbers cannot be misread.
 
-  // (1)+(2) Active-client → membership coverage.
+  // (1)+(2) Active-client → membership coverage. Active-membership coverage is reported under BOTH signals
+  // (is_active AND expiration-derived in-force) plus their intersection — a discovery comparison, since only
+  // 273/2018 rows are is_active (#518). `is_active` is NOT hardcoded as truth; see activeSignalNote + verdict.
   activeClientsWithAnyMembershipRow: number;
-  activeClientsWithActiveMembershipRow: number;
   anyMembershipCoverageShare: number;
-  activeMembershipCoverageShare: number;
+  activeSignalNote: string;
+  activeClientsWithActiveMembershipRow: number; // signal 1: is_active.
+  activeMembershipCoverageShareIsActive: number;
+  activeClientsWithInForceMembershipRow: number; // signal 2: expiration-based in force.
+  activeMembershipCoverageShareInForce: number;
+  activeClientsWithBothSignalsMembershipRow: number; // intersection.
+  activeMembershipCoverageShareBothSignals: number;
 
   // (3) Silent Churn coverage, three-way. The skew compares silent vs attendance-KNOWN non-silent only;
   // unknown-attendance coverage is its own separate pair and never contaminates the comparison.
@@ -260,16 +298,15 @@ interface ProbeResult {
   // (6) Per-band detail under BOTH rules. totalActive conserves to activeClientsTotal across each map;
   // per band, attendanceKnown + unknownAttendance === totalActive. Primary rates are known-base + gated;
   // full-base rates are advisory-only fields.
-  bandsActiveOnly: Record<ResolvedBand, BandDetail>;
+  bandsActiveOnly: Record<ResolvedBand, BandDetail>; // active-only rule under is_active (drives rate readiness).
+  bandsActiveOnlyInForce: Record<ResolvedBand, BandDetail>; // active-only rule under the in-force signal (comparison).
   bandsMostRecent: Record<ResolvedBand, BandDetail>;
   rateReadyBandCountActiveOnly: number; // real bands whose known-base rate cleared the per-band gate.
   unclassifiedShare: number; // most-recent rule.
 
-  // (7) Holds — a STATE, not a plan type; underlying band kept when determinable.
+  // (7) Holds — #518 discovery: /memberships exposes NO hold field, so this is honestly false. Holds are not
+  // on this endpoint (they live on the client side / are not surfaced here); a hold is a STATE, not a band.
   holdSignalExposed: boolean;
-  holdMembershipRows: number;
-  activeClientsWithHoldRow: number;
-  holdRowsWithDeterminableBand: number;
 
   // (8) Rate readiness.
   perBandDenominatorsClean: boolean;
@@ -335,11 +372,15 @@ function share(numer: number, denom: number): number {
 }
 
 // ─── Commitment-band classification (pure; exercised by the selftest) ───────────────────────────────
+// Wodify's live unit vocabulary is "Month(s)" / "Year(s)" / "Week(s)" (parenthetical plural) plus ""/absent
+// (#518). Normalize by stripping every non-letter FIRST — "month(s)" → "months" — then match a prefix, so the
+// parenthetical form can never silently fall through to unclassified again (the #517 VOID bug).
 function unitToMonths(length: number, unit: string): number | null {
-  const u = unit.trim().toLowerCase();
-  if (/^mo(nth)?s?$/.test(u) || u === 'month' || u === 'months') return length;
-  if (/^y(ea)?rs?$/.test(u) || u === 'year' || u === 'years') return length * 12;
-  return null; // weeks / days / unknown units are not commitment bands we recognize.
+  const u = unit.trim().toLowerCase().replace(/[^a-z]/g, ''); // "Month(s)" → "months"; "" stays "".
+  if (u.startsWith('month') || u === 'mo' || u === 'mos') return length;
+  if (u.startsWith('year') || u === 'yr' || u === 'yrs') return length * 12;
+  if (u.startsWith('week') || u.startsWith('day')) return null; // sub-month units are not a commitment band.
+  return null; // empty / unknown unit → unresolvable → unclassified (honest; no invented band).
 }
 
 function bandFromMonths(months: number): CommitmentBand {
@@ -352,18 +393,19 @@ function bandFromMonths(months: number): CommitmentBand {
 }
 
 interface MembershipRow {
-  isActiveRow: boolean; // is_active && !is_deleted.
+  isActiveFlag: boolean; // signal 1: is_active && !is_deleted (Wodify's active flag).
+  inForce: boolean; // signal 2: !is_deleted && (never-expires OR expiration not yet past vs asOf).
   band: CommitmentBand;
-  isHold: boolean;
   sortDate: string | null; // canonical YMD used for the most-recent ordering (start, else end/expiration).
   index: number; // stable tie-break (original row order).
 }
 
-// Derive a commitment band from a membership row's payment_plan + name. Name-based non-commitment wins first
-// (a pack with a stray commitment length is still not a commitment). Then the initial commitment, then renewal.
-function bandOf(pp: Record<string, unknown> | null, membershipName: string, planName: string): CommitmentBand {
-  const nameForNonCommit = `${membershipName} ${planName}`;
-  if (NON_COMMITMENT_NAME.test(nameForNonCommit)) return 'non_commitment';
+// Derive a commitment band from a membership row. Non-commitment wins first: the STRUCTURED membership_type
+// (Class Pack / Appointment Pack, #518) is authoritative; the plan/membership-name regex is a fallback. Then
+// the initial commitment length+unit, then renewal.
+function bandOf(pp: Record<string, unknown> | null, membershipType: string, membershipName: string, planName: string): CommitmentBand {
+  if (NON_COMMITMENT_TYPE.test(membershipType)) return 'non_commitment'; // structured signal — authoritative.
+  if (NON_COMMITMENT_NAME.test(`${membershipName} ${planName}`)) return 'non_commitment'; // name fallback.
 
   const tryLenUnit = (lenNames: string[], unitNames: string[]): CommitmentBand | null => {
     if (!pp) return null;
@@ -383,7 +425,7 @@ function bandOf(pp: Record<string, unknown> | null, membershipName: string, plan
     ?? 'unclassified';
 }
 
-function extractMembership(rec: unknown, index: number): { clientId: string; row: MembershipRow } | null {
+function extractMembership(rec: unknown, index: number, asOfYmd: string): { clientId: string; row: MembershipRow } | null {
   if (!isPlainObject(rec)) return null;
   const clientId = asString(firstField(rec, MEMBERSHIP_CLIENT_ID_FIELDS)).trim();
   if (clientId === '') return null; // an un-joinable row is not counted against any client.
@@ -395,20 +437,25 @@ function extractMembership(rec: unknown, index: number): { clientId: string; row
   const planName = asString(pp ? firstField(pp, PLAN_NAME_FIELDS) : firstField(rec, PLAN_NAME_FIELDS));
 
   const isDeleted = asBool(firstField(rec, IS_DELETED_FIELDS));
-  const isActiveRow = asBool(firstField(rec, IS_ACTIVE_FIELDS)) && !isDeleted;
+  const isActiveFlag = asBool(firstField(rec, IS_ACTIVE_FIELDS)) && !isDeleted;
 
   const start = strictYmd(firstField(rec, START_DATE_FIELDS));
   const end = strictYmd(firstField(rec, END_DATE_FIELDS));
 
-  const holdFlag = HOLD_FLAG_FIELDS.some((n) => (rec[n] !== undefined ? asBool(rec[n]) : false));
-  const isHold = holdFlag || HOLD_NAME.test(`${membershipName} ${membershipType} ${planName}`);
+  // Signal 2 — "currently in force" from the expiration fields (#518). A non-expiring membership
+  // (does_membership_expire !== true) has no end to be past → in force; an expiring one is in force only
+  // while its expiration date is today-or-later (lexical compare of zero-padded ISO dates vs the gym-local
+  // asOf YMD — no Date('YYYY-MM-DD') parse). Deleted rows are never in force.
+  const doesExpire = asBool(firstField(rec, DOES_EXPIRE_FIELDS));
+  const expirationYmd = strictYmd(firstField(rec, EXPIRATION_DATE_FIELDS));
+  const inForce = !isDeleted && (!doesExpire || (expirationYmd !== null && expirationYmd >= asOfYmd));
 
   return {
     clientId,
     row: {
-      isActiveRow,
-      band: bandOf(pp, membershipName, planName),
-      isHold,
+      isActiveFlag,
+      inForce,
+      band: bandOf(pp, membershipType, membershipName, planName),
       sortDate: start ?? end,
       index,
     },
@@ -439,7 +486,9 @@ interface AnalysisCounts {
   silentMembersTotal: number;
   unknownAttendanceTotal: number;
   activeClientsWithAnyMembershipRow: number;
-  activeClientsWithActiveMembershipRow: number;
+  activeClientsWithActiveMembershipRow: number; // signal 1: is_active.
+  activeClientsWithInForceMembershipRow: number; // signal 2: expiration-based "in force".
+  activeClientsWithBothSignalsMembershipRow: number; // intersection: is_active AND in force.
   silentMembersWithNoActiveMembershipRow: number;
   silentMembersWithActiveMembershipRow: number;
   knownNonSilentWithActiveMembershipRow: number;
@@ -449,12 +498,9 @@ interface AnalysisCounts {
   clientsWithConflictingBands: number;
   membersChangingBand: number;
   silentMembersChangingBand: number;
-  bandStatsActiveOnly: Record<ResolvedBand, BandCounts>;
+  bandStatsActiveOnly: Record<ResolvedBand, BandCounts>; // active-only rule under the is_active signal.
+  bandStatsActiveOnlyInForce: Record<ResolvedBand, BandCounts>; // active-only rule under the in-force signal.
   bandStatsMostRecent: Record<ResolvedBand, BandCounts>;
-  holdSignalExposed: boolean;
-  holdMembershipRows: number;
-  activeClientsWithHoldRow: number;
-  holdRowsWithDeterminableBand: number;
   clientRecordsScanned: number;
   membershipRecordsScanned: number;
 }
@@ -485,6 +531,8 @@ function analyze(
   thresholdRaw: unknown,
 ): AnalysisCounts {
   const threshold = resolveSilentChurnThresholdDays(thresholdRaw);
+  // Gym-local asOf as a canonical YMD for the in-force expiration compare (lexical, no Date parse).
+  const asOfYmd = `${asOf.getFullYear()}-${String(asOf.getMonth() + 1).padStart(2, '0')}-${String(asOf.getDate()).padStart(2, '0')}`;
 
   // Active clients only (the classifier excludes non-active clients). Map clientId → the FULL locked-
   // classifier bucket (healthy | watch | silent | unknown). `unknown` is preserved as its own category —
@@ -504,21 +552,13 @@ function analyze(
   // Memberships grouped by client id (all statuses; band assignment is scoped to active clients below).
   const byClient = new Map<string, MembershipRow[]>();
   let membershipRecordsScanned = 0;
-  let holdSignalExposed = false;
-  let holdMembershipRows = 0;
-  let holdRowsWithDeterminableBand = 0;
   for (let i = 0; i < membershipRecords.length; i++) {
     membershipRecordsScanned += 1;
-    const extracted = extractMembership(membershipRecords[i], i);
+    const extracted = extractMembership(membershipRecords[i], i, asOfYmd);
     if (!extracted) continue;
     const list = byClient.get(extracted.clientId) ?? [];
     list.push(extracted.row);
     byClient.set(extracted.clientId, list);
-    if (extracted.row.isHold) {
-      holdSignalExposed = true;
-      holdMembershipRows += 1;
-      if (extracted.row.band !== 'unclassified' && extracted.row.band !== 'non_commitment') holdRowsWithDeterminableBand += 1;
-    }
   }
 
   const counts: AnalysisCounts = {
@@ -529,6 +569,8 @@ function analyze(
     unknownAttendanceTotal: 0,
     activeClientsWithAnyMembershipRow: 0,
     activeClientsWithActiveMembershipRow: 0,
+    activeClientsWithInForceMembershipRow: 0,
+    activeClientsWithBothSignalsMembershipRow: 0,
     silentMembersWithNoActiveMembershipRow: 0,
     silentMembersWithActiveMembershipRow: 0,
     knownNonSilentWithActiveMembershipRow: 0,
@@ -539,11 +581,8 @@ function analyze(
     membersChangingBand: 0,
     silentMembersChangingBand: 0,
     bandStatsActiveOnly: freshBandCounts(),
+    bandStatsActiveOnlyInForce: freshBandCounts(),
     bandStatsMostRecent: freshBandCounts(),
-    holdSignalExposed,
-    holdMembershipRows,
-    activeClientsWithHoldRow: 0,
-    holdRowsWithDeterminableBand,
     clientRecordsScanned,
     membershipRecordsScanned,
   };
@@ -558,16 +597,21 @@ function analyze(
     else counts.unknownAttendanceTotal += 1;
 
     const rows = byClient.get(clientId) ?? [];
-    const activeRows = rows.filter((r) => r.isActiveRow);
+    // Two active-row lenses (Reviewer discovery comparison — is_active is NOT hardcoded as truth).
+    const activeRowsIsActive = rows.filter((r) => r.isActiveFlag);
+    const inForceRows = rows.filter((r) => r.inForce);
     const hasAny = rows.length > 0;
-    const hasActive = activeRows.length > 0;
+    const hasActive = activeRowsIsActive.length > 0; // signal 1 — drives band assignment + silent coverage.
+    const hasInForce = inForceRows.length > 0; // signal 2 — reported alongside for the coverage comparison.
 
     if (hasAny) counts.activeClientsWithAnyMembershipRow += 1;
     if (hasActive) counts.activeClientsWithActiveMembershipRow += 1;
-    if (rows.some((r) => r.isHold)) counts.activeClientsWithHoldRow += 1;
+    if (hasInForce) counts.activeClientsWithInForceMembershipRow += 1;
+    if (rows.some((r) => r.isActiveFlag && r.inForce)) counts.activeClientsWithBothSignalsMembershipRow += 1;
 
     // (3) Coverage, three-way: silent / attendance-known non-silent / unknown. unknown is tallied on its
-    // own and NEVER folded into the non-silent side of the skew comparison.
+    // own and NEVER folded into the non-silent side of the skew comparison. (Uses the is_active signal, in
+    // step with the band assignment; the dual-signal comparison sits on the active-membership coverage above.)
     if (silent) {
       if (hasActive) counts.silentMembersWithActiveMembershipRow += 1;
       else counts.silentMembersWithNoActiveMembershipRow += 1;
@@ -577,8 +621,10 @@ function analyze(
       counts.knownNonSilentWithActiveMembershipRow += 1;
     }
 
-    // (5)+(6) Assignment rules. Active-only uses active rows; the fallback uses the most-recent date-eligible row.
-    const activeOnlyBand = resolveBand(activeRows);
+    // (5)+(6) Assignment rules. Active-only uses the is_active rows (the clean "current membership" signal);
+    // the fallback uses the most-recent date-eligible row. The in-force band tally is a coverage-comparison view.
+    const activeOnlyBand = resolveBand(activeRowsIsActive);
+    const inForceBand = resolveBand(inForceRows);
     const eligible = rows.filter((r) => r.sortDate !== null);
     let fallbackBand: ResolvedBand;
     if (eligible.length === 0) {
@@ -591,9 +637,9 @@ function analyze(
       fallbackBand = eligible[0].band;
     }
 
-    // (4) Collisions. A "conflicting band" is scoped to the CURRENTLY-ACTIVE rows (the live-blocking case that
-    // forces an arbitrary pick now); a purely HISTORICAL band change instead surfaces as an assignment delta.
-    if (activeRows.length > 1) counts.clientsWithMultipleActiveMemberships += 1;
+    // (4) Collisions. A "conflicting band" is scoped to the CURRENTLY-ACTIVE (is_active) rows (the live-
+    // blocking case that forces an arbitrary pick now); a purely HISTORICAL band change surfaces as a delta.
+    if (activeRowsIsActive.length > 1) counts.clientsWithMultipleActiveMemberships += 1;
     if (!hasActive && hasAny) counts.clientsWithNoActiveButHistoricalMemberships += 1;
     if (activeOnlyBand === 'conflicting') counts.clientsWithConflictingBands += 1;
 
@@ -605,6 +651,7 @@ function analyze(
       if (silent) s.silentCount += 1;
     };
     bump(counts.bandStatsActiveOnly, activeOnlyBand);
+    bump(counts.bandStatsActiveOnlyInForce, inForceBand);
     bump(counts.bandStatsMostRecent, fallbackBand);
     // Band DELTA = both rules can place the member but disagree (incl. active-only 'conflicting' the fallback
     // resolves to one band). A member unassignable under a rule is a COVERAGE gap, reported above — not a swing.
@@ -647,7 +694,9 @@ function freshMeta(): TransportMeta {
 }
 
 function buildResult(counts: AnalysisCounts, meta: TransportMeta, threshold: number, asOfIsBounded: boolean): ProbeResult {
-  const activeMembershipCoverageShare = share(counts.activeClientsWithActiveMembershipRow, counts.activeClientsTotal);
+  const activeMembershipCoverageShareIsActive = share(counts.activeClientsWithActiveMembershipRow, counts.activeClientsTotal);
+  const activeMembershipCoverageShareInForce = share(counts.activeClientsWithInForceMembershipRow, counts.activeClientsTotal);
+  const activeMembershipCoverageShareBothSignals = share(counts.activeClientsWithBothSignalsMembershipRow, counts.activeClientsTotal);
   const anyMembershipCoverageShare = share(counts.activeClientsWithAnyMembershipRow, counts.activeClientsTotal);
   const attendanceKnownTotal = counts.healthyTotal + counts.watchTotal + counts.silentMembersTotal;
   const attendanceKnownNonSilentTotal = counts.healthyTotal + counts.watchTotal;
@@ -691,12 +740,22 @@ function buildResult(counts: AnalysisCounts, meta: TransportMeta, threshold: num
     return out;
   };
   const bandsActiveOnly = buildBands(counts.bandStatsActiveOnly);
+  const bandsActiveOnlyInForce = buildBands(counts.bandStatsActiveOnlyInForce);
   const bandsMostRecent = buildBands(counts.bandStatsMostRecent);
   // Readiness rollup uses the ACTIVE-ONLY rule (assignment rule 1 — the primary candidate for a card).
   const rateReadyBandCountActiveOnly = ALL_RESOLVED_BANDS.filter((b) => bandsActiveOnly[b].rateReady).length;
 
+  // Dual-signal coverage gate (Reviewer discovery comparison). Block ONLY when BOTH signals fall short; when
+  // they disagree (is_active low but in-force fine, or vice versa), flag it — don't block on the unvalidated
+  // is_active signal, and don't silently pass on the possibly-over-inclusive in-force one.
+  const isActiveCovBelow = activeMembershipCoverageShareIsActive < MIN_ACTIVE_MEMBERSHIP_COVERAGE;
+  const inForceCovBelow = activeMembershipCoverageShareInForce < MIN_ACTIVE_MEMBERSHIP_COVERAGE;
+  const bothCoverageSignalsBelow = isActiveCovBelow && inForceCovBelow;
+  const coverageSignalsDisagree = isActiveCovBelow !== inForceCovBelow;
+
   const readinessReasons: ReadinessReason[] = [];
-  if (activeMembershipCoverageShare < MIN_ACTIVE_MEMBERSHIP_COVERAGE) readinessReasons.push('low_active_membership_coverage');
+  if (bothCoverageSignalsBelow) readinessReasons.push('low_active_membership_coverage');
+  else if (coverageSignalsDisagree) readinessReasons.push('active_membership_signal_ambiguous');
   if (conflictingBandShare > MAX_CONFLICTING_BAND_SHARE) readinessReasons.push('conflicting_band_collisions');
   if (unclassifiedShare > MAX_UNCLASSIFIED_SHARE) readinessReasons.push('high_unclassified_share');
   if (bandDeltaShare > MAX_BAND_DELTA_SHARE) readinessReasons.push('unstable_active_only_vs_fallback');
@@ -718,9 +777,11 @@ function buildResult(counts: AnalysisCounts, meta: TransportMeta, threshold: num
     counts.clientRecordsScanned > 0 &&
     counts.membershipRecordsScanned > 0;
 
-  // Verdict precedence: coverage → collisions → assignment stability → clean. A blocked scan cannot be rate_ready.
+  // Verdict precedence: coverage → collisions → assignment stability → clean. A blocked scan cannot be
+  // rate_ready. Coverage blocks ONLY when BOTH active signals fall short (never on is_active alone); a
+  // signal disagreement flags 'active_membership_signal_ambiguous' above and lands as counts_only_possible.
   let verdict: Verdict;
-  if (!coverageComplete || activeMembershipCoverageShare < MIN_ACTIVE_MEMBERSHIP_COVERAGE) {
+  if (!coverageComplete || bothCoverageSignalsBelow) {
     verdict = 'blocked_low_membership_coverage';
   } else if (conflictingBandShare > MAX_CONFLICTING_BAND_SHARE) {
     verdict = 'blocked_unresolved_collisions';
@@ -757,9 +818,14 @@ function buildResult(counts: AnalysisCounts, meta: TransportMeta, threshold: num
     attendanceKnownNonSilentTotal,
     rateBasisNote: RATE_BASIS_NOTE,
     activeClientsWithAnyMembershipRow: counts.activeClientsWithAnyMembershipRow,
-    activeClientsWithActiveMembershipRow: counts.activeClientsWithActiveMembershipRow,
     anyMembershipCoverageShare,
-    activeMembershipCoverageShare,
+    activeSignalNote: ACTIVE_SIGNAL_NOTE,
+    activeClientsWithActiveMembershipRow: counts.activeClientsWithActiveMembershipRow,
+    activeMembershipCoverageShareIsActive,
+    activeClientsWithInForceMembershipRow: counts.activeClientsWithInForceMembershipRow,
+    activeMembershipCoverageShareInForce,
+    activeClientsWithBothSignalsMembershipRow: counts.activeClientsWithBothSignalsMembershipRow,
+    activeMembershipCoverageShareBothSignals,
     silentMembersWithNoActiveMembershipRow: counts.silentMembersWithNoActiveMembershipRow,
     silentMembersWithActiveMembershipRow: counts.silentMembersWithActiveMembershipRow,
     silentCoverageShare,
@@ -777,13 +843,11 @@ function buildResult(counts: AnalysisCounts, meta: TransportMeta, threshold: num
     silentMembersChangingBand: counts.silentMembersChangingBand,
     bandDeltaShare,
     bandsActiveOnly,
+    bandsActiveOnlyInForce,
     bandsMostRecent,
     rateReadyBandCountActiveOnly,
     unclassifiedShare,
-    holdSignalExposed: counts.holdSignalExposed,
-    holdMembershipRows: counts.holdMembershipRows,
-    activeClientsWithHoldRow: counts.activeClientsWithHoldRow,
-    holdRowsWithDeterminableBand: counts.holdRowsWithDeterminableBand,
+    holdSignalExposed: false, // #518: /memberships exposes no hold field — honestly false, not a scan miss.
     perBandDenominatorsClean,
     readinessReasons,
     verdict,
@@ -907,6 +971,7 @@ function runSelfTest(): void {
     '9000009', '9000010', '9000011', '9000012', '9000013', '9000014', '9000099',
     '80000001', '80000002', '80000013', '80000017', // membership ids (8 digit)
     '2026-05-01', '2026-06-14', '2024-01-01', '2026-03-01', '2026-06-05', '2026-06-13', // exact dates
+    '2025-01-01', // an expiration_date read for the in-force signal — must never surface
     '1900-01-01', // the Wodify null-date sentinel — read in memory, must never surface
     'sk_live_DEADBEEFCAFE1234', 'Bearer_TOKEN_XYZ', // secret-looking tokens
   ];
@@ -922,7 +987,9 @@ function runSelfTest(): void {
     api_token: 'sk_live_DEADBEEFCAFE1234',
   });
 
-  // Build a /memberships record. payment_plan carries the commitment fields; PII on the row + a token.
+  // Build a /memberships record matching the live shape (#518): units default to the real "Month(s)" vocab,
+  // membership_type drives pack detection, does_membership_expire + expiration_date drive the in-force signal.
+  // No hold field exists on /memberships. PII on the row + a token, all of which must be suppressed.
   const membership = (
     membershipId: string,
     clientId: string,
@@ -937,7 +1004,8 @@ function runSelfTest(): void {
       start?: string;
       end?: string;
       autoRenew?: boolean;
-      onHold?: boolean;
+      doesExpire?: boolean; // default false → non-expiring → in force (for a non-deleted row).
+      expiration?: string; // YMD; only consulted when doesExpire is true.
     },
   ): Record<string, unknown> => ({
     id: membershipId,
@@ -947,21 +1015,21 @@ function runSelfTest(): void {
     Email: 'secret@member.example',
     auth_header: 'Bearer_TOKEN_XYZ',
     name: opts.membershipName ?? 'BJJ Unlimited',
-    membership_type: opts.membershipType ?? 'Recurring',
+    membership_type: opts.membershipType ?? 'Class Plan', // #518 vocab; "Class Pack"/"Appointment Pack" = non-commitment.
     is_active: opts.isActive,
     is_deleted: opts.isDeleted ?? false,
     has_been_renewed: false,
+    does_membership_expire: opts.doesExpire ?? false,
     start_date: opts.start ?? '2024-01-01',
     end_date: opts.end ?? '',
-    expiration_date: opts.end ?? '',
+    expiration_date: opts.expiration ?? opts.end ?? '',
     scheduled_deactivation_date: '',
-    is_on_hold: opts.onHold ?? false,
     payment_plan: {
       payment_plan_name: opts.planName ?? 'Monthly Unlimited',
       initial_commitment_length: opts.initLen,
-      initial_commitment_time_unit: opts.initUnit ?? 'Month',
+      initial_commitment_time_unit: opts.initUnit ?? 'Month(s)', // the real parenthetical-plural vocab.
       renewal_commitment_length: opts.initLen,
-      renewal_commitment_time_unit: opts.initUnit ?? 'Month',
+      renewal_commitment_time_unit: opts.initUnit ?? 'Month(s)',
       is_auto_renew: opts.autoRenew ?? true,
     },
   });
@@ -1001,31 +1069,34 @@ function runSelfTest(): void {
     client('9000099', 'Inactive', '2026-05-01'), // non-active → excluded from every count
   ];
 
+  // Units use the real "Month(s)" vocab (via the factory default) — so the whole main fixture is an
+  // end-to-end proof of the unit fix: if "Month(s)" ever stopped parsing, these bands would collapse.
   const memberships: Record<string, unknown>[] = [
-    membership('80000001', '9000001', { isActive: true, initLen: 12, initUnit: 'Month' }), // twelve_month_annual
-    membership('80000002', '9000002', { isActive: true, initLen: 1, initUnit: 'Month' }), // month_to_month
-    membership('80000003', '9000003', { isActive: false, initLen: 12, initUnit: 'Month', start: '2024-01-01', end: '2025-01-01' }), // historical only
+    membership('80000001', '9000001', { isActive: true, initLen: 12 }), // twelve_month_annual
+    membership('80000002', '9000002', { isActive: true, initLen: 1 }), // month_to_month
+    // historical only: is_active false AND expired (does_membership_expire + past expiration) → NOT in force either.
+    membership('80000003', '9000003', { isActive: false, initLen: 12, start: '2024-01-01', end: '2025-01-01', doesExpire: true, expiration: '2025-01-01' }),
     // 9000004 — two ACTIVE 6-month memberships (same band → multiple-active, NOT a band conflict).
-    membership('80000004', '9000004', { isActive: true, initLen: 6, initUnit: 'Month' }),
-    membership('80000005', '9000004', { isActive: true, initLen: 6, initUnit: 'Month' }),
+    membership('80000004', '9000004', { isActive: true, initLen: 6 }),
+    membership('80000005', '9000004', { isActive: true, initLen: 6 }),
     // 9000005 — two ACTIVE memberships with DIFFERENT bands → conflicting bands.
-    membership('80000006', '9000005', { isActive: true, initLen: 3, initUnit: 'Month' }),
-    membership('80000007', '9000005', { isActive: true, initLen: 6, initUnit: 'Month' }),
-    // 9000006 — a PACK → non_commitment regardless of any length.
-    membership('80000008', '9000006', { isActive: true, planName: 'Drop-in Pack', membershipName: '10 Class Pack', initLen: 12, initUnit: 'Month' }),
-    // 9000007 — active 3-month (older start) + newer INACTIVE 12-month → active-only=3-month, fallback=12-month.
-    membership('80000009', '9000007', { isActive: true, initLen: 3, initUnit: 'Month', start: '2024-01-01' }),
-    membership('80000010', '9000007', { isActive: false, initLen: 12, initUnit: 'Month', start: '2026-03-01', end: '' }),
-    // 9000008 — active membership in a HOLD state; underlying 12-month band must be kept.
-    membership('80000011', '9000008', { isActive: true, initLen: 12, initUnit: 'Month', onHold: true, membershipName: 'BJJ (On Hold)' }),
+    membership('80000006', '9000005', { isActive: true, initLen: 3 }),
+    membership('80000007', '9000005', { isActive: true, initLen: 6 }),
+    // 9000006 — a PACK via the STRUCTURED membership_type field → non_commitment despite a 12-month length.
+    membership('80000008', '9000006', { isActive: true, membershipType: 'Class Pack', initLen: 12 }),
+    // 9000007 — active 3-month (older start) + newer INACTIVE, EXPIRED 12-month → active-only=3-month, fallback=12-month.
+    membership('80000009', '9000007', { isActive: true, initLen: 3, start: '2024-01-01' }),
+    membership('80000010', '9000007', { isActive: false, initLen: 12, start: '2026-03-01', doesExpire: true, expiration: '2025-01-01' }),
+    // 9000008 — plain active 12-month (no hold field exists on /memberships).
+    membership('80000011', '9000008', { isActive: true, initLen: 12 }),
     // Membership for the INACTIVE client — must not be counted (client dropped by classifier).
-    membership('80000012', '9000099', { isActive: true, initLen: 12, initUnit: 'Month' }),
+    membership('80000012', '9000099', { isActive: true, initLen: 12 }),
     // The month-to-month cohort (watch + healthy×2 + silent + unknown-sentinel). 9000014 has NO rows.
-    membership('80000013', '9000009', { isActive: true, initLen: 1, initUnit: 'Month' }),
-    membership('80000014', '9000010', { isActive: true, initLen: 1, initUnit: 'Month' }),
-    membership('80000015', '9000011', { isActive: true, initLen: 1, initUnit: 'Month' }),
-    membership('80000016', '9000012', { isActive: true, initLen: 1, initUnit: 'Month' }),
-    membership('80000017', '9000013', { isActive: true, initLen: 1, initUnit: 'Month' }),
+    membership('80000013', '9000009', { isActive: true, initLen: 1 }),
+    membership('80000014', '9000010', { isActive: true, initLen: 1 }),
+    membership('80000015', '9000011', { isActive: true, initLen: 1 }),
+    membership('80000016', '9000012', { isActive: true, initLen: 1 }),
+    membership('80000017', '9000013', { isActive: true, initLen: 1 }),
   ];
 
   const counts = analyze(clients, memberships, TODAY, THRESHOLD);
@@ -1097,11 +1168,17 @@ function runSelfTest(): void {
     ['pseudo-bands never rate: not_an_assignable_commitment_band + null rates', bA.unassignable.rateNotReadyReasons.includes('not_an_assignable_commitment_band') && bA.unassignable.silentRateKnownBase === null && bA.unassignable.silentRateFullBaseAdvisory === null && bA.conflicting.silentRateKnownBase === null],
     ['unknown-by-band under both rules (m2m 1 + unassignable 1 each)', bA.month_to_month.unknownAttendance === 1 && bM.month_to_month.unknownAttendance === 1 && bA.unassignable.unknownAttendance === 1 && bM.unassignable.unknownAttendance === 1],
     ['rateReadyBandCountActiveOnly == 1 (only m2m clears the gate)', result.rateReadyBandCountActiveOnly === 1],
-    // Holds — state kept, underlying band determinable.
-    ['holdSignalExposed == true', result.holdSignalExposed === true],
-    ['holdMembershipRows == 1', result.holdMembershipRows === 1],
-    ['activeClientsWithHoldRow == 1', result.activeClientsWithHoldRow === 1],
-    ['holdRowsWithDeterminableBand == 1', result.holdRowsWithDeterminableBand === 1],
+    // Pack detection via the STRUCTURED membership_type field (9000006 carries no name hint now).
+    ['non_commitment came from membership_type (Class Pack), not a name regex', bA.non_commitment.totalActive === 1],
+    // Holds — #518: no hold field on /memberships → honestly false (not a scan miss).
+    ['holdSignalExposed == false (no hold field on /memberships)', result.holdSignalExposed === false],
+    // Dual active-signal coverage: in this fixture the two signals AGREE (the is_active:false rows are also
+    // expired), so in-force == is_active == both == 12 and there is NO ambiguity reason.
+    ['activeClientsWithInForceMembershipRow == 12', result.activeClientsWithInForceMembershipRow === 12],
+    ['activeClientsWithBothSignalsMembershipRow == 12', result.activeClientsWithBothSignalsMembershipRow === 12],
+    ['coverage shares equal under both signals (0.857)', result.activeMembershipCoverageShareIsActive === 0.857 && result.activeMembershipCoverageShareInForce === 0.857],
+    ['bandsActiveOnlyInForce present + conserves', sumTotal(result.bandsActiveOnlyInForce) === 14 && bandsConserve(result.bandsActiveOnlyInForce)],
+    ['no active_membership_signal_ambiguous when signals agree', !result.readinessReasons.includes('active_membership_signal_ambiguous')],
     // Verdict — pinned exactly (fixture: delta 2/13 > 0.1; skew 0.333 > 0.2; collisions 1/13 under 0.1).
     ['verdict == blocked_unstable_assignment', result.verdict === 'blocked_unstable_assignment'],
     ['readinessReasons exactly [instability, known-nonsilent skew]', JSON.stringify(result.readinessReasons) === JSON.stringify(['unstable_active_only_vs_fallback', 'silent_vs_known_nonsilent_coverage_skew'])],
@@ -1112,26 +1189,54 @@ function runSelfTest(): void {
   const failed = checks.filter(([, ok]) => !ok).map(([n]) => n);
   if (failed.length > 0) return fail(`behavioral check(s): ${failed.join(' | ')}`);
 
-  // Band-classifier unit assertions (pins the pure mapping so a future edit can't silently drift).
-  const b = (initLen: number | undefined, unit: string, planName = 'Monthly', mName = 'BJJ'): CommitmentBand =>
-    bandOf(initLen === undefined ? null : { initial_commitment_length: initLen, initial_commitment_time_unit: unit }, mName, planName);
+  // Band-classifier assertions (pins the pure mapping so a future edit can't silently drift). The unit vocab
+  // is the REAL "Month(s)" / "Year(s)" / "Week(s)" form (#518) — the regression this PR fixes.
+  const b = (
+    initLen: number | undefined,
+    unit: string,
+    opts: { type?: string; planName?: string; mName?: string } = {},
+  ): CommitmentBand =>
+    bandOf(
+      initLen === undefined ? null : { initial_commitment_length: initLen, initial_commitment_time_unit: unit },
+      opts.type ?? 'Class Plan',
+      opts.mName ?? 'BJJ',
+      opts.planName ?? 'Monthly',
+    );
   const bandChecks: Array<[string, boolean]> = [
-    ['0 months → month_to_month', b(0, 'Month') === 'month_to_month'],
-    ['1 month → month_to_month', b(1, 'Month') === 'month_to_month'],
-    ['3 months → three_month', b(3, 'Month') === 'three_month'],
-    ['6 months → six_month', b(6, 'Month') === 'six_month'],
-    ['12 months → twelve_month_annual', b(12, 'Month') === 'twelve_month_annual'],
-    ['1 year → twelve_month_annual', b(1, 'Year') === 'twelve_month_annual'],
-    ['24 months → twenty_four_month', b(24, 'Month') === 'twenty_four_month'],
-    ['2 years → twenty_four_month', b(2, 'Year') === 'twenty_four_month'],
-    ['4 months → unclassified', b(4, 'Month') === 'unclassified'],
-    ['pack name → non_commitment (even with 12mo length)', b(12, 'Month', 'Drop-in Pack', '10 Class Pack') === 'non_commitment'],
-    ['private lesson name → non_commitment', b(undefined, 'Month', 'Private Lesson Pack') === 'non_commitment'],
-    ['no plan data → unclassified', b(undefined, 'Month') === 'unclassified'],
-    ['weeks unit → unclassified', b(8, 'Week') === 'unclassified'],
+    // The fix: parenthetical-plural units must resolve (they were the #517 VOID).
+    ['1 "Month(s)" → month_to_month', b(1, 'Month(s)') === 'month_to_month'],
+    ['3 "Month(s)" → three_month', b(3, 'Month(s)') === 'three_month'],
+    ['6 "Month(s)" → six_month', b(6, 'Month(s)') === 'six_month'],
+    ['12 "Month(s)" → twelve_month_annual', b(12, 'Month(s)') === 'twelve_month_annual'],
+    ['24 "Month(s)" → twenty_four_month', b(24, 'Month(s)') === 'twenty_four_month'],
+    ['1 "Year(s)" → twelve_month_annual', b(1, 'Year(s)') === 'twelve_month_annual'],
+    ['2 "Year(s)" → twenty_four_month', b(2, 'Year(s)') === 'twenty_four_month'],
+    ['8 "Week(s)" → unclassified (sub-month unit, not a band)', b(8, 'Week(s)') === 'unclassified'],
+    ['empty unit + len 6 → unclassified (unresolvable, honest)', b(6, '') === 'unclassified'],
+    ['0 + empty unit → month_to_month (zero-length short-circuit)', b(0, '') === 'month_to_month'],
+    // Bare "Month"/"Year" (no parenthetical) still work — normalization is a superset.
+    ['bare "Month" still → months', b(12, 'Month') === 'twelve_month_annual'],
+    ['2 "Month(s)" → unclassified (no 2-month band)', b(2, 'Month(s)') === 'unclassified'],
+    // Structured pack detection via membership_type (authoritative over any length).
+    ['membership_type "Class Pack" → non_commitment (even with 12-mo length)', b(12, 'Month(s)', { type: 'Class Pack' }) === 'non_commitment'],
+    ['membership_type "Appointment Pack" → non_commitment', b(undefined, 'Month(s)', { type: 'Appointment Pack' }) === 'non_commitment'],
+    ['membership_type "Class Plan" + 12 "Month(s)" → twelve (NOT a pack)', b(12, 'Month(s)', { type: 'Class Plan' }) === 'twelve_month_annual'],
+    // Name regex remains a fallback when membership_type is absent.
+    ['name-regex fallback: "Drop-in Pack" with no type → non_commitment', b(12, 'Month(s)', { type: '', planName: 'Drop-in Pack', mName: '10 Class Pack' }) === 'non_commitment'],
+    ['no plan data → unclassified', b(undefined, 'Month(s)') === 'unclassified'],
   ];
   const bandFailed = bandChecks.filter(([, ok]) => !ok).map(([n]) => n);
   if (bandFailed.length > 0) return fail(`band-classifier check(s): ${bandFailed.join(' | ')}`);
+
+  // Direct unit-normalization pins (independent of bandOf), so the "(s)" stripping can't silently regress.
+  const unitChecks: Array<[string, boolean]> = [
+    ['unitToMonths(12,"Month(s)") == 12', unitToMonths(12, 'Month(s)') === 12],
+    ['unitToMonths(1,"Year(s)") == 12', unitToMonths(1, 'Year(s)') === 12],
+    ['unitToMonths(8,"Week(s)") == null', unitToMonths(8, 'Week(s)') === null],
+    ['unitToMonths(6,"") == null', unitToMonths(6, '') === null],
+  ];
+  const unitFailed = unitChecks.filter(([, ok]) => !ok).map(([n]) => n);
+  if (unitFailed.length > 0) return fail(`unit-normalization check(s): ${unitFailed.join(' | ')}`);
 
   // Verdict-branch coverage — each branch fires on a crafted fixture.
   // (a) rate_ready: one 12-month band with a known base of 6 (>= the gate), full coverage, no swing/skew.
@@ -1151,11 +1256,36 @@ function runSelfTest(): void {
     TODAY, THRESHOLD,
   );
   const countsOnly = buildResult(baseClean, meta, THRESHOLD, true);
-  // (c) blocked coverage: active client with NO active membership row.
+  // (c) blocked coverage: the client's only row is BOTH not-is_active AND expired → low under BOTH signals.
   const lowCov = analyze(
     [client('9000001', 'Active', '2026-06-14')],
-    [membership('80000001', '9000001', { isActive: false, initLen: 12, initUnit: 'Month', start: '2024-01-01', end: '2025-01-01' })],
+    [membership('80000001', '9000001', { isActive: false, initLen: 12, start: '2024-01-01', end: '2025-01-01', doesExpire: true, expiration: '2025-01-01' })],
     TODAY, THRESHOLD,
+  );
+  // (f) DUAL SIGNAL — the two active signals diverge per row (Reviewer-required):
+  //   9000001: is_active FALSE but non-expiring → in force, NOT is_active.
+  //   9000002: is_active TRUE but expired → is_active, NOT in force.
+  const dual = buildResult(
+    analyze(
+      [client('9000001', 'Active', '2026-06-14'), client('9000002', 'Active', '2026-06-14')],
+      [
+        membership('80000001', '9000001', { isActive: false, initLen: 12, doesExpire: false }),
+        membership('80000002', '9000002', { isActive: true, initLen: 12, doesExpire: true, expiration: '2025-01-01' }),
+      ],
+      TODAY, THRESHOLD,
+    ),
+    meta, THRESHOLD, true,
+  );
+  // (g) SIGNAL DISAGREEMENT at the gate — all rows in force, none is_active → is_active coverage 0 (<gate),
+  // in-force coverage 1.0 (>=gate). Must flag 'active_membership_signal_ambiguous', NOT block on is_active.
+  const disagreeIds = ['9000001', '9000002', '9000003', '9000004', '9000005'];
+  const disagree = buildResult(
+    analyze(
+      disagreeIds.map((cid) => client(cid, 'Active', '2026-06-14')),
+      disagreeIds.map((cid, i) => membership(`8000000${i + 1}`, cid, { isActive: false, initLen: 12, doesExpire: false })),
+      TODAY, THRESHOLD,
+    ),
+    meta, THRESHOLD, true,
   );
   // (d) blocked collisions: half the joinable clients carry conflicting ACTIVE bands (checked before
   // instability, which this fixture also trips — precedence is part of the pin).
@@ -1191,6 +1321,15 @@ function runSelfTest(): void {
     ['reachedPageCap → coverageComplete false', buildResult(baseClean, { ...meta, reachedPageCap: true }, THRESHOLD, true).coverageComplete === false],
     ['memberships key unseen → coverageComplete false', buildResult(baseClean, { ...meta, membershipsRecordKeySeen: false }, THRESHOLD, true).coverageComplete === false],
     ['blocked scan cannot be rate_ready', buildResult(baseClean, { ...meta, membershipsHttpStatusClass: '4xx' }, THRESHOLD, true).verdict !== 'rate_ready'],
+    // (f) dual signal — in-force counts the is_active:false-but-unexpired row; is_active counts the
+    // is_active:true-but-expired row; the intersection counts neither.
+    ['dual: is_active coverage counts only the active-but-expired client (1)', dual.activeClientsWithActiveMembershipRow === 1],
+    ['dual: in-force coverage counts only the inactive-but-unexpired client (1)', dual.activeClientsWithInForceMembershipRow === 1],
+    ['dual: intersection counts neither (0)', dual.activeClientsWithBothSignalsMembershipRow === 0],
+    // (g) signal disagreement → flag, do NOT block on the unvalidated is_active signal.
+    ['disagree: is_active coverage 0.0, in-force 1.0', disagree.activeMembershipCoverageShareIsActive === 0 && disagree.activeMembershipCoverageShareInForce === 1],
+    ['disagree: verdict counts_only_possible (not blocked_low_membership_coverage)', disagree.verdict === 'counts_only_possible'],
+    ['disagree: reason active_membership_signal_ambiguous present', disagree.readinessReasons.includes('active_membership_signal_ambiguous')],
   ];
   const branchFailed = branchChecks.filter(([, ok]) => !ok).map(([n]) => n);
   if (branchFailed.length > 0) return fail(`verdict-branch check(s): ${branchFailed.join(' | ')}`);
@@ -1206,13 +1345,14 @@ function runSelfTest(): void {
 
   console.log(serialized);
   console.log(
-    'SELFTEST PASS: all FOUR locked-classifier buckets preserved (sentinel-1900 and empty dates land ' +
-      'unknown — never non-silent, never in the attendance-known base); per-band known-base denominators ' +
-      '(watch in, unknown out) pinned by exact rate values under BOTH assignment rules; coverage skew ' +
-      'compares silent vs attendance-KNOWN non-silent with unknown coverage its own number; rate gating ' +
-      '(below-minimum + unknown-majority) withholds rates while counts still emit; collisions, assignment ' +
-      'delta, pack/pass exclusion, hold-keeps-band, and verdict branches all correct; no planted ' +
-      'PII/date/id/token leaked; no file or network touched.',
+    'SELFTEST PASS: unit vocab "Month(s)"/"Year(s)"/"Week(s)"/empty maps correctly (the #517 VOID fix — the ' +
+      'whole main fixture is an end-to-end proof); packs detected via the structured membership_type field ' +
+      '(name regex as fallback); NO hold field on /memberships → holdSignalExposed honestly false; DUAL ' +
+      'active-signal coverage reported under is_active AND expiration-derived in-force AND their intersection, ' +
+      'with a not-yet-expired-but-inactive row counted in force and vice versa, and a signal disagreement ' +
+      'flagged (not blocked) rather than trusting is_active; all four classifier buckets + known-base rate ' +
+      'gating + collisions + assignment delta + verdict branches still correct; no planted PII/date/id/token ' +
+      'leaked; no file or network touched.',
   );
 }
 
