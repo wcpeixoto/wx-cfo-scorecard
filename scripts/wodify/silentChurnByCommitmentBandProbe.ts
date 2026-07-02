@@ -500,6 +500,7 @@ interface AnalysisCounts {
   silentMembersChangingBand: number;
   bandStatsActiveOnly: Record<ResolvedBand, BandCounts>; // active-only rule under the is_active signal.
   bandStatsActiveOnlyInForce: Record<ResolvedBand, BandCounts>; // active-only rule under the in-force signal.
+  bandStatsActiveOnlyMostRecent: Record<ResolvedBand, BandCounts>; // active-only + most-recent tiebreak (the card rule).
   bandStatsMostRecent: Record<ResolvedBand, BandCounts>;
   clientRecordsScanned: number;
   membershipRecordsScanned: number;
@@ -522,6 +523,31 @@ function resolveBand(rows: MembershipRow[]): ResolvedBand {
   const distinct = new Set(rows.map((r) => r.band));
   if (distinct.size === 1) return [...distinct][0];
   return 'conflicting';
+}
+
+// Most-recent-first ordering for membership rows: a date-eligible row (non-null sortDate) outranks a date-less
+// one; then by start/else end/expiration date DESC; ties broken by later original row order (index desc). This
+// is the SAME rule the most-recent fallback in analyze() uses (extracted so the active-only-most-recent card
+// build reuses it verbatim — no drift). On the non-null-only list analyze() feeds it, behavior is identical to
+// the previous inline comparator; the mostRecent selftest pins guard that.
+function compareMostRecent(a: MembershipRow, b: MembershipRow): number {
+  if (a.sortDate !== b.sortDate) {
+    if (a.sortDate === null) return 1; // nulls last.
+    if (b.sortDate === null) return -1;
+    return a.sortDate < b.sortDate ? 1 : -1; // date desc.
+  }
+  return a.index < b.index ? 1 : -1; // later original row wins the tie.
+}
+
+// Card assignment rule (locked): "active-membership-only band with a most-recent tiebreak". Assign from the
+// is_active rows ONLY; a single distinct band wins outright; multiple active rows that DISAGREE are resolved to
+// the MOST-RECENT active row's band (never left 'conflicting' — the card must place every active-membership
+// client in exactly one band). No active row → 'unassignable' (the client has no current commitment membership).
+function resolveActiveBandMostRecent(activeRows: MembershipRow[]): ResolvedBand {
+  if (activeRows.length === 0) return 'unassignable';
+  const distinct = new Set(activeRows.map((r) => r.band));
+  if (distinct.size === 1) return [...distinct][0];
+  return [...activeRows].sort(compareMostRecent)[0].band;
 }
 
 function analyze(
@@ -582,6 +608,7 @@ function analyze(
     silentMembersChangingBand: 0,
     bandStatsActiveOnly: freshBandCounts(),
     bandStatsActiveOnlyInForce: freshBandCounts(),
+    bandStatsActiveOnlyMostRecent: freshBandCounts(),
     bandStatsMostRecent: freshBandCounts(),
     clientRecordsScanned,
     membershipRecordsScanned,
@@ -630,12 +657,12 @@ function analyze(
     if (eligible.length === 0) {
       fallbackBand = 'unassignable';
     } else {
-      eligible.sort((a, b) => {
-        if (a.sortDate! !== b.sortDate!) return a.sortDate! < b.sortDate! ? 1 : -1; // start/end desc.
-        return a.index < b.index ? 1 : -1; // stable: later original row wins the tie.
-      });
+      eligible.sort(compareMostRecent); // start/else end desc; ties → later original row.
       fallbackBand = eligible[0].band;
     }
+    // Card rule (active-membership-only + most-recent tiebreak). Reuses the is_active rows already filtered
+    // above; multi-active disagreements resolve to the most-recent active band instead of 'conflicting'.
+    const activeMostRecentBand = resolveActiveBandMostRecent(activeRowsIsActive);
 
     // (4) Collisions. A "conflicting band" is scoped to the CURRENTLY-ACTIVE (is_active) rows (the live-
     // blocking case that forces an arbitrary pick now); a purely HISTORICAL band change surfaces as a delta.
@@ -652,6 +679,7 @@ function analyze(
     };
     bump(counts.bandStatsActiveOnly, activeOnlyBand);
     bump(counts.bandStatsActiveOnlyInForce, inForceBand);
+    bump(counts.bandStatsActiveOnlyMostRecent, activeMostRecentBand);
     bump(counts.bandStatsMostRecent, fallbackBand);
     // Band DELTA = both rules can place the member but disagree (incl. active-only 'conflicting' the fallback
     // resolves to one band). A member unassignable under a rule is a COVERAGE gap, reported above — not a swing.
@@ -1119,6 +1147,12 @@ function runSelfTest(): void {
   const bandsConserve = (bands: Record<ResolvedBand, BandDetail>): boolean =>
     ALL_RESOLVED_BANDS.every((k) => bands[k].attendanceKnown + bands[k].unknownAttendance === bands[k].totalActive);
 
+  // The card rule map (active-only + most-recent tiebreak) — a BandCounts map on `counts`, not on the
+  // ProbeResult. The card build reshapes THIS map into the table rows, so pin it end-to-end here.
+  const bMR = counts.bandStatsActiveOnlyMostRecent;
+  const bMRSum = ALL_RESOLVED_BANDS.reduce((s, k) => s + bMR[k].totalActive, 0);
+  const bMRConserves = ALL_RESOLVED_BANDS.every((k) => bMR[k].attendanceKnown + bMR[k].unknownAttendance === bMR[k].totalActive);
+
   const checks: Array<[string, boolean]> = [
     // Classifier split — ALL FOUR buckets preserved; inactive client excluded; unknown NOT non-silent.
     ['activeClientsTotal == 14 (inactive client excluded)', result.activeClientsTotal === 14],
@@ -1162,6 +1196,16 @@ function runSelfTest(): void {
     ['twelve mostRecent {4, 4, 0, 2} (9000003 + 9000007 fall back in)', bM.twelve_month_annual.totalActive === 4 && bM.twelve_month_annual.attendanceKnown === 4 && bM.twelve_month_annual.silentCount === 2],
     ['six mostRecent == 2 (9000004 + 9000005 tie→later row)', bM.six_month.totalActive === 2],
     ['activeOnly conflicting == 1 (9000005) / three == 1 / six == 1 / pack == 1', bA.conflicting.totalActive === 1 && bA.three_month.totalActive === 1 && bA.six_month.totalActive === 1 && bA.non_commitment.totalActive === 1],
+    // Card rule (active-only + most-recent tiebreak): 9000005's conflicting 3mo+6mo resolves to the most-recent
+    // active row (tie on start → later row → six_month), so conflicting == 0 and six == 2 (with 9000004).
+    ['card-rule totals sum to 14', bMRSum === 14],
+    ['card-rule per-band known+unknown == total (conserves)', bMRConserves],
+    ['card-rule conflicting == 0 (multi-active resolved by most-recent tiebreak)', bMR.conflicting.totalActive === 0],
+    ['card-rule six_month == 2 (9000004 + 9000005-resolved)', bMR.six_month.totalActive === 2],
+    ['card-rule three_month == 1 (9000007 single active)', bMR.three_month.totalActive === 1],
+    ['card-rule twelve == 2 (9000001 + 9000008) / pack == 1 (9000006)', bMR.twelve_month_annual.totalActive === 2 && bMR.non_commitment.totalActive === 1],
+    ['card-rule m2m unchanged {6,5,1,1} vs activeOnly (single-active clients do not move)', bMR.month_to_month.totalActive === 6 && bMR.month_to_month.attendanceKnown === 5 && bMR.month_to_month.unknownAttendance === 1 && bMR.month_to_month.silentCount === 1],
+    ['card-rule unassignable == 2 (9000003 no-active + 9000014 no-rows); no rate on pseudo-band', bMR.unassignable.totalActive === 2],
     // Unknown-by-band emitted under BOTH rules; pseudo-bands never carry a rate.
     ['unassignable activeOnly {2, 1, 1, 1} (9000003 silent-historical + 9000014 unknown-no-rows)', bA.unassignable.totalActive === 2 && bA.unassignable.attendanceKnown === 1 && bA.unassignable.unknownAttendance === 1 && bA.unassignable.silentCount === 1],
     ['unassignable mostRecent {1, 0, 1, 0} (only 9000014 has no dated row anywhere)', bM.unassignable.totalActive === 1 && bM.unassignable.unknownAttendance === 1],
@@ -1399,8 +1443,36 @@ async function main(): Promise<void> {
   emit(buildResult(counts, meta, threshold, true));
 }
 
-main().catch(() => {
-  // Never surface raw error detail (it can echo URL / headers). Emit a generic, safe line only.
-  console.error('silent-churn-by-commitment-band probe failed before producing a result (no data emitted).');
-  process.exit(1);
-});
+// Pure logic + the safe network/aggregation layer are exported so the GATED Slice-1 build
+// (buildSilentChurnByCommitmentBand.ts) reuses the SAME validated classifier / unit-vocab / pack-detection /
+// band-assignment / leak-guard — no duplicated logic, no drift (the beltProgressionJoinProbe → build pattern).
+// main() runs ONLY on direct exec (guarded below) so an import never fires a network pull.
+export {
+  analyze,
+  buildResult,
+  bandOf,
+  unitToMonths,
+  resolveActiveBandMostRecent,
+  compareMostRecent,
+  fetchAll,
+  gymLocalAsOf,
+  leaks,
+  freshMeta,
+  COMMITMENT_BANDS,
+  ALL_RESOLVED_BANDS,
+  CLIENTS_PATH,
+  MEMBERSHIPS_PATH,
+  CLIENTS_RECORD_ARRAY_KEYS,
+  MEMBERSHIPS_RECORD_ARRAY_KEYS,
+  MIN_BAND_KNOWN_DENOMINATOR,
+};
+export type { ProbeResult, AnalysisCounts, BandCounts, CommitmentBand, ResolvedBand, TransportMeta };
+
+const invokedDirectly = !!process.argv[1] && process.argv[1].endsWith('silentChurnByCommitmentBandProbe.ts');
+if (invokedDirectly) {
+  main().catch(() => {
+    // Never surface raw error detail (it can echo URL / headers). Emit a generic, safe line only.
+    console.error('silent-churn-by-commitment-band probe failed before producing a result (no data emitted).');
+    process.exit(1);
+  });
+}
