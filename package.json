@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:belt-fn-bundle": "node scripts/checkBeltFnBundle.mjs"
   },
   "dependencies": {
     "apexcharts": "^5.10.4",
@@ -22,6 +23,7 @@
     "@types/react": "^18.3.8",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "esbuild": "^0.21.5",
     "typescript": "^5.5.4",
     "vite": "^5.4.0",
     "vitest": "^2.1.9"
