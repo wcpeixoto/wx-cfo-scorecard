@@ -36,135 +36,21 @@ import {
   parsePrevious,
   analyze,
   scanForLeak,
+  buildBeltPayload,
+  canonicalize,
   type ProbeResult,
-} from './beltProgressionJoinProbe.ts';
+  type PayloadRow,
+  type BeltPayload,
+} from '../../src/lib/gym/beltRetentionAggregate.ts';
 
-const WORKSPACE_ID = 'default';
-
-// Locked segment → belt_band allowlist, in canonical emit order. MUST match the DDL
-// member_retention_by_belt_band_chk constraint exactly (SQL ↔ build cannot drift).
-const SCHEMA_SEGMENT_BAND_ALLOWLIST: { segment: string; bands: string[] }[] = [
-  { segment: 'adults', bands: ['White', 'Blue', 'Purple', 'Brown+Black'] },
-  { segment: 'kids', bands: ['White', 'Grey-family', 'Yellow+Orange'] },
-  { segment: 'unknown', bands: ['unknown'] },
-];
-
-// (segment, belt_band) → the probe's Tier-2 active/churn matrix label.
-function tier2Label(segment: string, band: string): string {
-  if (segment === 'adults') return `Adults: ${band}`;
-  if (segment === 'kids') return `Kids: ${band}`;
-  return 'unknown'; // segment 'unknown' is sourced from the unknown lines, not the band matrices
-}
-
-interface PayloadRow {
-  workspace_id: string;
-  period_month: string;
-  segment: string;
-  belt_band: string;
-  active_count: number;
-  lost_count: number;
-}
-interface MonthConservation {
-  month: string;
-  activeSum: number;
-  activeExpected: number;
-  activeOk: boolean;
-  lostSum: number;
-  lostExpected: number;
-  lostOk: boolean;
-}
-interface BuildOutput {
-  table: 'member_retention_by_belt';
-  workspace_id: string;
-  months: string[];
-  nameBridge69: ProbeResult['nameBridge69'] & { collisionFree: boolean };
-  rowCount: number;
-  rows: PayloadRow[];
-  conservation: { perMonth: MonthConservation[]; allActiveOk: boolean; allLostOk: boolean };
-  payloadSha256: string;
-}
-
-// Stable serialization for hashing: rows sorted + fixed key order.
-function canonicalize(rows: PayloadRow[]): string {
-  const sorted = [...rows].sort((a, b) =>
-    a.segment !== b.segment
-      ? a.segment.localeCompare(b.segment)
-      : a.belt_band !== b.belt_band
-        ? a.belt_band.localeCompare(b.belt_band)
-        : a.period_month.localeCompare(b.period_month),
-  );
-  return JSON.stringify(
-    sorted.map((r) => [r.workspace_id, r.period_month, r.segment, r.belt_band, r.active_count, r.lost_count]),
-  );
-}
+// The persisted payload = the pure BeltPayload (rows + conservation + name-bridge, from the shared src
+// module) PLUS the sha256 integrity hash. node:crypto stays HERE in the CLI wrapper, out of the pure module;
+// BuildOutput's shape is UNCHANGED from before the Slice-1 extraction (byte-identical stdout).
+type BuildOutput = BeltPayload & { payloadSha256: string };
 
 function buildPayload(res: ProbeResult): BuildOutput {
-  const months = res.months;
-  const n = months.length;
-
-  // Index the probe's Tier-2 matrices by label for O(1) lookup; absent label/month → 0.
-  const activeByLabel = new Map<string, number[]>();
-  for (const r of res.tier2Banding.active) activeByLabel.set(r.label, r.byMonth);
-  const churnByLabel = new Map<string, number[]>();
-  for (const r of res.tier2Banding.churn) churnByLabel.set(r.label, r.byMonth);
-  const at = (m: Map<string, number[]>, label: string, mi: number): number => m.get(label)?.[mi] ?? 0;
-
-  // Emit the full deterministic grid: every allowlisted (segment, band) × month, plus unknown × month.
-  const rows: PayloadRow[] = [];
-  for (const { segment, bands } of SCHEMA_SEGMENT_BAND_ALLOWLIST) {
-    for (const band of bands) {
-      for (let mi = 0; mi < n; mi++) {
-        const active =
-          segment === 'unknown' ? res.tier2Banding.activeUnknownByMonth[mi] : at(activeByLabel, tier2Label(segment, band), mi);
-        const lost =
-          segment === 'unknown' ? res.tier2Banding.churnUnknownByMonth[mi] : at(churnByLabel, tier2Label(segment, band), mi);
-        rows.push({
-          workspace_id: WORKSPACE_ID,
-          period_month: months[mi],
-          segment,
-          belt_band: band,
-          active_count: active,
-          lost_count: lost,
-        });
-      }
-    }
-  }
-
-  // Two CONSERVATION checks per month: Σ active (all bands + unknown) ties the active-panel total; Σ lost
-  // (all bands + unknown) ties total retention Lost. These prove the reshape neither drops nor double-counts.
-  const perMonth: MonthConservation[] = months.map((month, mi) => {
-    const monthRows = rows.filter((r) => r.period_month === month);
-    const activeSum = monthRows.reduce((s, r) => s + r.active_count, 0);
-    const lostSum = monthRows.reduce((s, r) => s + r.lost_count, 0);
-    const activeExpected = res.reconstruction.perMonth[mi].activeMembers;
-    const lostExpected = res.churnSuppression.lostTotalByMonth[mi];
-    return {
-      month,
-      activeSum,
-      activeExpected,
-      activeOk: activeSum === activeExpected,
-      lostSum,
-      lostExpected,
-      lostOk: lostSum === lostExpected,
-    };
-  });
-
-  const collisionFree = res.nameBridge69.ambiguousNames === 0 && res.nameBridge69.unmatchedNames === 0;
-
-  return {
-    table: 'member_retention_by_belt',
-    workspace_id: WORKSPACE_ID,
-    months,
-    nameBridge69: { ...res.nameBridge69, collisionFree },
-    rowCount: rows.length,
-    rows,
-    conservation: {
-      perMonth,
-      allActiveOk: perMonth.every((p) => p.activeOk),
-      allLostOk: perMonth.every((p) => p.lostOk),
-    },
-    payloadSha256: createHash('sha256').update(canonicalize(rows)).digest('hex'),
-  };
+  const payload = buildBeltPayload(res);
+  return { ...payload, payloadSha256: createHash('sha256').update(canonicalize(payload.rows)).digest('hex') };
 }
 
 // ─── SELF-TEST (network-free; synthetic 3-source; reshape + conservation + sha stability + leak) ─────
