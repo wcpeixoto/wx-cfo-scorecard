@@ -8,7 +8,17 @@ Every item carries the canonical three fields — **Result** (what changes for t
 
 ---
 
-## Retention (priority) (5 active + 2 shipped)
+## Retention (priority) (5 active + 1 parked + 2 shipped)
+
+### Silent Churn by commitment band — ⏸ PARKED
+
+**Status / Priority:** Retention (priority) · ⏸ PARKED (owner, 2026-07-02) — Phase-0 feasibility CLEARED; deferred, not abandoned.
+
+Result: An owner-dashboard card breaking Silent Churn down by membership commitment length (month-to-month / 3 / 6 / 12 / 24-month, plus packs as a separate non-commitment row) — counts per band + an indicative silent-rate where the attendance-known base ≥ 5. Shows whether longer commitments retain better.
+
+Why: Phase-0 probing (#517/#519) showed the signal is real and directional — silent-churn rate falls as commitment lengthens; packs are worst. Turns Silent Churn from one number into a retention-by-plan read.
+
+Premise / status: Feasibility CLEARED over the attendance-known base (~95% coverage; the probe's earlier "blocked" verdict was over the wrong full-base denominator that included guardian/billing accounts). FOUR decisions LOCKED (2026-07-02): (1) churn def = attendance-silent v1 (locked classifier); termination/renewal churn = Phase 2, blocked on a separate renewal-semantics probe. (2) assignment = active-membership-only, most-recent tiebreak (in-force rejected — inflates conflicts; coverage lens only). (3) output = counts per band + INDICATIVE silent-rate on known≥5 bands, rate NULL where known<5, counts always shown (aggregate-count policy, no <5 masking). (4) banding = 5 commitment bands + packs as a separate non_commitment row (excluded from band denominators); guardian/unknown-attendance excluded. Data-layer (dry-run build + gated non-PII table DDL, anon-SELECT only, mirrors member_retention_by_belt) was built and Reviewer-PASSED as PR #521 but CLOSED UNMERGED on park — recoverable from the closed PR. The #519 probe (scripts/wodify/silentChurnByCommitmentBandProbe.ts) stays on main as the resume artifact. OPEN owner decision on resume: the ~⅔ of active clients with no current active-membership row ("unassignable") — keep the 7-row table (unassignable in coverage only) vs add a no_active_membership 8th band row. Resume = reopen/rebuild from #521 → gated migration-apply + first --commit write (two-AI) → Slice 2 card (reads the pre-aggregated table only; no member-level data in the SPA).
 
 ### Churn-evolution chart — SEGMENT (age-cohort) toggle (Phase 2)
 
