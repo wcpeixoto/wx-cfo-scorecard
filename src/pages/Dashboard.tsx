@@ -67,6 +67,15 @@ import {
 import { fetchMemberRetentionRates } from '../lib/gym/fetchMemberRetentionRates';
 import type { RetentionMonth } from '../lib/gym/memberRetentionSeries';
 import {
+  postBeltImport,
+  beltRejectMessage,
+  detectBeltSourceKind,
+  isBeltImportConfigured,
+  BeltImportError,
+  type BeltImportSummary,
+  type Kind as BeltSourceKind,
+} from '../lib/gym/beltRetentionImportClient';
+import {
   clearPossibleDuplicateReview,
   isPossibleDuplicateReviewed,
   readPossibleDuplicateReview,
@@ -790,6 +799,22 @@ function DashboardSkeleton() {
   );
 }
 
+// Churn-by-Belt importer (Slice 3) — the three ordered upload slots and the advisory
+// detected-kind chip labels. `key` matches the source Kind so a detected kind that
+// differs from the slot flags an advisory (chip only; the server re-classifies).
+type BeltSlotKey = 'retention' | 'current68' | 'previous69';
+const BELT_IMPORT_SLOTS: { key: BeltSlotKey; label: string }[] = [
+  { key: 'retention', label: 'Member Retention (client grain)' },
+  { key: 'current68', label: 'Progressions Current (report 68)' },
+  { key: 'previous69', label: 'Progressions Previous (report 69)' },
+];
+const BELT_KIND_LABELS: Record<BeltSourceKind, string> = {
+  retention: 'Member Retention',
+  current68: 'Progressions Current (68)',
+  previous69: 'Progressions Previous (69)',
+  unknown: 'Unrecognized',
+};
+
 export default function Dashboard() {
   const bootT0Ref = useRef(performance.now());
   const bootPhaseLoggedRef = useRef<Record<string, boolean>>({});
@@ -816,6 +841,27 @@ export default function Dashboard() {
   const [retentionImportBusy, setRetentionImportBusy] = useState(false);
   const [retentionImportError, setRetentionImportError] = useState<string | null>(null);
   const [retentionImportDone, setRetentionImportDone] = useState<{ count: number; firstMonth: string; lastMonth: string } | null>(null);
+  // Churn-by-Belt upload (Settings → Data, Slice 3) — three raw Wodify exports POSTed to the
+  // gated sync-belt-retention edge function. SECURITY: file bytes + the import secret are
+  // TRANSIENT in React state only — never persisted (no localStorage/sessionStorage/IndexedDB)
+  // and never rendered/logged. Advisory detected-kind is header-line only. Counts-only response.
+  const beltImportRetentionRef = useRef<HTMLInputElement>(null);
+  const beltImportCurrent68Ref = useRef<HTMLInputElement>(null);
+  const beltImportPrevious69Ref = useRef<HTMLInputElement>(null);
+  const [beltImportFiles, setBeltImportFiles] = useState<Record<BeltSlotKey, File | null>>({
+    retention: null,
+    current68: null,
+    previous69: null,
+  });
+  const [beltImportKinds, setBeltImportKinds] = useState<Record<BeltSlotKey, BeltSourceKind | null>>({
+    retention: null,
+    current68: null,
+    previous69: null,
+  });
+  const [beltImportSecret, setBeltImportSecret] = useState('');
+  const [beltImportBusy, setBeltImportBusy] = useState(false);
+  const [beltImportError, setBeltImportError] = useState<string | null>(null);
+  const [beltImportSummary, setBeltImportSummary] = useState<BeltImportSummary | null>(null);
   const [bootLoadError, setBootLoadError] = useState<string | null>(null);
   const [lastImportSummary, setLastImportSummary] = useState<TransactionImportSummary | null>(null);
   const [importExamples, setImportExamples] = useState<{
@@ -2857,6 +2903,68 @@ export default function Dashboard() {
     setRetentionImportError(null);
   }, []);
 
+  // ── Churn-by-Belt upload handlers (Slice 3) ──────────────────────────────────
+  const beltImportRefs: Record<BeltSlotKey, React.RefObject<HTMLInputElement>> = {
+    retention: beltImportRetentionRef,
+    current68: beltImportCurrent68Ref,
+    previous69: beltImportPrevious69Ref,
+  };
+  const beltImportReady =
+    beltImportFiles.retention !== null &&
+    beltImportFiles.current68 !== null &&
+    beltImportFiles.previous69 !== null &&
+    beltImportSecret.length > 0;
+  const beltImportConfigured = isBeltImportConfigured();
+
+  const handleBeltFileSelected = useCallback(async (key: BeltSlotKey, event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = ''; // allow re-selecting the same filename
+    if (!file) return;
+    setBeltImportError(null);
+    setBeltImportSummary(null);
+    setBeltImportFiles((prev) => ({ ...prev, [key]: file }));
+    // Advisory detected-kind: read the HEADER LINE only (never the rows, never rendered).
+    try {
+      const headerText = await file.slice(0, 65536).text();
+      const headerLine = headerText.split(/\r?\n/, 1)[0] ?? '';
+      setBeltImportKinds((prev) => ({ ...prev, [key]: detectBeltSourceKind(headerLine) }));
+    } catch {
+      setBeltImportKinds((prev) => ({ ...prev, [key]: null }));
+    }
+  }, []);
+
+  const handleRunBeltImport = useCallback(async () => {
+    const { retention, current68, previous69 } = beltImportFiles;
+    if (!retention || !current68 || !previous69 || beltImportSecret.length === 0) return;
+    setBeltImportBusy(true);
+    setBeltImportError(null);
+    setBeltImportSummary(null);
+    try {
+      const summary = await postBeltImport({ retention, current68, previous69 }, beltImportSecret);
+      setBeltImportSummary(summary);
+      setBeltImportSecret(''); // clear the transient secret after a successful POST
+    } catch (err) {
+      if (err instanceof BeltImportError) {
+        setBeltImportError(beltRejectMessage(err.code));
+      } else {
+        setBeltImportError('Couldn’t reach the import service. Check your connection and try again.');
+      }
+    } finally {
+      setBeltImportBusy(false);
+    }
+  }, [beltImportFiles, beltImportSecret]);
+
+  const handleResetBeltImport = useCallback(() => {
+    setBeltImportFiles({ retention: null, current68: null, previous69: null });
+    setBeltImportKinds({ retention: null, current68: null, previous69: null });
+    setBeltImportSecret('');
+    setBeltImportError(null);
+    setBeltImportSummary(null);
+  }, []);
+
+  // Belt-and-suspenders: clear the transient secret on unmount (it is never persisted).
+  useEffect(() => () => setBeltImportSecret(''), []);
+
   const handleClearImportedData = useCallback(async () => {
     setImportLoading(true);
     setImportError(null);
@@ -4283,6 +4391,147 @@ export default function Dashboard() {
                             >
                               Cancel
                             </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* Churn by Belt import card — three raw Wodify exports → the gated
+                      sync-belt-retention edge function. Single gated submit (server is
+                      authoritative — no preview/confirm). Secret + file bytes stay in
+                      memory only; the counts-only response is safe to render. */}
+                  <div className="ta-card">
+                    <div className="ta-card-header">
+                      <h3 className="ta-card-title">Churn by Belt</h3>
+                    </div>
+                    <div className="ta-card-body">
+                      <div className="card-head">
+                        <p className="subtle">
+                          Upload the three raw Wodify exports — Member Retention (client grain),
+                          Progressions Current (report 68), and Progressions Previous (report 69) — to
+                          refresh the belt-band retention grid. Enter your import code, then run it.
+                          Files and the code stay in memory only; nothing is saved in your browser, and
+                          the server returns counts only.
+                        </p>
+                      </div>
+
+                      <div className="belt-import-slots">
+                        {BELT_IMPORT_SLOTS.map((slot) => {
+                          const file = beltImportFiles[slot.key];
+                          const kind = beltImportKinds[slot.key];
+                          const kindMismatch = file !== null && kind !== null && kind !== slot.key;
+                          return (
+                            <div className="belt-import-slot" key={slot.key}>
+                              <input
+                                ref={beltImportRefs[slot.key]}
+                                type="file"
+                                accept=".csv,text/csv"
+                                className="sr-only"
+                                onChange={(event) => void handleBeltFileSelected(slot.key, event)}
+                              />
+                              <div className="belt-import-slot-head">
+                                <span className="belt-import-slot-label">{slot.label}</span>
+                                {file && kind ? (
+                                  <span className={`belt-import-chip${kindMismatch ? ' belt-import-chip--warn' : ''}`}>
+                                    {BELT_KIND_LABELS[kind]}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="settings-actions">
+                                <button
+                                  type="button"
+                                  className="ghost-btn"
+                                  onClick={() => beltImportRefs[slot.key].current?.click()}
+                                  disabled={beltImportBusy}
+                                >
+                                  {file ? 'Replace file' : 'Choose file'}
+                                </button>
+                              </div>
+                              {file ? <p className="belt-import-filename">{file.name}</p> : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="belt-import-secret">
+                        <label className="event-form-label" htmlFor="belt-import-secret-input">
+                          Import code
+                        </label>
+                        <input
+                          id="belt-import-secret-input"
+                          className="event-form-input"
+                          type="password"
+                          autoComplete="off"
+                          value={beltImportSecret}
+                          onChange={(event) => setBeltImportSecret(event.target.value)}
+                          disabled={beltImportBusy}
+                          placeholder="Enter your import code"
+                        />
+                      </div>
+
+                      {!beltImportConfigured ? (
+                        <p className="subtle">
+                          Import is unavailable — this build has no Supabase connection configured.
+                        </p>
+                      ) : null}
+
+                      <div className="settings-actions">
+                        <button
+                          type="button"
+                          onClick={() => void handleRunBeltImport()}
+                          disabled={beltImportBusy || !beltImportReady || !beltImportConfigured}
+                        >
+                          {beltImportBusy ? 'Importing…' : 'Run belt import'}
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={handleResetBeltImport}
+                          disabled={beltImportBusy}
+                        >
+                          Reset
+                        </button>
+                      </div>
+
+                      {beltImportError ? <p className="settings-error">{beltImportError}</p> : null}
+
+                      {beltImportSummary ? (
+                        <div className="import-summary">
+                          <p className="subtle">Imported — the belt-band retention grid was updated.</p>
+                          <div className="import-summary-grid">
+                            <div>
+                              <span className="import-summary-label">Rows written</span>
+                              <strong>{beltImportSummary.rowCount}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">Months</span>
+                              <strong>{beltImportSummary.months}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">Month range</span>
+                              <strong>
+                                {beltImportSummary.monthLabels.length
+                                  ? beltImportSummary.monthLabels.map((m) => toMonthLabel(m)).join(', ')
+                                  : '—'}
+                              </strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">Conservation</span>
+                              <strong>{beltImportSummary.conservationOk ? 'OK' : 'Failed'}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">Name bridge</span>
+                              <strong>{beltImportSummary.bridgeCollisionFree ? 'Collision-free' : 'Collision'}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">Ambiguous names</span>
+                              <strong>{beltImportSummary.ambiguousNames}</strong>
+                            </div>
+                            <div>
+                              <span className="import-summary-label">Unmatched names</span>
+                              <strong>{beltImportSummary.unmatchedNames}</strong>
+                            </div>
                           </div>
                         </div>
                       ) : null}

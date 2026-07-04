@@ -40,8 +40,11 @@
 // of member data — sanitized reject codes only; the multipart body is never
 // logged and is never written to Storage or any bucket.
 //
-// CORS / OPTIONS preflight is intentionally OUT OF SCOPE this pass (deferred to
-// the Slice 3 UI); no permissive CORS path is added here.
+// CORS / OPTIONS preflight (Slice 3): the SPA sends custom headers, so the browser
+// preflights with OPTIONS and needs CORS headers on every response to read the body.
+// Handled by a NARROW allowlist (corsHeadersFor in beltRetentionUpload.ts) — never
+// `*`. CORS is browser-UX only; the trigger secret + service-role posture remain the
+// security gate (a non-browser client ignores CORS).
 //
 // GATED: not invoked live in this PR. First live invoke requires a Reviewer audit
 // + Wesley's explicit authorization to set BELT_IMPORT_TRIGGER_SECRET and run it
@@ -50,6 +53,7 @@
 import {
   aggregateUpload,
   classifyUploads,
+  corsHeadersFor,
   exceedsSizeCap,
   verifyImportSecret,
   MAX_FILE_BYTES,
@@ -64,15 +68,17 @@ const BELT_TABLE = 'member_retention_by_belt';
 // thousands of parts can't exhaust memory before the size cap is evaluated.
 const MAX_FILE_PARTS = 3;
 
-function jsonResponse(status: number, body: unknown): Response {
+// Every response carries the CORS headers for the caller's Origin — the browser
+// blocks reading even a 200 body (or an error JSON) without them.
+function jsonResponse(status: number, body: unknown, cors: Record<string, string>): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...cors },
   });
 }
 
-function reject(status: number, code: UploadRejectCode): Response {
-  return jsonResponse(status, { error: code });
+function reject(status: number, code: UploadRejectCode, cors: Record<string, string>): Response {
+  return jsonResponse(status, { error: code }, cors);
 }
 
 // Persist the NON-PII per-band grid via the Supabase REST API using the
@@ -113,10 +119,19 @@ async function persistBeltPayload(
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  // 1. Method guard FIRST — non-POST short-circuits before ANY secret / env /
-  //    parse work. (CORS/OPTIONS is deferred to Slice 3; no preflight branch.)
+  // CORS headers for this caller's Origin — attached to EVERY response below so the
+  // browser can read the 200 body and every error JSON. Narrow allowlist, not `*`.
+  const cors = corsHeadersFor(req.headers.get('Origin'));
+
+  // 0. OPTIONS preflight FIRST — before the method guard 405s it. A 204 with the
+  //    CORS headers lets the browser proceed to the real POST. No body, no work.
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors });
+  }
+
+  // 1. Method guard — non-POST short-circuits before ANY secret / env / parse work.
   if (req.method !== 'POST') {
-    return reject(405, 'method_not_allowed');
+    return reject(405, 'method_not_allowed', cors);
   }
 
   // 2. Structural trigger gate — a NEW secret distinct from SYNC_TRIGGER_SECRET,
@@ -125,13 +140,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
   //    upload. FAIL CLOSED if it is not configured server-side.
   const triggerSecret = Deno.env.get('BELT_IMPORT_TRIGGER_SECRET');
   if (!triggerSecret) {
-    return reject(500, 'internal_error');
+    return reject(500, 'internal_error', cors);
   }
   // Constant-time compare of the provided header against the secret. Missing or
   // mismatched → generic 403 (never reveal which). No PARSING before this passes.
   const providedSecret = req.headers.get('x-belt-import-trigger-secret') ?? '';
   if (!(await verifyImportSecret(triggerSecret, providedSecret))) {
-    return reject(403, 'forbidden');
+    return reject(403, 'forbidden', cors);
   }
 
   try {
@@ -144,7 +159,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       form = await req.formData();
     } catch {
       // Not a well-formed multipart body (or wrong content-type).
-      return reject(400, 'bad_multipart');
+      return reject(400, 'bad_multipart', cors);
     }
 
     const files: File[] = [];
@@ -156,10 +171,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
     if (files.length !== MAX_FILE_PARTS) {
       // Need exactly three file parts; fewer/more (after the early break) → reject.
-      return reject(400, 'bad_multipart');
+      return reject(400, 'bad_multipart', cors);
     }
     if (exceedsSizeCap(files.map((f) => f.size))) {
-      return reject(413, 'payload_too_large');
+      return reject(413, 'payload_too_large', cors);
     }
 
     // Only now, after the cap passes, materialize the text.
@@ -169,7 +184,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     //    duplicate / unclassified → reject before any aggregation.
     const classified = classifyUploads(texts);
     if (!classified.ok) {
-      return reject(422, classified.code);
+      return reject(422, classified.code, cors);
     }
 
     // 5 + 6. Aggregate via the Slice-1 module and enforce the pre-write gates
@@ -180,30 +195,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
       previous69: classified.previous69,
     });
     if (!aggregated.ok) {
-      return reject(422, aggregated.code);
+      return reject(422, aggregated.code, cors);
     }
 
     // 7. Only after every gate passes do we read the data secrets and write.
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!supabaseUrl || !serviceKey) {
-      return reject(500, 'internal_error'); // generic — never reveal which secret
+      return reject(500, 'internal_error', cors); // generic — never reveal which secret
     }
 
     try {
       await persistBeltPayload(supabaseUrl, serviceKey, aggregated.payload);
     } catch {
-      return reject(502, 'persist_failed'); // status-only upstream, no body echoed
+      return reject(502, 'persist_failed', cors); // status-only upstream, no body echoed
     }
 
     // COUNTS-ONLY summary back to the caller — NO raw rows, NO PII. Every field is
     // an integer, a boolean, or a YYYY-MM month label (safe by the Slice-1
     // contract). Uploaded texts are transient in memory; never logged or stored.
-    return jsonResponse(200, { ok: true, ...aggregated.summary });
+    return jsonResponse(200, { ok: true, ...aggregated.summary }, cors);
   } catch {
     // Sanitized catch-all — never raw err.message, URLs, headers, rows, or
     // secrets. No logging, so the function keeps its zero-`console.*` invariant.
-    return reject(500, 'internal_error');
+    return reject(500, 'internal_error', cors);
   }
 });
 
