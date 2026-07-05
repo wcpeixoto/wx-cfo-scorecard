@@ -132,6 +132,28 @@ export function exceedsSizeCap(fileSizes: number[]): boolean {
   return false;
 }
 
+/**
+ * Best-effort MEMORY early-out: true when a numeric Content-Length header exceeds
+ * `maxBytes`. Lets the shell reject an oversized upload BEFORE `req.formData()`
+ * buffers the whole body into memory.
+ *
+ * BEST-EFFORT ONLY — NOT the authoritative size gate. Content-Length can be absent
+ * (chunked transfer) or understated by a hostile client, so a false here proves
+ * nothing; the post-parse per-file (5 MB) + total (15 MB) `exceedsSizeCap` check
+ * stays the authoritative cap and must not be removed or weakened. Multipart
+ * framing overhead means a legit body's Content-Length is ALWAYS ≥ the sum of its
+ * file bytes, so comparing against MAX_TOTAL_BYTES can never false-reject a valid
+ * ≤15 MB upload. Absent / non-numeric / negative headers → false (defer to parse).
+ */
+export function contentLengthExceeds(header: string | null | undefined, maxBytes: number): boolean {
+  if (header == null) return false;
+  const trimmed = header.trim();
+  if (trimmed === '' || !/^\d+$/.test(trimmed)) return false; // non-numeric / garbage → defer
+  const n = Number(trimmed);
+  if (!Number.isFinite(n)) return false;
+  return n > maxBytes;
+}
+
 // ─── CLASSIFICATION ──────────────────────────────────────────────────────────
 // Map the three uploaded texts to their source kind by HEADER LINE only, using
 // the SAME `classify` header-signature routing the Slice-1 module (and the CLI)
