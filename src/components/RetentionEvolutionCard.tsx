@@ -3,7 +3,7 @@
 // synthetic sample fixture until the table is seeded. GYM-WIDE only — a segmented retention TREND is
 // still the gated client-grain + DOB-join slice. Renders beside Attendance Health (2/3 column) via .retention-hero-split.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 
 import PeriodDropdown from './PeriodDropdown';
 import RetentionEvolutionChart from './RetentionEvolutionChart';
@@ -37,6 +37,7 @@ const TIMEFRAME_DROPDOWN_OPTIONS = RETENTION_TIMEFRAME_OPTIONS.map((o) => ({
 }));
 
 export function RetentionEvolutionCard() {
+  const titleTooltipId = useId();
   const [live, setLive] = useState<RetentionMonth[] | null>(null);
   const [cohortRows, setCohortRows] = useState<CohortRetentionRow[] | null>(null);
   const [timeframe, setTimeframe] = useState<RetentionTimeframeId>(DEFAULT_RETENTION_TIMEFRAME);
@@ -134,17 +135,22 @@ export function RetentionEvolutionCard() {
           <div className="retention-evolution-titlerow">
             <h3 className="gym-card-title retention-evolution-title">
               {metricLabel}
-              <span className="cashflow-help">
+              <span className="db-tooltip-wrap">
                 <button
                   type="button"
-                  className="cashflow-tooltip"
+                  className="db-tooltip-btn"
                   aria-label={`${metricLabel} explanation`}
+                  aria-describedby={titleTooltipId}
                 >
                   &#9432;
                 </button>
-                <div role="tooltip" className="cashflow-tooltip-panel retention-evolution-tooltip-panel">
-                  <ul className="cashflow-tooltip-list">
-                    <li className="cashflow-tooltip-body">
+                <div
+                  id={titleTooltipId}
+                  role="tooltip"
+                  className="db-tooltip-panel is-left is-wide"
+                >
+                  <ul className="db-tooltip-list">
+                    <li className="db-tooltip-body">
                       Month-over-month <strong>membership / renewal</strong>{' '}
                       {metric === 'churn' ? 'churn' : 'retention'} from Wodify's "Member Retention Rates"
                       report: of the members active at the start of a month, the share{' '}
@@ -152,13 +158,13 @@ export function RetentionEvolutionCard() {
                         ? 'whose membership lapsed by month-end (the complement of retention).'
                         : 'still active at month-end.'}
                     </li>
-                    <li className="cashflow-tooltip-body">
+                    <li className="db-tooltip-body">
                       This is a different metric from the attendance-based Silent Churn and Attendance
                       Health cards, which measure who has stopped showing up — not whether their
                       membership renewed.
                     </li>
                     {view.dataBeginsMonth && (
-                      <li className="cashflow-tooltip-body">
+                      <li className="db-tooltip-body">
                         Membership tracking began {formatMonthLong(view.dataBeginsMonth)}.
                       </li>
                     )}

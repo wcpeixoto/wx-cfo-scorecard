@@ -7,7 +7,7 @@
 // browser. This is Class-Plan MEMBERSHIP churn (the #495/#501 metric: of members active at the start of
 // a month, who lapsed) partitioned by belt — NOT attendance-based Silent Churn.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 
 import MemberRetentionByBeltChart from './MemberRetentionByBeltChart';
 import {
@@ -21,6 +21,7 @@ import {
 import { SAMPLE_BELT_ROWS } from '../lib/gym/memberRetentionByBeltFixture';
 
 export function MemberRetentionByBeltCard() {
+  const titleTooltipId = useId();
   const [liveRows, setLiveRows] = useState<BeltRetentionRow[] | null>(null);
   // Adults is the default segment (the larger, higher-belt-spread program).
   const [segment, setSegment] = useState<BeltSegmentId>('adults');
@@ -55,18 +56,27 @@ export function MemberRetentionByBeltCard() {
           <div className="retention-evolution-titlerow">
             <h3 className="gym-card-title retention-evolution-title">
               Churn by Belt
-              <span className="cashflow-help">
-                <button type="button" className="cashflow-tooltip" aria-label="Churn by Belt explanation">
+              <span className="db-tooltip-wrap">
+                <button
+                  type="button"
+                  className="db-tooltip-btn"
+                  aria-label="Churn by Belt explanation"
+                  aria-describedby={titleTooltipId}
+                >
                   &#9432;
                 </button>
-                <div role="tooltip" className="cashflow-tooltip-panel retention-evolution-tooltip-panel">
-                  <ul className="cashflow-tooltip-list">
-                    <li className="cashflow-tooltip-body">
+                <div
+                  id={titleTooltipId}
+                  role="tooltip"
+                  className="db-tooltip-panel is-left is-wide"
+                >
+                  <ul className="db-tooltip-list">
+                    <li className="db-tooltip-body">
                       Monthly membership <strong>churn rate</strong> (lapsed ÷ active) for each belt band,
                       smoothed over a trailing 3-month window so a single small band's month-to-month
                       noise doesn't dominate.
                     </li>
-                    <li className="cashflow-tooltip-body">
+                    <li className="db-tooltip-body">
                       This is membership churn from Wodify's retention report — a different metric from the
                       attendance-based Silent Churn and Attendance Health cards.
                     </li>
