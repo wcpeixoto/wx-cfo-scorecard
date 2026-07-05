@@ -78,6 +78,41 @@ export async function verifyImportSecret(configured: string, provided: string): 
   return diff === 0;
 }
 
+// ─── CORS (browser preflight support for the Slice-3 upload UI) ──────────────
+// The SPA sends custom headers (x-belt-import-trigger-secret, authorization,
+// apikey), so the browser issues an OPTIONS preflight and also needs CORS headers
+// on the real response to read the body. CORS is browser-UX ONLY — NOT the
+// security gate: the trigger secret + service-role posture remain the boundary,
+// and a non-browser client ignores CORS entirely. So this is a NARROW allowlist
+// (never `*`): echo the caller's Origin only when it is one of the two known SPA
+// origins, otherwise send no Access-Control-Allow-Origin.
+//
+// PURE + node-builtin-free so the Deno shell can call it and vitest can unit-test
+// it without a Deno runtime. Same cross-runtime contract as the rest of this file.
+export const CORS_ALLOWED_ORIGINS = [
+  'https://wcpeixoto.github.io',
+  'https://scorecard.wxestates.com',
+] as const;
+
+/**
+ * Build the CORS headers for a request Origin. Methods/allowed-headers are always
+ * returned; `Access-Control-Allow-Origin` is set ONLY when `origin` is in the
+ * allowlist (an absent or disallowed origin gets no ACAO, so the browser blocks
+ * it). `Vary: Origin` keeps a shared cache from serving one origin's ACAO to
+ * another. The shell attaches these to the 204 preflight AND every real response.
+ */
+export function corsHeadersFor(origin: string | null | undefined): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-belt-import-trigger-secret',
+    Vary: 'Origin',
+  };
+  if (origin && (CORS_ALLOWED_ORIGINS as readonly string[]).includes(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+  }
+  return headers;
+}
+
 // ─── SIZE CAP ────────────────────────────────────────────────────────────────
 // Per-file cap on the raw upload, enforced BEFORE any parse/aggregation work. The
 // three real exports are a few hundred client-grain rows each (< ~200 KB); 5 MB

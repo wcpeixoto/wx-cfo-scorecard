@@ -4121,6 +4121,67 @@ body {
   font-size: 14px;
 }
 
+/* ── Churn by Belt import (Slice 3) — three-slot upload card. Layout only; reuses
+   .settings-actions buttons, .event-form-input for the secret, and .import-summary
+   for the counts-only result. Inner wells, not card-outer surfaces. ── */
+.belt-import-slots {
+  display: grid;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.belt-import-slot {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid #E4E7EC;
+  border-radius: 12px;
+  background: #FCFCFD;
+}
+
+.belt-import-slot-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.belt-import-slot-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #344054;
+}
+
+.belt-import-chip {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #ECFDF3;
+  color: #027A48;
+  border: 1px solid #A6F4C5;
+}
+
+.belt-import-chip--warn {
+  background: #FFFAEB;
+  color: #B54708;
+  border-color: #FEDF89;
+}
+
+.belt-import-filename {
+  margin: 0;
+  font-size: 13px;
+  color: #667085;
+  word-break: break-all;
+}
+
+.belt-import-secret {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+  max-width: 360px;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
