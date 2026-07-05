@@ -59,6 +59,9 @@ export function GymPage() {
   // / unconfigured read leaves `snapshot` null and every card falls back to its
   // sample fixture — the live snapshot is optional, never a render error.
   const [snapshot, setSnapshot] = useState<RetentionAggregateSnapshot | null>(null);
+  // Attendance Health drill-down dimension — the toggle lives on the Attendance
+  // Health card (top of page) and drives the breakdown grid directly below it.
+  const [breakdownDim, setBreakdownDim] = useState<'tenure' | 'age'>('tenure');
 
   useEffect(() => {
     let cancelled = false;
@@ -81,29 +84,32 @@ export function GymPage() {
     <div className="stack-grid">
       <div className="ta-page">
         <div className="gym-retention">
-          {/* WATCH — live signals. Top row: Attendance Health (1/3, donut) in line
-              with the Churn chart (RetentionEvolutionCard, 2/3) via
-              .retention-hero-split. Silent Churn is HIDDEN — its card + helpers stay
-              defined in this file (not rendered), so this is a reversible hide, not a
-              delete. (Page + section headers removed per owner — only card-level
-              titles remain.) */}
+          {/* WATCH — live signals. Top row: Attendance Health (1/3, donut, with the
+              By tenure | By age toggle) in line with the Churn chart
+              (RetentionEvolutionCard, 2/3) via .retention-hero-split; the toggle
+              drives the full-width Attendance Health breakdown grid directly below.
+              Silent Churn is HIDDEN — its card + helpers stay defined in this file
+              (not rendered), so this is a reversible hide, not a delete. */}
           <section className="gym-section">
             <div className="gym-card-grid">
               <div className="retention-hero-split">
-                <AttendanceHealthCard snapshot={snapshot} />
+                <AttendanceHealthCard
+                  snapshot={snapshot}
+                  dimension={breakdownDim}
+                  onDimensionChange={setBreakdownDim}
+                />
                 <RetentionEvolutionCard />
               </div>
+              <AttendanceBreakdownCard snapshot={snapshot} dimension={breakdownDim} />
             </div>
           </section>
 
           {/* PATTERNS — the two 1/3 rate cards (Risk by Time as Member / by Age
-              Group), then the full-width Attendance Health drill-down (Tenure | Age
-              toggle), then Churn by Belt at the bottom (data not connected yet). */}
+              Group), then Churn by Belt at the bottom (data not connected yet). */}
           <section className="gym-section">
             <div className="gym-card-grid gym-card-grid--patterns">
               <ChurnRiskByTenureCard snapshot={snapshot} />
               <CohortRetentionCard snapshot={snapshot} />
-              <AttendanceBreakdownCard snapshot={snapshot} />
               <MemberRetentionByBeltCard />
             </div>
           </section>
@@ -397,7 +403,15 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
 // the live snapshot is optional, never a render error. Churn Risk by Tenure now
 // reads the same snapshot's per-band tenure histogram (§6 aggregate extension);
 // Member Movement's census reads it too (its intake stays sample).
-function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
+function AttendanceHealthCard({
+  snapshot,
+  dimension,
+  onDimensionChange,
+}: {
+  snapshot: RetentionAggregateSnapshot | null;
+  dimension: 'tenure' | 'age';
+  onDimensionChange: (d: 'tenure' | 'age') => void;
+}) {
   const { silentChurnThresholdDays, excludeUnknownRecency } = useRetentionSettings();
 
   // One render path for both sources: deriveBuckets (live histogram) and
@@ -500,10 +514,26 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
     <article className="card gym-card gym-card--full attendance-health-card">
       <header className="gym-card-head">
         <div className="attendance-health-titlerow">
-          <h3 className="gym-card-title">Attendance Health</h3>
-          {!snapshot && (
-            <span className="gym-sample-badge">Sample data</span>
-          )}
+          <div className="attendance-health-titlewrap">
+            <h3 className="gym-card-title">Attendance Health</h3>
+            {!snapshot && <span className="gym-sample-badge">Sample data</span>}
+          </div>
+          <div className="segmented-toggle" role="group" aria-label="Break down by tenure or age">
+            <button
+              type="button"
+              className={`segmented-toggle-btn${dimension === 'tenure' ? ' is-active' : ''}`}
+              onClick={() => onDimensionChange('tenure')}
+            >
+              By tenure
+            </button>
+            <button
+              type="button"
+              className={`segmented-toggle-btn${dimension === 'age' ? ' is-active' : ''}`}
+              onClick={() => onDimensionChange('age')}
+            >
+              By age
+            </button>
+          </div>
         </div>
       </header>
 
@@ -940,9 +970,14 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
 // builder). No new classification. Same dual-source gating as the donut and the
 // rate cards: live when the snapshot carries the per-band histogram for the
 // SELECTED dimension, sample fixture otherwise; the badge tracks the selection.
-function AttendanceBreakdownCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
+function AttendanceBreakdownCard({
+  snapshot,
+  dimension,
+}: {
+  snapshot: RetentionAggregateSnapshot | null;
+  dimension: 'tenure' | 'age';
+}) {
   const { silentChurnThresholdDays, excludeUnknownRecency } = useRetentionSettings();
-  const [dimension, setDimension] = useState<'tenure' | 'age'>('tenure');
 
   const tenureBands = snapshot?.tenureBands ?? null;
   const cohorts = snapshot?.cohorts ?? null;
@@ -1007,27 +1042,9 @@ function AttendanceBreakdownCard({ snapshot }: { snapshot: RetentionAggregateSna
   return (
     <article className="card gym-card gym-card--full segment-explorer-card attendance-breakdown-card">
       <header className="gym-card-head">
-        <div className="segment-explorer-titlerow attendance-breakdown-titlerow">
-          <div className="attendance-breakdown-titlewrap">
-            <h3 className="gym-card-title">Attendance Health by {isTenure ? 'Tenure' : 'Age'}</h3>
-            {!liveAsOf && <span className="gym-sample-badge">Sample data</span>}
-          </div>
-          <div className="segmented-toggle" role="group" aria-label="Break down by tenure or age">
-            <button
-              type="button"
-              className={`segmented-toggle-btn${isTenure ? ' is-active' : ''}`}
-              onClick={() => setDimension('tenure')}
-            >
-              By tenure
-            </button>
-            <button
-              type="button"
-              className={`segmented-toggle-btn${!isTenure ? ' is-active' : ''}`}
-              onClick={() => setDimension('age')}
-            >
-              By age
-            </button>
-          </div>
+        <div className="segment-explorer-titlerow">
+          <h3 className="gym-card-title">Attendance Health by {isTenure ? 'Tenure' : 'Age'}</h3>
+          {!liveAsOf && <span className="gym-sample-badge">Sample data</span>}
         </div>
         <p className="gym-card-subtitle">
           A cross-section of active members — {isTenure ? 'tenure' : 'age group'} today by recency
