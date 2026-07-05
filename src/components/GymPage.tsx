@@ -92,10 +92,11 @@ export function GymPage() {
             </div>
           </section>
 
-          {/* PATTERNS — the two 1/3 rate cards (Risk by Time as Member / by Age
-              Group), then Churn by Belt at the bottom (data not connected yet). */}
+          {/* PATTERNS — the two 1/2 rate cards (Risk by Time as Member / by Age
+              Group) side by side, then Churn by Belt full-width below (data not
+              connected yet). */}
           <section className="gym-section">
-            <div className="gym-card-grid gym-card-grid--patterns">
+            <div className="gym-card-grid">
               <ChurnRiskByTenureCard snapshot={snapshot} />
               <CohortRetentionCard snapshot={snapshot} />
               <MemberRetentionByBeltCard />
@@ -838,7 +839,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
     );
 
   return (
-    <article className="card gym-card gym-card--third churn-tenure-card">
+    <article className="card gym-card gym-card--half churn-tenure-card">
       <header className="gym-card-head">
         <div className="churn-tenure-titlerow">
           <h3 className="gym-card-title">Risk by Time as Member</h3>
@@ -996,7 +997,7 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
     );
 
   return (
-    <article className="card gym-card gym-card--third cohort-age-card">
+    <article className="card gym-card gym-card--half cohort-age-card">
       <header className="gym-card-head">
         <div className="cohort-age-titlerow">
           <h3 className="gym-card-title">by Age Group</h3>

@@ -12849,10 +12849,6 @@ body {
 .gym-card--hero,
 .gym-card--full { grid-column: 1 / -1; }
 .gym-card--half { grid-column: span 1; }
-/* Patterns section uses a 3-col track so a card can sit at 1/3 width; full-width
-   siblings keep grid-column: 1 / -1 and still span the whole row. */
-.gym-card-grid--patterns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.gym-card--third { grid-column: span 1; }
 
 /* Base gym card — shared head/title/subtitle for every gym card */
 .gym-card {
@@ -12872,10 +12868,8 @@ body {
   color: var(--text-secondary);
 }
 @media (max-width: 767px) {
-  .gym-card-grid,
-  .gym-card-grid--patterns { grid-template-columns: minmax(0, 1fr); }
-  .gym-card--half,
-  .gym-card--third { grid-column: 1 / -1; }
+  .gym-card-grid { grid-template-columns: minmax(0, 1fr); }
+  .gym-card--half { grid-column: 1 / -1; }
 }
 
 /* ── Silent Churn — live (sample-data) hero card ─────────────────────────
