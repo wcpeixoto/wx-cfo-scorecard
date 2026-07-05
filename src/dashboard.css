@@ -41,6 +41,7 @@
   --success-600:       #039855; /* "Getting Better" pill fg */
   --error-50:          #FEF3F2; /* "Getting Worse" pill bg */
   --brand-300:         #9CB9FF; /* hover underline color */
+  --brand-400:         #7592FF; /* TailAdmin brand-400 — lighter bar fill (by Age Group) */
   --brand-500:         #465FFF; /* brand fill — chartTokens.brand (progress bars) */
   --brand-600:         #3641F5; /* hover label color */
 }
@@ -12849,10 +12850,6 @@ body {
 .gym-card--hero,
 .gym-card--full { grid-column: 1 / -1; }
 .gym-card--half { grid-column: span 1; }
-/* Patterns section uses a 3-col track so a card can sit at 1/3 width; full-width
-   siblings keep grid-column: 1 / -1 and still span the whole row. */
-.gym-card-grid--patterns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.gym-card--third { grid-column: span 1; }
 
 /* Base gym card — shared head/title/subtitle for every gym card */
 .gym-card {
@@ -12872,10 +12869,8 @@ body {
   color: var(--text-secondary);
 }
 @media (max-width: 767px) {
-  .gym-card-grid,
-  .gym-card-grid--patterns { grid-template-columns: minmax(0, 1fr); }
-  .gym-card--half,
-  .gym-card--third { grid-column: 1 / -1; }
+  .gym-card-grid { grid-template-columns: minmax(0, 1fr); }
+  .gym-card--half { grid-column: 1 / -1; }
 }
 
 /* ── Silent Churn — live (sample-data) hero card ─────────────────────────
@@ -13280,6 +13275,12 @@ body {
   align-items: center;
   gap: 10px;
 }
+/* A touch more breathing room from the subtitle down to the table on both rate
+   cards (the shared .gym-card-head default is 16px). */
+.churn-tenure-card .gym-card-head,
+.cohort-age-card .gym-card-head {
+  margin-bottom: 24px;
+}
 .churn-tenure-body {
   flex: 1;
   display: flex;
@@ -13594,7 +13595,7 @@ body {
   display: block;
   height: 100%;
   border-radius: 4px;
-  background: var(--brand-500);
+  background: var(--brand-400);
 }
 .cohort-age-rate-val {
   flex: 0 0 auto;
@@ -13607,8 +13608,6 @@ body {
 .cohort-age-rate-empty {
   color: var(--text-secondary);
 }
-/* Unknown-age (dirty-data) row — muted text; its bar keeps the shared brand fill. */
-.cohort-age-row--unknown .cohort-age-col { color: var(--text-secondary); }
 .cohort-age-base-note {
   margin: 0;
   font-size: 14px;
