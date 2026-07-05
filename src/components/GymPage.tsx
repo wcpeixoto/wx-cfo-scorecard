@@ -480,12 +480,11 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
   // read this base, so they always sum to 100%. Divide-by-zero guarded: an all-zero
   // known base yields a null center % (line omitted) and 0 row %s (never NaN).
   const knownActive = healthy + watch + silent;
-  // Center headline = AT-RISK share (Reconnect + High Risk), the SAME at-risk =
-  // watch + silent definition the "Risk by Time as Member" / "by Age Group" cards
-  // headline — so a filtered donut reads the same % as those cards for that cohort.
-  // The three-way legend below keeps its own per-slice % via rowPct.
-  const atRisk = watch + silent;
-  const atRiskPct = knownActive > 0 ? Math.round((atRisk / knownActive) * 100) : null;
+  // Center headline = HIGH-RISK share (silent only) — the conservative signal the
+  // owner acts on. The "Risk by Time as Member" / "by Age Group" cards headline the
+  // SAME high-risk rate (silent / known), so a filtered donut reads the same % as
+  // those cards for that cohort. The three-way legend keeps its own per-slice %.
+  const highRiskPct = knownActive > 0 ? Math.round((silent / knownActive) * 100) : null;
   const rowPct = (n: number): number => (knownActive > 0 ? Math.round((n / knownActive) * 100) : 0);
 
   // Legend day-bands reuse the resolved-threshold logic that drove the old `helper`
@@ -522,8 +521,8 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
   // the insight renders the honest "unavailable" branch. Wired through
   // attendanceYoYInsight so a real prior-year source would light the ↑/↓/→ branches
   // automatically — never fabricated.
-  const priorYearAtRiskPct: number | null = null;
-  const insight = attendanceYoYInsight(atRiskPct, priorYearAtRiskPct);
+  const priorYearHighRiskPct: number | null = null;
+  const insight = attendanceYoYInsight(highRiskPct, priorYearHighRiskPct);
 
   // Mirrors the shipped ApexCharts donut in TopCategoriesCard (type:'donut', white
   // separator stroke, custom .ec-donut-tooltip, no built-in labels — center text is
@@ -665,11 +664,11 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
                 height={200}
               />
               <div className="attendance-donut-center" aria-hidden="true">
-                <span className="attendance-donut-center-value">{atRiskPct ?? 0}%</span>
+                <span className="attendance-donut-center-value">{highRiskPct ?? 0}%</span>
                 <span className="attendance-donut-center-label">
-                  {atRisk} {atRisk === 1 ? 'client' : 'clients'}
+                  {silent} {silent === 1 ? 'client' : 'clients'}
                   <br />
-                  at risk
+                  at high risk
                 </span>
               </div>
             </div>
@@ -744,9 +743,9 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
 }
 
 // Bottom insight (RETENTION_FINISH_PLAN req 8) — deterministic and prior-year-gated.
-// The ↑/↓/→ branches light up ONLY from a REAL prior-year at-risk % (`prior`);
+// The ↑/↓/→ branches light up ONLY from a REAL prior-year High-Risk % (`prior`);
 // `prior === null` (the current reality — the snapshot has no prior-year attendance
-// composition) yields the honest "unavailable" branch. At-risk % is a BAD metric,
+// composition) yields the honest "unavailable" branch. High-Risk % is a BAD metric,
 // so a LOWER current value is an improvement (↑ better). Never fabricates a YoY delta.
 function attendanceYoYInsight(current: number | null, prior: number | null): string {
   if (current === null || prior === null) return 'Prior-year comparison unavailable';
@@ -759,11 +758,11 @@ function attendanceYoYInsight(current: number | null, prior: number | null): str
 
 // Churn Risk by Tenure — the first Patterns card to turn the member layer into a
 // segment insight. Buckets ACTIVE members by tenure (days since membershipStart)
-// and, within each band, shows what share are at risk (on watch OR silent) at the
-// LIVE resolved threshold, using the same classifyMember the Watch cards use — so
-// the silent slices here re-partition the Silent Churn set rather than redefining
-// it. The hero is the band with the highest risk rate. Deterministic: the copy
-// only rephrases code-computed counts and rates; it never authors the at-risk call.
+// and, within each band, shows the HIGH-RISK share (silent only) at the LIVE
+// resolved threshold, using the same classifyMember the Watch cards use — so the
+// silent slices here re-partition the Silent Churn set rather than redefining it.
+// This matches the Attendance Health donut's high-risk headline. Deterministic: the
+// copy only rephrases code-computed counts and rates; it never authors the call.
 //
 // Dual-source (§6 aggregate extension): with a snapshot carrying the per-band
 // tenure histogram (validated against this build's band edges — see
@@ -794,12 +793,14 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
 
   const { activeTotal, bands, unknownTenure } = result;
 
-  // Rates are ALWAYS over the attendance-known base (recency-unknown held out); the
-  // displayed Tracked column is that same denominator so each row reconciles
-  // (atRisk / Tracked === Risk rate). There is no full-base view any more.
+  // High-risk rate is ALWAYS over the attendance-known base (recency-unknown held
+  // out): silent / knownActiveTotal. There is no full-base view.
   const heroBandId = result.heroBandIdKnown;
   const heroBand = bands.find((b) => b.id === heroBandId) ?? null;
-  const bandRate = (b: TenureBandRisk) => b.riskRateKnown;
+  // High-risk rate (silent only), matching the Attendance Health donut headline —
+  // NOT the at-risk (watch + silent) rate. null when the band has no known base.
+  const bandRate = (b: TenureBandRisk) =>
+    b.knownActiveTotal > 0 ? b.silent / b.knownActiveTotal : null;
   // Recency-unknowns held out of the known base, summed across the REAL bands.
   // (The unknownTenure bucket is a SEPARATE population — bad membershipStart, not
   // bad attendance — and is never part of any band's rate denominator.)
@@ -818,7 +819,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
       ? (Math.round((Math.max(...barRates) * 100) / 10) * 10 + 10) / 100
       : 1;
 
-  // Risk rate rendered as a Top-Traffic-Source-style bar + value: track fills
+  // High-risk rate rendered as a Top-Traffic-Source-style bar + value: track fills
   // left-to-right to the rate (scaled to barCeiling), value right of the bar. A
   // null rate has no denominator, so there is no bar to draw — an em dash.
   const rateCell = (rate: number | null) =>
@@ -880,7 +881,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
         <div className="churn-tenure-table">
           <div className="churn-tenure-head">
             <span className="churn-tenure-col churn-tenure-col--band">Tenure</span>
-            <span className="churn-tenure-col churn-tenure-col--rate-head">Risk rate</span>
+            <span className="churn-tenure-col churn-tenure-col--rate-head">High risk</span>
           </div>
           <ul className="churn-tenure-rows">
             {bands.map((b) => (
@@ -908,7 +909,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
 
         {!excludeUnknownRecency && unknownRecencyTotal > 0 && (
           <p className="churn-tenure-base-note">
-            Rates among attendance-known members in each cohort.
+            High-risk rates among attendance-known members in each cohort.
           </p>
         )}
       </div>
@@ -918,7 +919,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
 
 // Retention by Age Group (Cohort Retention Card — RETENTION_FINISH_PLAN.md §6–§9,
 // rev.3 client_status basis). Two reads in one card: Read 1 — cohort health
-// (Healthy/Watch/Silent + at-risk rate per age cohort, active members), re-derived
+// (Healthy/Watch/Silent + high-risk rate per age cohort, active members), re-derived
 // at the owner threshold via computeChurnRiskByCohortFromAggregate (same
 // deriveBuckets + known-base + hero rules as Churn-by-Tenure); Read 2 — lapsed
 // (inactive) members per cohort. Deterministic: copy only rephrases code-computed
@@ -958,14 +959,17 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
   // base (recency-unknown held out); atRisk is unchanged. No full-base view.
   const heroBandId = result.heroBandIdKnown;
   const heroBand = bands.find((b) => b.id === heroBandId) ?? null;
-  const bandRate = (b: CohortRisk) => b.riskRateKnown;
+  // High-risk rate (silent only), matching the Attendance Health donut headline —
+  // NOT the at-risk (watch + silent) rate. null when the band has no known base.
+  const bandRate = (b: CohortRisk) =>
+    b.knownActiveTotal > 0 ? b.silent / b.knownActiveTotal : null;
   const unknownRecencyTotal = bands.reduce((sum, b) => sum + b.unknownRecency, 0);
 
   // The unknown-cohort row renders only when it carries members (active or lapsed),
   // matching the unknown-tenure row's "surface, don't fabricate" rule.
   const showUnknownRow = unknownCohort.activeTotal > 0 || unknownCohort.lapsed > 0;
 
-  // Risk rate as a scaled bar + value, identical to Churn-by-Tenure: bars scale to
+  // High-risk rate as a scaled bar + value, identical to Churn-by-Tenure: bars scale to
   // a ceiling of (max rate rounded to nearest 10%) + 10% so cohort differences read
   // clearly; value labels show the true rate; a null rate has no bar (em dash).
   const barRates = [
@@ -1042,7 +1046,7 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
         <div className="cohort-age-table">
           <div className="cohort-age-head">
             <span className="cohort-age-col cohort-age-col--band">Age group</span>
-            <span className="cohort-age-col cohort-age-col--rate-head">Risk rate</span>
+            <span className="cohort-age-col cohort-age-col--rate-head">High risk</span>
           </div>
           <ul className="cohort-age-rows">
             {bands.map((b) => (
@@ -1067,7 +1071,7 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
 
         {!excludeUnknownRecency && unknownRecencyTotal > 0 && (
           <p className="cohort-age-base-note">
-            At-risk rates among attendance-known members in each group.
+            High-risk rates among attendance-known members in each group.
           </p>
         )}
       </div>
