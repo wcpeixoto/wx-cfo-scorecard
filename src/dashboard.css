@@ -13242,14 +13242,15 @@ body {
   gap: 24px;
   align-items: center;
 }
-/* Column titles — Basic Table 3 header: text-theme-xs / font-medium / gray-500.
-   No divider rule (dividers removed). */
+/* Column titles — Basic Table 3 header: text-theme-sm / font-normal / gray-500
+   (14px/400, line-height 20px). No divider rule (dividers removed). */
 .churn-tenure-head {
   padding: 0 0 12px;
 }
 .churn-tenure-head .churn-tenure-col {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
   color: var(--text-secondary);
 }
 /* Risk-rate title right-aligned over the values. */
