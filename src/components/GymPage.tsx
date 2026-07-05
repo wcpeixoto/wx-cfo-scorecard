@@ -480,7 +480,12 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
   // read this base, so they always sum to 100%. Divide-by-zero guarded: an all-zero
   // known base yields a null center % (line omitted) and 0 row %s (never NaN).
   const knownActive = healthy + watch + silent;
-  const highRiskPct = knownActive > 0 ? Math.round((silent / knownActive) * 100) : null;
+  // Center headline = AT-RISK share (Reconnect + High Risk), the SAME at-risk =
+  // watch + silent definition the "Risk by Time as Member" / "by Age Group" cards
+  // headline — so a filtered donut reads the same % as those cards for that cohort.
+  // The three-way legend below keeps its own per-slice % via rowPct.
+  const atRisk = watch + silent;
+  const atRiskPct = knownActive > 0 ? Math.round((atRisk / knownActive) * 100) : null;
   const rowPct = (n: number): number => (knownActive > 0 ? Math.round((n / knownActive) * 100) : 0);
 
   // Legend day-bands reuse the resolved-threshold logic that drove the old `helper`
@@ -517,8 +522,8 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
   // the insight renders the honest "unavailable" branch. Wired through
   // attendanceYoYInsight so a real prior-year source would light the ↑/↓/→ branches
   // automatically — never fabricated.
-  const priorYearHighRiskPct: number | null = null;
-  const insight = attendanceYoYInsight(highRiskPct, priorYearHighRiskPct);
+  const priorYearAtRiskPct: number | null = null;
+  const insight = attendanceYoYInsight(atRiskPct, priorYearAtRiskPct);
 
   // Mirrors the shipped ApexCharts donut in TopCategoriesCard (type:'donut', white
   // separator stroke, custom .ec-donut-tooltip, no built-in labels — center text is
@@ -660,11 +665,11 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
                 height={200}
               />
               <div className="attendance-donut-center" aria-hidden="true">
-                <span className="attendance-donut-center-value">{highRiskPct ?? 0}%</span>
+                <span className="attendance-donut-center-value">{atRiskPct ?? 0}%</span>
                 <span className="attendance-donut-center-label">
-                  {silent} {silent === 1 ? 'client' : 'clients'}
+                  {atRisk} {atRisk === 1 ? 'client' : 'clients'}
                   <br />
-                  at high risk
+                  at risk
                 </span>
               </div>
             </div>
@@ -739,9 +744,9 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
 }
 
 // Bottom insight (RETENTION_FINISH_PLAN req 8) — deterministic and prior-year-gated.
-// The ↑/↓/→ branches light up ONLY from a REAL prior-year High-Risk % (`prior`);
+// The ↑/↓/→ branches light up ONLY from a REAL prior-year at-risk % (`prior`);
 // `prior === null` (the current reality — the snapshot has no prior-year attendance
-// composition) yields the honest "unavailable" branch. High-Risk % is a BAD metric,
+// composition) yields the honest "unavailable" branch. At-risk % is a BAD metric,
 // so a LOWER current value is an improvement (↑ better). Never fabricates a YoY delta.
 function attendanceYoYInsight(current: number | null, prior: number | null): string {
   if (current === null || prior === null) return 'Prior-year comparison unavailable';
