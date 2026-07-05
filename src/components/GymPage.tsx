@@ -34,6 +34,7 @@ import {
 import {
   RECENCY_STAGES,
   buildSegmentExplorerView,
+  buildSegmentExplorerViewFromCohort,
   type RecencyStageId,
 } from '../lib/gym/segmentExplorer';
 import { deriveBuckets } from '../lib/gym/retentionAggregateView';
@@ -95,14 +96,14 @@ export function GymPage() {
             </div>
           </section>
 
-          {/* PATTERNS — monthly trends. Churn Risk by Tenure / Retention by Age
-              Group / Segment Explorer, Churn by Belt a recessed full-width card at
-              the bottom (data not connected yet). */}
+          {/* PATTERNS — the two 1/3 rate cards (Risk by Time as Member / by Age
+              Group), then the full-width Attendance Health drill-down (Tenure | Age
+              toggle), then Churn by Belt at the bottom (data not connected yet). */}
           <section className="gym-section">
             <div className="gym-card-grid gym-card-grid--patterns">
               <ChurnRiskByTenureCard snapshot={snapshot} />
               <CohortRetentionCard snapshot={snapshot} />
-              <SegmentExplorerCard snapshot={snapshot} />
+              <AttendanceBreakdownCard snapshot={snapshot} />
               <MemberRetentionByBeltCard />
             </div>
           </section>
@@ -931,33 +932,47 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
   );
 }
 
-// Segment Explorer — Slice 1a (tenure × recency cross-section). A NEW presentation
-// view over the EXISTING Churn-Risk-by-Tenure result: it renders the per-band
-// aggregates as a grid of today's active members, tenure band (rows) × recency
-// stage (columns), with the locked classifier vocabulary. It adds NO computation —
-// the same dual-source gating as ChurnRiskByTenureCard (live aggregate when the
-// snapshot carries the tenure histogram, sample fixture otherwise), the same
-// threshold from RetentionSettings, fed through the pure buildSegmentExplorerView
-// adapter (Healthy subtraction, per-row known-base rate; aggregate
-// counts shown as real numbers). Honest labels: it is a cross-SECTION of today's
-// actives — not a journey over time — and long-tenure rows show survivors only (footer).
-function SegmentExplorerCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
+// Attendance Health by tenure & age — the drill-down for the Attendance Health
+// donut. A Tenure | Age toggle swaps a band × recency-stage cross-section of
+// today's active members. Both dimensions are PRESENTATION-ONLY views over the
+// existing computes — tenure via buildSegmentExplorerView, age via
+// buildSegmentExplorerViewFromCohort (the cohort result re-keyed through the SAME
+// builder). No new classification. Same dual-source gating as the donut and the
+// rate cards: live when the snapshot carries the per-band histogram for the
+// SELECTED dimension, sample fixture otherwise; the badge tracks the selection.
+function AttendanceBreakdownCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays, excludeUnknownRecency } = useRetentionSettings();
+  const [dimension, setDimension] = useState<'tenure' | 'age'>('tenure');
 
   const tenureBands = snapshot?.tenureBands ?? null;
-  const result = useMemo(
-    () =>
-      tenureBands
-        ? computeChurnRiskByTenureFromAggregate(tenureBands, silentChurnThresholdDays)
-        : computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
-    [tenureBands, silentChurnThresholdDays],
-  );
-  // Live only when the snapshot actually carries a usable tenure histogram —
-  // exactly the ChurnRiskByTenureCard gate, so the two cards badge identically.
-  const liveAsOf = tenureBands && snapshot ? snapshot.asOf : null;
+  const cohorts = snapshot?.cohorts ?? null;
 
-  const view = useMemo(() => buildSegmentExplorerView(result), [result]);
-  const { thresholdDays, activeTotal, rows, unknownRecencyTotal } = view;
+  const view = useMemo(() => {
+    if (dimension === 'tenure') {
+      const result = tenureBands
+        ? computeChurnRiskByTenureFromAggregate(tenureBands, silentChurnThresholdDays)
+        : computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY);
+      return buildSegmentExplorerView(result);
+    }
+    const result = computeChurnRiskByCohortFromAggregate(
+      cohorts ?? SAMPLE_COHORT_HISTOGRAM,
+      silentChurnThresholdDays,
+    );
+    return buildSegmentExplorerViewFromCohort(result);
+  }, [dimension, tenureBands, cohorts, silentChurnThresholdDays]);
+
+  // Live only when the snapshot carries the histogram for the SELECTED dimension —
+  // the two dimensions can badge differently (tenure live, age still sample).
+  const liveAsOf =
+    dimension === 'tenure'
+      ? tenureBands && snapshot
+        ? snapshot.asOf
+        : null
+      : cohorts && snapshot
+        ? snapshot.asOf
+        : null;
+
+  const { thresholdDays, activeTotal, rows } = view;
 
   // When parent/guardian accounts are excluded (toggle ON), drop the Unknown-recency
   // column entirely — the grid becomes a Healthy/Watch/Silent cross-section. When OFF,
@@ -982,21 +997,41 @@ function SegmentExplorerCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
     }
   };
 
+  const isTenure = dimension === 'tenure';
+  const bandHeader = isTenure ? 'Current tenure today' : 'Age group';
+  const unknownLabel = isTenure ? 'Unknown tenure' : 'Unknown age';
   // The survivorship footer is mandatory in BOTH states; sample mode has no live
   // as-of, so it names the fixture date and flags itself as sample.
   const asOfLabel = liveAsOf ?? '2026-06-02 (sample)';
 
   return (
-    <article className="card gym-card gym-card--full segment-explorer-card">
+    <article className="card gym-card gym-card--full segment-explorer-card attendance-breakdown-card">
       <header className="gym-card-head">
-        <div className="segment-explorer-titlerow">
-          <h3 className="gym-card-title">Today&rsquo;s members by tenure &amp; risk stage</h3>
-          {!liveAsOf && (
-            <span className="gym-sample-badge">Sample data</span>
-          )}
+        <div className="segment-explorer-titlerow attendance-breakdown-titlerow">
+          <div className="attendance-breakdown-titlewrap">
+            <h3 className="gym-card-title">Attendance Health by {isTenure ? 'Tenure' : 'Age'}</h3>
+            {!liveAsOf && <span className="gym-sample-badge">Sample data</span>}
+          </div>
+          <div className="segmented-toggle" role="group" aria-label="Break down by tenure or age">
+            <button
+              type="button"
+              className={`segmented-toggle-btn${isTenure ? ' is-active' : ''}`}
+              onClick={() => setDimension('tenure')}
+            >
+              By tenure
+            </button>
+            <button
+              type="button"
+              className={`segmented-toggle-btn${!isTenure ? ' is-active' : ''}`}
+              onClick={() => setDimension('age')}
+            >
+              By age
+            </button>
+          </div>
         </div>
         <p className="gym-card-subtitle">
-          A cross-section of active members — tenure today by recency stage.
+          A cross-section of active members — {isTenure ? 'tenure' : 'age group'} today by recency
+          stage.
         </p>
       </header>
 
@@ -1007,11 +1042,11 @@ function SegmentExplorerCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
           <div
             className="segment-explorer-table"
             role="table"
-            aria-label="Active members by tenure and recency stage"
+            aria-label={`Active members by ${isTenure ? 'tenure' : 'age group'} and recency stage`}
           >
             <div className="segment-explorer-head" role="row">
               <span className="segment-explorer-col segment-explorer-col--band" role="columnheader">
-                Current tenure today
+                {bandHeader}
               </span>
               {visibleStages.map((s) => (
                 <span
@@ -1038,7 +1073,7 @@ function SegmentExplorerCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
                   }`}
                 >
                   <span className="segment-explorer-col segment-explorer-col--band" role="cell">
-                    {row.isUnknownTenure ? 'Unknown tenure' : row.label}
+                    {row.isUnknownTenure ? unknownLabel : row.label}
                   </span>
                   {row.cells
                     .filter((cell) => visibleStages.some((s) => s.id === cell.stage))
@@ -1061,14 +1096,16 @@ function SegmentExplorerCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
         )}
 
         <p className="segment-explorer-suppression-note">
-          Cells are aggregate counts of active members by tenure and recency stage. No member
-          identities or individual records are stored or shown.
+          Cells are aggregate counts of active members by {isTenure ? 'tenure' : 'age group'} and
+          recency stage. No member identities or individual records are stored or shown.
         </p>
 
         <p className="segment-explorer-survivorship">
           Snapshot as of {asOfLabel}. This is a cross-section of today&rsquo;s active members —
-          members who already left are not in this base, so long-tenure bands show survivors only
-          and can look healthier than the real experience.
+          members who already left are not in this base, so{' '}
+          {isTenure
+            ? 'long-tenure bands show survivors only and can look healthier than the real experience.'
+            : 'each age group shows only members who are still active today.'}
         </p>
       </div>
     </article>

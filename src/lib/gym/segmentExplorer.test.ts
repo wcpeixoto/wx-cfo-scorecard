@@ -6,7 +6,15 @@ import {
   type TenureBandRisk,
 } from './churnRiskByTenure';
 import { TENURE_BANDS, UNKNOWN_TENURE_ID } from './tenureBands';
-import { RECENCY_STAGES, buildSegmentExplorerView } from './segmentExplorer';
+import {
+  computeChurnRiskByCohortFromAggregate,
+  SAMPLE_COHORT_HISTOGRAM,
+} from './churnRiskByCohort';
+import {
+  RECENCY_STAGES,
+  buildSegmentExplorerView,
+  buildSegmentExplorerViewFromCohort,
+} from './segmentExplorer';
 
 // The Segment Explorer (1a) is a PURE view over the SAME aggregates
 // computeChurnRiskByTenure(FromAggregate) returns. These tests lock the
@@ -175,5 +183,32 @@ describe('buildSegmentExplorerView — against the real sample compute', () => {
     }
     const total = view.rows.reduce((s, r) => s + r.activeTotal, 0);
     expect(total).toBe(result.activeTotal);
+  });
+});
+
+describe('buildSegmentExplorerViewFromCohort — age variant reuses the tenure grid', () => {
+  it('re-keys the cohort result through the same builder (unknownCohort → unknown row)', () => {
+    const result = computeChurnRiskByCohortFromAggregate(SAMPLE_COHORT_HISTOGRAM, 21);
+    const view = buildSegmentExplorerViewFromCohort(result);
+
+    // One row per cohort band, then the unknown-cohort row last.
+    expect(view.rows).toHaveLength(result.bands.length + 1);
+    expect(view.rows.slice(0, result.bands.length).map((r) => r.id)).toEqual(
+      result.bands.map((b) => b.id),
+    );
+    const unknownRow = view.rows[view.rows.length - 1];
+    expect(unknownRow.isUnknownTenure).toBe(true);
+    expect(unknownRow.id).toBe(result.unknownCohort.id);
+
+    // Same presentation arithmetic as the tenure grid: cells partition each band
+    // (healthy = known − watch − silent, + unknownRecency == activeTotal), and the
+    // row rate is the source's known-base rate.
+    result.bands.forEach((band, i) => {
+      const row = view.rows[i];
+      expect(row.cells.reduce((s, c) => s + c.count, 0)).toBe(band.activeTotal);
+      const healthy = row.cells.find((c) => c.stage === 'healthy');
+      expect(healthy?.count).toBe(band.knownActiveTotal - band.watch - band.silent);
+      expect(row.rate).toBe(band.riskRateKnown);
+    });
   });
 });

@@ -13321,6 +13321,17 @@ body {
   align-items: center;
   gap: 10px;
 }
+/* Attendance Health drill-down header — title/badge left, Tenure|Age toggle right. */
+.attendance-breakdown-titlerow {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.attendance-breakdown-titlewrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .segment-explorer-body {
   flex: 1;
   display: flex;
