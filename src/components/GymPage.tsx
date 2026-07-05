@@ -696,7 +696,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
     <article className="card gym-card gym-card--third churn-tenure-card">
       <header className="gym-card-head">
         <div className="churn-tenure-titlerow">
-          <h3 className="gym-card-title">Churn Risk by Time as Member</h3>
+          <h3 className="gym-card-title">Risk by Time as Member</h3>
           <div className="db-tooltip-wrap">
             <button
               type="button"
