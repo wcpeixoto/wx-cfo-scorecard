@@ -661,6 +661,24 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
   // bad attendance — and is never part of any band's rate denominator.)
   const unknownRecencyTotal = bands.reduce((sum, b) => sum + b.unknownRecency, 0);
 
+  // Risk rate rendered as a Top-Traffic-Source-style bar + value: track fills
+  // left-to-right to the rate (0–100%), value right of the bar. A null rate has
+  // no denominator, so there is no bar to draw — an em dash, never a 0% bar.
+  const rateCell = (rate: number | null) =>
+    rate === null ? (
+      <span className="churn-tenure-rate-empty">—</span>
+    ) : (
+      <>
+        <span className="churn-tenure-bar" aria-hidden="true">
+          <span
+            className="churn-tenure-bar-fill"
+            style={{ width: `${Math.round(rate * 100)}%` }}
+          />
+        </span>
+        <span className="churn-tenure-rate-val">{formatRate(rate)}</span>
+      </>
+    );
+
   return (
     <article className="card gym-card gym-card--third churn-tenure-card">
       <header className="gym-card-head">
@@ -706,7 +724,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
         <div className="churn-tenure-table">
           <div className="churn-tenure-head">
             <span className="churn-tenure-col churn-tenure-col--band">Tenure</span>
-            <span className="churn-tenure-col churn-tenure-col--num">Risk rate</span>
+            <span className="churn-tenure-col churn-tenure-col--rate-head">Risk rate</span>
           </div>
           <ul className="churn-tenure-rows">
             {bands.map((b) => (
@@ -715,7 +733,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
                 className={`churn-tenure-row${b.id === heroBandId ? ' churn-tenure-row--hero' : ''}`}
               >
                 <span className="churn-tenure-col churn-tenure-col--band">{b.label}</span>
-                <span className="churn-tenure-col churn-tenure-col--num">{formatRate(bandRate(b))}</span>
+                <span className="churn-tenure-col churn-tenure-col--rate">{rateCell(bandRate(b))}</span>
               </li>
             ))}
             {/* Dirty-data members (missing/invalid or future membershipStart) are
@@ -727,8 +745,8 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
                 <span className="churn-tenure-col churn-tenure-col--band">
                   {unknownTenure.label}
                 </span>
-                <span className="churn-tenure-col churn-tenure-col--num">
-                  {formatRate(unknownTenure.riskRate)}
+                <span className="churn-tenure-col churn-tenure-col--rate">
+                  {rateCell(unknownTenure.riskRate)}
                 </span>
               </li>
             )}

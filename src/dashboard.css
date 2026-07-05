@@ -41,6 +41,7 @@
   --success-600:       #039855; /* "Getting Better" pill fg */
   --error-50:          #FEF3F2; /* "Getting Worse" pill bg */
   --brand-300:         #9CB9FF; /* hover underline color */
+  --brand-500:         #465FFF; /* brand fill — chartTokens.brand (progress bars) */
   --brand-600:         #3641F5; /* hover label color */
 }
 
@@ -13171,21 +13172,24 @@ body {
   font-size: 14px;
   color: var(--text-secondary);
 }
+/* TailAdmin "Basic Table 3" layout: label column sizes to content, the rate
+   column (bar + value) takes the rest; every cell left-aligned. */
 .churn-tenure-head,
 .churn-tenure-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px;
-  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
   align-items: center;
 }
+/* Column titles — Basic Table 3 header: text-theme-xs / font-medium / gray-500,
+   left-aligned (no uppercase), with a gray-100 rule under the header. */
 .churn-tenure-head {
-  padding: 0 0 8px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--bg-muted);
 }
 .churn-tenure-head .churn-tenure-col {
   font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-weight: 500;
   color: var(--text-secondary);
 }
 .churn-tenure-rows {
@@ -13193,11 +13197,15 @@ body {
   margin: 0;
   padding: 0;
 }
+/* Body rows — text-theme-sm, gray-100 dividers between rows (Basic Table 3). */
 .churn-tenure-row {
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--bg-muted);
   font-size: 14px;
   color: var(--text-primary);
+}
+.churn-tenure-rows .churn-tenure-row:last-child {
+  border-bottom: none;
 }
 .churn-tenure-col--band {
   font-weight: 500;
@@ -13205,16 +13213,47 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.churn-tenure-col--num {
+/* Rate cell — Top-Traffic-Source row: proportional bar then the value. */
+.churn-tenure-col--rate {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.churn-tenure-bar {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+.churn-tenure-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--brand-500);
+}
+.churn-tenure-rate-val {
+  flex: 0 0 auto;
+  min-width: 34px;
   text-align: right;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.churn-tenure-rate-empty {
+  color: var(--text-secondary);
 }
 .churn-tenure-row--hero { background: var(--bg-main); }
 .churn-tenure-row--hero .churn-tenure-col--band { font-weight: 600; }
-.churn-tenure-row--hero .churn-tenure-col--num:last-child { color: var(--warning); }
+/* Highest-risk row keeps its distinct color — bar and value in --warning. */
+.churn-tenure-row--hero .churn-tenure-bar-fill { background: var(--warning); }
+.churn-tenure-row--hero .churn-tenure-rate-val { color: var(--warning); }
 /* Unknown-tenure (dirty-data) row — muted so it reads as a data-quality note,
    matching the Attendance Health "Unknown" tile. Only renders when present. */
 .churn-tenure-row--unknown .churn-tenure-col { color: var(--text-secondary); }
+.churn-tenure-row--unknown .churn-tenure-bar-fill { background: var(--text-secondary); }
 
 /* ── Segment Explorer (1a) — tenure × recency cross-section grid ──────────
    Full-width Patterns card. A NEW presentation view over the same
