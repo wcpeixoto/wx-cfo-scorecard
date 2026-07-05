@@ -13178,7 +13178,7 @@ body {
 .churn-tenure-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 16px;
+  gap: 24px;
   align-items: center;
 }
 /* Column titles — Basic Table 3 header: text-theme-xs / font-medium / gray-500.
@@ -13244,10 +13244,6 @@ body {
 .churn-tenure-rate-empty {
   color: var(--text-secondary);
 }
-/* Highest-risk row keeps a subtle emphasis via background + bold label; the bar
-   and value stay the shared brand color (all bars one color). */
-.churn-tenure-row--hero { background: var(--bg-main); }
-.churn-tenure-row--hero .churn-tenure-col--band { font-weight: 600; }
 /* Unknown-tenure (dirty-data) row — muted text so it reads as a data-quality
    note; its bar keeps the shared brand fill. Only renders when present. */
 .churn-tenure-row--unknown .churn-tenure-col { color: var(--text-secondary); }
