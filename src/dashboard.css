@@ -41,6 +41,7 @@
   --success-600:       #039855; /* "Getting Better" pill fg */
   --error-50:          #FEF3F2; /* "Getting Worse" pill bg */
   --brand-300:         #9CB9FF; /* hover underline color */
+  --brand-400:         #7592FF; /* TailAdmin brand-400 — lighter bar fill (by Age Group) */
   --brand-500:         #465FFF; /* brand fill — chartTokens.brand (progress bars) */
   --brand-600:         #3641F5; /* hover label color */
 }
@@ -13274,6 +13275,12 @@ body {
   align-items: center;
   gap: 10px;
 }
+/* A touch more breathing room from the subtitle down to the table on both rate
+   cards (the shared .gym-card-head default is 16px). */
+.churn-tenure-card .gym-card-head,
+.cohort-age-card .gym-card-head {
+  margin-bottom: 24px;
+}
 .churn-tenure-body {
   flex: 1;
   display: flex;
@@ -13588,7 +13595,7 @@ body {
   display: block;
   height: 100%;
   border-radius: 4px;
-  background: var(--brand-500);
+  background: var(--brand-400);
 }
 .cohort-age-rate-val {
   flex: 0 0 auto;
@@ -13601,8 +13608,6 @@ body {
 .cohort-age-rate-empty {
   color: var(--text-secondary);
 }
-/* Unknown-age (dirty-data) row — muted text; its bar keeps the shared brand fill. */
-.cohort-age-row--unknown .cohort-age-col { color: var(--text-secondary); }
 .cohort-age-base-note {
   margin: 0;
   font-size: 14px;

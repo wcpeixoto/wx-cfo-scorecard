@@ -872,6 +872,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
             <span className="gym-sample-badge">Sample data</span>
           )}
         </div>
+        <p className="gym-card-subtitle">Which member stages are most at risk?</p>
       </header>
 
       <div className="churn-tenure-body">
@@ -954,7 +955,7 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
   // (pre-cohort row → cohorts null).
   const liveAsOf = cohorts && snapshot ? snapshot.asOf : null;
 
-  const { activeTotal, bands, unknownCohort } = result;
+  const { activeTotal, bands } = result;
 
   // Read 1, identical to Churn-by-Tenure: rates are always over the attendance-known
   // base (recency-unknown held out); atRisk is unchanged. No full-base view.
@@ -966,17 +967,10 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
     b.knownActiveTotal > 0 ? b.silent / b.knownActiveTotal : null;
   const unknownRecencyTotal = bands.reduce((sum, b) => sum + b.unknownRecency, 0);
 
-  // The unknown-cohort row renders only when it carries members (active or lapsed),
-  // matching the unknown-tenure row's "surface, don't fabricate" rule.
-  const showUnknownRow = unknownCohort.activeTotal > 0 || unknownCohort.lapsed > 0;
-
   // High-risk rate as a scaled bar + value, identical to Churn-by-Tenure: bars scale to
   // a ceiling of (max rate rounded to nearest 10%) + 10% so cohort differences read
   // clearly; value labels show the true rate; a null rate has no bar (em dash).
-  const barRates = [
-    ...bands.map(bandRate),
-    showUnknownRow ? bandRate(unknownCohort) : null,
-  ].filter((r): r is number => r !== null);
+  const barRates = bands.map(bandRate).filter((r): r is number => r !== null);
   const barCeiling =
     barRates.length > 0
       ? (Math.round((Math.max(...barRates) * 100) / 10) * 10 + 10) / 100
@@ -1056,17 +1050,6 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
                 <span className="cohort-age-col cohort-age-col--rate">{rateCell(bandRate(b))}</span>
               </li>
             ))}
-            {/* Unknown-age members (missing/sentinel/invalid DOB) surfaced rather
-                than dropped — keeps the card honest against the Member Movement
-                census once live. Hidden while the sample data is clean. */}
-            {showUnknownRow && (
-              <li className="cohort-age-row cohort-age-row--unknown">
-                <span className="cohort-age-col cohort-age-col--band">{unknownCohort.label}</span>
-                <span className="cohort-age-col cohort-age-col--rate">
-                  {rateCell(bandRate(unknownCohort))}
-                </span>
-              </li>
-            )}
           </ul>
         </div>
 
