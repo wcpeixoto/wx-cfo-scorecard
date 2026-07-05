@@ -851,7 +851,7 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
     <article className="card gym-card gym-card--third cohort-age-card">
       <header className="gym-card-head">
         <div className="cohort-age-titlerow">
-          <h3 className="gym-card-title">Retention by Age Group</h3>
+          <h3 className="gym-card-title">by Age Group</h3>
           <div className="db-tooltip-wrap">
             <button
               type="button"
