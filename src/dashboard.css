@@ -13714,6 +13714,51 @@ body {
   gap: 12px;
   flex-wrap: wrap;
 }
+/* YoY pills — own full-width line at the top of the right-hand control cluster, so they
+   sit at the card's top-right above the toggles/timeframe. Rendered only in By-age view. */
+.retention-evolution-yoy {
+  flex-basis: 100%;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.retention-evolution-yoy-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  background: var(--bg-main);
+  color: var(--text-secondary);
+}
+.retention-evolution-yoy-pill-band {
+  color: var(--text-secondary);
+}
+.retention-evolution-yoy-pill-delta {
+  font-variant-numeric: tabular-nums;
+}
+.retention-evolution-yoy-pill--better {
+  border-color: var(--positive);
+}
+.retention-evolution-yoy-pill--better .retention-evolution-yoy-pill-delta {
+  color: var(--positive);
+}
+.retention-evolution-yoy-pill--worse {
+  border-color: var(--negative);
+}
+.retention-evolution-yoy-pill--worse .retention-evolution-yoy-pill-delta {
+  color: var(--negative);
+}
+.retention-evolution-yoy-pill--neutral .retention-evolution-yoy-pill-delta {
+  color: var(--text-secondary);
+}
 .retention-evolution-timeframe {
   display: flex;
   align-items: center;
