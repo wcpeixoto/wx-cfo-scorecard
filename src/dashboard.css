@@ -13052,19 +13052,68 @@ body {
    mirroring the .silent-churn-* inner scale. The breakdown tiles are inner
    sub-elements (UI_CARDS out of scope), matching a dashed inset
    (12px radius, --bg-main, 1px --line). */
-/* Title/badge left, the By tenure | By age drill-down toggle right; wraps on a
-   narrow (1/3-width) card so the toggle drops below the title instead of clipping. */
+/* Title/badge left, the kebab (⋮) drill-down menu right. */
 .attendance-health-titlerow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: 10px;
 }
 .attendance-health-titlewrap {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+/* Kebab trigger — borderless 32px icon button (the .action-dropdown container
+   handles menu positioning). */
+.attendance-health-kebab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.attendance-health-kebab:hover,
+.attendance-health-kebab[aria-expanded='true'] {
+  background: var(--bg-main);
+  color: var(--text-primary);
+}
+.attendance-health-kebab svg {
+  width: 18px;
+  height: 18px;
+}
+.attendance-health-menu-panel {
+  min-width: 176px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+/* Menu group header — small uppercase label, not selectable. */
+.action-dropdown-menu li.action-dropdown-group {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+/* Active selection — this card's trigger is an icon (no label), so the menu marks
+   the current cohort. */
+.attendance-health-menu-panel button.is-active {
+  color: var(--brand-600);
+  font-weight: 600;
+}
+/* Selected cohort shown under the title (All shows no subtitle). */
+.attendance-health-subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
 }
 .attendance-health-body {
   flex: 1;
