@@ -111,22 +111,37 @@ function normalizeKey(s: string): string {
 function normalizeName(s: string): string {
   return (s ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
-function toYearMonth(raw: string): string | null {
-  const m = (raw ?? '').trim().match(/^(\d{4})-(\d{2})/); // ISO leading YYYY-MM (retention First Of Month)
-  if (!m) return null;
-  const mm = Number(m[2]);
-  return mm >= 1 && mm <= 12 ? `${m[1]}-${m[2]}` : null;
-}
 const MON: Record<string, number> = {
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
 };
-// Belt "Date Achieved" / "Promoted On" format is "MMM D, YYYY" (e.g. "Jun 25, 2025"). → YYYY-MM.
-function beltDateToYM(raw: string): string | null {
-  const m = (raw ?? '').trim().match(/^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})$/);
-  if (!m) return null;
-  const mo = MON[m[1].toLowerCase()];
-  if (!mo) return null;
-  return `${m[3]}-${String(mo).padStart(2, '0')}`;
+// Flexible month parser — accepts EITHER Wodify export format so ONE "Keep the data
+// formatted" setting works for all three files (target: leave it UNCHECKED → all ISO).
+// Both the retention "First Of Month" and the belt "Date Achieved" route through this,
+// so neither field depends on a particular export toggle anymore. Accepts:
+//   (a) ISO leading YYYY-MM, optionally -DD and a time suffix: 2025-06, 2025-06-01,
+//       2025-06-01T00:00:00Z  (the former toYearMonth behavior); OR
+//   (b) month-name form MMM/Month D, YYYY: "Jun 25, 2025", "June 25, 2025" (the former
+//       beltDateToYM behavior).
+// Returns null for ANYTHING ambiguous or unrecognized — numeric slash/dot dates
+// (6/1/2025, 06.01.2025), empty, garbage — so day-vs-month order is never guessed.
+// Pure + node-builtin-free: regex + the MON lookup only, no Date parsing, no imports.
+function parseFlexibleMonth(raw: string): string | null {
+  const s = (raw ?? '').trim();
+  if (s === '') return null;
+  // (a) ISO leading YYYY-MM (+ optional -DD and/or time). Anchored to $ so a numeric
+  //     slash/dot date or trailing junk can't slip past as a partial match.
+  const iso = s.match(/^(\d{4})-(\d{2})(?:-\d{2})?(?:[T ].*)?$/);
+  if (iso) {
+    const mm = Number(iso[2]);
+    return mm >= 1 && mm <= 12 ? `${iso[1]}-${iso[2]}` : null;
+  }
+  // (b) MMM D, YYYY / Month D, YYYY — the month name's tail is absorbed by [a-z]*.
+  const mdy = s.match(/^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})$/);
+  if (mdy) {
+    const mo = MON[mdy[1].toLowerCase()];
+    return mo ? `${mdy[3]}-${String(mo).padStart(2, '0')}` : null;
+  }
+  return null;
 }
 function addMonths(ym: string, n: number): string {
   const [y, m] = ym.split('-').map(Number);
@@ -213,7 +228,7 @@ function parseRetention(text: string): RetParse {
     const cells = grid[r];
     const cid = get(cells, 'clientid').trim();
     if (cid === '') continue;
-    const mappedFrom = toYearMonth(get(cells, 'firstofmonth'));
+    const mappedFrom = parseFlexibleMonth(get(cells, 'firstofmonth'));
     const mapped = mappedFrom ? addMonths(mappedFrom, 1) : null;
     const ct = get(cells, 'changetype').trim().toLowerCase();
     const name = normalizeName(get(cells, 'clientname'));
@@ -260,7 +275,7 @@ function parseCurrent(text: string): CurParse {
     if (cid === '') continue;
     const prog = get(cells, 'progression').trim() || '(none)';
     const level = get(cells, 'level').trim() || '(none)';
-    const ym = beltDateToYM(get(cells, 'dateachieved'));
+    const ym = parseFlexibleMonth(get(cells, 'dateachieved'));
     const label = `${prog}|${level}`;
     const arr = byId.get(cid) ?? [];
     arr.push({ label, ym });
@@ -299,7 +314,7 @@ function parsePrevious(text: string): PrevParse {
     if (name === '') continue;
     const prog = get(cells, 'progression').trim() || '(none)';
     const level = get(cells, 'level').trim() || '(none)';
-    const ym = beltDateToYM(get(cells, 'dateachieved'));
+    const ym = parseFlexibleMonth(get(cells, 'dateachieved'));
     const arr = byName.get(name) ?? [];
     arr.push({ label: `${prog}|${level}`, ym });
     byName.set(name, arr);
@@ -745,6 +760,7 @@ export {
   parseRetention,
   parseCurrent,
   parsePrevious,
+  parseFlexibleMonth,
   analyze,
   classify,
   tier2Band,
