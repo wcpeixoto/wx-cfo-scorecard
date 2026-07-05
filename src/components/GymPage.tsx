@@ -11,9 +11,9 @@
 // built, gated on a data policy or API access (see RETENTION_FINISH_PLAN.md).
 // Overview / Membership / Classes are hidden for now.
 
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import ReactApexChart from 'react-apexcharts';
-import { FiAlertTriangle, FiCheck, FiPhone } from 'react-icons/fi';
+import { FiAlertTriangle, FiCheck, FiMoreVertical, FiPhone } from 'react-icons/fi';
 import { useRetentionSettings } from '../context/RetentionSettingsContext';
 import { FIXTURE_TODAY, SAMPLE_GYM_MEMBERS } from '../lib/gym/memberFixture';
 import {
@@ -31,12 +31,8 @@ import {
   computeChurnRiskByCohortFromAggregate,
   type CohortRisk,
 } from '../lib/gym/churnRiskByCohort';
-import {
-  RECENCY_STAGES,
-  buildSegmentExplorerView,
-  buildSegmentExplorerViewFromCohort,
-  type RecencyStageId,
-} from '../lib/gym/segmentExplorer';
+import { TENURE_BANDS } from '../lib/gym/tenureBands';
+import { COHORT_BANDS } from '../lib/gym/cohortBands';
 import { deriveBuckets } from '../lib/gym/retentionAggregateView';
 import { buildRetentionRateView } from '../lib/gym/retentionRates';
 import {
@@ -59,9 +55,6 @@ export function GymPage() {
   // / unconfigured read leaves `snapshot` null and every card falls back to its
   // sample fixture — the live snapshot is optional, never a render error.
   const [snapshot, setSnapshot] = useState<RetentionAggregateSnapshot | null>(null);
-  // Attendance Health drill-down dimension — the toggle lives on the Attendance
-  // Health card (top of page) and drives the breakdown grid directly below it.
-  const [breakdownDim, setBreakdownDim] = useState<'tenure' | 'age'>('tenure');
 
   useEffect(() => {
     let cancelled = false;
@@ -84,23 +77,18 @@ export function GymPage() {
     <div className="stack-grid">
       <div className="ta-page">
         <div className="gym-retention">
-          {/* WATCH — live signals. Top row: Attendance Health (1/3, donut, with the
-              By tenure | By age toggle) in line with the Churn chart
-              (RetentionEvolutionCard, 2/3) via .retention-hero-split; the toggle
-              drives the full-width Attendance Health breakdown grid directly below.
-              Silent Churn is HIDDEN — its card + helpers stay defined in this file
-              (not rendered), so this is a reversible hide, not a delete. */}
+          {/* WATCH — live signals. Top row: Attendance Health (1/3, donut) in line
+              with the Churn chart (RetentionEvolutionCard, 2/3) via
+              .retention-hero-split. The donut card carries a kebab (⋮) menu that
+              filters the donut to a tenure/age cohort (All = whole gym). Silent
+              Churn is HIDDEN — its card + helpers stay defined in this file (not
+              rendered), so this is a reversible hide, not a delete. */}
           <section className="gym-section">
             <div className="gym-card-grid">
               <div className="retention-hero-split">
-                <AttendanceHealthCard
-                  snapshot={snapshot}
-                  dimension={breakdownDim}
-                  onDimensionChange={setBreakdownDim}
-                />
+                <AttendanceHealthCard snapshot={snapshot} />
                 <RetentionEvolutionCard />
               </div>
-              <AttendanceBreakdownCard snapshot={snapshot} dimension={breakdownDim} />
             </div>
           </section>
 
@@ -403,28 +391,87 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
 // the live snapshot is optional, never a render error. Churn Risk by Tenure now
 // reads the same snapshot's per-band tenure histogram (§6 aggregate extension);
 // Member Movement's census reads it too (its intake stays sample).
-function AttendanceHealthCard({
-  snapshot,
-  dimension,
-  onDimensionChange,
-}: {
-  snapshot: RetentionAggregateSnapshot | null;
-  dimension: 'tenure' | 'age';
-  onDimensionChange: (d: 'tenure' | 'age') => void;
-}) {
+
+// The kebab-menu drill-down selection: whole gym, or one tenure/age cohort.
+type AttendanceSelection =
+  | { kind: 'all' }
+  | { kind: 'tenure'; bandId: string; label: string }
+  | { kind: 'age'; bandId: string; label: string };
+
+// One tenure/age band's slice of the Attendance-Health classification, in the same
+// { healthy, watch, silent, unknown } shape deriveBuckets returns. Healthy is the
+// sanctioned subtraction over values the per-band compute already returned; unknown
+// is that band's recency-unknown count. No re-classification.
+function bandBuckets(
+  band: { knownActiveTotal: number; watch: number; silent: number; unknownRecency: number },
+  thresholdDays: number,
+): { thresholdDays: number; healthy: number; watch: number; silent: number; unknown: number } {
+  return {
+    thresholdDays,
+    healthy: band.knownActiveTotal - band.watch - band.silent,
+    watch: band.watch,
+    silent: band.silent,
+    unknown: band.unknownRecency,
+  };
+}
+
+function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays, excludeUnknownRecency } = useRetentionSettings();
 
-  // One render path for both sources: deriveBuckets (live histogram) and
-  // computeAttendanceHealth (sample fixture) return the SAME H/W/S/unknown shape,
-  // re-cut at the owner's CURRENT threshold whenever it changes. UNCHANGED data path
-  // — the donut layout is a pure presentation adapter over these code-computed counts.
-  const result = useMemo(
-    () =>
-      snapshot
-        ? deriveBuckets(snapshot, silentChurnThresholdDays)
-        : computeAttendanceHealth(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
-    [snapshot, silentChurnThresholdDays],
-  );
+  // Drill-down selection — the kebab (⋮) menu filters the donut to a single
+  // tenure/age cohort. Default 'all' = whole gym (the original card behavior).
+  const [selection, setSelection] = useState<AttendanceSelection>({ kind: 'all' });
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close the menu on outside-click / Escape (mirrors PeriodDropdown).
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [menuOpen]);
+
+  // Donut buckets for the current selection. 'all' = whole-gym via deriveBuckets /
+  // computeAttendanceHealth (the UNCHANGED original path). A tenure/age cohort reads
+  // that one band's slice of the SAME classification from the existing per-band
+  // computes — healthy = known − watch − silent, unknown = the band's recency-unknowns
+  // — so a filtered donut can never disagree with the rate cards. `live` tracks the
+  // selected dimension's data (tenure/age can be live or sample independently).
+  const { result, live } = useMemo(() => {
+    if (selection.kind === 'all') {
+      return {
+        result: snapshot
+          ? deriveBuckets(snapshot, silentChurnThresholdDays)
+          : computeAttendanceHealth(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
+        live: !!snapshot,
+      };
+    }
+    if (selection.kind === 'tenure') {
+      const tenureLive = !!snapshot?.tenureBands;
+      const t = snapshot?.tenureBands
+        ? computeChurnRiskByTenureFromAggregate(snapshot.tenureBands, silentChurnThresholdDays)
+        : computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY);
+      const band = t.bands.find((b) => b.id === selection.bandId) ?? t.unknownTenure;
+      return { result: bandBuckets(band, t.thresholdDays), live: tenureLive };
+    }
+    const cohortLive = !!snapshot?.cohorts;
+    const c = computeChurnRiskByCohortFromAggregate(
+      snapshot?.cohorts ?? SAMPLE_COHORT_HISTOGRAM,
+      silentChurnThresholdDays,
+    );
+    const band = c.bands.find((b) => b.id === selection.bandId) ?? c.unknownCohort;
+    return { result: bandBuckets(band, c.thresholdDays), live: cohortLive };
+  }, [selection, snapshot, silentChurnThresholdDays]);
 
   const { thresholdDays, healthy, watch, silent, unknown } = result;
 
@@ -516,25 +563,86 @@ function AttendanceHealthCard({
         <div className="attendance-health-titlerow">
           <div className="attendance-health-titlewrap">
             <h3 className="gym-card-title">Attendance Health</h3>
-            {!snapshot && <span className="gym-sample-badge">Sample data</span>}
+            {!live && <span className="gym-sample-badge">Sample data</span>}
           </div>
-          <div className="segmented-toggle" role="group" aria-label="Break down by tenure or age">
+          <div className="action-dropdown attendance-health-menu" ref={menuRef}>
             <button
               type="button"
-              className={`segmented-toggle-btn${dimension === 'tenure' ? ' is-active' : ''}`}
-              onClick={() => onDimensionChange('tenure')}
+              className="attendance-health-kebab"
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-label="Break attendance health down by tenure or age"
             >
-              By tenure
+              <FiMoreVertical aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              className={`segmented-toggle-btn${dimension === 'age' ? ' is-active' : ''}`}
-              onClick={() => onDimensionChange('age')}
-            >
-              By age
-            </button>
+            {menuOpen && (
+              <ul className="action-dropdown-menu attendance-health-menu-panel" role="menu">
+                <li>
+                  <button
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={selection.kind === 'all'}
+                    className={selection.kind === 'all' ? 'is-active' : ''}
+                    onClick={() => {
+                      setSelection({ kind: 'all' });
+                      setMenuOpen(false);
+                    }}
+                  >
+                    All members
+                  </button>
+                </li>
+                <li className="action-dropdown-group" role="presentation">
+                  By tenure
+                </li>
+                {TENURE_BANDS.map((b) => (
+                  <li key={b.id}>
+                    <button
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={selection.kind === 'tenure' && selection.bandId === b.id}
+                      className={
+                        selection.kind === 'tenure' && selection.bandId === b.id ? 'is-active' : ''
+                      }
+                      onClick={() => {
+                        setSelection({ kind: 'tenure', bandId: b.id, label: b.label });
+                        setMenuOpen(false);
+                      }}
+                    >
+                      {b.label}
+                    </button>
+                  </li>
+                ))}
+                <li className="action-dropdown-group" role="presentation">
+                  By age
+                </li>
+                {COHORT_BANDS.map((b) => (
+                  <li key={b.id}>
+                    <button
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={selection.kind === 'age' && selection.bandId === b.id}
+                      className={
+                        selection.kind === 'age' && selection.bandId === b.id ? 'is-active' : ''
+                      }
+                      onClick={() => {
+                        setSelection({ kind: 'age', bandId: b.id, label: b.label });
+                        setMenuOpen(false);
+                      }}
+                    >
+                      {b.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
+        {selection.kind !== 'all' && (
+          <p className="attendance-health-subtitle">
+            {selection.kind === 'tenure' ? 'Tenure' : 'Age'}: {selection.label}
+          </p>
+        )}
       </header>
 
       <div className="attendance-health-body">
@@ -957,173 +1065,6 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
             At-risk rates among attendance-known members in each group.
           </p>
         )}
-      </div>
-    </article>
-  );
-}
-
-// Attendance Health by tenure & age — the drill-down for the Attendance Health
-// donut. A Tenure | Age toggle swaps a band × recency-stage cross-section of
-// today's active members. Both dimensions are PRESENTATION-ONLY views over the
-// existing computes — tenure via buildSegmentExplorerView, age via
-// buildSegmentExplorerViewFromCohort (the cohort result re-keyed through the SAME
-// builder). No new classification. Same dual-source gating as the donut and the
-// rate cards: live when the snapshot carries the per-band histogram for the
-// SELECTED dimension, sample fixture otherwise; the badge tracks the selection.
-function AttendanceBreakdownCard({
-  snapshot,
-  dimension,
-}: {
-  snapshot: RetentionAggregateSnapshot | null;
-  dimension: 'tenure' | 'age';
-}) {
-  const { silentChurnThresholdDays, excludeUnknownRecency } = useRetentionSettings();
-
-  const tenureBands = snapshot?.tenureBands ?? null;
-  const cohorts = snapshot?.cohorts ?? null;
-
-  const view = useMemo(() => {
-    if (dimension === 'tenure') {
-      const result = tenureBands
-        ? computeChurnRiskByTenureFromAggregate(tenureBands, silentChurnThresholdDays)
-        : computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY);
-      return buildSegmentExplorerView(result);
-    }
-    const result = computeChurnRiskByCohortFromAggregate(
-      cohorts ?? SAMPLE_COHORT_HISTOGRAM,
-      silentChurnThresholdDays,
-    );
-    return buildSegmentExplorerViewFromCohort(result);
-  }, [dimension, tenureBands, cohorts, silentChurnThresholdDays]);
-
-  // Live only when the snapshot carries the histogram for the SELECTED dimension —
-  // the two dimensions can badge differently (tenure live, age still sample).
-  const liveAsOf =
-    dimension === 'tenure'
-      ? tenureBands && snapshot
-        ? snapshot.asOf
-        : null
-      : cohorts && snapshot
-        ? snapshot.asOf
-        : null;
-
-  const { thresholdDays, activeTotal, rows } = view;
-
-  // When parent/guardian accounts are excluded (toggle ON), drop the Unknown-recency
-  // column entirely — the grid becomes a Healthy/Watch/Silent cross-section. When OFF,
-  // all four recency stages show. The recency-unknown population is never in a rate
-  // either way (the at-risk rate is always the known base).
-  const visibleStages = excludeUnknownRecency
-    ? RECENCY_STAGES.filter((s) => s.id !== 'unknownRecency')
-    : RECENCY_STAGES;
-
-  // Day ranges for the recency columns, composed from the resolved threshold and
-  // the locked WATCH_FLOOR_DAYS — the same edges classifyMember cuts at.
-  const stageRange = (stage: RecencyStageId): string => {
-    switch (stage) {
-      case 'healthy':
-        return `0–${WATCH_FLOOR_DAYS - 1} days`;
-      case 'watch':
-        return `${WATCH_FLOOR_DAYS}–${thresholdDays - 1} days`;
-      case 'silent':
-        return `${thresholdDays}+ days`;
-      case 'unknownRecency':
-        return 'no check-in on file';
-    }
-  };
-
-  const isTenure = dimension === 'tenure';
-  const bandHeader = isTenure ? 'Current tenure today' : 'Age group';
-  const unknownLabel = isTenure ? 'Unknown tenure' : 'Unknown age';
-  // The survivorship footer is mandatory in BOTH states; sample mode has no live
-  // as-of, so it names the fixture date and flags itself as sample.
-  const asOfLabel = liveAsOf ?? '2026-06-02 (sample)';
-
-  return (
-    <article className="card gym-card gym-card--full segment-explorer-card attendance-breakdown-card">
-      <header className="gym-card-head">
-        <div className="segment-explorer-titlerow">
-          <h3 className="gym-card-title">Attendance Health by {isTenure ? 'Tenure' : 'Age'}</h3>
-          {!liveAsOf && <span className="gym-sample-badge">Sample data</span>}
-        </div>
-        <p className="gym-card-subtitle">
-          A cross-section of active members — {isTenure ? 'tenure' : 'age group'} today by recency
-          stage.
-        </p>
-      </header>
-
-      <div className="segment-explorer-body">
-        {activeTotal === 0 ? (
-          <p className="segment-explorer-empty">No active members to analyze right now.</p>
-        ) : (
-          <div
-            className="segment-explorer-table"
-            role="table"
-            aria-label={`Active members by ${isTenure ? 'tenure' : 'age group'} and recency stage`}
-          >
-            <div className="segment-explorer-head" role="row">
-              <span className="segment-explorer-col segment-explorer-col--band" role="columnheader">
-                {bandHeader}
-              </span>
-              {visibleStages.map((s) => (
-                <span
-                  key={s.id}
-                  className="segment-explorer-col segment-explorer-col--num"
-                  role="columnheader"
-                >
-                  <span className="segment-explorer-colhead">{s.label}</span>
-                  <span className="segment-explorer-colsub">{stageRange(s.id)}</span>
-                </span>
-              ))}
-              <span className="segment-explorer-col segment-explorer-col--num" role="columnheader">
-                <span className="segment-explorer-colhead">At-risk rate</span>
-                <span className="segment-explorer-colsub">known base</span>
-              </span>
-            </div>
-            <ul className="segment-explorer-rows">
-              {rows.map((row) => (
-                <li
-                  key={row.id}
-                  role="row"
-                  className={`segment-explorer-row${
-                    row.isUnknownTenure ? ' segment-explorer-row--unknown' : ''
-                  }`}
-                >
-                  <span className="segment-explorer-col segment-explorer-col--band" role="cell">
-                    {row.isUnknownTenure ? unknownLabel : row.label}
-                  </span>
-                  {row.cells
-                    .filter((cell) => visibleStages.some((s) => s.id === cell.stage))
-                    .map((cell) => (
-                      <span
-                        key={cell.stage}
-                        className="segment-explorer-col segment-explorer-col--num"
-                        role="cell"
-                      >
-                        {cell.count}
-                      </span>
-                    ))}
-                  <span className="segment-explorer-col segment-explorer-col--num" role="cell">
-                    {formatRate(row.rate)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <p className="segment-explorer-suppression-note">
-          Cells are aggregate counts of active members by {isTenure ? 'tenure' : 'age group'} and
-          recency stage. No member identities or individual records are stored or shown.
-        </p>
-
-        <p className="segment-explorer-survivorship">
-          Snapshot as of {asOfLabel}. This is a cross-section of today&rsquo;s active members —
-          members who already left are not in this base, so{' '}
-          {isTenure
-            ? 'long-tenure bands show survivors only and can look healthier than the real experience.'
-            : 'each age group shows only members who are still active today.'}
-        </p>
       </div>
     </article>
   );
