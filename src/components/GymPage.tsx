@@ -99,7 +99,7 @@ export function GymPage() {
               Group / Segment Explorer, Churn by Belt a recessed full-width card at
               the bottom (data not connected yet). */}
           <section className="gym-section">
-            <div className="gym-card-grid">
+            <div className="gym-card-grid gym-card-grid--patterns">
               <ChurnRiskByTenureCard snapshot={snapshot} />
               <CohortRetentionCard snapshot={snapshot} />
               <SegmentExplorerCard snapshot={snapshot} />
@@ -633,6 +633,7 @@ function attendanceYoYInsight(current: number | null, prior: number | null): str
 // accounts) — honesty notes, not defects.
 function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays, excludeUnknownRecency } = useRetentionSettings();
+  const titleTooltipId = useId();
 
   const tenureBands = snapshot?.tenureBands ?? null;
   const result = useMemo(
@@ -647,67 +648,101 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
   // still honestly Sample (pre-tenure row → tenureBands null).
   const liveAsOf = tenureBands && snapshot ? snapshot.asOf : null;
 
-  const { thresholdDays, activeTotal, bands, unknownTenure } = result;
+  const { activeTotal, bands, unknownTenure } = result;
 
   // Rates are ALWAYS over the attendance-known base (recency-unknown held out); the
   // displayed Tracked column is that same denominator so each row reconciles
   // (atRisk / Tracked === Risk rate). There is no full-base view any more.
   const heroBandId = result.heroBandIdKnown;
   const heroBand = bands.find((b) => b.id === heroBandId) ?? null;
-  const bandActive = (b: TenureBandRisk) => b.knownActiveTotal;
   const bandRate = (b: TenureBandRisk) => b.riskRateKnown;
   // Recency-unknowns held out of the known base, summed across the REAL bands.
   // (The unknownTenure bucket is a SEPARATE population — bad membershipStart, not
   // bad attendance — and is never part of any band's rate denominator.)
   const unknownRecencyTotal = bands.reduce((sum, b) => sum + b.unknownRecency, 0);
 
+  // Bars scale to a ceiling of (max rate rounded to the nearest 10%) + 10% — not a
+  // flat 100% — so the differences between cohorts read more clearly (e.g. a 57%
+  // max rounds to 60%, +10% → a 70% ceiling). Value labels still show the true
+  // rate; only the bar width is rescaled.
+  const barRates = [
+    ...bands.map(bandRate),
+    unknownTenure.activeTotal > 0 ? unknownTenure.riskRate : null,
+  ].filter((r): r is number => r !== null);
+  const barCeiling =
+    barRates.length > 0
+      ? (Math.round((Math.max(...barRates) * 100) / 10) * 10 + 10) / 100
+      : 1;
+
+  // Risk rate rendered as a Top-Traffic-Source-style bar + value: track fills
+  // left-to-right to the rate (scaled to barCeiling), value right of the bar. A
+  // null rate has no denominator, so there is no bar to draw — an em dash.
+  const rateCell = (rate: number | null) =>
+    rate === null ? (
+      <span className="churn-tenure-rate-empty">—</span>
+    ) : (
+      <>
+        <span className="churn-tenure-bar" aria-hidden="true">
+          <span
+            className="churn-tenure-bar-fill"
+            style={{ width: `${Math.min(100, Math.round((rate / barCeiling) * 100))}%` }}
+          />
+        </span>
+        <span className="churn-tenure-rate-val">{formatRate(rate)}</span>
+      </>
+    );
+
   return (
-    <article className="card gym-card gym-card--full churn-tenure-card">
+    <article className="card gym-card gym-card--third churn-tenure-card">
       <header className="gym-card-head">
         <div className="churn-tenure-titlerow">
-          <h3 className="gym-card-title">Churn Risk by Tenure</h3>
+          <h3 className="gym-card-title">Churn Risk by Time as Member</h3>
+          <div className="db-tooltip-wrap">
+            <button
+              type="button"
+              className="db-tooltip-btn"
+              aria-label="How tenure is measured"
+              aria-describedby={titleTooltipId}
+            >
+              &#9432;
+            </button>
+            <div
+              id={titleTooltipId}
+              role="tooltip"
+              className="db-tooltip-panel is-left is-wide churn-tenure-title-tooltip-panel"
+            >
+              <ul className="db-tooltip-list">
+                <li className="db-tooltip-body">
+                  Tenure counts from each member&rsquo;s start date in our current
+                  records (Wodify&rsquo;s &ldquo;Client Since&rdquo;). Members whose
+                  history predates these records can show shorter tenure than their
+                  real one, and staff accounts carry account-setup dates rather than
+                  member tenure.
+                </li>
+              </ul>
+            </div>
+          </div>
           {!liveAsOf && (
             <span className="gym-sample-badge">Sample data</span>
           )}
         </div>
-        <p className="gym-card-subtitle">Which tenure cohort is drifting most.</p>
       </header>
 
       <div className="churn-tenure-body">
         {activeTotal === 0 || !heroBand ? (
           <p className="churn-tenure-empty">No active members to analyze right now.</p>
-        ) : (
-          <>
-            <div className="churn-tenure-hero">
-              <span className="churn-tenure-hero-value">{formatRate(bandRate(heroBand))}</span>
-              <span className="churn-tenure-hero-label">
-                at risk in the {heroBand.label} cohort — the highest by tenure
-              </span>
-            </div>
-            <p className="churn-tenure-helper">
-              At-risk = active members on watch or silent at the {thresholdDays}-day threshold
-              ({heroBand.atRisk} of {bandActive(heroBand)} attendance-known in this band).
-            </p>
-          </>
-        )}
+        ) : null}
 
         <div className="churn-tenure-table">
           <div className="churn-tenure-head">
             <span className="churn-tenure-col churn-tenure-col--band">Tenure</span>
-            <span className="churn-tenure-col churn-tenure-col--num">Tracked</span>
-            <span className="churn-tenure-col churn-tenure-col--num">At risk</span>
-            <span className="churn-tenure-col churn-tenure-col--num">Risk rate</span>
+            <span className="churn-tenure-col churn-tenure-col--rate-head">Risk rate</span>
           </div>
           <ul className="churn-tenure-rows">
             {bands.map((b) => (
-              <li
-                key={b.id}
-                className={`churn-tenure-row${b.id === heroBandId ? ' churn-tenure-row--hero' : ''}`}
-              >
+              <li key={b.id} className="churn-tenure-row">
                 <span className="churn-tenure-col churn-tenure-col--band">{b.label}</span>
-                <span className="churn-tenure-col churn-tenure-col--num">{bandActive(b)}</span>
-                <span className="churn-tenure-col churn-tenure-col--num">{b.atRisk}</span>
-                <span className="churn-tenure-col churn-tenure-col--num">{formatRate(bandRate(b))}</span>
+                <span className="churn-tenure-col churn-tenure-col--rate">{rateCell(bandRate(b))}</span>
               </li>
             ))}
             {/* Dirty-data members (missing/invalid or future membershipStart) are
@@ -719,14 +754,8 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
                 <span className="churn-tenure-col churn-tenure-col--band">
                   {unknownTenure.label}
                 </span>
-                <span className="churn-tenure-col churn-tenure-col--num">
-                  {unknownTenure.activeTotal}
-                </span>
-                <span className="churn-tenure-col churn-tenure-col--num">
-                  {unknownTenure.atRisk}
-                </span>
-                <span className="churn-tenure-col churn-tenure-col--num">
-                  {formatRate(unknownTenure.riskRate)}
+                <span className="churn-tenure-col churn-tenure-col--rate">
+                  {rateCell(unknownTenure.riskRate)}
                 </span>
               </li>
             )}
@@ -736,14 +765,6 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
         {!excludeUnknownRecency && unknownRecencyTotal > 0 && (
           <p className="churn-tenure-base-note">
             Rates among attendance-known members in each cohort.
-          </p>
-        )}
-        {liveAsOf && (
-          <p className="churn-tenure-caveat">
-            Tenure counts from each member&rsquo;s start date in our current records
-            (Wodify&rsquo;s &ldquo;Client Since&rdquo;). Members whose history predates
-            these records can show shorter tenure than their real one, and staff
-            accounts carry account-setup dates rather than member tenure.
           </p>
         )}
       </div>
