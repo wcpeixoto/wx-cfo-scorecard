@@ -792,6 +792,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
 // ended." Copy over the deterministic numbers; the card never authors the call.
 function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays, excludeUnknownRecency } = useRetentionSettings();
+  const titleTooltipId = useId();
 
   const cohorts = snapshot?.cohorts ?? null;
   const result = useMemo(
@@ -807,28 +808,81 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
   // (pre-cohort row → cohorts null).
   const liveAsOf = cohorts && snapshot ? snapshot.asOf : null;
 
-  const { thresholdDays, activeTotal, bands, unknownCohort } = result;
+  const { activeTotal, bands, unknownCohort } = result;
 
   // Read 1, identical to Churn-by-Tenure: rates are always over the attendance-known
   // base (recency-unknown held out); atRisk is unchanged. No full-base view.
   const heroBandId = result.heroBandIdKnown;
   const heroBand = bands.find((b) => b.id === heroBandId) ?? null;
-  const bandActive = (b: CohortRisk) => b.knownActiveTotal;
   const bandRate = (b: CohortRisk) => b.riskRateKnown;
   const unknownRecencyTotal = bands.reduce((sum, b) => sum + b.unknownRecency, 0);
-
-  // Read 2 lapsed cells render the real aggregate count (owner-dashboard
-  // aggregate-count policy — AGENTS.md "Retention page data policy"; no <5 mask).
 
   // The unknown-cohort row renders only when it carries members (active or lapsed),
   // matching the unknown-tenure row's "surface, don't fabricate" rule.
   const showUnknownRow = unknownCohort.activeTotal > 0 || unknownCohort.lapsed > 0;
 
+  // Risk rate as a scaled bar + value, identical to Churn-by-Tenure: bars scale to
+  // a ceiling of (max rate rounded to nearest 10%) + 10% so cohort differences read
+  // clearly; value labels show the true rate; a null rate has no bar (em dash).
+  const barRates = [
+    ...bands.map(bandRate),
+    showUnknownRow ? bandRate(unknownCohort) : null,
+  ].filter((r): r is number => r !== null);
+  const barCeiling =
+    barRates.length > 0
+      ? (Math.round((Math.max(...barRates) * 100) / 10) * 10 + 10) / 100
+      : 1;
+  const rateCell = (rate: number | null) =>
+    rate === null ? (
+      <span className="cohort-age-rate-empty">—</span>
+    ) : (
+      <>
+        <span className="cohort-age-bar" aria-hidden="true">
+          <span
+            className="cohort-age-bar-fill"
+            style={{ width: `${Math.min(100, Math.round((rate / barCeiling) * 100))}%` }}
+          />
+        </span>
+        <span className="cohort-age-rate-val">{formatRate(rate)}</span>
+      </>
+    );
+
   return (
-    <article className="card gym-card gym-card--full cohort-age-card">
+    <article className="card gym-card gym-card--third cohort-age-card">
       <header className="gym-card-head">
         <div className="cohort-age-titlerow">
-          <h3 className="gym-card-title">Retention by Age Group</h3>
+          <h3 className="gym-card-title">by Age Group</h3>
+          <div className="db-tooltip-wrap">
+            <button
+              type="button"
+              className="db-tooltip-btn"
+              aria-label="How age groups are measured"
+              aria-describedby={titleTooltipId}
+            >
+              &#9432;
+            </button>
+            <div
+              id={titleTooltipId}
+              role="tooltip"
+              className="db-tooltip-panel is-left is-wide cohort-age-title-tooltip-panel"
+            >
+              <ul className="db-tooltip-list">
+                <li className="db-tooltip-body">
+                  Counts are aggregate age-group totals. No member names, IDs, DOBs,
+                  exact ages, or individual records are stored or shown.
+                </li>
+                <li className="db-tooltip-body">
+                  Age groups come from each member&rsquo;s date of birth (age ranges
+                  only — birthdates never leave our system). &ldquo;Lapsed&rdquo;
+                  counts everyone whose membership is inactive today; because inactive
+                  profiles can include never-enrolled accounts (a parent/guardian,
+                  staff, or a legacy profile) that skew into Adults 16+, read it as
+                  &ldquo;inactive in this age group,&rdquo; not &ldquo;memberships
+                  ended.&rdquo;
+                </li>
+              </ul>
+            </div>
+          </div>
           {!liveAsOf && (
             <span className="gym-sample-badge">Sample data</span>
           )}
@@ -839,41 +893,18 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
       <div className="cohort-age-body">
         {activeTotal === 0 || !heroBand ? (
           <p className="cohort-age-empty">No active members to analyze right now.</p>
-        ) : (
-          <>
-            <div className="cohort-age-hero">
-              <span className="cohort-age-hero-value">{formatRate(bandRate(heroBand))}</span>
-              <span className="cohort-age-hero-label">
-                at risk in {heroBand.label} — the highest by age group
-              </span>
-            </div>
-            <p className="cohort-age-helper">
-              At-risk = active members on watch or silent at the {thresholdDays}-day threshold
-              ({heroBand.atRisk} of {bandActive(heroBand)} attendance-known in this group). Lapsed =
-              members whose membership is inactive today.
-            </p>
-          </>
-        )}
+        ) : null}
 
         <div className="cohort-age-table">
           <div className="cohort-age-head">
             <span className="cohort-age-col cohort-age-col--band">Age group</span>
-            <span className="cohort-age-col cohort-age-col--num">Tracked</span>
-            <span className="cohort-age-col cohort-age-col--num">At risk</span>
-            <span className="cohort-age-col cohort-age-col--num">Risk rate</span>
-            <span className="cohort-age-col cohort-age-col--num">Lapsed</span>
+            <span className="cohort-age-col cohort-age-col--rate-head">Risk rate</span>
           </div>
           <ul className="cohort-age-rows">
             {bands.map((b) => (
-              <li
-                key={b.id}
-                className={`cohort-age-row${b.id === heroBandId ? ' cohort-age-row--hero' : ''}`}
-              >
+              <li key={b.id} className="cohort-age-row">
                 <span className="cohort-age-col cohort-age-col--band">{b.label}</span>
-                <span className="cohort-age-col cohort-age-col--num">{bandActive(b)}</span>
-                <span className="cohort-age-col cohort-age-col--num">{b.atRisk}</span>
-                <span className="cohort-age-col cohort-age-col--num">{formatRate(bandRate(b))}</span>
-                <span className="cohort-age-col cohort-age-col--num">{b.lapsed}</span>
+                <span className="cohort-age-col cohort-age-col--rate">{rateCell(bandRate(b))}</span>
               </li>
             ))}
             {/* Unknown-age members (missing/sentinel/invalid DOB) surfaced rather
@@ -882,12 +913,9 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
             {showUnknownRow && (
               <li className="cohort-age-row cohort-age-row--unknown">
                 <span className="cohort-age-col cohort-age-col--band">{unknownCohort.label}</span>
-                <span className="cohort-age-col cohort-age-col--num">{bandActive(unknownCohort)}</span>
-                <span className="cohort-age-col cohort-age-col--num">{unknownCohort.atRisk}</span>
-                <span className="cohort-age-col cohort-age-col--num">
-                  {formatRate(bandRate(unknownCohort))}
+                <span className="cohort-age-col cohort-age-col--rate">
+                  {rateCell(bandRate(unknownCohort))}
                 </span>
-                <span className="cohort-age-col cohort-age-col--num">{unknownCohort.lapsed}</span>
               </li>
             )}
           </ul>
@@ -898,18 +926,6 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
             At-risk rates among attendance-known members in each group.
           </p>
         )}
-        <p className="cohort-age-suppression-note">
-          Counts are aggregate age-group totals. No member names, IDs, DOBs, exact ages, or
-          individual records are stored or shown.
-        </p>
-
-        <p className="cohort-age-caveat">
-          Age groups come from each member&rsquo;s date of birth (age ranges only — birthdates
-          never leave our system). &ldquo;Lapsed&rdquo; counts everyone whose membership is
-          inactive today; because inactive profiles can include never-enrolled accounts (a
-          parent/guardian, staff, or a legacy profile) that skew into Adults 16+, read it as
-          &ldquo;inactive in this age group,&rdquo; not &ldquo;memberships ended.&rdquo;
-        </p>
       </div>
     </article>
   );
