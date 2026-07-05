@@ -13458,11 +13458,11 @@ body {
   .app-sidebar.is-collapsed .app-sidebar-submenu { display: flex; }
 }
 
-/* ── Retention by Age Group (Cohort Retention) — cohort risk + lapsed table ──
-   Half-width Patterns card. Card outer stays the locked white .card surface
-   (UI_CARDS); inner content copies the .churn-tenure-* table idiom (not a shared
-   primitive — see the no-generalize rule) with a 5th "Lapsed" (Read 2) column. No
-   new hex values. */
+/* ── Retention by Age Group (Cohort Retention) — cohort risk table ──
+   1/3-width Patterns card. Card outer stays the locked white .card surface
+   (UI_CARDS); inner content mirrors the finished .churn-tenure-* table idiom
+   (Basic Table 3 header + Top-Traffic-Source bars — not a shared primitive, see
+   the no-generalize rule). No new hex values. */
 .cohort-age-titlerow {
   display: flex;
   align-items: center;
@@ -13474,26 +13474,7 @@ body {
   flex-direction: column;
   gap: 16px;
 }
-.cohort-age-hero {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.cohort-age-hero-value {
-  font-size: 32px;
-  font-weight: 600;
-  line-height: 1.1;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-.cohort-age-hero-label {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-.cohort-age-helper,
-.cohort-age-empty,
-.cohort-age-caveat,
-.cohort-age-suppression-note {
+.cohort-age-empty {
   margin: 0;
   font-size: 14px;
   color: var(--text-secondary);
@@ -13501,28 +13482,32 @@ body {
 .cohort-age-head,
 .cohort-age-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 56px 56px 72px 56px;
-  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 24px;
   align-items: center;
 }
+/* Column titles — Basic Table 3 header: text-theme-sm / font-normal / gray-500
+   (14px/400, line-height 20px). No divider rule (dividers removed). */
 .cohort-age-head {
-  padding: 0 0 8px;
+  padding: 0 0 12px;
 }
 .cohort-age-head .cohort-age-col {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
   color: var(--text-secondary);
+}
+.cohort-age-col--rate-head {
+  text-align: right;
 }
 .cohort-age-rows {
   list-style: none;
   margin: 0;
   padding: 0;
 }
+/* Body rows — text-theme-sm, no dividers. */
 .cohort-age-row {
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
+  padding: 12px 0;
   font-size: 14px;
   color: var(--text-primary);
 }
@@ -13532,13 +13517,39 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cohort-age-col--num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+/* Rate cell — Top-Traffic-Source row: proportional bar then the value. */
+.cohort-age-col--rate {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.cohort-age-row--hero { background: var(--bg-main); }
-.cohort-age-row--hero .cohort-age-col--band { font-weight: 600; }
-/* Unknown-age (dirty-data) row — muted so it reads as a data-quality note. */
+.cohort-age-bar {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+.cohort-age-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--brand-500);
+}
+.cohort-age-rate-val {
+  flex: 0 0 auto;
+  min-width: 34px;
+  text-align: right;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.cohort-age-rate-empty {
+  color: var(--text-secondary);
+}
+/* Unknown-age (dirty-data) row — muted text; its bar keeps the shared brand fill. */
 .cohort-age-row--unknown .cohort-age-col { color: var(--text-secondary); }
 .cohort-age-base-note {
   margin: 0;
