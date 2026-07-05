@@ -13052,7 +13052,16 @@ body {
    mirroring the .silent-churn-* inner scale. The breakdown tiles are inner
    sub-elements (UI_CARDS out of scope), matching a dashed inset
    (12px radius, --bg-main, 1px --line). */
+/* Title/badge left, the By tenure | By age drill-down toggle right; wraps on a
+   narrow (1/3-width) card so the toggle drops below the title instead of clipping. */
 .attendance-health-titlerow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.attendance-health-titlewrap {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -13317,17 +13326,6 @@ body {
    grid and right-aligned numeric cells. Card outer stays the locked white .card
    surface (UI_CARDS). No new hex values. */
 .segment-explorer-titlerow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-/* Attendance Health drill-down header — title/badge left, Tenure|Age toggle right. */
-.attendance-breakdown-titlerow {
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.attendance-breakdown-titlewrap {
   display: flex;
   align-items: center;
   gap: 10px;
