@@ -713,7 +713,6 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
             <span className="gym-sample-badge">Sample data</span>
           )}
         </div>
-        <p className="gym-card-subtitle">Which tenure cohort is drifting most.</p>
       </header>
 
       <div className="churn-tenure-body">

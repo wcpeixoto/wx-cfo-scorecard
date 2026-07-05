@@ -13181,31 +13181,30 @@ body {
   gap: 16px;
   align-items: center;
 }
-/* Column titles — Basic Table 3 header: text-theme-xs / font-medium / gray-500,
-   left-aligned (no uppercase), with a gray-100 rule under the header. */
+/* Column titles — Basic Table 3 header: text-theme-xs / font-medium / gray-500.
+   No divider rule (dividers removed). */
 .churn-tenure-head {
   padding: 0 0 12px;
-  border-bottom: 1px solid var(--bg-muted);
 }
 .churn-tenure-head .churn-tenure-col {
   font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
 }
+/* Risk-rate title right-aligned over the values. */
+.churn-tenure-col--rate-head {
+  text-align: right;
+}
 .churn-tenure-rows {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-/* Body rows — text-theme-sm, gray-100 dividers between rows (Basic Table 3). */
+/* Body rows — text-theme-sm, no dividers. */
 .churn-tenure-row {
   padding: 12px 0;
-  border-bottom: 1px solid var(--bg-muted);
   font-size: 14px;
   color: var(--text-primary);
-}
-.churn-tenure-rows .churn-tenure-row:last-child {
-  border-bottom: none;
 }
 .churn-tenure-col--band {
   font-weight: 500;
@@ -13245,15 +13244,13 @@ body {
 .churn-tenure-rate-empty {
   color: var(--text-secondary);
 }
+/* Highest-risk row keeps a subtle emphasis via background + bold label; the bar
+   and value stay the shared brand color (all bars one color). */
 .churn-tenure-row--hero { background: var(--bg-main); }
 .churn-tenure-row--hero .churn-tenure-col--band { font-weight: 600; }
-/* Highest-risk row keeps its distinct color — bar and value in --warning. */
-.churn-tenure-row--hero .churn-tenure-bar-fill { background: var(--warning); }
-.churn-tenure-row--hero .churn-tenure-rate-val { color: var(--warning); }
-/* Unknown-tenure (dirty-data) row — muted so it reads as a data-quality note,
-   matching the Attendance Health "Unknown" tile. Only renders when present. */
+/* Unknown-tenure (dirty-data) row — muted text so it reads as a data-quality
+   note; its bar keeps the shared brand fill. Only renders when present. */
 .churn-tenure-row--unknown .churn-tenure-col { color: var(--text-secondary); }
-.churn-tenure-row--unknown .churn-tenure-bar-fill { background: var(--text-secondary); }
 
 /* ── Segment Explorer (1a) — tenure × recency cross-section grid ──────────
    Full-width Patterns card. A NEW presentation view over the same
