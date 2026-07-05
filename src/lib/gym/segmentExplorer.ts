@@ -15,6 +15,7 @@
 // deriveBuckets. Pure + unit-tested so the grid can never drift from its source.
 
 import type { ChurnRiskByTenureResult, TenureBandRisk } from './churnRiskByTenure';
+import type { ChurnRiskByCohortResult } from './churnRiskByCohort';
 
 // Owner-dashboard aggregate-count policy (AGENTS.md — "Retention page data policy"):
 // these tenure × recency cells are aggregate counts of active members, with no
@@ -112,4 +113,22 @@ export function buildSegmentExplorerView(
     rows,
     unknownRecencyTotal,
   };
+}
+
+// Age-group variant. The cohort result (churnRiskByCohort.ts) mirrors the tenure
+// result — same per-band shape (CohortRisk adds only `lapsed`, which this grid
+// ignores) — except its dirty-data bucket is named `unknownCohort`. Re-key it so
+// the SAME builder produces the age × recency cross-section. No new arithmetic;
+// the age × stage grid can never drift from the tenure one.
+export function buildSegmentExplorerViewFromCohort(
+  result: ChurnRiskByCohortResult,
+): SegmentExplorerView {
+  return buildSegmentExplorerView({
+    thresholdDays: result.thresholdDays,
+    activeTotal: result.activeTotal,
+    bands: result.bands,
+    unknownTenure: result.unknownCohort,
+    heroBandId: result.heroBandId,
+    heroBandIdKnown: result.heroBandIdKnown,
+  });
 }
