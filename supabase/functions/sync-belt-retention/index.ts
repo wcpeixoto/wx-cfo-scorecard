@@ -53,6 +53,7 @@
 import {
   aggregateUpload,
   classifyUploads,
+  contentLengthExceeds,
   corsHeadersFor,
   exceedsSizeCap,
   verifyImportSecret,
@@ -150,10 +151,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    // 3. Size cap on the RAW upload, BEFORE aggregation. Read the multipart form,
-    //    collect at most MAX_FILE_PARTS file parts, and reject if any single file
-    //    or the running total exceeds the cap. The `File` parts expose `.size`
-    //    without materializing the bytes; we only read text after the cap passes.
+    // 3a. Content-Length MEMORY early-out — reject an oversized body BEFORE
+    //     req.formData() buffers it all into memory. BEST-EFFORT ONLY: the header
+    //     can be absent (chunked) or understated, so this never REPLACES the
+    //     authoritative post-parse cap below — it just avoids buffering a body we'd
+    //     reject anyway. Multipart overhead means a legit ≤15 MB upload always has
+    //     Content-Length ≥ its file bytes, so this can't false-reject a valid one.
+    if (contentLengthExceeds(req.headers.get('Content-Length'), MAX_TOTAL_BYTES)) {
+      return reject(413, 'payload_too_large', cors);
+    }
+
+    // 3b. Authoritative size cap on the RAW upload, BEFORE aggregation. Read the
+    //     multipart form, collect at most MAX_FILE_PARTS file parts, and reject if
+    //     any single file or the running total exceeds the cap. The `File` parts
+    //     expose `.size` without materializing bytes; text is read only after this.
     let form: FormData;
     try {
       form = await req.formData();

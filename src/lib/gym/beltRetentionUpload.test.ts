@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   aggregateUpload,
   classifyUploads,
+  contentLengthExceeds,
   exceedsSizeCap,
   verifyImportSecret,
   MAX_FILE_BYTES,
@@ -89,6 +90,36 @@ describe('exceedsSizeCap', () => {
 
   it('total cap is three times the per-file cap', () => {
     expect(MAX_TOTAL_BYTES).toBe(3 * MAX_FILE_BYTES);
+  });
+});
+
+// ─── contentLengthExceeds (best-effort memory early-out) ─────────────────────
+describe('contentLengthExceeds', () => {
+  it('absent header (null / undefined) → false (defer to the post-parse cap)', () => {
+    expect(contentLengthExceeds(null, MAX_TOTAL_BYTES)).toBe(false);
+    expect(contentLengthExceeds(undefined, MAX_TOTAL_BYTES)).toBe(false);
+  });
+
+  it('non-numeric / garbage / empty → false (defer, never throw)', () => {
+    expect(contentLengthExceeds('', MAX_TOTAL_BYTES)).toBe(false);
+    expect(contentLengthExceeds('   ', MAX_TOTAL_BYTES)).toBe(false);
+    expect(contentLengthExceeds('not-a-number', MAX_TOTAL_BYTES)).toBe(false);
+    expect(contentLengthExceeds('12abc', MAX_TOTAL_BYTES)).toBe(false);
+    expect(contentLengthExceeds('-5', MAX_TOTAL_BYTES)).toBe(false); // negative → not \d+
+    expect(contentLengthExceeds('1e9', MAX_TOTAL_BYTES)).toBe(false); // scientific → not \d+
+  });
+
+  it('exactly maxBytes → false (boundary is not "exceeds")', () => {
+    expect(contentLengthExceeds(String(MAX_TOTAL_BYTES), MAX_TOTAL_BYTES)).toBe(false);
+  });
+
+  it('> maxBytes → true (early-out fires)', () => {
+    expect(contentLengthExceeds(String(MAX_TOTAL_BYTES + 1), MAX_TOTAL_BYTES)).toBe(true);
+    expect(contentLengthExceeds('99999999999', MAX_TOTAL_BYTES)).toBe(true);
+  });
+
+  it('a legit small upload → false', () => {
+    expect(contentLengthExceeds('200000', MAX_TOTAL_BYTES)).toBe(false); // ~200 KB
   });
 });
 
