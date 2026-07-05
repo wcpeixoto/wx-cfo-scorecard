@@ -13,7 +13,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import ReactApexChart from 'react-apexcharts';
-import { FiAlertTriangle, FiCheck, FiMoreVertical, FiPhone } from 'react-icons/fi';
+import { FiAlertTriangle, FiCheck, FiChevronDown, FiMoreVertical, FiPhone } from 'react-icons/fi';
 import { useRetentionSettings } from '../context/RetentionSettingsContext';
 import { FIXTURE_TODAY, SAMPLE_GYM_MEMBERS } from '../lib/gym/memberFixture';
 import {
@@ -757,10 +757,102 @@ function attendanceYoYInsight(current: number | null, prior: number | null): str
     : `↓ ${deltaPct}% worse than this month last year`;
 }
 
+// The rate-column metric the two rate cards can switch between via the header
+// chevron dropdown. Default High risk (silent); Healthy and Reconnect are the other
+// two attendance stages. Local state → resets to High risk on every mount (page load).
+type RateMetric = 'highRisk' | 'healthy' | 'reconnect';
+const RATE_METRICS: readonly RateMetric[] = ['highRisk', 'healthy', 'reconnect'];
+const RATE_METRIC_LABELS: Record<RateMetric, string> = {
+  highRisk: 'High risk',
+  healthy: 'Healthy',
+  reconnect: 'Reconnect',
+};
+
+// The selected metric's rate over the attendance-known base, from values the per-band
+// compute already returned (High risk = silent, Reconnect = watch, Healthy = known −
+// watch − silent). null when the band has no known base. No new classification.
+function metricRate(
+  b: { knownActiveTotal: number; watch: number; silent: number },
+  metric: RateMetric,
+): number | null {
+  if (b.knownActiveTotal <= 0) return null;
+  const n =
+    metric === 'highRisk'
+      ? b.silent
+      : metric === 'reconnect'
+        ? b.watch
+        : b.knownActiveTotal - b.watch - b.silent;
+  return n / b.knownActiveTotal;
+}
+
+// Header dropdown that swaps the rate column's metric (High risk / Healthy /
+// Reconnect). Reuses the canonical .action-dropdown menu; outside-click / Escape close.
+function RateMetricDropdown({
+  value,
+  onChange,
+}: {
+  value: RateMetric;
+  onChange: (m: RateMetric) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [open]);
+  return (
+    <div className="action-dropdown rate-metric-dropdown" ref={ref}>
+      <button
+        type="button"
+        className="rate-metric-trigger"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Rate column metric: ${RATE_METRIC_LABELS[value]}`}
+      >
+        {RATE_METRIC_LABELS[value]}
+        <FiChevronDown className={`rate-metric-caret${open ? ' is-open' : ''}`} aria-hidden="true" />
+      </button>
+      {open && (
+        <ul className="action-dropdown-menu rate-metric-menu" role="menu">
+          {RATE_METRICS.map((m) => (
+            <li key={m}>
+              <button
+                type="button"
+                role="menuitemradio"
+                aria-checked={m === value}
+                className={m === value ? 'is-active' : ''}
+                onClick={() => {
+                  onChange(m);
+                  setOpen(false);
+                }}
+              >
+                {RATE_METRIC_LABELS[m]}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // Churn Risk by Tenure — the first Patterns card to turn the member layer into a
 // segment insight. Buckets ACTIVE members by tenure (days since membershipStart)
-// and, within each band, shows the HIGH-RISK share (silent only) at the LIVE
-// resolved threshold, using the same classifyMember the Watch cards use — so the
+// and, within each band, shows the header-selected stage rate (default High risk =
+// silent; the dropdown swaps to Healthy or Reconnect) at the LIVE resolved
+// threshold, using the same classifyMember the Watch cards use — so the
 // silent slices here re-partition the Silent Churn set rather than redefining it.
 // This matches the Attendance Health donut's high-risk headline. Deterministic: the
 // copy only rephrases code-computed counts and rates; it never authors the call.
@@ -778,6 +870,8 @@ function attendanceYoYInsight(current: number | null, prior: number | null): str
 function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays, excludeUnknownRecency } = useRetentionSettings();
   const titleTooltipId = useId();
+  // Header-dropdown metric; resets to High risk on every mount.
+  const [rateMetric, setRateMetric] = useState<RateMetric>('highRisk');
 
   const tenureBands = snapshot?.tenureBands ?? null;
   const result = useMemo(
@@ -798,10 +892,9 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
   // out): silent / knownActiveTotal. There is no full-base view.
   const heroBandId = result.heroBandIdKnown;
   const heroBand = bands.find((b) => b.id === heroBandId) ?? null;
-  // High-risk rate (silent only), matching the Attendance Health donut headline —
-  // NOT the at-risk (watch + silent) rate. null when the band has no known base.
-  const bandRate = (b: TenureBandRisk) =>
-    b.knownActiveTotal > 0 ? b.silent / b.knownActiveTotal : null;
+  // The header-selected metric's rate (default High risk = silent / known, matching
+  // the Attendance Health donut headline). null when the band has no known base.
+  const bandRate = (b: TenureBandRisk) => metricRate(b, rateMetric);
   // Recency-unknowns held out of the known base, summed across the REAL bands.
   // (The unknownTenure bucket is a SEPARATE population — bad membershipStart, not
   // bad attendance — and is never part of any band's rate denominator.)
@@ -883,7 +976,9 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
         <div className="churn-tenure-table">
           <div className="churn-tenure-head">
             <span className="churn-tenure-col churn-tenure-col--band">Tenure</span>
-            <span className="churn-tenure-col churn-tenure-col--rate-head">High risk</span>
+            <span className="churn-tenure-col churn-tenure-col--rate-head">
+              <RateMetricDropdown value={rateMetric} onChange={setRateMetric} />
+            </span>
           </div>
           <ul className="churn-tenure-rows">
             {bands.map((b) => (
@@ -911,7 +1006,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
 
         {!excludeUnknownRecency && unknownRecencyTotal > 0 && (
           <p className="churn-tenure-base-note">
-            High-risk rates among attendance-known members in each cohort.
+            {RATE_METRIC_LABELS[rateMetric]} rates among attendance-known members in each cohort.
           </p>
         )}
       </div>
@@ -940,6 +1035,8 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
 function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
   const { silentChurnThresholdDays, excludeUnknownRecency } = useRetentionSettings();
   const titleTooltipId = useId();
+  // Header-dropdown metric; resets to High risk on every mount.
+  const [rateMetric, setRateMetric] = useState<RateMetric>('highRisk');
 
   const cohorts = snapshot?.cohorts ?? null;
   const result = useMemo(
@@ -961,10 +1058,9 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
   // base (recency-unknown held out); atRisk is unchanged. No full-base view.
   const heroBandId = result.heroBandIdKnown;
   const heroBand = bands.find((b) => b.id === heroBandId) ?? null;
-  // High-risk rate (silent only), matching the Attendance Health donut headline —
-  // NOT the at-risk (watch + silent) rate. null when the band has no known base.
-  const bandRate = (b: CohortRisk) =>
-    b.knownActiveTotal > 0 ? b.silent / b.knownActiveTotal : null;
+  // The header-selected metric's rate (default High risk = silent / known, matching
+  // the Attendance Health donut headline). null when the band has no known base.
+  const bandRate = (b: CohortRisk) => metricRate(b, rateMetric);
   const unknownRecencyTotal = bands.reduce((sum, b) => sum + b.unknownRecency, 0);
 
   // High-risk rate as a scaled bar + value, identical to Churn-by-Tenure: bars scale to
@@ -1041,7 +1137,9 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
         <div className="cohort-age-table">
           <div className="cohort-age-head">
             <span className="cohort-age-col cohort-age-col--band">Age group</span>
-            <span className="cohort-age-col cohort-age-col--rate-head">High risk</span>
+            <span className="cohort-age-col cohort-age-col--rate-head">
+              <RateMetricDropdown value={rateMetric} onChange={setRateMetric} />
+            </span>
           </div>
           <ul className="cohort-age-rows">
             {bands.map((b) => (
@@ -1055,7 +1153,7 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
 
         {!excludeUnknownRecency && unknownRecencyTotal > 0 && (
           <p className="cohort-age-base-note">
-            High-risk rates among attendance-known members in each group.
+            {RATE_METRIC_LABELS[rateMetric]} rates among attendance-known members in each group.
           </p>
         )}
       </div>
