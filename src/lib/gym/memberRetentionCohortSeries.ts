@@ -37,7 +37,7 @@ export type CohortOverlay = {
 // exported churnPctOf and the .retentionPct field both read directly off the point.
 //   - suppressed row (counts null) → null gap
 //   - returning + lost === 0 (a zero-event band) → null (never 0/0)
-function cohortRowToPoint(row: CohortRetentionRow): RetentionEvolutionPoint | null {
+export function cohortRowToPoint(row: CohortRetentionRow): RetentionEvolutionPoint | null {
   if (row.suppressed) return null;
   const returning = row.returningMembers;
   const lost = row.lostMembers;

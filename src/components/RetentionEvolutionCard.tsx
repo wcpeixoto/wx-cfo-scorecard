@@ -12,7 +12,8 @@ import {
   fetchMemberRetentionByCohort,
   type CohortRetentionRow,
 } from '../lib/gym/fetchMemberRetentionByCohort';
-import { buildCohortOverlay } from '../lib/gym/memberRetentionCohortSeries';
+import { buildCohortOverlay, type PlottedCohortBand } from '../lib/gym/memberRetentionCohortSeries';
+import { computeCohortYoY, type CohortYoYResult } from '../lib/gym/cohortRetentionYoY';
 import { SAMPLE_MEMBER_RETENTION_MONTHS } from '../lib/gym/memberRetentionFixture';
 import {
   DEFAULT_RETENTION_TIMEFRAME,
@@ -121,6 +122,30 @@ export function RetentionEvolutionCard() {
     );
   }, [byAge, cohortRows, view.points]);
 
+  // YoY pills (By-age view only): per plotted band, the displayed window's LAST month vs the SAME
+  // calendar month one year earlier, computed off the FULL cohort series (the year-ago partner may
+  // fall outside the visible window). A band with no computable pair renders no pill — never a
+  // placeholder/dash. Tracks the churn/retention toggle via `metric`.
+  const yoyPills = useMemo(() => {
+    if (!byAge || !cohortRows || view.points.length === 0 || !view.dataBeginsMonth) return null;
+    const displayedMonth = view.points[view.points.length - 1].periodMonth;
+    const dataBeginsMonth = view.dataBeginsMonth;
+    const bands: { band: PlottedCohortBand; label: string }[] = [
+      { band: 'youth3to15', label: 'Youth 3–15' },
+      { band: 'adults16plus', label: 'Adults 16+' },
+    ];
+    const shown = bands
+      .map(({ band, label }) => ({
+        label,
+        yoy: computeCohortYoY({ rows: cohortRows, band, displayedMonth, dataBeginsMonth, metric }),
+      }))
+      .filter(
+        (p): p is { label: string; yoy: Extract<CohortYoYResult, { status: 'show' }> } =>
+          p.yoy.status === 'show',
+      );
+    return shown.length > 0 ? shown : null;
+  }, [byAge, cohortRows, view.points, view.dataBeginsMonth, metric]);
+
   // Headline stat: the mean of the visible metric across the selected timeframe — so the subtitle
   // reads e.g. "Average Churn 8%" and tracks both the toggle and the timeframe. Stays the gym-wide
   // All average even under By age (never recomputed per segment).
@@ -182,6 +207,39 @@ export function RetentionEvolutionCard() {
           </p>
         </div>
         <div className="retention-evolution-controls">
+          {/* YoY pills — By-age view only, one per band with a computable same-month-last-year pair.
+              Mirrors attendanceYoYInsight's ↑/↓/→ idiom; sits on its own line at the top-right. */}
+          {yoyPills && (
+            <div
+              className="retention-evolution-yoy"
+              aria-label="Year-over-year change versus the same month last year"
+            >
+              {yoyPills.map(({ label, yoy }) => {
+                const arrow =
+                  yoy.direction === 'better' ? '↑' : yoy.direction === 'worse' ? '↓' : '→';
+                // Face shows ABSOLUTE magnitude — arrow + color carry direction, so a signed
+                // delta would read as "↑ -10.0pp" on the churn view (semantic arrow vs
+                // metric-relative sign). The tooltip keeps the "X points better/worse" wording.
+                const magnitude = `${Math.abs(yoy.deltaPp).toFixed(1)}pp`;
+                const words =
+                  yoy.direction === 'neutral'
+                    ? 'about the same as'
+                    : `${Math.abs(yoy.deltaPp).toFixed(1)} points ${yoy.direction} than`;
+                return (
+                  <span
+                    key={label}
+                    className={`retention-evolution-yoy-pill retention-evolution-yoy-pill--${yoy.direction}`}
+                    title={`${label}: ${metricLabel} ${words} the same month last year`}
+                  >
+                    <span className="retention-evolution-yoy-pill-band">{label}</span>
+                    <span className="retention-evolution-yoy-pill-delta">
+                      {arrow} {magnitude}
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
+          )}
           {/* Segment toggle shows only when an overlay is possible (live All axis + cohort data);
               when on the sample fixture it stays hidden so the card is unchanged. */}
           {cohortAvailable && (
