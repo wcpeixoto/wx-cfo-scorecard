@@ -14,6 +14,7 @@ import { realRetentionMonths, type RetentionMonth } from '../lib/gym/memberReten
 import type { RetentionAggregateSnapshot } from '../lib/gym/fetchRetentionAggregate';
 import {
   buildMonthlySourceExport,
+  latestCompleteMonth,
   type FinancialBasis,
 } from '../lib/export/buildMonthlySourceExport';
 import type { DashboardModel } from '../lib/data/contract';
@@ -98,7 +99,10 @@ export function ExportSourceJsonCard({
     }
   }, [model, financialTxnCount, currentCalendarMonth, financialBasis, silentChurnThresholdDays]);
 
-  const financialLive = financialTxnCount > 0;
+  // Mirror the builder's gate exactly (txns present AND a complete month exists) so this status
+  // line can never disagree with the exported usable_for_attack_plan.
+  const financialLive =
+    financialTxnCount > 0 && latestCompleteMonth(model.monthlyRollups, currentCalendarMonth) !== null;
   const forecastAvailable = model.cashFlowForecastSeries.some((p) => p.status === 'projected');
   const retentionLive = retention.loaded
     ? Boolean(retention.rates) && realRetentionMonths(retention.rates ?? []).length > 0
