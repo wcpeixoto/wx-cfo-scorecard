@@ -56,7 +56,9 @@ function shiftMonth(periodMonth: string, deltaMonths: number): string {
 
 // The latest rollup month strictly BEFORE the current calendar month = latest COMPLETE month.
 // null when no complete month has data yet (only the partial current month present, or empty).
-function latestCompleteMonth(rollups: MonthlyRollup[], currentCalendarMonth: string): string | null {
+// Exported so the Export card can gate its "Financial: Live" status on the SAME complete-month
+// condition the builder uses — the two can never disagree with the exported usable_for_attack_plan.
+export function latestCompleteMonth(rollups: MonthlyRollup[], currentCalendarMonth: string): string | null {
   const complete = rollups
     .map((r) => r.month)
     .filter((month) => month < currentCalendarMonth)
@@ -235,7 +237,13 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
       ? { source: 'live', latest_month: scorecardMonth, basis: financialBasis }
       : { source: 'missing' },
     forecast: forecastAvailable
-      ? { source: 'model', basis: 'projection', latest_month: scorecardMonth ?? null }
+      ? {
+          source: 'model',
+          basis: 'projection',
+          // The forecast's own last projected month — describes the projection horizon, not the
+          // actuals anchor (which can differ from the last forecast row).
+          latest_month: projectedRows[projectedRows.length - 1].month,
+        }
       : { source: 'not_available' },
     retention_rates: retentionLive
       ? { source: 'live', latest_month: realRetention[realRetention.length - 1].periodMonth }

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildMonthlySourceExport, type MonthlySourceExportInputs } from './buildMonthlySourceExport';
+import {
+  buildMonthlySourceExport,
+  latestCompleteMonth,
+  type MonthlySourceExportInputs,
+} from './buildMonthlySourceExport';
 import type { DashboardModel } from '../data/contract';
 import type { RetentionMonth } from '../gym/memberRetentionSeries';
 import type { RetentionAggregateSnapshot } from '../gym/fetchRetentionAggregate';
@@ -200,6 +204,9 @@ describe('buildMonthlySourceExport', () => {
     const out = buildMonthlySourceExport(fullLive()) as any;
     expect(out.forecast.basis).toBe('projection');
     expect(out.forecast.note).toMatch(/projection/i);
+    // provenance.latest_month tracks the forecast horizon (last projected row), not the actuals anchor
+    expect(out.provenance.forecast.latest_month).toBe('2026-08');
+    expect(out.scorecard_month).toBe('2026-06'); // ≠ forecast latest_month, proving they're decoupled
     const forecastMonths = out.forecast.series.map((s: any) => s.month);
     expect(forecastMonths).toEqual(['2026-07', '2026-08']); // only projected rows
     const actualMonths = out.financial_monthly.map((m: any) => m.month);
@@ -232,6 +239,35 @@ describe('buildMonthlySourceExport', () => {
       }),
     }) as any;
     expect([dec.scorecard_month, dec.planning_month]).toEqual(['2026-12', '2027-01']);
+  });
+
+  it('11. txns present but no complete month → card gate and payload agree (both not usable)', () => {
+    // Only the partial current month has data — the builder's financial gate (txns>0 AND a complete
+    // month exists) fails, and the Export card derives its "Financial: Live" status from the SAME
+    // latestCompleteMonth() helper. They must agree: not live, not usable.
+    const input: MonthlySourceExportInputs = {
+      ...fullLive(),
+      currentCalendarMonth: '2026-07',
+      financialTxnCount: 42, // txns exist...
+      model: model({
+        monthlyRollups: [rollup('2026-07', 3000, 2000, { tx: 42 })], // ...but only the partial current month
+        kpiComparisonByTimeframe: { ttm: ttmEntry(1, 1, 1, 1) },
+        cashFlowForecastSeries: [],
+      }),
+    };
+
+    // What the card gates on:
+    const cardFinancialLive =
+      input.financialTxnCount > 0 &&
+      latestCompleteMonth(input.model.monthlyRollups, input.currentCalendarMonth) !== null;
+    expect(cardFinancialLive).toBe(false);
+
+    // What the payload reports:
+    const out = buildMonthlySourceExport(input) as any;
+    expect(out.usable_for_attack_plan).toBe(false);
+    expect(out.missing_or_unavailable).toContain('financial:no_complete_month');
+    expect(out.financial_monthly).toBeUndefined();
+    expect(out.provenance.financial.source).toBe('missing');
   });
 
   it('10. generated_at is the injected value; builder is deterministic', () => {
