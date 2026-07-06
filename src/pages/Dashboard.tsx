@@ -16,6 +16,7 @@ import CashTrendHero from '../components/CashTrendHero';
 import IncomeExpenseCard from '../components/IncomeExpenseCard';
 import PayrollEfficiencyCard from '../components/PayrollEfficiencyCard';
 import CashReserveCalendarCard from '../components/CashReserveCalendarCard';
+import { ExportSourceJsonCard } from '../components/ExportSourceJsonCard';
 import KpiCards from '../components/KpiCards';
 import TopCategoriesCard from '../components/TopCategoriesCard';
 import PeriodDropdown from '../components/PeriodDropdown';
@@ -4538,6 +4539,12 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  <ExportSourceJsonCard
+                    model={model}
+                    financialTxnCount={baseTxns.length}
+                    currentCalendarMonth={currentCalendarMonth}
+                    financialBasis={profitabilityCashFlowMode}
+                  />
                 </div>
               </div>
               </div>{/* end data wrapper */}

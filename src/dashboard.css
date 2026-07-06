@@ -915,6 +915,26 @@ body {
   color: var(--text-secondary);
   font-size: 0.82rem;
 }
+/* Export monthly source JSON card (Settings → Data) — per-domain live/missing status list. */
+.export-source-status {
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.export-source-status strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.export-source-warning {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--negative);
+}
 
 .kpi-grid {
   display: grid;
