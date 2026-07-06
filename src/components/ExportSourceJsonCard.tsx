@@ -48,8 +48,9 @@ export function ExportSourceJsonCard({
   });
   const [exporting, setExporting] = useState(false);
 
-  // Probe retention live-status once for the status lines; the export reuses whatever landed (and
-  // re-fetches if the click beats the probe). A null result is "not live", never a fabricated value.
+  // Probe retention live-status once to seed the pre-click status lines. The export itself ALWAYS
+  // re-fetches on click (see handleExport) and never reads this probe for the payload — so an
+  // in-session import can't leave a stale file. A null result is "not live", never a fabricated value.
   useEffect(() => {
     let cancelled = false;
     Promise.all([
