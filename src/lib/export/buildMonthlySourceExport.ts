@@ -16,7 +16,13 @@
 // is omitted and recorded in `missing_or_unavailable` — sample fixtures are never serialized as real.
 //
 // generated_at + currentCalendarMonth are INJECTED by the click handler (this module never calls
-// `Date.now()`/`new Date()`), keeping it deterministic and unit-testable.
+// `Date.now()`/`new Date()`), keeping it deterministic and unit-testable. generated_at is the single
+// point-in-time snapshot timestamp: for a synchronous export the dashboard-state read and the file
+// write happen at the same instant.
+//
+// A top-level `scope` declares which domains this export is DESIGNED to cover, so an empty
+// `missing_or_unavailable` can't be misread as whole-dashboard completeness. A `warnings` array
+// flags when blocks anchor to different as-of periods.
 
 import type {
   DashboardModel,
@@ -41,7 +47,7 @@ export type MonthlySourceExportInputs = {
   retentionRates: RetentionMonth[] | null; // fetchMemberRetentionRates() → null when not seeded
   snapshot: RetentionAggregateSnapshot | null; // fetchLatestRetentionAggregate() → null on error/unseeded
   thresholdDays: number; // useRetentionSettings().silentChurnThresholdDays
-  generatedAt: string; // ISO 8601, injected
+  generatedAt: string; // ISO 8601, injected — point-in-time snapshot (state-read == file-write)
   businessName?: string;
 };
 
@@ -251,6 +257,58 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     retention_snapshot: snapshotProvenance,
   };
 
+  // ---- SCOPE (what this export is DESIGNED to cover) ----
+  // Declared so a reader can't mistake `missing_or_unavailable: []` for whole-dashboard
+  // completeness. Big Picture analytics (Money Left on the Table, payroll efficiency,
+  // sustainability, cost spikes) and any per-member / per-transaction detail are intentionally
+  // OUT of scope — their absence is NOT a "missing" gap. `absent_domains` reconciles 1:1 with the
+  // in-scope codes in `missing_or_unavailable`.
+  const domainPresence: Record<string, boolean> = {
+    financial_actuals: financialLive,
+    forecast: forecastAvailable,
+    membership_retention: retentionLive,
+    attendance_snapshot: Boolean(snapshot),
+  };
+  const coveredDomains = Object.keys(domainPresence);
+  const scope = {
+    covered_domains: coveredDomains,
+    present_domains: coveredDomains.filter((d) => domainPresence[d]),
+    absent_domains: coveredDomains.filter((d) => !domainPresence[d]),
+    note:
+      'Aggregate scorecard export. Only covered_domains are included. Big Picture analytics ' +
+      '(Money Left on the Table, payroll efficiency, sustainability, cost spikes) and any ' +
+      'per-member or per-transaction detail are intentionally out of scope — their absence is ' +
+      'NOT recorded in missing_or_unavailable.',
+  };
+
+  // ---- AS-OF anchors + divergence warning ----
+  // Each block reflects its own as-of: financial/retention anchor on a whole MONTH (last complete
+  // month), attendance on a DAY (as-of now). When these fall in different months a reader must not
+  // cross-compare them as same-period — and it explains a live cash-balance vs. monthly-actuals
+  // drift as a point-in-time snapshot, not a bug.
+  const lastRetentionMonth = retentionLive
+    ? realRetention[realRetention.length - 1].periodMonth
+    : null;
+  const asOf: Record<string, string | null> = {
+    financial: financialLive ? scorecardMonth : null, // 'YYYY-MM'
+    retention_rates: lastRetentionMonth, // 'YYYY-MM'
+    attendance_snapshot: snapshot ? snapshot.asOf : null, // 'YYYY-MM-DD'
+  };
+  const periodAnchors: [string, string][] = [];
+  if (financialLive && scorecardMonth) periodAnchors.push(['financial', scorecardMonth]);
+  if (lastRetentionMonth) periodAnchors.push(['retention_rates', lastRetentionMonth]);
+  if (snapshot) periodAnchors.push(['attendance_snapshot', snapshot.asOf.slice(0, 7)]);
+  const distinctPeriods = new Set(periodAnchors.map(([, token]) => token));
+  const warnings: string[] = [];
+  if (distinctPeriods.size > 1) {
+    warnings.push(
+      `as_of_divergence: blocks anchor to different periods (${periodAnchors
+        .map(([domain, token]) => `${domain}=${token}`)
+        .join(', ')}). Each block reflects its own as-of; do not cross-compare as same-period. ` +
+        'Point-in-time export.',
+    );
+  }
+
   return {
     schema_version: MONTHLY_SOURCE_SCHEMA_VERSION,
     generated_at: generatedAt,
@@ -258,6 +316,9 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     scorecard_month: resolvedScorecardMonth,
     planning_month: planningMonth,
     usable_for_attack_plan: usableForAttackPlan,
+    scope,
+    as_of: asOf,
+    warnings,
     provenance,
     ...(financialMonthly ? { financial_monthly: financialMonthly } : {}),
     ...(financialComparisons ? { financial_comparisons: financialComparisons } : {}),

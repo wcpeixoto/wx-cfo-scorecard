@@ -270,6 +270,62 @@ describe('buildMonthlySourceExport', () => {
     expect(out.provenance.financial.source).toBe('missing');
   });
 
+  it('12. integrity — scope declared, full-live reconciles clean', () => {
+    const out = buildMonthlySourceExport(fullLive()) as any;
+    expect(out.scope.covered_domains).toEqual([
+      'financial_actuals',
+      'forecast',
+      'membership_retention',
+      'attendance_snapshot',
+    ]);
+    expect(out.scope.present_domains).toEqual(out.scope.covered_domains); // all live
+    expect(out.scope.absent_domains).toEqual([]);
+    // reconciliation invariant: absent in-scope domains map 1:1 onto missing codes
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+    expect(out.warnings).toEqual([]); // all blocks anchor on 2026-06
+    // out-of-scope card families are declared, never counted as "missing"
+    expect(out.scope.note).toMatch(/out of scope/i);
+    expect(out.scope.note).toMatch(/Money Left on the Table/);
+    expect(out.scope.covered_domains).not.toContain('payroll_efficiency');
+  });
+
+  it('13. integrity — absent in-scope domains reconcile 1:1 with missing_or_unavailable', () => {
+    const input = fullLive();
+    input.snapshot = null; // attendance out
+    (input.model as any).cashFlowForecastSeries = [
+      { month: '2026-06', revenue: 10000, expenses: 7500, netCashFlow: 2500, status: 'actual' }, // forecast out
+    ];
+    const out = buildMonthlySourceExport(input) as any;
+    expect(out.scope.present_domains).toEqual(['financial_actuals', 'membership_retention']);
+    expect(out.scope.absent_domains).toEqual(['forecast', 'attendance_snapshot']);
+    // every covered domain is present XOR absent, and absent count === missing code count
+    expect(out.scope.present_domains.length + out.scope.absent_domains.length).toBe(
+      out.scope.covered_domains.length,
+    );
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+    expect(out.missing_or_unavailable).toContain('forecast:not_available');
+    expect(out.missing_or_unavailable).toContain('retention_snapshot:not_live');
+  });
+
+  it('14. integrity — as_of divergence warning when blocks anchor to different months', () => {
+    const input = fullLive();
+    // attendance snapshot moves to July while financial + retention stay on June
+    input.snapshot = snap(
+      { '2': 120, '10': 41 },
+      { overflow: 5, unknown: 8, asOf: '2026-07-06', dues: { totalMonthly: 2400 } },
+    );
+    const out = buildMonthlySourceExport(input) as any;
+    expect(out.as_of).toEqual({
+      financial: '2026-06',
+      retention_rates: '2026-06',
+      attendance_snapshot: '2026-07-06',
+    });
+    expect(out.warnings).toHaveLength(1);
+    expect(out.warnings[0]).toMatch(/as_of_divergence/);
+    expect(out.warnings[0]).toContain('financial=2026-06');
+    expect(out.warnings[0]).toContain('attendance_snapshot=2026-07');
+  });
+
   it('10. generated_at is the injected value; builder is deterministic', () => {
     const input = fullLive();
     const a = buildMonthlySourceExport(input) as any;
