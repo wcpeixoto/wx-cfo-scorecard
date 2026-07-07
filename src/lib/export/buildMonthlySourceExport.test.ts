@@ -213,7 +213,11 @@ describe('buildMonthlySourceExport', () => {
     expect(out.attendance_snapshot.high_risk).toBe(expected.silent);
     expect(out.attendance_snapshot.healthy).toBe(expected.healthy);
     expect(out.attendance_snapshot.watch).toBe(expected.watch);
-    expect(out.attendance_snapshot.active_total).toBe(expected.activeTotal);
+    // active_total = KNOWN base (healthy+watch+high_risk), mirroring the Retention page — it EXCLUDES
+    // unknown, so it is deriveBuckets.activeTotal minus unknown, and unknown is reported separately.
+    expect(out.attendance_snapshot.active_total).toBe(expected.healthy + expected.watch + expected.silent);
+    expect(out.attendance_snapshot.active_total).toBe(expected.activeTotal - expected.unknown);
+    expect(out.attendance_snapshot.unknown).toBe(expected.unknown);
     expect(out.attendance_snapshot.threshold_days).toBe(expected.thresholdDays);
     expect(out.attendance_snapshot.silent_monthly_dues_at_risk).toBe(2400);
 
@@ -368,6 +372,33 @@ describe('buildMonthlySourceExport', () => {
   it('16. run-out null (cash never crosses $0) is carried honestly', () => {
     const out = buildMonthlySourceExport(fullLive()) as any; // fullLive climbs, never runs out
     expect(out.forecast.scenario_run_out_month).toBeNull();
+  });
+
+  it('17. attendance active_total mirrors the Retention known base (excludes unknown)', () => {
+    const out = buildMonthlySourceExport(fullLive()) as any;
+    // fullLive snapshot: {2:120, 10:41}, overflow 5, unknown 8, threshold 21, WATCH_FLOOR 8
+    // → healthy 120, watch 41, high_risk(silent) 5, unknown 8. Known base = 166, not 174.
+    expect(out.attendance_snapshot.active_total).toBe(166);
+    expect(out.attendance_snapshot.unknown).toBe(8);
+    expect(out.attendance_snapshot.active_base_note).toMatch(/excluded from active_total/i);
+  });
+
+  it('18. financial_comparisons carries a ttm_window (model bounds preferred, else derived)', () => {
+    // fixture ttmEntry() carries no window → fallback: trailing-12 ending at the scorecard month
+    const derived = buildMonthlySourceExport(fullLive()) as any;
+    expect(derived.financial_comparisons.ttm_window).toEqual({ start: '2025-07', end: '2026-06' });
+
+    // when the model carries an explicit TTM window, it is preferred verbatim
+    const withWindow = fullLive();
+    (withWindow.model as any).kpiComparisonByTimeframe = {
+      ttm: {
+        ...ttmEntry(110000, 85000, 25000, 0.23),
+        currentStartMonth: '2025-05',
+        currentEndMonth: '2026-04',
+      },
+    };
+    const out = buildMonthlySourceExport(withWindow) as any;
+    expect(out.financial_comparisons.ttm_window).toEqual({ start: '2025-05', end: '2026-04' });
   });
 
   it('10. generated_at is the injected value; builder is deterministic', () => {
