@@ -14,6 +14,11 @@
 //     model.cashFlowForecastSeries trend (which carries no ending balance). Both prop-drilled from Dashboard.
 //   - membership retention series ← fetchMemberRetentionRates rows (seed row dropped via realRetentionMonths)
 //   - attendance snapshot ← deriveBuckets(snapshot, thresholdDays) (the Attendance Health card's own fn)
+//   - tenure bands ← computeChurnRiskByTenureFromAggregate(snapshot.tenureBands, thresholdDays) (the
+//     Churn-by-Tenure card's own per-band risk split — active_total + healthy/watch/silent, verbatim)
+//   - cohort recency histogram ← computeChurnRiskByCohortFromAggregate(snapshot.cohorts, thresholdDays)
+//     (the Cohort Retention card's own per-cohort split — active recency + lapsed; DISTINCT from the
+//     cohort retention RATE table, a later slice)
 //
 // STRICT FACTUAL/PII BOUNDARY: only aggregate numbers, category names, counts, rates, and dates are
 // read. Transaction rows, payees, memos, accounts, member identities, DOBs, ages, import summaries,
@@ -42,6 +47,8 @@ import type { RetentionMonth } from '../gym/memberRetentionSeries';
 import { realRetentionMonths } from '../gym/memberRetentionSeries';
 import type { RetentionAggregateSnapshot } from '../gym/fetchRetentionAggregate';
 import { deriveBuckets } from '../gym/retentionAggregateView';
+import { computeChurnRiskByTenureFromAggregate } from '../gym/churnRiskByTenure';
+import { computeChurnRiskByCohortFromAggregate } from '../gym/churnRiskByCohort';
 import type { EfficiencyOpportunitiesResult } from '../kpis/efficiencyOpportunities';
 import type { WhatNeedsAttentionResult } from '../kpis/digHere';
 import type { OwnerDistributionStatus } from '../data/ownerDistributionStatus';
@@ -487,6 +494,65 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     missing.push('retention_snapshot:not_live');
   }
 
+  // ---- TENURE BANDS (optional; active-side recency partition by tenure) ----
+  // The Churn-by-Tenure card's OWN per-band risk split, reused VERBATIM via the shared deterministic
+  // helper (computeChurnRiskByTenureFromAggregate — deriveBuckets per band). The export authors NO risk
+  // classification: active_total / unknown_recency / healthy / watch / silent all come straight off the
+  // helper result, so these rows are byte-for-byte the values the live card renders. Raw per-day bins
+  // (countsByDaysAbsent) are DROPPED — noise for the attack plan (the sparkline-drop precedent).
+  // Retention-domain: gated on snapshot.tenureBands (per-field), NOT financialLive. Absent (pre-tenure
+  // snapshot, malformed, or edge-mismatch → the fetcher nulls it per-field) ⇒ omit + one code.
+  let tenureBands: Record<string, unknown> | undefined;
+  if (snapshot?.tenureBands) {
+    const tenureRisk = computeChurnRiskByTenureFromAggregate(snapshot.tenureBands, thresholdDays);
+    tenureBands = {
+      threshold_days: tenureRisk.thresholdDays,
+      band_edges: snapshot.tenureBands.bandEdges, // self-describing {id, minDays}, verbatim
+      bands: [...tenureRisk.bands, tenureRisk.unknownTenure].map((b) => ({
+        id: b.id,
+        active_total: b.activeTotal, // full base: bins + overflow + unknown-recency (helper-computed)
+        unknown_recency: b.unknownRecency,
+        risk: {
+          // healthy = knownActiveTotal − watch − silent (deriveBuckets' healthy bucket); the export
+          // never re-derives the threshold split — the deterministic layer owns it.
+          healthy: b.knownActiveTotal - b.watch - b.silent,
+          watch: b.watch,
+          silent: b.silent,
+        },
+      })),
+    };
+  } else {
+    missing.push('tenure_bands:not_live');
+  }
+
+  // ---- COHORT RECENCY HISTOGRAM (optional; active-side recency partition by age cohort) ----
+  // The Cohort Retention card's OWN per-cohort split, reused VERBATIM via computeChurnRiskByCohortFromAggregate
+  // (same deriveBuckets-per-band helper). This is the age-cohort RECENCY histogram — active_total + lapsed +
+  // the risk split — which is DISTINCT from the cohort retention RATE table (new/returning/lost); named
+  // `cohort_recency_histogram` so Slice C2's `cohort_retention_rates` never collides. Raw per-day bins dropped.
+  // Retention-domain: gated on snapshot.cohorts (per-field), NOT financialLive. Absent ⇒ omit + one code.
+  let cohortRecencyHistogram: Record<string, unknown> | undefined;
+  if (snapshot?.cohorts) {
+    const cohortRisk = computeChurnRiskByCohortFromAggregate(snapshot.cohorts, thresholdDays);
+    cohortRecencyHistogram = {
+      threshold_days: cohortRisk.thresholdDays,
+      cohort_edges: snapshot.cohorts.cohortEdges, // self-describing {id, minAge, maxAge}, verbatim
+      cohorts: [...cohortRisk.bands, cohortRisk.unknownCohort].map((c) => ({
+        id: c.id,
+        active_total: c.activeTotal, // active-side full base (helper-computed)
+        unknown_recency: c.unknownRecency,
+        lapsed: c.lapsed, // Read 2 — inactive (lapsed) head-count in this cohort
+        risk: {
+          healthy: c.knownActiveTotal - c.watch - c.silent,
+          watch: c.watch,
+          silent: c.silent,
+        },
+      })),
+    };
+  } else {
+    missing.push('cohort_recency_histogram:not_live');
+  }
+
   // Required domains for a usable Attack Plan file: financial + membership retention.
   const usableForAttackPlan = financialLive && retentionLive;
 
@@ -545,6 +611,28 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
       ? { source: 'live', latest_month: realRetention[realRetention.length - 1].periodMonth }
       : { source: 'not_live' },
     retention_snapshot: snapshotProvenance,
+    tenure_bands: snapshot?.tenureBands
+      ? {
+          source: 'model',
+          basis: 'aggregate_snapshot',
+          note:
+            'The Churn-by-Tenure card’s own per-band risk split, reused verbatim — NOT recomputed by ' +
+            'the export. Counts are active-side recency partitions of the attendance snapshot, cut at ' +
+            'threshold_days into healthy / watch / silent; active_total is the full base (incl. ' +
+            'unknown_recency). Distinct from any membership-retention rate.',
+        }
+      : { source: 'not_live' },
+    cohort_recency_histogram: snapshot?.cohorts
+      ? {
+          source: 'model',
+          basis: 'aggregate_snapshot',
+          note:
+            'The Cohort Retention card’s own per-age-cohort split, reused verbatim — NOT recomputed by ' +
+            'the export. This is the age-cohort RECENCY histogram (active_total recency split + lapsed ' +
+            'head-count), which is DISTINCT from the cohort retention RATE table (new/returning/lost) — ' +
+            'do not conflate them.',
+        }
+      : { source: 'not_live' },
   };
 
   // ---- SCOPE (what this export is DESIGNED to cover) ----
@@ -561,6 +649,10 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     forecast: forecastAvailable,
     membership_retention: retentionLive,
     attendance_snapshot: Boolean(snapshot),
+    // Retention-domain, per-field on the snapshot (a snapshot can carry attendance but be missing
+    // tenure/cohort — pre-migration or edge-mismatch). Each reconciles 1:1 with its own code.
+    tenure_bands: Boolean(snapshot?.tenureBands),
+    cohort_recency_histogram: Boolean(snapshot?.cohorts),
   };
   const coveredDomains = Object.keys(domainPresence);
   const scope = {
@@ -592,6 +684,10 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     owner_distributions: financialLive ? scorecardMonth : null, // 'YYYY-MM' — monthly anchor (not the window)
     retention_rates: lastRetentionMonth, // 'YYYY-MM'
     attendance_snapshot: snapshot ? snapshot.asOf : null, // 'YYYY-MM-DD'
+    // Same day anchor as attendance_snapshot (they partition the SAME snapshot). Not added to the
+    // divergence check below — they introduce no new period token beyond attendance_snapshot's.
+    tenure_bands: snapshot?.tenureBands ? snapshot.asOf : null, // 'YYYY-MM-DD'
+    cohort_recency_histogram: snapshot?.cohorts ? snapshot.asOf : null, // 'YYYY-MM-DD'
   };
   const periodAnchors: [string, string][] = [];
   if (financialLive && scorecardMonth) periodAnchors.push(['financial', scorecardMonth]);
@@ -637,6 +733,8 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     ...(forecast ? { forecast } : {}),
     ...(membershipRetentionMonthly ? { membership_retention_monthly: membershipRetentionMonthly } : {}),
     ...(attendanceSnapshot ? { attendance_snapshot: attendanceSnapshot } : {}),
+    ...(tenureBands ? { tenure_bands: tenureBands } : {}),
+    ...(cohortRecencyHistogram ? { cohort_recency_histogram: cohortRecencyHistogram } : {}),
     missing_or_unavailable: missing,
   };
 }

@@ -9,6 +9,13 @@ import type { DashboardModel, ScenarioPoint } from '../data/contract';
 import type { RetentionMonth } from '../gym/memberRetentionSeries';
 import type { RetentionAggregateSnapshot } from '../gym/fetchRetentionAggregate';
 import { deriveBuckets } from '../gym/retentionAggregateView';
+import type { CohortHistogram, TenureBandHistogram } from '../gym/wodifyRetentionAggregate';
+import { TENURE_BANDS, UNKNOWN_TENURE_ID } from '../gym/tenureBands';
+import {
+  SAMPLE_COHORT_HISTOGRAM,
+  computeChurnRiskByCohortFromAggregate,
+} from '../gym/churnRiskByCohort';
+import { computeChurnRiskByTenureFromAggregate } from '../gym/churnRiskByTenure';
 
 // ---- minimal SoT-shaped fixtures (only the fields the builder reads) ----
 function rollup(
@@ -89,15 +96,42 @@ function retMonth(periodMonth: string, over: Partial<RetentionMonth> = {}): Rete
   };
 }
 
+// An empty per-band recency slice (no absences, no unknowns).
+function emptyRecency() {
+  return { countsByDaysAbsent: {} as Record<string, number>, overflow365Plus: 0, unknownRecency: 0 };
+}
+
+// A live tenure histogram: every band + the unknown-tenure bucket present (deterministic contract),
+// with one seeded band so the export's per-band risk split is non-trivial. At threshold 21 /
+// WATCH_FLOOR 8 the seeded lt3m band → healthy 10 (day 2), watch 5 (day 10), silent 4 (day 30 + 1
+// overflow), unknown_recency 2 ⇒ active_total 21.
+function tenureHist(): TenureBandHistogram {
+  const bands: Record<string, ReturnType<typeof emptyRecency>> = {};
+  for (const b of TENURE_BANDS) bands[b.id] = emptyRecency();
+  bands[UNKNOWN_TENURE_ID] = emptyRecency();
+  bands.lt3m = { countsByDaysAbsent: { '2': 10, '10': 5, '30': 3 }, overflow365Plus: 1, unknownRecency: 2 };
+  return { bandEdges: TENURE_BANDS.map(({ id, minDays }) => ({ id, minDays })), bands };
+}
+
 function snap(
   counts: Record<string, number>,
-  over?: { overflow?: number; unknown?: number; asOf?: string; dues?: { totalMonthly: number } | null },
+  over?: {
+    overflow?: number;
+    unknown?: number;
+    asOf?: string;
+    dues?: { totalMonthly: number } | null;
+    // `undefined` ⇒ default live histogram; explicit `null` ⇒ per-field absent (pre-migration / mismatch).
+    tenure?: TenureBandHistogram | null;
+    cohortHist?: CohortHistogram | null;
+  },
 ): RetentionAggregateSnapshot {
   return {
     asOf: over?.asOf ?? '2026-06-28',
     unknown: over?.unknown ?? 0,
     daysAbsentHistogram: { countsByDaysAbsent: counts, overflow365Plus: over?.overflow ?? 0 },
     dues: over?.dues ?? null,
+    tenureBands: over?.tenure === undefined ? tenureHist() : over.tenure,
+    cohorts: over?.cohortHist === undefined ? SAMPLE_COHORT_HISTOGRAM : over.cohortHist,
   } as unknown as RetentionAggregateSnapshot;
 }
 
@@ -494,6 +528,8 @@ describe('buildMonthlySourceExport', () => {
       'forecast',
       'membership_retention',
       'attendance_snapshot',
+      'tenure_bands',
+      'cohort_recency_histogram',
     ]);
     expect(out.scope.present_domains).toEqual(out.scope.covered_domains); // all live
     expect(out.scope.absent_domains).toEqual([]);
@@ -520,7 +556,12 @@ describe('buildMonthlySourceExport', () => {
       'owner_distributions',
       'membership_retention',
     ]);
-    expect(out.scope.absent_domains).toEqual(['forecast', 'attendance_snapshot']);
+    expect(out.scope.absent_domains).toEqual([
+      'forecast',
+      'attendance_snapshot',
+      'tenure_bands',
+      'cohort_recency_histogram',
+    ]);
     // every covered domain is present XOR absent, and absent count === missing code count
     expect(out.scope.present_domains.length + out.scope.absent_domains.length).toBe(
       out.scope.covered_domains.length,
@@ -545,6 +586,8 @@ describe('buildMonthlySourceExport', () => {
       owner_distributions: '2026-06', // ditto (anchor is the month, not the trailing-12 window)
       retention_rates: '2026-06',
       attendance_snapshot: '2026-07-06',
+      tenure_bands: '2026-07-06', // shares attendance's snapshot day — no new divergence token
+      cohort_recency_histogram: '2026-07-06', // ditto
     });
     expect(out.warnings).toHaveLength(1);
     expect(out.warnings[0]).toMatch(/as_of_divergence/);
@@ -849,6 +892,140 @@ describe('buildMonthlySourceExport', () => {
     expect(out.provenance.owner_distributions).toEqual({ source: 'not_live' });
     expect(out.as_of.owner_distributions).toBeNull();
     expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+  });
+
+  it('C1. tenure_bands + cohort_recency_histogram present & correct off a live snapshot', () => {
+    const input = fullLive();
+    const out = buildMonthlySourceExport(input) as any;
+
+    // --- tenure: rows === the shared helper's per-band split (verbatim), bins dropped ---
+    const tExp = computeChurnRiskByTenureFromAggregate(input.snapshot!.tenureBands!, input.thresholdDays);
+    expect(out.tenure_bands.threshold_days).toBe(tExp.thresholdDays);
+    expect(out.tenure_bands.band_edges).toEqual(input.snapshot!.tenureBands!.bandEdges); // verbatim {id,minDays}
+    const tRows = [...tExp.bands, tExp.unknownTenure].map((b) => ({
+      id: b.id,
+      active_total: b.activeTotal,
+      unknown_recency: b.unknownRecency,
+      risk: { healthy: b.knownActiveTotal - b.watch - b.silent, watch: b.watch, silent: b.silent },
+    }));
+    expect(out.tenure_bands.bands).toEqual(tRows);
+    // seeded band spot-check (threshold 21 / floor 8): healthy 10, watch 5, silent 4, unknown 2
+    expect(out.tenure_bands.bands.find((b: any) => b.id === 'lt3m')).toEqual({
+      id: 'lt3m',
+      active_total: 21,
+      unknown_recency: 2,
+      risk: { healthy: 10, watch: 5, silent: 4 },
+    });
+    // the unknown-tenure bucket is surfaced as a row, never dropped
+    expect(out.tenure_bands.bands.some((b: any) => b.id === UNKNOWN_TENURE_ID)).toBe(true);
+
+    // --- cohort: rows === the shared helper's per-cohort split, lapsed carried (Read 2) ---
+    const cExp = computeChurnRiskByCohortFromAggregate(input.snapshot!.cohorts!, input.thresholdDays);
+    expect(out.cohort_recency_histogram.threshold_days).toBe(cExp.thresholdDays);
+    expect(out.cohort_recency_histogram.cohort_edges).toEqual(input.snapshot!.cohorts!.cohortEdges);
+    const cRows = [...cExp.bands, cExp.unknownCohort].map((c) => ({
+      id: c.id,
+      active_total: c.activeTotal,
+      unknown_recency: c.unknownRecency,
+      lapsed: c.lapsed,
+      risk: { healthy: c.knownActiveTotal - c.watch - c.silent, watch: c.watch, silent: c.silent },
+    }));
+    expect(out.cohort_recency_histogram.cohorts).toEqual(cRows);
+    expect(
+      out.cohort_recency_histogram.cohorts.reduce((s: number, c: any) => s + c.lapsed, 0),
+    ).toBe(cExp.lapsedTotal);
+
+    // provenance + as_of; both share attendance's snapshot day ⇒ no new divergence token
+    expect(out.provenance.tenure_bands).toEqual({
+      source: 'model',
+      basis: 'aggregate_snapshot',
+      note: expect.stringMatching(/reused verbatim/i),
+    });
+    expect(out.provenance.cohort_recency_histogram.basis).toBe('aggregate_snapshot');
+    expect(out.provenance.cohort_recency_histogram.note).toMatch(/DISTINCT from the cohort retention RATE/);
+    expect(out.as_of.tenure_bands).toBe(input.snapshot!.asOf);
+    expect(out.as_of.cohort_recency_histogram).toBe(input.snapshot!.asOf);
+    expect(out.warnings).toEqual([]);
+    expect(out.missing_or_unavailable).toEqual([]);
+  });
+
+  it('C2. tenureBands null → tenure block omitted + code; cohorts still present (per-field)', () => {
+    const input = fullLive();
+    input.snapshot = snap(
+      { '2': 120, '10': 41 },
+      { overflow: 5, unknown: 8, dues: { totalMonthly: 2400 }, tenure: null },
+    );
+    const out = buildMonthlySourceExport(input) as any;
+    expect(out.tenure_bands).toBeUndefined();
+    expect(out.missing_or_unavailable).toContain('tenure_bands:not_live');
+    expect(out.provenance.tenure_bands).toEqual({ source: 'not_live' });
+    expect(out.as_of.tenure_bands).toBeNull();
+    expect(out.scope.absent_domains).toContain('tenure_bands');
+    // cohorts survive independently
+    expect(out.cohort_recency_histogram).toBeDefined();
+    expect(out.missing_or_unavailable).not.toContain('cohort_recency_histogram:not_live');
+    expect(out.scope.absent_domains).not.toContain('cohort_recency_histogram');
+    // attendance snapshot itself is still live (whole snapshot present)
+    expect(out.attendance_snapshot).toBeDefined();
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+  });
+
+  it('C3. cohorts null → cohort block omitted + code; tenure still present (symmetric)', () => {
+    const input = fullLive();
+    input.snapshot = snap(
+      { '2': 120, '10': 41 },
+      { overflow: 5, unknown: 8, dues: { totalMonthly: 2400 }, cohortHist: null },
+    );
+    const out = buildMonthlySourceExport(input) as any;
+    expect(out.cohort_recency_histogram).toBeUndefined();
+    expect(out.missing_or_unavailable).toContain('cohort_recency_histogram:not_live');
+    expect(out.provenance.cohort_recency_histogram).toEqual({ source: 'not_live' });
+    expect(out.as_of.cohort_recency_histogram).toBeNull();
+    expect(out.scope.absent_domains).toContain('cohort_recency_histogram');
+    expect(out.tenure_bands).toBeDefined();
+    expect(out.missing_or_unavailable).not.toContain('tenure_bands:not_live');
+    expect(out.scope.absent_domains).not.toContain('tenure_bands');
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+  });
+
+  it('C4. no snapshot → both blocks omitted + both codes (+ retention_snapshot), reconciles 1:1', () => {
+    const out = buildMonthlySourceExport({ ...fullLive(), snapshot: null }) as any;
+    expect(out.tenure_bands).toBeUndefined();
+    expect(out.cohort_recency_histogram).toBeUndefined();
+    expect(out.missing_or_unavailable).toContain('tenure_bands:not_live');
+    expect(out.missing_or_unavailable).toContain('cohort_recency_histogram:not_live');
+    expect(out.missing_or_unavailable).toContain('retention_snapshot:not_live');
+    expect(out.scope.absent_domains).toEqual(
+      expect.arrayContaining(['attendance_snapshot', 'tenure_bands', 'cohort_recency_histogram']),
+    );
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+  });
+
+  it('C5. raw per-day bins are DROPPED — decoy key/field never serialized (blocks still present)', () => {
+    const input = fullLive();
+    // Non-numeric decoy keys: Number(k)=NaN routes the count to `healthy`, so the COUNT still
+    // aggregates — but the bin KEY and the countsByDaysAbsent structure must never be serialized.
+    const decoyTenure = tenureHist();
+    decoyTenure.bands.lt3m = {
+      countsByDaysAbsent: { DECOY_TENURE_BIN: 3 },
+      overflow365Plus: 0,
+      unknownRecency: 0,
+    };
+    const decoyCohort = JSON.parse(JSON.stringify(SAMPLE_COHORT_HISTOGRAM)) as CohortHistogram;
+    decoyCohort.cohorts.adults16plus.active.countsByDaysAbsent = { DECOY_COHORT_BIN: 5 };
+    input.snapshot = snap({ '2': 10 }, { tenure: decoyTenure, cohortHist: decoyCohort });
+
+    const json = JSON.stringify(buildMonthlySourceExport(input));
+    expect(json).not.toContain('DECOY_TENURE_BIN');
+    expect(json).not.toContain('DECOY_COHORT_BIN');
+    expect(json).not.toContain('countsByDaysAbsent');
+    expect(json).not.toContain('overflow365Plus');
+    expect(json).not.toContain('unknownRecency'); // export uses snake_case unknown_recency
+
+    // absence is the DROP, not a missing block — both blocks are present
+    const out = buildMonthlySourceExport(input) as any;
+    expect(out.tenure_bands).toBeDefined();
+    expect(out.cohort_recency_histogram).toBeDefined();
   });
 
   it('10. generated_at is the injected value; builder is deterministic', () => {
