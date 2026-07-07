@@ -20,6 +20,7 @@ import {
 import type { DashboardModel, ScenarioPoint } from '../lib/data/contract';
 import type { EfficiencyOpportunitiesResult } from '../lib/kpis/efficiencyOpportunities';
 import type { WhatNeedsAttentionResult } from '../lib/kpis/digHere';
+import type { OwnerDistributionStatus } from '../lib/data/ownerDistributionStatus';
 
 type RetentionState = {
   rates: RetentionMonth[] | null;
@@ -41,6 +42,10 @@ export function ExportSourceJsonCard({
   scenarioRunOutMonth,
   efficiencyResult,
   whatNeedsAttention,
+  ownerDistributionStatus,
+  ownerPayProjection,
+  ownerPayReserveFloor,
+  targetNetMargin,
 }: {
   model: DashboardModel;
   financialTxnCount: number;
@@ -54,6 +59,12 @@ export function ExportSourceJsonCard({
   // Efficiency / Cost Spikes), drilled from Dashboard so the export reuses them verbatim.
   efficiencyResult: EfficiencyOpportunitiesResult;
   whatNeedsAttention: WhatNeedsAttentionResult;
+  // Owner-pay sustainability — the Today page's own trailing-12 status (computed upstream, so no txns
+  // reach the export) plus the inputs the pure next-distribution helper needs.
+  ownerDistributionStatus: OwnerDistributionStatus;
+  ownerPayProjection: ScenarioPoint[];
+  ownerPayReserveFloor: number;
+  targetNetMargin: number;
 }) {
   const { silentChurnThresholdDays } = useRetentionSettings();
   const [retention, setRetention] = useState<RetentionState>({
@@ -98,6 +109,10 @@ export function ExportSourceJsonCard({
         scenarioRunOutMonth,
         efficiencyResult,
         whatNeedsAttention,
+        ownerDistributionStatus,
+        ownerPayProjection,
+        ownerPayReserveFloor,
+        targetNetMargin,
         retentionRates: rates,
         snapshot,
         thresholdDays: silentChurnThresholdDays,
@@ -124,6 +139,10 @@ export function ExportSourceJsonCard({
     scenarioRunOutMonth,
     efficiencyResult,
     whatNeedsAttention,
+    ownerDistributionStatus,
+    ownerPayProjection,
+    ownerPayReserveFloor,
+    targetNetMargin,
     silentChurnThresholdDays,
   ]);
 

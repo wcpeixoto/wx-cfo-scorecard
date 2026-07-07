@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { DashboardModel, ScenarioPoint, Txn } from '../lib/data/contract';
 import type { CashTrendDeltaResult } from '../lib/data/cashTrendDelta';
 import type { ReserveCoverageDelta } from '../lib/kpis/compute';
-import { classifyTxn } from '../lib/cashFlow';
+import { computeOwnerDistributionStatus } from '../lib/data/ownerDistributionStatus';
 import { CashOnHandCard } from './CashOnHandCard';
 import { OperatingReserveCard } from './OperatingReserveCard';
 import { OwnerDistributionsCard } from './OwnerDistributionsCard';
@@ -10,9 +10,6 @@ import { NextOwnerDistributionCard } from './NextOwnerDistributionCard';
 import { REQUIRED_SERIES_LENGTH } from '../lib/data/nextOwnerDistribution';
 
 type ReprojectOwnerPay = (revenueGrowthPct: number) => ScenarioPoint[];
-
-const DIST_ON_TARGET_LOW  = 0.90; // actual >= target × 0.90
-const DIST_ON_TARGET_HIGH = 1.10; // actual <= target × 1.10
 
 interface TodayPageProps {
   model: DashboardModel;
@@ -50,39 +47,12 @@ export function TodayPage({ model, txns, forecastProjection, negativeCashMonth, 
   const isOwnerPaySimulated =
     ownerPaySliderValue !== 0 && activeOwnerPayProjection !== ownerPayProjection;
 
-  const distributionStatus = useMemo(() => {
-    if (
-      !model.monthlyRollups ||
-      model.monthlyRollups.length < 3 ||
-      !targetNetMargin ||
-      targetNetMargin === 0 ||
-      !txns ||
-      txns.length === 0
-    ) {
-      return { status: 'on_target' as const, targetAmount: 0, actualAmount: 0 };
-    }
-
-    const recentMonths = model.monthlyRollups.slice(-12);
-    const totalRevenue = recentMonths.reduce((sum, m) => sum + (m.revenue ?? 0), 0);
-    const targetAmount = totalRevenue * targetNetMargin;
-
-    const cutoffMonth = recentMonths[0].month;
-    const actualAmount = txns
-      .filter(txn => classifyTxn(txn) === 'owner-distribution')
-      .filter(txn => txn.month >= cutoffMonth)
-      .reduce((sum, txn) => sum + Math.abs(txn.amount), 0);
-
-    let status: 'below_target' | 'on_target' | 'above_target';
-    if (actualAmount < targetAmount * DIST_ON_TARGET_LOW) {
-      status = 'below_target';
-    } else if (actualAmount > targetAmount * DIST_ON_TARGET_HIGH) {
-      status = 'above_target';
-    } else {
-      status = 'on_target';
-    }
-
-    return { status, targetAmount, actualAmount };
-  }, [model, txns, targetNetMargin]);
+  // Trailing-12 owner-draw actual-vs-target. Extracted to a pure helper so the Today page and the
+  // monthly-source export share ONE source of truth (parity proven in ownerDistributionStatus.test.ts).
+  const distributionStatus = useMemo(
+    () => computeOwnerDistributionStatus(model, txns, targetNetMargin),
+    [model, txns, targetNetMargin],
+  );
 
   return (
     <div className="today-page">

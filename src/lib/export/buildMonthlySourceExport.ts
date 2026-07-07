@@ -7,6 +7,8 @@
 //     uncategorized warning) ← DashboardModel — the Big Picture tiles' own computed reads, reused verbatim
 //   - financial levers (money left, payroll efficiency, cost spikes) ← computeEfficiencyOpportunities +
 //     computeWhatNeedsAttention results, drilled from Dashboard — the recommended-action values, verbatim
+//   - owner distributions (trailing-12 actual-vs-target + next distribution) ← computeOwnerDistributionStatus
+//     (drilled) + computeNextOwnerDistribution — the owner-pay sustainability lens, reused verbatim
 //   - forecast (projection) ← scenarioProjection (composed ScenarioPoint[] with month-end endingCashBalance)
 //     + scenarioRunOutMonth — the SAME forward series the Forecast page renders, NOT the naive
 //     model.cashFlowForecastSeries trend (which carries no ending balance). Both prop-drilled from Dashboard.
@@ -42,6 +44,8 @@ import type { RetentionAggregateSnapshot } from '../gym/fetchRetentionAggregate'
 import { deriveBuckets } from '../gym/retentionAggregateView';
 import type { EfficiencyOpportunitiesResult } from '../kpis/efficiencyOpportunities';
 import type { WhatNeedsAttentionResult } from '../kpis/digHere';
+import type { OwnerDistributionStatus } from '../data/ownerDistributionStatus';
+import { computeNextOwnerDistribution, REQUIRED_SERIES_LENGTH } from '../data/nextOwnerDistribution';
 
 export const MONTHLY_SOURCE_SCHEMA_VERSION = '0.1';
 const DEFAULT_BUSINESS_NAME = 'Gracie Sports';
@@ -65,6 +69,14 @@ export type MonthlySourceExportInputs = {
   // recomputed here; emitted only when financialLive (they are financial-derived).
   efficiencyResult: EfficiencyOpportunitiesResult;
   whatNeedsAttention: WhatNeedsAttentionResult;
+  // Owner-pay sustainability lens. ownerDistributionStatus is the trailing-12 actual-vs-target result
+  // computed UPSTREAM (in Dashboard, where txns live) so this builder never receives transaction rows —
+  // the PII boundary holds. ownerPayProjection + ownerPayReserveFloor feed the pure next-distribution
+  // helper (no PII; scalars only). targetNetMargin drives target_configured (0/unset ⇒ not meaningful).
+  ownerDistributionStatus: OwnerDistributionStatus;
+  ownerPayProjection: ScenarioPoint[];
+  ownerPayReserveFloor: number;
+  targetNetMargin: number;
   retentionRates: RetentionMonth[] | null; // fetchMemberRetentionRates() → null when not seeded
   snapshot: RetentionAggregateSnapshot | null; // fetchLatestRetentionAggregate() → null on error/unseeded
   thresholdDays: number; // useRetentionSettings().silentChurnThresholdDays
@@ -142,6 +154,10 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     scenarioRunOutMonth,
     efficiencyResult,
     whatNeedsAttention,
+    ownerDistributionStatus,
+    ownerPayProjection,
+    ownerPayReserveFloor,
+    targetNetMargin,
     retentionRates,
     snapshot,
     thresholdDays,
@@ -342,6 +358,50 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     missing.push('financial_levers:not_live');
   }
 
+  // ---- OWNER DISTRIBUTIONS (owner-pay sustainability; financial-derived) ----
+  // Trailing-12 owner-draw actual-vs-target + the next-distribution forecast. The status is the SAME
+  // value the Today page renders (computeOwnerDistributionStatus, computed upstream), reused verbatim.
+  // window comes from the helper's ACTUAL slice(-12) bounds — NOT assumed to end on scorecard_month,
+  // because that slice includes the partial current month when present. next_distribution reuses the
+  // pure computeNextOwnerDistribution, GUARDING its <9-point throw with an explicit 'unavailable' state.
+  // target_configured:false (margin unset/0) and next_distribution.state:'unavailable' are
+  // present-but-degraded states — NOT missing domains, so they push no code. Gated on financialLive.
+  let ownerDistributions: Record<string, unknown> | undefined;
+  if (financialLive) {
+    const targetConfigured = targetNetMargin > 0;
+    let nextDistribution: Record<string, unknown>;
+    if (ownerPayProjection.length >= REQUIRED_SERIES_LENGTH) {
+      const nd = computeNextOwnerDistribution(ownerPayProjection, ownerPayReserveFloor);
+      // Bar-segment geometry (nd.bars) is chart-only — dropped.
+      nextDistribution =
+        nd.state === 'forecast'
+          ? { state: 'forecast', month_label: nd.monthLabel, distribution_amount: nd.distributionAmount }
+          : { state: 'blocked', blocker: nd.blocker };
+    } else {
+      // Guard the helper's <9-point throw — an honest 'unavailable' instead of an exception.
+      nextDistribution = { state: 'unavailable' };
+    }
+    ownerDistributions = {
+      basis: 'trailing_12_actual_vs_target',
+      note:
+        'Owner draws are EXCLUDED from operating cash and runway by design — do NOT reconcile these ' +
+        'figures against operating cash flow, net_burn, or runway. This is a separate owner-pay lens.',
+      // Actual trailing-12 window used for the target (helper bounds); null when no target is computed.
+      window:
+        ownerDistributionStatus.windowStart && ownerDistributionStatus.windowEnd
+          ? { start: ownerDistributionStatus.windowStart, end: ownerDistributionStatus.windowEnd }
+          : null,
+      target_net_margin: targetConfigured ? targetNetMargin : null,
+      target_configured: targetConfigured,
+      target_amount: ownerDistributionStatus.targetAmount,
+      actual_amount: ownerDistributionStatus.actualAmount,
+      status: ownerDistributionStatus.status,
+      next_distribution: nextDistribution,
+    };
+  } else {
+    missing.push('owner_distributions:not_live');
+  }
+
   // ---- FORECAST (optional; projection, never mixed with actuals) ----
   // Serializes the composed scenario projection the owner sees on the Forecast page — a forward
   // CASH-FLOW projection carrying a real month-end endingCashBalance — NOT the naive
@@ -460,6 +520,18 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
             'present-but-empty state, not a missing domain).',
         }
       : { source: 'not_live' },
+    owner_distributions: financialLive
+      ? {
+          source: 'model',
+          basis: 'trailing_12',
+          note:
+            "The dashboard's own trailing-12 owner-draw actual-vs-target (the Today page's own value) " +
+            'plus the next-distribution forecast, reused verbatim — NOT recomputed by the export. Owner ' +
+            'draws are a separate owner-pay lens, excluded from operating cash and runway by design; do ' +
+            'not reconcile against them. target_configured:false (margin unset) and ' +
+            "next_distribution.state:'unavailable' (too few projection points) are degraded, not missing.",
+        }
+      : { source: 'not_live' },
     forecast: forecastAvailable
       ? {
           source: 'model',
@@ -485,6 +557,7 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     financial_actuals: financialLive,
     dashboard_signals: financialLive,
     financial_levers: financialLive,
+    owner_distributions: financialLive,
     forecast: forecastAvailable,
     membership_retention: retentionLive,
     attendance_snapshot: Boolean(snapshot),
@@ -516,6 +589,7 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     // because it always equals the financial month (no new period token).
     dashboard_signals: financialLive ? scorecardMonth : null, // 'YYYY-MM'
     financial_levers: financialLive ? scorecardMonth : null, // 'YYYY-MM' — shares the financial anchor
+    owner_distributions: financialLive ? scorecardMonth : null, // 'YYYY-MM' — monthly anchor (not the window)
     retention_rates: lastRetentionMonth, // 'YYYY-MM'
     attendance_snapshot: snapshot ? snapshot.asOf : null, // 'YYYY-MM-DD'
   };
@@ -559,6 +633,7 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     ...(moneyLeft ? { money_left: moneyLeft } : {}),
     ...(payrollEfficiency ? { payroll_efficiency: payrollEfficiency } : {}),
     ...(costSpikes ? { cost_spikes: costSpikes } : {}),
+    ...(ownerDistributions ? { owner_distributions: ownerDistributions } : {}),
     ...(forecast ? { forecast } : {}),
     ...(membershipRetentionMonthly ? { membership_retention_monthly: membershipRetentionMonthly } : {}),
     ...(attendanceSnapshot ? { attendance_snapshot: attendanceSnapshot } : {}),
