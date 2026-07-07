@@ -5,6 +5,8 @@
 //   - financial actuals + comparisons + runway + expense categories ← DashboardModel (computeDashboardModel)
 //   - dashboard signals (KPI cards, category movers, trajectory lights, suggested margins,
 //     uncategorized warning) ← DashboardModel — the Big Picture tiles' own computed reads, reused verbatim
+//   - financial levers (money left, payroll efficiency, cost spikes) ← computeEfficiencyOpportunities +
+//     computeWhatNeedsAttention results, drilled from Dashboard — the recommended-action values, verbatim
 //   - forecast (projection) ← scenarioProjection (composed ScenarioPoint[] with month-end endingCashBalance)
 //     + scenarioRunOutMonth — the SAME forward series the Forecast page renders, NOT the naive
 //     model.cashFlowForecastSeries trend (which carries no ending balance). Both prop-drilled from Dashboard.
@@ -38,6 +40,8 @@ import type { RetentionMonth } from '../gym/memberRetentionSeries';
 import { realRetentionMonths } from '../gym/memberRetentionSeries';
 import type { RetentionAggregateSnapshot } from '../gym/fetchRetentionAggregate';
 import { deriveBuckets } from '../gym/retentionAggregateView';
+import type { EfficiencyOpportunitiesResult } from '../kpis/efficiencyOpportunities';
+import type { WhatNeedsAttentionResult } from '../kpis/digHere';
 
 export const MONTHLY_SOURCE_SCHEMA_VERSION = '0.1';
 const DEFAULT_BUSINESS_NAME = 'Gracie Sports';
@@ -56,6 +60,11 @@ export type MonthlySourceExportInputs = {
   // First projected month whose month-end cash falls below $0 (Dashboard.todayRunOutNegativeCashMonth),
   // or null if it never does within the horizon. A $0 crossing — reserve-independent.
   scenarioRunOutMonth: string | null;
+  // Recoverable-dollar levers — the dashboard's OWN already-computed recommended-action values, drilled
+  // in from Dashboard (computeEfficiencyOpportunities + computeWhatNeedsAttention). Reused verbatim, not
+  // recomputed here; emitted only when financialLive (they are financial-derived).
+  efficiencyResult: EfficiencyOpportunitiesResult;
+  whatNeedsAttention: WhatNeedsAttentionResult;
   retentionRates: RetentionMonth[] | null; // fetchMemberRetentionRates() → null when not seeded
   snapshot: RetentionAggregateSnapshot | null; // fetchLatestRetentionAggregate() → null on error/unseeded
   thresholdDays: number; // useRetentionSettings().silentChurnThresholdDays
@@ -131,6 +140,8 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     financialBasis,
     scenarioProjection,
     scenarioRunOutMonth,
+    efficiencyResult,
+    whatNeedsAttention,
     retentionRates,
     snapshot,
     thresholdDays,
@@ -281,6 +292,56 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     missing.push('dashboard_signals:not_live');
   }
 
+  // ---- FINANCIAL LEVERS (recommended actions; financial-derived) ----
+  // The dashboard's OWN recoverable-dollar levers, reused VERBATIM off the drilled results — never
+  // recomputed here. money_left + payroll_efficiency come from computeEfficiencyOpportunities; cost_spikes
+  // from computeWhatNeedsAttention. Render-only geometry (bar widths, window details, chart series,
+  // sparklines) is dropped. Gated on the SAME financialLive condition as the financial blocks, so the
+  // one domain reconciles 1:1 with `missing_or_unavailable`. cost_spikes.no_data=true is a
+  // present-but-empty state (insufficient baseline history), NOT a missing domain.
+  let moneyLeft: Record<string, unknown> | undefined;
+  let payrollEfficiency: Record<string, unknown> | undefined;
+  let costSpikes: Record<string, unknown> | undefined;
+  if (financialLive) {
+    moneyLeft = {
+      window_label: efficiencyResult.windowLabel,
+      total_extra_per_month: efficiencyResult.totalExtraPerMonth,
+      benchmark_revenue_qualified: efficiencyResult.benchmarkRevenueQualified,
+      rows: efficiencyResult.rows.map((r) => ({
+        category: r.category,
+        today_pct: r.todayPct,
+        best_pct: r.bestPct,
+        extra_per_month: r.extraPerMonth,
+        best_period_label: r.bestPeriodLabel,
+      })),
+    };
+    payrollEfficiency = {
+      payroll_today_pct: efficiencyResult.payrollTodayPct,
+      payroll_best_pct: efficiencyResult.payrollBestPct,
+      payroll_best_window_label: efficiencyResult.payrollBestWindowLabel,
+      payroll_extra_per_month: efficiencyResult.payrollExtraPerMonth,
+    };
+    costSpikes = {
+      current_month: whatNeedsAttention.currentMonth,
+      baseline_months: whatNeedsAttention.baselineMonths,
+      no_data: whatNeedsAttention.noData,
+      rows: whatNeedsAttention.rows.map((r) => ({
+        category_name: r.categoryName,
+        bucket: r.bucket,
+        current_spend: r.currentSpend,
+        expected_spend: r.expectedSpend,
+        delta: r.delta,
+        current_ratio: r.currentRatio,
+        baseline_ratio: r.baselineRatio,
+        current_avg_spend: r.currentAvgSpend,
+        baseline_avg_spend: r.baselineAvgSpend,
+        current_revenue: r.currentRevenue,
+      })),
+    };
+  } else {
+    missing.push('financial_levers:not_live');
+  }
+
   // ---- FORECAST (optional; projection, never mixed with actuals) ----
   // Serializes the composed scenario projection the owner sees on the Forecast page — a forward
   // CASH-FLOW projection carrying a real month-end endingCashBalance — NOT the naive
@@ -386,6 +447,19 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
             'margins with a text justification. uncategorized_warning may be null when live (no warning).',
         }
       : { source: 'not_live' },
+    financial_levers: financialLive
+      ? {
+          source: 'model',
+          basis: 'derived_signal',
+          note:
+            "The dashboard's own computed recommended-action levers, reused verbatim — NOT recomputed " +
+            'by the export. money_left = $/mo recoverable per category vs its own best 3-month window ' +
+            '(total_extra_per_month sums the visible rows); payroll_efficiency = payroll % of revenue ' +
+            'today vs its best window plus the $/mo excess; cost_spikes = categories overspending vs ' +
+            'their trailing baseline. cost_spikes.no_data=true means insufficient baseline history (a ' +
+            'present-but-empty state, not a missing domain).',
+        }
+      : { source: 'not_live' },
     forecast: forecastAvailable
       ? {
           source: 'model',
@@ -410,6 +484,7 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
   const domainPresence: Record<string, boolean> = {
     financial_actuals: financialLive,
     dashboard_signals: financialLive,
+    financial_levers: financialLive,
     forecast: forecastAvailable,
     membership_retention: retentionLive,
     attendance_snapshot: Boolean(snapshot),
@@ -440,6 +515,7 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     // signals with the day-anchored attendance snapshot. Not added to the divergence check below
     // because it always equals the financial month (no new period token).
     dashboard_signals: financialLive ? scorecardMonth : null, // 'YYYY-MM'
+    financial_levers: financialLive ? scorecardMonth : null, // 'YYYY-MM' — shares the financial anchor
     retention_rates: lastRetentionMonth, // 'YYYY-MM'
     attendance_snapshot: snapshot ? snapshot.asOf : null, // 'YYYY-MM-DD'
   };
@@ -480,6 +556,9 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     // uncategorized_warning is present-but-null when live with no active warning — include the key
     // (value null) whenever the block is live; omit only when dashboard_signals itself is not live.
     ...(uncategorizedWarning !== undefined ? { uncategorized_warning: uncategorizedWarning } : {}),
+    ...(moneyLeft ? { money_left: moneyLeft } : {}),
+    ...(payrollEfficiency ? { payroll_efficiency: payrollEfficiency } : {}),
+    ...(costSpikes ? { cost_spikes: costSpikes } : {}),
     ...(forecast ? { forecast } : {}),
     ...(membershipRetentionMonthly ? { membership_retention_monthly: membershipRetentionMonthly } : {}),
     ...(attendanceSnapshot ? { attendance_snapshot: attendanceSnapshot } : {}),
