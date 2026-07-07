@@ -3,6 +3,8 @@
 // Serializes ALREADY-COMPUTED scorecard data into one ChatGPT-readable JSON object. It reuses the
 // dashboard's source-of-truth outputs and NEVER re-implements dashboard math:
 //   - financial actuals + comparisons + runway + expense categories ← DashboardModel (computeDashboardModel)
+//   - dashboard signals (KPI cards, category movers, trajectory lights, suggested margins,
+//     uncategorized warning) ← DashboardModel — the Big Picture tiles' own computed reads, reused verbatim
 //   - forecast (projection) ← scenarioProjection (composed ScenarioPoint[] with month-end endingCashBalance)
 //     + scenarioRunOutMonth — the SAME forward series the Forecast page renders, NOT the naive
 //     model.cashFlowForecastSeries trend (which carries no ending balance). Both prop-drilled from Dashboard.
@@ -213,6 +215,72 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     missing.push(financialTxnCount > 0 ? 'financial:no_complete_month' : 'financial:no_import');
   }
 
+  // ---- DASHBOARD SIGNALS (Big Picture read-outs; financial-derived) ----
+  // The dashboard's OWN already-computed Big Picture signals — KPI deltas, category movers, trajectory
+  // lights, suggested margins, and the uncategorized-txn warning — reused VERBATIM off DashboardModel,
+  // never recomputed here. Gated on the SAME financialLive condition as the financial blocks (they are
+  // all financial-derived). When not live, all five are omitted and ONE code is recorded, so the domain
+  // reconciles 1:1 with `missing_or_unavailable`. uncategorized_warning may be present-but-null when
+  // live (no warning) — a null field, NOT a missing domain, so it never pushes a code.
+  let kpiCards: Record<string, unknown>[] | undefined;
+  let categoryMovers: Record<string, unknown>[] | undefined;
+  let trajectorySignals: Record<string, unknown>[] | undefined;
+  let suggestedMargins: Record<string, unknown> | undefined;
+  let uncategorizedWarning: Record<string, unknown> | null | undefined;
+  if (financialLive) {
+    kpiCards = model.kpiCards.map((c) => ({
+      id: c.id,
+      label: c.label,
+      value: c.value,
+      previous_value: c.previousValue,
+      delta_percent: c.deltaPercent,
+      trend: c.trend, // sign of the change (arrow glyph)
+      sentiment: c.sentiment, // favorability; may invert vs trend for lower-is-better metrics
+      format: c.format,
+    }));
+    // sparkline intentionally dropped — an intra-category series is noise for the attack plan.
+    categoryMovers = model.movers.map((m) => ({
+      category: m.category,
+      current: m.current,
+      previous: m.previous,
+      delta: m.delta,
+      delta_percent: m.deltaPercent,
+      priority_score: m.priorityScore,
+    }));
+    trajectorySignals = model.trajectorySignals.map((t) => ({
+      id: t.id,
+      label: t.label,
+      timeframe: t.timeframe,
+      current_start_month: t.currentStartMonth,
+      current_end_month: t.currentEndMonth,
+      previous_start_month: t.previousStartMonth,
+      previous_end_month: t.previousEndMonth,
+      current_month_count: t.currentMonthCount,
+      previous_month_count: t.previousMonthCount,
+      current_net_cash_flow: t.currentNetCashFlow,
+      previous_net_cash_flow: t.previousNetCashFlow,
+      delta: t.delta,
+      percent_change: t.percentChange,
+      direction: t.direction,
+      light: t.light, // green/red/neutral status glyph
+      has_sufficient_history: t.hasSufficientHistory,
+    }));
+    suggestedMargins = {
+      revenue_margin: model.suggestedRevenueMargin,
+      expense_margin: model.suggestedExpenseMargin,
+      justification: model.suggestedMarginJustification,
+    };
+    // Present-but-null when live and no warning is active. Never pushes a missing code.
+    uncategorizedWarning = model.uncategorizedWarning
+      ? {
+          count: model.uncategorizedWarning.count,
+          absolute_amount: model.uncategorizedWarning.absoluteAmount,
+        }
+      : null;
+  } else {
+    missing.push('dashboard_signals:not_live');
+  }
+
   // ---- FORECAST (optional; projection, never mixed with actuals) ----
   // Serializes the composed scenario projection the owner sees on the Forecast page — a forward
   // CASH-FLOW projection carrying a real month-end endingCashBalance — NOT the naive
@@ -305,6 +373,19 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     financial: financialLive
       ? { source: 'live', latest_month: scorecardMonth, basis: financialBasis }
       : { source: 'missing' },
+    dashboard_signals: financialLive
+      ? {
+          source: 'model',
+          basis: 'derived_signal',
+          note:
+            "The dashboard's own computed Big Picture signals (KPI deltas, category movers, trajectory " +
+            'lights, suggested margins), reused verbatim — NOT recomputed by the export. Definitions: ' +
+            'kpi_cards.sentiment = favorability of the change (may invert vs trend for lower-is-better ' +
+            'metrics like expenses; up=favorable, down=unfavorable); trajectory_signals.light = ' +
+            'green/red/neutral status glyph; suggested_margins are the model’s target revenue/expense ' +
+            'margins with a text justification. uncategorized_warning may be null when live (no warning).',
+        }
+      : { source: 'not_live' },
     forecast: forecastAvailable
       ? {
           source: 'model',
@@ -328,6 +409,7 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
   // in-scope codes in `missing_or_unavailable`.
   const domainPresence: Record<string, boolean> = {
     financial_actuals: financialLive,
+    dashboard_signals: financialLive,
     forecast: forecastAvailable,
     membership_retention: retentionLive,
     attendance_snapshot: Boolean(snapshot),
@@ -354,6 +436,10 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     : null;
   const asOf: Record<string, string | null> = {
     financial: financialLive ? scorecardMonth : null, // 'YYYY-MM'
+    // Same monthly anchor as financial — so a reader does not cross-compare these dashboard-derived
+    // signals with the day-anchored attendance snapshot. Not added to the divergence check below
+    // because it always equals the financial month (no new period token).
+    dashboard_signals: financialLive ? scorecardMonth : null, // 'YYYY-MM'
     retention_rates: lastRetentionMonth, // 'YYYY-MM'
     attendance_snapshot: snapshot ? snapshot.asOf : null, // 'YYYY-MM-DD'
   };
@@ -387,6 +473,13 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     ...(financialComparisons ? { financial_comparisons: financialComparisons } : {}),
     ...(runway ? { runway } : {}),
     ...(topExpenseCategories ? { top_expense_categories: topExpenseCategories } : {}),
+    ...(kpiCards ? { kpi_cards: kpiCards } : {}),
+    ...(categoryMovers ? { category_movers: categoryMovers } : {}),
+    ...(trajectorySignals ? { trajectory_signals: trajectorySignals } : {}),
+    ...(suggestedMargins ? { suggested_margins: suggestedMargins } : {}),
+    // uncategorized_warning is present-but-null when live with no active warning — include the key
+    // (value null) whenever the block is live; omit only when dashboard_signals itself is not live.
+    ...(uncategorizedWarning !== undefined ? { uncategorized_warning: uncategorizedWarning } : {}),
     ...(forecast ? { forecast } : {}),
     ...(membershipRetentionMonthly ? { membership_retention_monthly: membershipRetentionMonthly } : {}),
     ...(attendanceSnapshot ? { attendance_snapshot: attendanceSnapshot } : {}),
