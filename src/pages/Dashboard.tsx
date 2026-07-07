@@ -142,6 +142,7 @@ import type {
   TrendPoint,
   Txn,
 } from '../lib/data/contract';
+import { computeOwnerDistributionStatus } from '../lib/data/ownerDistributionStatus';
 import { chartTokens } from '../lib/ui/chartTokens';
 
 type TabId =
@@ -2486,6 +2487,13 @@ export default function Dashboard() {
       ? businessRules.safetyReserveAmount
       : model.runway.reserveTarget;
 
+  // Trailing-12 owner-draw actual-vs-target — the SAME value the Today page shows (shared pure helper).
+  // Computed here (txns in scope) so the export receives only the scalar result, never transaction rows.
+  const ownerDistributionStatus = useMemo(
+    () => computeOwnerDistributionStatus(model, baseTxns, businessRules.targetNetMargin),
+    [model, baseTxns, businessRules.targetNetMargin],
+  );
+
   // Slider re-projection: given a revenueGrowthPct override, re-runs the
   // identical pipeline used to build ownerPayProjection but with the
   // supplied growth rate substituted. Called from NextOwnerDistributionCard
@@ -4548,6 +4556,10 @@ export default function Dashboard() {
                     scenarioRunOutMonth={todayRunOutNegativeCashMonth}
                     efficiencyResult={efficiencyResult}
                     whatNeedsAttention={whatNeedsAttention}
+                    ownerDistributionStatus={ownerDistributionStatus}
+                    ownerPayProjection={ownerPayProjection}
+                    ownerPayReserveFloor={ownerPayReserveFloor}
+                    targetNetMargin={businessRules.targetNetMargin}
                   />
                 </div>
               </div>

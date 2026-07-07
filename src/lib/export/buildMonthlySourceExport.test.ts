@@ -123,6 +123,10 @@ function emptyWhatNeedsAttention() {
     rows: [],
   } as unknown as MonthlySourceExportInputs['whatNeedsAttention'];
 }
+// Degenerate owner-distribution status (margin unset / no data) — the neutral zero/null result.
+function degenerateOwnerStatus(): MonthlySourceExportInputs['ownerDistributionStatus'] {
+  return { status: 'on_target', targetAmount: 0, actualAmount: 0, windowStart: null, windowEnd: null };
+}
 
 const BASE: MonthlySourceExportInputs = {
   model: model(),
@@ -133,11 +137,29 @@ const BASE: MonthlySourceExportInputs = {
   scenarioRunOutMonth: null,
   efficiencyResult: emptyEfficiency(),
   whatNeedsAttention: emptyWhatNeedsAttention(),
+  ownerDistributionStatus: degenerateOwnerStatus(),
+  ownerPayProjection: [],
+  ownerPayReserveFloor: 0,
+  targetNetMargin: 0,
   retentionRates: null,
   snapshot: null,
   thresholdDays: 21,
   generatedAt: '2026-07-06T14:00:00Z',
 };
+
+// 9-point owner-pay projection (satisfies computeNextOwnerDistribution's REQUIRED_SERIES_LENGTH). Cash
+// sits well above the reserve floor in every 4-month window ⇒ a forecast at the first display month.
+function ownerPay9(endingBalance = 50000): MonthlySourceExportInputs['ownerPayProjection'] {
+  return Array.from({ length: 9 }, (_, i) =>
+    scenPoint(shiftMonthToken('2026-07', i), 10000, 8000, endingBalance),
+  );
+}
+// Local month shifter for fixtures (the builder's own shiftMonth is not exported).
+function shiftMonthToken(start: string, delta: number): string {
+  const [y, m] = start.split('-').map(Number);
+  const total = y * 12 + (m - 1) + delta;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
+}
 
 // A fully-live input: financial through 2026-06, retention series, live snapshot, projected forecast.
 function fullLive(): MonthlySourceExportInputs {
@@ -258,6 +280,18 @@ function fullLive(): MonthlySourceExportInputs {
         },
       ],
     } as unknown as MonthlySourceExportInputs['whatNeedsAttention'],
+    // Owner distributions — real trailing-12 status (windowEnd = scorecard month in the normal case)
+    // + a 9-point projection that yields a forecast at the first display month.
+    ownerDistributionStatus: {
+      status: 'below_target',
+      targetAmount: 30000,
+      actualAmount: 20000,
+      windowStart: '2025-07',
+      windowEnd: '2026-06',
+    },
+    ownerPayProjection: ownerPay9(),
+    ownerPayReserveFloor: 10000,
+    targetNetMargin: 0.25,
     retentionRates: [
       retMonth('2025-06', { isSeedBoundary: true }), // seed — must be dropped
       retMonth('2025-07'),
@@ -326,6 +360,12 @@ describe('buildMonthlySourceExport', () => {
     expect(json2).not.toContain('chart-series-secret');
     expect(json2).not.toContain('sparklineData');
     expect(json2).not.toContain('sparkline');
+    // owner-distribution next-distribution bar geometry never leaks
+    expect(json2).not.toContain('bars');
+    expect(json2).not.toContain('reserveSegment');
+    expect(json2).not.toContain('safeCashSegment');
+    expect(json2).not.toContain('distributionSegment');
+    expect(json2).not.toContain('endingCashBeforePayout');
   });
 
   it('3. financial missing → blocks omitted, code, unusable', () => {
@@ -450,6 +490,7 @@ describe('buildMonthlySourceExport', () => {
       'financial_actuals',
       'dashboard_signals',
       'financial_levers',
+      'owner_distributions',
       'forecast',
       'membership_retention',
       'attendance_snapshot',
@@ -471,11 +512,12 @@ describe('buildMonthlySourceExport', () => {
     input.scenarioProjection = []; // forecast out
     input.scenarioRunOutMonth = null;
     const out = buildMonthlySourceExport(input) as any;
-    // dashboard_signals + financial_levers ride on financialLive (true here), so they stay present.
+    // dashboard_signals + financial_levers + owner_distributions ride on financialLive (true here).
     expect(out.scope.present_domains).toEqual([
       'financial_actuals',
       'dashboard_signals',
       'financial_levers',
+      'owner_distributions',
       'membership_retention',
     ]);
     expect(out.scope.absent_domains).toEqual(['forecast', 'attendance_snapshot']);
@@ -500,6 +542,7 @@ describe('buildMonthlySourceExport', () => {
       financial: '2026-06',
       dashboard_signals: '2026-06', // shares the financial month — never a new divergence token
       financial_levers: '2026-06', // ditto
+      owner_distributions: '2026-06', // ditto (anchor is the month, not the trailing-12 window)
       retention_rates: '2026-06',
       attendance_snapshot: '2026-07-06',
     });
@@ -722,6 +765,89 @@ describe('buildMonthlySourceExport', () => {
     expect(out.provenance.financial_levers).toEqual({ source: 'not_live' });
     expect(out.as_of.financial_levers).toBeNull();
     // #544 reconciliation holds with the new domain included
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+  });
+
+  it('25. owner distributions — deterministic values; next_distribution forecast; drops bars', () => {
+    const out = buildMonthlySourceExport(fullLive()) as any;
+    expect(out.owner_distributions.basis).toBe('trailing_12_actual_vs_target');
+    expect(out.owner_distributions.note).toMatch(/do NOT reconcile/i);
+    expect(out.owner_distributions.window).toEqual({ start: '2025-07', end: '2026-06' });
+    expect(out.owner_distributions.target_net_margin).toBe(0.25);
+    expect(out.owner_distributions.target_configured).toBe(true);
+    expect(out.owner_distributions.target_amount).toBe(30000);
+    expect(out.owner_distributions.actual_amount).toBe(20000);
+    expect(out.owner_distributions.status).toBe('below_target');
+    // 9-point projection well above the floor → forecast at the first display month; bars dropped
+    expect(out.owner_distributions.next_distribution).toEqual({
+      state: 'forecast',
+      month_label: 'Jul 2026',
+      distribution_amount: 40000,
+    });
+    expect(out.owner_distributions.next_distribution.bars).toBeUndefined();
+    expect(out.as_of.owner_distributions).toBe('2026-06');
+    expect(out.provenance.owner_distributions.source).toBe('model');
+    expect(out.provenance.owner_distributions.basis).toBe('trailing_12');
+  });
+
+  it('26. owner distributions window comes from the helper bounds, NOT scorecard_month', () => {
+    // The trailing-12 slice can end on the PARTIAL current month. Prove window.end tracks the helper,
+    // not the scorecard month (they must be able to differ).
+    const input = fullLive();
+    input.ownerDistributionStatus = {
+      status: 'below_target',
+      targetAmount: 30000,
+      actualAmount: 20000,
+      windowStart: '2025-08',
+      windowEnd: '2026-07', // partial current month — later than scorecard_month
+    };
+    const out = buildMonthlySourceExport(input) as any;
+    expect(out.owner_distributions.window).toEqual({ start: '2025-08', end: '2026-07' });
+    expect(out.scorecard_month).toBe('2026-06');
+    expect(out.owner_distributions.window.end).not.toBe(out.scorecard_month); // decoupled
+  });
+
+  it('27. degenerate owner status (margin unset) → target_configured:false, window:null, no code', () => {
+    const input = fullLive();
+    input.targetNetMargin = 0;
+    input.ownerDistributionStatus = degenerateOwnerStatus();
+    const out = buildMonthlySourceExport(input) as any;
+    expect(out.owner_distributions.target_configured).toBe(false);
+    expect(out.owner_distributions.target_net_margin).toBeNull();
+    expect(out.owner_distributions.window).toBeNull();
+    expect(out.owner_distributions.target_amount).toBe(0);
+    expect(out.owner_distributions.status).toBe('on_target');
+    // present-but-degraded — NOT a missing domain
+    expect(out.missing_or_unavailable).not.toContain('owner_distributions:not_live');
+    expect(out.scope.present_domains).toContain('owner_distributions');
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+  });
+
+  it('28. next_distribution:unavailable when the projection has < 9 points (throw guarded)', () => {
+    const input = fullLive();
+    input.ownerPayProjection = ownerPay9().slice(0, 5); // only 5 points — helper would throw
+    const out = buildMonthlySourceExport(input) as any;
+    expect(out.owner_distributions.next_distribution).toEqual({ state: 'unavailable' });
+    // still a present domain (owner status is live) — no missing code
+    expect(out.missing_or_unavailable).not.toContain('owner_distributions:not_live');
+  });
+
+  it('29. next_distribution:blocked when cash sits below the reserve floor', () => {
+    const input = fullLive();
+    input.ownerPayProjection = ownerPay9(5000); // every month below the 10000 floor
+    const out = buildMonthlySourceExport(input) as any;
+    expect(out.owner_distributions.next_distribution.state).toBe('blocked');
+    expect(out.owner_distributions.next_distribution.blocker).toBe('reserve_shortfall');
+    expect(out.owner_distributions.next_distribution.bars).toBeUndefined();
+  });
+
+  it('30. owner distributions gated on financialLive — omitted + one code, reconciles 1:1', () => {
+    const out = buildMonthlySourceExport({ ...fullLive(), financialTxnCount: 0 }) as any;
+    expect(out.owner_distributions).toBeUndefined();
+    expect(out.missing_or_unavailable).toContain('owner_distributions:not_live');
+    expect(out.scope.absent_domains).toContain('owner_distributions');
+    expect(out.provenance.owner_distributions).toEqual({ source: 'not_live' });
+    expect(out.as_of.owner_distributions).toBeNull();
     expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
   });
 
