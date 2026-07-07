@@ -101,6 +101,29 @@ function snap(
   } as unknown as RetentionAggregateSnapshot;
 }
 
+// Financial-lever results (drilled from Dashboard). Empty variants for BASE; fullLive() sets real values.
+function emptyEfficiency() {
+  return {
+    windowLabel: '',
+    rows: [],
+    totalExtraPerMonth: 0,
+    payrollExtraPerMonth: null,
+    payrollTodayPct: null,
+    payrollBestPct: null,
+    payrollBestWindowLabel: null,
+    payrollRollingSeries: [],
+    benchmarkRevenueQualified: false,
+  } as unknown as MonthlySourceExportInputs['efficiencyResult'];
+}
+function emptyWhatNeedsAttention() {
+  return {
+    currentMonth: '',
+    baselineMonths: '',
+    noData: true,
+    rows: [],
+  } as unknown as MonthlySourceExportInputs['whatNeedsAttention'];
+}
+
 const BASE: MonthlySourceExportInputs = {
   model: model(),
   financialTxnCount: 0,
@@ -108,6 +131,8 @@ const BASE: MonthlySourceExportInputs = {
   financialBasis: 'operating',
   scenarioProjection: [],
   scenarioRunOutMonth: null,
+  efficiencyResult: emptyEfficiency(),
+  whatNeedsAttention: emptyWhatNeedsAttention(),
   retentionRates: null,
   snapshot: null,
   thresholdDays: 21,
@@ -188,6 +213,51 @@ function fullLive(): MonthlySourceExportInputs {
       scenPoint('2026-08', 10400, 7700, 30300),
     ],
     scenarioRunOutMonth: null,
+    // Financial levers — real values for deterministic assertions. Render-only geometry (bar widths,
+    // window details, chart series, sparkline) is populated so the tests can prove it is dropped.
+    efficiencyResult: {
+      windowLabel: 'Apr – Jun 2026',
+      rows: [
+        {
+          category: 'Marketing',
+          bestPct: 8,
+          todayPct: 12,
+          extraPerMonth: 400,
+          bestPeriodLabel: 'was 8% avg (Jan–Mar 2026)',
+          greenWidthPct: 60, // geometry — must NOT appear
+          redWidthPct: 40, // geometry — must NOT appear
+          bestWindow: { label: 'Jan – Mar 2026', months: [] }, // must NOT appear
+          todayWindow: { label: 'Apr – Jun 2026', months: [] }, // must NOT appear
+        },
+      ],
+      totalExtraPerMonth: 400,
+      payrollExtraPerMonth: 250,
+      payrollTodayPct: 35,
+      payrollBestPct: 30,
+      payrollBestWindowLabel: 'Jan – Mar 2026',
+      payrollRollingSeries: [{ label: 'chart-series-secret', payrollPct: 33 }], // must NOT appear
+      benchmarkRevenueQualified: true,
+    } as unknown as MonthlySourceExportInputs['efficiencyResult'],
+    whatNeedsAttention: {
+      currentMonth: 'Jun 2026',
+      baselineMonths: 'Dec 2025 – May 2026',
+      noData: false,
+      rows: [
+        {
+          categoryName: 'Utilities',
+          bucket: 'fixed',
+          currentSpend: 800,
+          expectedSpend: 500,
+          delta: 300,
+          currentRatio: 0.08,
+          baselineRatio: 0.05,
+          currentAvgSpend: 800,
+          baselineAvgSpend: 500,
+          currentRevenue: 10000,
+          sparklineData: [1, 2, 3, 4, 5, 6], // must NOT appear
+        },
+      ],
+    } as unknown as MonthlySourceExportInputs['whatNeedsAttention'],
     retentionRates: [
       retMonth('2025-06', { isSeedBoundary: true }), // seed — must be dropped
       retMonth('2025-07'),
@@ -247,6 +317,15 @@ describe('buildMonthlySourceExport', () => {
     expect(json2).not.toContain('summaryBullets');
     expect(json2).not.toContain('summary_bullets');
     expect(json2).not.toContain('dig_here');
+    // financial-lever render-only geometry / chart series never leak
+    expect(json2).not.toContain('greenWidthPct');
+    expect(json2).not.toContain('redWidthPct');
+    expect(json2).not.toContain('bestWindow');
+    expect(json2).not.toContain('todayWindow');
+    expect(json2).not.toContain('payrollRollingSeries');
+    expect(json2).not.toContain('chart-series-secret');
+    expect(json2).not.toContain('sparklineData');
+    expect(json2).not.toContain('sparkline');
   });
 
   it('3. financial missing → blocks omitted, code, unusable', () => {
@@ -370,6 +449,7 @@ describe('buildMonthlySourceExport', () => {
     expect(out.scope.covered_domains).toEqual([
       'financial_actuals',
       'dashboard_signals',
+      'financial_levers',
       'forecast',
       'membership_retention',
       'attendance_snapshot',
@@ -391,10 +471,11 @@ describe('buildMonthlySourceExport', () => {
     input.scenarioProjection = []; // forecast out
     input.scenarioRunOutMonth = null;
     const out = buildMonthlySourceExport(input) as any;
-    // dashboard_signals rides on financialLive (true here), so it stays present alongside financial.
+    // dashboard_signals + financial_levers ride on financialLive (true here), so they stay present.
     expect(out.scope.present_domains).toEqual([
       'financial_actuals',
       'dashboard_signals',
+      'financial_levers',
       'membership_retention',
     ]);
     expect(out.scope.absent_domains).toEqual(['forecast', 'attendance_snapshot']);
@@ -418,6 +499,7 @@ describe('buildMonthlySourceExport', () => {
     expect(out.as_of).toEqual({
       financial: '2026-06',
       dashboard_signals: '2026-06', // shares the financial month — never a new divergence token
+      financial_levers: '2026-06', // ditto
       retention_rates: '2026-06',
       attendance_snapshot: '2026-07-06',
     });
@@ -558,6 +640,88 @@ describe('buildMonthlySourceExport', () => {
     expect(out.provenance.dashboard_signals).toEqual({ source: 'not_live' });
     expect(out.as_of.dashboard_signals).toBeNull();
     // the #544 reconciliation invariant holds with the new domain included
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+  });
+
+  it('22. financial levers — deterministic serialized values, render geometry dropped', () => {
+    const out = buildMonthlySourceExport(fullLive()) as any;
+    expect(out.money_left).toEqual({
+      window_label: 'Apr – Jun 2026',
+      total_extra_per_month: 400,
+      benchmark_revenue_qualified: true,
+      rows: [
+        {
+          category: 'Marketing',
+          today_pct: 12,
+          best_pct: 8,
+          extra_per_month: 400,
+          best_period_label: 'was 8% avg (Jan–Mar 2026)',
+        },
+      ],
+    });
+    // no render geometry survived on the row
+    expect(out.money_left.rows[0].greenWidthPct).toBeUndefined();
+    expect(out.money_left.rows[0].bestWindow).toBeUndefined();
+    expect(out.payroll_efficiency).toEqual({
+      payroll_today_pct: 35,
+      payroll_best_pct: 30,
+      payroll_best_window_label: 'Jan – Mar 2026',
+      payroll_extra_per_month: 250,
+    });
+    expect(out.payroll_efficiency.payrollRollingSeries).toBeUndefined();
+    expect(out.cost_spikes).toEqual({
+      current_month: 'Jun 2026',
+      baseline_months: 'Dec 2025 – May 2026',
+      no_data: false,
+      rows: [
+        {
+          category_name: 'Utilities',
+          bucket: 'fixed',
+          current_spend: 800,
+          expected_spend: 500,
+          delta: 300,
+          current_ratio: 0.08,
+          baseline_ratio: 0.05,
+          current_avg_spend: 800,
+          baseline_avg_spend: 500,
+          current_revenue: 10000,
+        },
+      ],
+    });
+    expect(out.cost_spikes.rows[0].sparklineData).toBeUndefined();
+    // anchored on the financial month + declared model-derived
+    expect(out.as_of.financial_levers).toBe('2026-06');
+    expect(out.provenance.financial_levers.source).toBe('model');
+    expect(out.provenance.financial_levers.basis).toBe('derived_signal');
+  });
+
+  it('23. cost_spikes no_data:true is a present-but-empty state, not a missing domain', () => {
+    const input = fullLive();
+    (input.whatNeedsAttention as any) = {
+      currentMonth: 'Jun 2026',
+      baselineMonths: '',
+      noData: true,
+      rows: [],
+    };
+    const out = buildMonthlySourceExport(input) as any;
+    expect(out.cost_spikes.no_data).toBe(true);
+    expect(out.cost_spikes.rows).toEqual([]);
+    expect('cost_spikes' in out).toBe(true); // present
+    expect(out.missing_or_unavailable).not.toContain('financial_levers:not_live');
+    expect(out.scope.present_domains).toContain('financial_levers');
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+  });
+
+  it('24. financial levers gated on financialLive — omitted + one code, reconciles 1:1', () => {
+    const out = buildMonthlySourceExport({ ...fullLive(), financialTxnCount: 0 }) as any;
+    expect(out.money_left).toBeUndefined();
+    expect(out.payroll_efficiency).toBeUndefined();
+    expect(out.cost_spikes).toBeUndefined();
+    expect(out.missing_or_unavailable).toContain('financial_levers:not_live');
+    expect(out.scope.absent_domains).toContain('financial_levers');
+    expect(out.provenance.financial_levers).toEqual({ source: 'not_live' });
+    expect(out.as_of.financial_levers).toBeNull();
+    // #544 reconciliation holds with the new domain included
     expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
   });
 

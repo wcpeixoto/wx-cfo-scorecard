@@ -4546,6 +4546,8 @@ export default function Dashboard() {
                     financialBasis={profitabilityCashFlowMode}
                     scenarioProjection={scenarioProjection}
                     scenarioRunOutMonth={todayRunOutNegativeCashMonth}
+                    efficiencyResult={efficiencyResult}
+                    whatNeedsAttention={whatNeedsAttention}
                   />
                 </div>
               </div>

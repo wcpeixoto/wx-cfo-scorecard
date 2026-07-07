@@ -18,6 +18,8 @@ import {
   type FinancialBasis,
 } from '../lib/export/buildMonthlySourceExport';
 import type { DashboardModel, ScenarioPoint } from '../lib/data/contract';
+import type { EfficiencyOpportunitiesResult } from '../lib/kpis/efficiencyOpportunities';
+import type { WhatNeedsAttentionResult } from '../lib/kpis/digHere';
 
 type RetentionState = {
   rates: RetentionMonth[] | null;
@@ -37,6 +39,8 @@ export function ExportSourceJsonCard({
   financialBasis,
   scenarioProjection,
   scenarioRunOutMonth,
+  efficiencyResult,
+  whatNeedsAttention,
 }: {
   model: DashboardModel;
   financialTxnCount: number;
@@ -46,6 +50,10 @@ export function ExportSourceJsonCard({
   // prop-drilled straight from Dashboard so the export carries the SAME forecast, not the naive trend.
   scenarioProjection: ScenarioPoint[];
   scenarioRunOutMonth: string | null;
+  // Recoverable-dollar levers — the dashboard's own already-computed results (Money Left / Payroll
+  // Efficiency / Cost Spikes), drilled from Dashboard so the export reuses them verbatim.
+  efficiencyResult: EfficiencyOpportunitiesResult;
+  whatNeedsAttention: WhatNeedsAttentionResult;
 }) {
   const { silentChurnThresholdDays } = useRetentionSettings();
   const [retention, setRetention] = useState<RetentionState>({
@@ -88,6 +96,8 @@ export function ExportSourceJsonCard({
         financialBasis,
         scenarioProjection,
         scenarioRunOutMonth,
+        efficiencyResult,
+        whatNeedsAttention,
         retentionRates: rates,
         snapshot,
         thresholdDays: silentChurnThresholdDays,
@@ -112,6 +122,8 @@ export function ExportSourceJsonCard({
     financialBasis,
     scenarioProjection,
     scenarioRunOutMonth,
+    efficiencyResult,
+    whatNeedsAttention,
     silentChurnThresholdDays,
   ]);
 
