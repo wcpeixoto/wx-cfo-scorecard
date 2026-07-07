@@ -4544,6 +4544,8 @@ export default function Dashboard() {
                     financialTxnCount={baseTxns.length}
                     currentCalendarMonth={currentCalendarMonth}
                     financialBasis={profitabilityCashFlowMode}
+                    scenarioProjection={scenarioProjection}
+                    scenarioRunOutMonth={todayRunOutNegativeCashMonth}
                   />
                 </div>
               </div>

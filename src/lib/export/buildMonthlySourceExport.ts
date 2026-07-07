@@ -3,7 +3,9 @@
 // Serializes ALREADY-COMPUTED scorecard data into one ChatGPT-readable JSON object. It reuses the
 // dashboard's source-of-truth outputs and NEVER re-implements dashboard math:
 //   - financial actuals + comparisons + runway + expense categories ← DashboardModel (computeDashboardModel)
-//   - forecast (projection) ← model.cashFlowForecastSeries (projected rows only)
+//   - forecast (projection) ← scenarioProjection (composed ScenarioPoint[] with month-end endingCashBalance)
+//     + scenarioRunOutMonth — the SAME forward series the Forecast page renders, NOT the naive
+//     model.cashFlowForecastSeries trend (which carries no ending balance). Both prop-drilled from Dashboard.
 //   - membership retention series ← fetchMemberRetentionRates rows (seed row dropped via realRetentionMonths)
 //   - attendance snapshot ← deriveBuckets(snapshot, thresholdDays) (the Attendance Health card's own fn)
 //
@@ -28,6 +30,7 @@ import type {
   DashboardModel,
   KpiTimeframeComparison,
   MonthlyRollup,
+  ScenarioPoint,
 } from '../data/contract';
 import type { RetentionMonth } from '../gym/memberRetentionSeries';
 import { realRetentionMonths } from '../gym/memberRetentionSeries';
@@ -44,6 +47,13 @@ export type MonthlySourceExportInputs = {
   financialTxnCount: number; // baseTxns.length — the financial live/empty gate
   currentCalendarMonth: string; // 'YYYY-MM' injected from getCurrentCalendarMonthToken()
   financialBasis: FinancialBasis; // profitabilityCashFlowMode
+  // Composed forward projection the owner sees on the Forecast page (ScenarioPoint[] with month-end
+  // endingCashBalance), prop-drilled from Dashboard.scenarioProjection. The builder serializes THIS —
+  // not the naive model.cashFlowForecastSeries trend. Empty [] ⇒ forecast not available.
+  scenarioProjection: ScenarioPoint[];
+  // First projected month whose month-end cash falls below $0 (Dashboard.todayRunOutNegativeCashMonth),
+  // or null if it never does within the horizon. A $0 crossing — reserve-independent.
+  scenarioRunOutMonth: string | null;
   retentionRates: RetentionMonth[] | null; // fetchMemberRetentionRates() → null when not seeded
   snapshot: RetentionAggregateSnapshot | null; // fetchLatestRetentionAggregate() → null on error/unseeded
   thresholdDays: number; // useRetentionSettings().silentChurnThresholdDays
@@ -108,6 +118,8 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     financialTxnCount,
     currentCalendarMonth,
     financialBasis,
+    scenarioProjection,
+    scenarioRunOutMonth,
     retentionRates,
     snapshot,
     thresholdDays,
@@ -155,6 +167,14 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
 
     const rw = model.runway;
     runway = {
+      // Trailing-operating-burn runway: self-funded (net_burn 0) whenever operating cash-positive. This
+      // is a DIFFERENT basis from forecast.scenario_run_out_month (a forward cash projection that
+      // includes owner draws). Both are correct on their own basis — labeled, deliberately NOT reconciled.
+      basis: 'trailing_operating',
+      basis_note:
+        'Self-funded trailing-operating burn (net_burn 0 when operating cash-positive). Differs by ' +
+        'design from forecast.scenario_run_out_month — a forward projection including owner draws. ' +
+        'Different bases; do not reconcile.',
       status: rw.status,
       months: rw.months,
       net_burn: rw.netBurn,
@@ -174,18 +194,31 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
   }
 
   // ---- FORECAST (optional; projection, never mixed with actuals) ----
-  const projectedRows = model.cashFlowForecastSeries.filter((p) => p.status === 'projected');
-  const forecastAvailable = projectedRows.length > 0;
+  // Serializes the composed scenario projection the owner sees on the Forecast page — a forward
+  // CASH-FLOW projection carrying a real month-end endingCashBalance — NOT the naive
+  // model.cashFlowForecastSeries trend (which has no ending balance). scenario_run_out_month is the
+  // first projected month cash crosses below $0 and is reserve-independent. reserve_target is the RAW
+  // runway reserve (the same value the forecast decision signals consume), carried here so a reader can
+  // compare the projected balance against the reserve floor without leaving the forecast block.
+  const forecastAvailable = scenarioProjection.length > 0;
   let forecast: Record<string, unknown> | undefined;
   if (forecastAvailable) {
     forecast = {
       basis: 'projection',
-      note: 'Forecast values are projections from the CFO Scorecard model, not actual results.',
-      series: projectedRows.map((p) => ({
+      note:
+        'Forward cash-flow projection (composed scenario), not actual results. projected_cash_balance ' +
+        'is month-end cash after that month’s net flow.',
+      scenario_run_out_month: scenarioRunOutMonth,
+      run_out_note:
+        'First projected month whose month-end cash falls below $0 (includes owner draws); ' +
+        'null = cash stays above $0 across the projected horizon. Independent of reserve_target.',
+      reserve_target: model.runway.reserveTarget,
+      series: scenarioProjection.map((p) => ({
         month: p.month,
-        projected_revenue: p.revenue,
-        projected_expenses: p.expenses,
+        projected_cash_in: p.cashIn,
+        projected_cash_out: p.cashOut,
         projected_net_cash_flow: p.netCashFlow,
+        projected_cash_balance: p.endingCashBalance,
       })),
     };
   } else {
@@ -248,7 +281,7 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
           basis: 'projection',
           // The forecast's own last projected month — describes the projection horizon, not the
           // actuals anchor (which can differ from the last forecast row).
-          latest_month: projectedRows[projectedRows.length - 1].month,
+          latest_month: scenarioProjection[scenarioProjection.length - 1].month,
         }
       : { source: 'not_available' },
     retention_rates: retentionLive
