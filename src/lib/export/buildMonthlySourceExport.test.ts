@@ -48,6 +48,15 @@ function model(over: Partial<Record<string, unknown>> = {}): DashboardModel {
     expenseSlices: [{ name: 'Rent', value: 1000, share: 0.4, color: '#111' }],
     cashFlowForecastSeries: [],
     topPayees: [],
+    // Dashboard-signal fields (required on DashboardModel; safe empties so any financial-live fixture
+    // that doesn't override them still serializes without crashing). fullLive() sets real values.
+    kpiCards: [],
+    movers: [],
+    trajectorySignals: [],
+    suggestedRevenueMargin: 0,
+    suggestedExpenseMargin: 0,
+    suggestedMarginJustification: '',
+    uncategorizedWarning: null,
   };
   return { ...base, ...over } as unknown as DashboardModel;
 }
@@ -117,6 +126,54 @@ function fullLive(): MonthlySourceExportInputs {
         rollup('2026-07', 3000, 2000, { savings: 0.33, tx: 12 }), // partial current — must be excluded
       ],
       kpiComparisonByTimeframe: { ttm: ttmEntry(110000, 85000, 25000, 0.23) },
+      // Dashboard signals — real values for deterministic assertions.
+      kpiCards: [
+        {
+          id: 'revenue',
+          label: 'Revenue',
+          value: 10000,
+          previousValue: 9000,
+          deltaPercent: 0.1,
+          trend: 'up',
+          sentiment: 'up',
+          format: 'currency',
+        },
+      ],
+      movers: [
+        {
+          category: 'Facilities',
+          current: 1200,
+          previous: 800,
+          delta: 400,
+          deltaPercent: 0.5,
+          priorityScore: 0.9,
+          sparkline: [1, 2, 3], // must NOT appear in the export
+        },
+      ],
+      trajectorySignals: [
+        {
+          id: 'monthlyTrend',
+          label: 'Monthly trend',
+          timeframe: 'thisMonth',
+          currentStartMonth: '2026-06',
+          currentEndMonth: '2026-06',
+          previousStartMonth: '2026-05',
+          previousEndMonth: '2026-05',
+          currentMonthCount: 1,
+          previousMonthCount: 1,
+          currentNetCashFlow: 2500,
+          previousNetCashFlow: 2000,
+          delta: 500,
+          percentChange: 0.25,
+          direction: 'up',
+          light: 'green',
+          hasSufficientHistory: true,
+        },
+      ],
+      suggestedRevenueMargin: 0.6,
+      suggestedExpenseMargin: 0.4,
+      suggestedMarginJustification: 'Based on TTM',
+      uncategorizedWarning: { count: 3, absoluteAmount: 450 },
       cashFlowForecastSeries: [
         { month: '2026-06', revenue: 10000, expenses: 7500, netCashFlow: 2500, status: 'actual' },
         { month: '2026-07', revenue: 10200, expenses: 7600, netCashFlow: 2600, status: 'projected' },
@@ -178,6 +235,18 @@ describe('buildMonthlySourceExport', () => {
     expect(json).not.toContain('"account"');
     expect(json).not.toContain('"transferAccount"');
     expect(json).not.toContain('top_payees');
+    // interpretive / member-identity model fields never leak, even when populated
+    (withPii.model as any).opportunities = [{ title: 'Secret Opp', savings: 100, hint: 'secret hint' }];
+    (withPii.model as any).summaryBullets = ['Secret bullet'];
+    (withPii.model as any).digHerePreview = [{ title: 'Dig Secret', savings: 5, hint: 'x' }];
+    const json2 = JSON.stringify(buildMonthlySourceExport(withPii));
+    expect(json2).not.toContain('Secret Opp');
+    expect(json2).not.toContain('Secret bullet');
+    expect(json2).not.toContain('Dig Secret');
+    expect(json2).not.toContain('opportunities');
+    expect(json2).not.toContain('summaryBullets');
+    expect(json2).not.toContain('summary_bullets');
+    expect(json2).not.toContain('dig_here');
   });
 
   it('3. financial missing → blocks omitted, code, unusable', () => {
@@ -300,6 +369,7 @@ describe('buildMonthlySourceExport', () => {
     const out = buildMonthlySourceExport(fullLive()) as any;
     expect(out.scope.covered_domains).toEqual([
       'financial_actuals',
+      'dashboard_signals',
       'forecast',
       'membership_retention',
       'attendance_snapshot',
@@ -321,7 +391,12 @@ describe('buildMonthlySourceExport', () => {
     input.scenarioProjection = []; // forecast out
     input.scenarioRunOutMonth = null;
     const out = buildMonthlySourceExport(input) as any;
-    expect(out.scope.present_domains).toEqual(['financial_actuals', 'membership_retention']);
+    // dashboard_signals rides on financialLive (true here), so it stays present alongside financial.
+    expect(out.scope.present_domains).toEqual([
+      'financial_actuals',
+      'dashboard_signals',
+      'membership_retention',
+    ]);
     expect(out.scope.absent_domains).toEqual(['forecast', 'attendance_snapshot']);
     // every covered domain is present XOR absent, and absent count === missing code count
     expect(out.scope.present_domains.length + out.scope.absent_domains.length).toBe(
@@ -342,6 +417,7 @@ describe('buildMonthlySourceExport', () => {
     const out = buildMonthlySourceExport(input) as any;
     expect(out.as_of).toEqual({
       financial: '2026-06',
+      dashboard_signals: '2026-06', // shares the financial month — never a new divergence token
       retention_rates: '2026-06',
       attendance_snapshot: '2026-07-06',
     });
@@ -399,6 +475,90 @@ describe('buildMonthlySourceExport', () => {
     };
     const out = buildMonthlySourceExport(withWindow) as any;
     expect(out.financial_comparisons.ttm_window).toEqual({ start: '2025-05', end: '2026-04' });
+  });
+
+  it('19. dashboard signals — deterministic serialized values, sparkline dropped', () => {
+    const out = buildMonthlySourceExport(fullLive()) as any;
+    expect(out.kpi_cards).toEqual([
+      {
+        id: 'revenue',
+        label: 'Revenue',
+        value: 10000,
+        previous_value: 9000,
+        delta_percent: 0.1,
+        trend: 'up',
+        sentiment: 'up',
+        format: 'currency',
+      },
+    ]);
+    expect(out.category_movers).toEqual([
+      {
+        category: 'Facilities',
+        current: 1200,
+        previous: 800,
+        delta: 400,
+        delta_percent: 0.5,
+        priority_score: 0.9,
+      },
+    ]);
+    expect(out.category_movers[0].sparkline).toBeUndefined(); // intra-category series dropped
+    expect(out.trajectory_signals).toEqual([
+      {
+        id: 'monthlyTrend',
+        label: 'Monthly trend',
+        timeframe: 'thisMonth',
+        current_start_month: '2026-06',
+        current_end_month: '2026-06',
+        previous_start_month: '2026-05',
+        previous_end_month: '2026-05',
+        current_month_count: 1,
+        previous_month_count: 1,
+        current_net_cash_flow: 2500,
+        previous_net_cash_flow: 2000,
+        delta: 500,
+        percent_change: 0.25,
+        direction: 'up',
+        light: 'green',
+        has_sufficient_history: true,
+      },
+    ]);
+    expect(out.suggested_margins).toEqual({
+      revenue_margin: 0.6,
+      expense_margin: 0.4,
+      justification: 'Based on TTM',
+    });
+    expect(out.uncategorized_warning).toEqual({ count: 3, absolute_amount: 450 });
+    // anchored on the financial month, and declared model-derived (not recomputed)
+    expect(out.as_of.dashboard_signals).toBe('2026-06');
+    expect(out.provenance.dashboard_signals.source).toBe('model');
+    expect(out.provenance.dashboard_signals.basis).toBe('derived_signal');
+  });
+
+  it('20. uncategorized_warning is present-but-null when live with no active warning', () => {
+    const input = fullLive();
+    (input.model as any).uncategorizedWarning = null;
+    const out = buildMonthlySourceExport(input) as any;
+    expect(out.uncategorized_warning).toBeNull();
+    expect('uncategorized_warning' in out).toBe(true); // key present, value null
+    // a null warning is NOT a missing domain — no code, dashboard_signals still present
+    expect(out.missing_or_unavailable).not.toContain('dashboard_signals:not_live');
+    expect(out.scope.present_domains).toContain('dashboard_signals');
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+  });
+
+  it('21. dashboard signals gated on financialLive — omitted + one code, reconciles 1:1', () => {
+    const out = buildMonthlySourceExport({ ...fullLive(), financialTxnCount: 0 }) as any;
+    expect(out.kpi_cards).toBeUndefined();
+    expect(out.category_movers).toBeUndefined();
+    expect(out.trajectory_signals).toBeUndefined();
+    expect(out.suggested_margins).toBeUndefined();
+    expect(out.uncategorized_warning).toBeUndefined();
+    expect(out.missing_or_unavailable).toContain('dashboard_signals:not_live');
+    expect(out.scope.absent_domains).toContain('dashboard_signals');
+    expect(out.provenance.dashboard_signals).toEqual({ source: 'not_live' });
+    expect(out.as_of.dashboard_signals).toBeNull();
+    // the #544 reconciliation invariant holds with the new domain included
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
   });
 
   it('10. generated_at is the injected value; builder is deterministic', () => {
