@@ -89,6 +89,15 @@ type MetricComparison = {
   ttm: number | null;
 };
 
+// Explicit shape (not a widened Record) so a window can't be assigned to a metric key, or vice versa.
+type FinancialComparisons = {
+  revenue: MetricComparison;
+  expenses: MetricComparison;
+  net_cash_flow: MetricComparison;
+  savings_rate: MetricComparison;
+  ttm_window: { start: string; end: string };
+};
+
 // this/prior/yoy are SELECTED from the SoT monthly rollups (scorecard month and its −1 / −12
 // neighbours) — a faithful reuse of already-computed monthly values that stays correct even when
 // imports lag (the pre-anchored kpiComparison maps anchor on the real current calendar month, so
@@ -139,7 +148,7 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
   const planningMonth = shiftMonth(resolvedScorecardMonth, 1);
 
   let financialMonthly: Record<string, unknown>[] | undefined;
-  let financialComparisons: Record<string, MetricComparison> | undefined;
+  let financialComparisons: FinancialComparisons | undefined;
   let runway: Record<string, unknown> | undefined;
   let topExpenseCategories: Record<string, unknown>[] | undefined;
 
@@ -158,11 +167,22 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
         transaction_count: r.transactionCount,
       }));
 
+    // TTM window bounds for the `ttm` scalars. Prefer the model's authoritative window — it describes
+    // the exact (real-now-anchored) TTM value the export already reports. Fall back to a trailing-12
+    // ending at the scorecard month when the model doesn't carry the bounds. Pure integer math (no Date).
+    const ttmStart = ttmEntry?.currentStartMonth;
+    const ttmEnd = ttmEntry?.currentEndMonth;
+    const ttmWindow =
+      ttmStart && ttmEnd
+        ? { start: ttmStart, end: ttmEnd }
+        : { start: shiftMonth(scorecardMonth, -11), end: scorecardMonth };
+
     financialComparisons = {
       revenue: metricComparison(rollupByMonth, ttmEntry, scorecardMonth, 'revenue'),
       expenses: metricComparison(rollupByMonth, ttmEntry, scorecardMonth, 'expenses'),
       net_cash_flow: metricComparison(rollupByMonth, ttmEntry, scorecardMonth, 'netCashFlow'),
       savings_rate: metricComparison(rollupByMonth, ttmEntry, scorecardMonth, 'savingsRate'),
+      ttm_window: ttmWindow,
     };
 
     const rw = model.runway;
@@ -251,11 +271,21 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     attendanceSnapshot = {
       as_of: snapshot.asOf,
       threshold_days: buckets.thresholdDays,
-      active_total: buckets.activeTotal,
+      // active_total = KNOWN base (healthy + watch + high_risk), mirroring the Retention page's
+      // Attendance Health surface (GymPage knownActive = healthy + watch + silent, which EXCLUDES
+      // unknown-recency profiles). Do NOT use buckets.activeTotal here — its integrity invariant is
+      // healthy+watch+silent+unknown, so it over-counts non-member/no-check-in profiles (the export
+      // named the dashboard surface, so it must match it). deriveBuckets is left untouched (shared
+      // with the live card); the exclusion happens only in this projection.
+      active_total: buckets.healthy + buckets.watch + buckets.silent,
       healthy: buckets.healthy,
       watch: buckets.watch,
       high_risk: buckets.silent,
       unknown: buckets.unknown,
+      active_base_note:
+        'active_total counts known-recency profiles only (healthy + watch + high_risk). ' +
+        'unknown-recency profiles are reported separately in `unknown` and are excluded from ' +
+        'active_total and all rates — mirroring the Retention page default.',
       // Honest FLOOR from the dues slice; null (never $0) when the slice is absent.
       silent_monthly_dues_at_risk: snapshot.dues?.totalMonthly ?? null,
     };
