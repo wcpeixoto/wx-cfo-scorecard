@@ -17,7 +17,7 @@ import {
   latestCompleteMonth,
   type FinancialBasis,
 } from '../lib/export/buildMonthlySourceExport';
-import type { DashboardModel } from '../lib/data/contract';
+import type { DashboardModel, ScenarioPoint } from '../lib/data/contract';
 
 type RetentionState = {
   rates: RetentionMonth[] | null;
@@ -35,11 +35,17 @@ export function ExportSourceJsonCard({
   financialTxnCount,
   currentCalendarMonth,
   financialBasis,
+  scenarioProjection,
+  scenarioRunOutMonth,
 }: {
   model: DashboardModel;
   financialTxnCount: number;
   currentCalendarMonth: string;
   financialBasis: FinancialBasis;
+  // The composed forward projection the owner sees on the Forecast page + its cash-run-out month,
+  // prop-drilled straight from Dashboard so the export carries the SAME forecast, not the naive trend.
+  scenarioProjection: ScenarioPoint[];
+  scenarioRunOutMonth: string | null;
 }) {
   const { silentChurnThresholdDays } = useRetentionSettings();
   const [retention, setRetention] = useState<RetentionState>({
@@ -80,6 +86,8 @@ export function ExportSourceJsonCard({
         financialTxnCount,
         currentCalendarMonth,
         financialBasis,
+        scenarioProjection,
+        scenarioRunOutMonth,
         retentionRates: rates,
         snapshot,
         thresholdDays: silentChurnThresholdDays,
@@ -97,13 +105,23 @@ export function ExportSourceJsonCard({
     } finally {
       setExporting(false);
     }
-  }, [model, financialTxnCount, currentCalendarMonth, financialBasis, silentChurnThresholdDays]);
+  }, [
+    model,
+    financialTxnCount,
+    currentCalendarMonth,
+    financialBasis,
+    scenarioProjection,
+    scenarioRunOutMonth,
+    silentChurnThresholdDays,
+  ]);
 
   // Mirror the builder's gate exactly (txns present AND a complete month exists) so this status
   // line can never disagree with the exported usable_for_attack_plan.
   const financialLive =
     financialTxnCount > 0 && latestCompleteMonth(model.monthlyRollups, currentCalendarMonth) !== null;
-  const forecastAvailable = model.cashFlowForecastSeries.some((p) => p.status === 'projected');
+  // Mirror the builder's forecast gate (composed projection has ≥1 point) so this status line can
+  // never disagree with what the export emits.
+  const forecastAvailable = scenarioProjection.length > 0;
   const retentionLive = retention.loaded
     ? Boolean(retention.rates) && realRetentionMonths(retention.rates ?? []).length > 0
     : null;

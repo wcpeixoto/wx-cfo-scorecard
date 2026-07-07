@@ -5,7 +5,7 @@ import {
   latestCompleteMonth,
   type MonthlySourceExportInputs,
 } from './buildMonthlySourceExport';
-import type { DashboardModel } from '../data/contract';
+import type { DashboardModel, ScenarioPoint } from '../data/contract';
 import type { RetentionMonth } from '../gym/memberRetentionSeries';
 import type { RetentionAggregateSnapshot } from '../gym/fetchRetentionAggregate';
 import { deriveBuckets } from '../gym/retentionAggregateView';
@@ -52,6 +52,20 @@ function model(over: Partial<Record<string, unknown>> = {}): DashboardModel {
   return { ...base, ...over } as unknown as DashboardModel;
 }
 
+// Composed forward projection point (only the fields the builder reads matter; cashIn/cashOut mirror
+// operating for the fixture). endingCashBalance is the month-end position the export surfaces.
+function scenPoint(month: string, cashIn: number, cashOut: number, endingCashBalance: number): ScenarioPoint {
+  return {
+    month,
+    operatingCashIn: cashIn,
+    operatingCashOut: cashOut,
+    cashIn,
+    cashOut,
+    netCashFlow: cashIn - cashOut,
+    endingCashBalance,
+  };
+}
+
 function retMonth(periodMonth: string, over: Partial<RetentionMonth> = {}): RetentionMonth {
   return {
     periodMonth,
@@ -83,6 +97,8 @@ const BASE: MonthlySourceExportInputs = {
   financialTxnCount: 0,
   currentCalendarMonth: '2026-07',
   financialBasis: 'operating',
+  scenarioProjection: [],
+  scenarioRunOutMonth: null,
   retentionRates: null,
   snapshot: null,
   thresholdDays: 21,
@@ -108,6 +124,13 @@ function fullLive(): MonthlySourceExportInputs {
       ],
     }),
     financialTxnCount: 146,
+    // Composed projection (future months only; must not overlap actuals through 2026-06). Cash climbs,
+    // so it never runs out within the horizon.
+    scenarioProjection: [
+      scenPoint('2026-07', 10200, 7600, 27600),
+      scenPoint('2026-08', 10400, 7700, 30300),
+    ],
+    scenarioRunOutMonth: null,
     retentionRates: [
       retMonth('2025-06', { isSeedBoundary: true }), // seed — must be dropped
       retMonth('2025-07'),
@@ -204,11 +227,11 @@ describe('buildMonthlySourceExport', () => {
     const out = buildMonthlySourceExport(fullLive()) as any;
     expect(out.forecast.basis).toBe('projection');
     expect(out.forecast.note).toMatch(/projection/i);
-    // provenance.latest_month tracks the forecast horizon (last projected row), not the actuals anchor
+    // provenance.latest_month tracks the forecast horizon (last projected month), not the actuals anchor
     expect(out.provenance.forecast.latest_month).toBe('2026-08');
     expect(out.scorecard_month).toBe('2026-06'); // ≠ forecast latest_month, proving they're decoupled
     const forecastMonths = out.forecast.series.map((s: any) => s.month);
-    expect(forecastMonths).toEqual(['2026-07', '2026-08']); // only projected rows
+    expect(forecastMonths).toEqual(['2026-07', '2026-08']); // composed projection months
     const actualMonths = out.financial_monthly.map((m: any) => m.month);
     // no month appears in both actuals and forecast
     expect(forecastMonths.some((m: string) => actualMonths.includes(m))).toBe(false);
@@ -216,9 +239,8 @@ describe('buildMonthlySourceExport', () => {
 
   it('8. forecast missing → omitted, code, usability unchanged', () => {
     const input = fullLive();
-    (input.model as any).cashFlowForecastSeries = [
-      { month: '2026-06', revenue: 10000, expenses: 7500, netCashFlow: 2500, status: 'actual' },
-    ];
+    input.scenarioProjection = []; // no composed projection ⇒ forecast unavailable
+    input.scenarioRunOutMonth = null;
     const out = buildMonthlySourceExport(input) as any;
     expect(out.forecast).toBeUndefined();
     expect(out.missing_or_unavailable).toContain('forecast:not_available');
@@ -292,9 +314,8 @@ describe('buildMonthlySourceExport', () => {
   it('13. integrity — absent in-scope domains reconcile 1:1 with missing_or_unavailable', () => {
     const input = fullLive();
     input.snapshot = null; // attendance out
-    (input.model as any).cashFlowForecastSeries = [
-      { month: '2026-06', revenue: 10000, expenses: 7500, netCashFlow: 2500, status: 'actual' }, // forecast out
-    ];
+    input.scenarioProjection = []; // forecast out
+    input.scenarioRunOutMonth = null;
     const out = buildMonthlySourceExport(input) as any;
     expect(out.scope.present_domains).toEqual(['financial_actuals', 'membership_retention']);
     expect(out.scope.absent_domains).toEqual(['forecast', 'attendance_snapshot']);
@@ -324,6 +345,29 @@ describe('buildMonthlySourceExport', () => {
     expect(out.warnings[0]).toMatch(/as_of_divergence/);
     expect(out.warnings[0]).toContain('financial=2026-06');
     expect(out.warnings[0]).toContain('attendance_snapshot=2026-07');
+  });
+
+  it('15. forecast carries the composed projection: ending balance, run-out, raw reserve', () => {
+    const input = fullLive();
+    input.scenarioRunOutMonth = '2026-08'; // cash crosses below $0 in Aug
+    const out = buildMonthlySourceExport(input) as any;
+    // projected_cash_balance comes straight from ScenarioPoint.endingCashBalance (the real ending
+    // balance the naive cashFlowForecastSeries never carried)
+    expect(out.forecast.series.map((s: any) => s.projected_cash_balance)).toEqual([27600, 30300]);
+    expect(out.forecast.series[0].projected_net_cash_flow).toBe(2600); // cashIn − cashOut
+    // run-out month carried through (a $0 crossing, reserve-independent)
+    expect(out.forecast.scenario_run_out_month).toBe('2026-08');
+    // reserve_target is the RAW runway reserve (what computeForecastDecisionSignals consumes), NOT the
+    // Settings-override-aware owner-pay floor — and it agrees with the runway block's reserve.
+    expect(out.forecast.reserve_target).toBe(10000);
+    expect(out.forecast.reserve_target).toBe(out.runway.reserve_target);
+    // runway is labeled a trailing-operating basis, deliberately distinct from the forward run-out
+    expect(out.runway.basis).toBe('trailing_operating');
+  });
+
+  it('16. run-out null (cash never crosses $0) is carried honestly', () => {
+    const out = buildMonthlySourceExport(fullLive()) as any; // fullLive climbs, never runs out
+    expect(out.forecast.scenario_run_out_month).toBeNull();
   });
 
   it('10. generated_at is the injected value; builder is deterministic', () => {
