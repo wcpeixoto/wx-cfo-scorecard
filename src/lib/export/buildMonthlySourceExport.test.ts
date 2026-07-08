@@ -608,6 +608,7 @@ describe('buildMonthlySourceExport', () => {
     const out = buildMonthlySourceExport(input) as any;
     expect(out.as_of).toEqual({
       financial: '2026-06',
+      cash: '2026-07-06', // point-in-time generated_at day — in as_of, NOT a periodAnchor
       dashboard_signals: '2026-06', // shares the financial month — never a new divergence token
       financial_levers: '2026-06', // ditto
       owner_distributions: '2026-06', // ditto (anchor is the month, not the trailing-12 window)
@@ -622,6 +623,27 @@ describe('buildMonthlySourceExport', () => {
     expect(out.warnings[0]).toMatch(/as_of_divergence/);
     expect(out.warnings[0]).toContain('financial=2026-06');
     expect(out.warnings[0]).toContain('attendance_snapshot=2026-07');
+  });
+
+  it('C13. cash point-in-time note + as_of.cash day anchor; not a divergence token', () => {
+    const input = fullLive();
+    const out = buildMonthlySourceExport(input) as any;
+    // note sits on the runway block, documents the point-in-time gap, warns against reconciling
+    expect(out.runway.current_cash_balance_note).toMatch(/point-in-time/);
+    expect(out.runway.current_cash_balance_note).toMatch(/do NOT reconcile/i);
+    expect(out.runway.current_cash_balance_note).toMatch(/in-progress current month/);
+    expect(out.runway.current_cash_balance).toBe(5000); // value itself unchanged
+    // as_of.cash = the generated_at DAY (point-in-time)
+    expect(out.as_of.cash).toBe(input.generatedAt.slice(0, 10));
+    expect(out.as_of.cash).toBe('2026-07-06');
+    // fullLive is all-aligned on 2026-06 → cash (a July day) is NOT in periodAnchors, so no warning fires
+    expect(out.warnings).toEqual([]);
+  });
+
+  it('C14. not financial-live → as_of.cash null and no runway block (note absent)', () => {
+    const out = buildMonthlySourceExport({ ...fullLive(), financialTxnCount: 0 }) as any;
+    expect(out.as_of.cash).toBeNull();
+    expect(out.runway).toBeUndefined();
   });
 
   it('15. forecast carries the composed projection: ending balance, run-out, raw reserve', () => {
