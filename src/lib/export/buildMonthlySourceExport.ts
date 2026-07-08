@@ -255,6 +255,15 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
       net_burn: rw.netBurn,
       gross_burn: rw.grossBurn,
       current_cash_balance: rw.currentCashBalance,
+      // Point-in-time anchor note (mirrors basis_note): the cash figure is the single field most
+      // likely to be mis-reconciled against the complete-month actuals, because it INCLUDES the
+      // in-progress current month while financial_monthly / financial_comparisons stop at the last
+      // complete month. Documenting the gap here prevents a false "cash doesn't match" discrepancy.
+      current_cash_balance_note:
+        'current_cash_balance is point-in-time as of generated_at (account starting balances + all ' +
+        'transactions through the latest, INCLUDING the in-progress current month). Do NOT reconcile ' +
+        'it against the complete-month financial_monthly / financial_comparisons actuals, which stop ' +
+        'at the last complete month.',
       reserve_target: rw.reserveTarget,
       percent_funded: rw.percentFunded,
     };
@@ -766,6 +775,13 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     : null;
   const asOf: Record<string, string | null> = {
     financial: financialLive ? scorecardMonth : null, // 'YYYY-MM'
+    // Point-in-time DAY anchor for runway.current_cash_balance (the generated_at day). Deliberately
+    // NOT added to periodAnchors below: it is a current-month day and would diverge from the
+    // last-complete-month financial anchor on EVERY export — the exact false discrepancy the
+    // current_cash_balance_note exists to prevent (same pattern as dashboard_signals: an as_of
+    // entry, not a period token).
+    cash: financialLive ? generatedAt.slice(0, 10) : null, // 'YYYY-MM-DD' point-in-time
+
     // Same monthly anchor as financial — so a reader does not cross-compare these dashboard-derived
     // signals with the day-anchored attendance snapshot. Not added to the divergence check below
     // because it always equals the financial month (no new period token).
