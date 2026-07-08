@@ -10,6 +10,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRetentionSettings } from '../context/RetentionSettingsContext';
 import { fetchMemberRetentionRates } from '../lib/gym/fetchMemberRetentionRates';
 import { fetchLatestRetentionAggregate } from '../lib/gym/fetchRetentionAggregate';
+import { fetchMemberRetentionByBelt, type BeltRetentionRow } from '../lib/gym/fetchMemberRetentionByBelt';
+import {
+  fetchMemberRetentionByCohort,
+  type CohortRetentionRow,
+} from '../lib/gym/fetchMemberRetentionByCohort';
 import { realRetentionMonths, type RetentionMonth } from '../lib/gym/memberRetentionSeries';
 import type { RetentionAggregateSnapshot } from '../lib/gym/fetchRetentionAggregate';
 import {
@@ -25,6 +30,8 @@ import type { OwnerDistributionStatus } from '../lib/data/ownerDistributionStatu
 type RetentionState = {
   rates: RetentionMonth[] | null;
   snapshot: RetentionAggregateSnapshot | null;
+  belt: BeltRetentionRow[] | null;
+  cohortRates: CohortRetentionRow[] | null;
   loaded: boolean;
 };
 
@@ -70,6 +77,8 @@ export function ExportSourceJsonCard({
   const [retention, setRetention] = useState<RetentionState>({
     rates: null,
     snapshot: null,
+    belt: null,
+    cohortRates: null,
     loaded: false,
   });
   const [exporting, setExporting] = useState(false);
@@ -82,8 +91,10 @@ export function ExportSourceJsonCard({
     Promise.all([
       fetchMemberRetentionRates().catch(() => null),
       fetchLatestRetentionAggregate().catch(() => null),
-    ]).then(([rates, snapshot]) => {
-      if (!cancelled) setRetention({ rates, snapshot, loaded: true });
+      fetchMemberRetentionByBelt().catch(() => null),
+      fetchMemberRetentionByCohort().catch(() => null),
+    ]).then(([rates, snapshot, belt, cohortRates]) => {
+      if (!cancelled) setRetention({ rates, snapshot, belt, cohortRates, loaded: true });
     });
     return () => {
       cancelled = true;
@@ -95,11 +106,13 @@ export function ExportSourceJsonCard({
     try {
       // ALWAYS re-fetch on click — the mount probe can go stale after an in-session Member
       // Retention Rates import. The fresh result feeds both the payload and the status lines.
-      const [rates, snapshot] = await Promise.all([
+      const [rates, snapshot, belt, cohortRates] = await Promise.all([
         fetchMemberRetentionRates().catch(() => null),
         fetchLatestRetentionAggregate().catch(() => null),
+        fetchMemberRetentionByBelt().catch(() => null),
+        fetchMemberRetentionByCohort().catch(() => null),
       ]);
-      setRetention({ rates, snapshot, loaded: true });
+      setRetention({ rates, snapshot, belt, cohortRates, loaded: true });
       const payload = buildMonthlySourceExport({
         model,
         financialTxnCount,
@@ -115,6 +128,8 @@ export function ExportSourceJsonCard({
         targetNetMargin,
         retentionRates: rates,
         snapshot,
+        beltRetention: belt,
+        cohortRetention: cohortRates,
         thresholdDays: silentChurnThresholdDays,
         generatedAt: new Date().toISOString(),
       });
@@ -157,6 +172,12 @@ export function ExportSourceJsonCard({
     ? Boolean(retention.rates) && realRetentionMonths(retention.rates ?? []).length > 0
     : null;
   const snapshotLive = retention.loaded ? Boolean(retention.snapshot) : null;
+  // Optional net-new retention domains — status only, NEVER folded into requiredMissing (usability
+  // gates on financial + membership retention alone).
+  const beltLive = retention.loaded ? Boolean(retention.belt && retention.belt.length > 0) : null;
+  const cohortRatesLive = retention.loaded
+    ? Boolean(retention.cohortRates && retention.cohortRates.length > 0)
+    : null;
   const requiredMissing = !financialLive || retentionLive === false;
 
   return (
@@ -178,6 +199,12 @@ export function ExportSourceJsonCard({
           </li>
           <li>
             Attendance snapshot: <strong>{statusLabel(snapshotLive)}</strong>
+          </li>
+          <li>
+            Churn by belt: <strong>{statusLabel(beltLive)}</strong>
+          </li>
+          <li>
+            Cohort retention rates: <strong>{statusLabel(cohortRatesLive)}</strong>
           </li>
           <li>
             Forecast: <strong>{forecastAvailable ? 'Available' : 'Missing'}</strong>

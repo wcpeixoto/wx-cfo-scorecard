@@ -18,7 +18,10 @@
 //     Churn-by-Tenure card's own per-band risk split — active_total + healthy/watch/silent, verbatim)
 //   - cohort recency histogram ← computeChurnRiskByCohortFromAggregate(snapshot.cohorts, thresholdDays)
 //     (the Cohort Retention card's own per-cohort split — active recency + lapsed; DISTINCT from the
-//     cohort retention RATE table, a later slice)
+//     cohort retention RATE table below)
+//   - belt retention ← fetchMemberRetentionByBelt rows (per period/segment/belt_band active+lost, verbatim)
+//   - cohort retention rates ← fetchMemberRetentionByCohort rows (per-cohort new/returning/lost flow;
+//     suppressed rows carry null counts VERBATIM — never coalesced to 0; DISTINCT from the recency histogram)
 //
 // STRICT FACTUAL/PII BOUNDARY: only aggregate numbers, category names, counts, rates, and dates are
 // read. Transaction rows, payees, memos, accounts, member identities, DOBs, ages, import summaries,
@@ -45,6 +48,8 @@ import type {
 } from '../data/contract';
 import type { RetentionMonth } from '../gym/memberRetentionSeries';
 import { realRetentionMonths } from '../gym/memberRetentionSeries';
+import type { BeltRetentionRow } from '../gym/fetchMemberRetentionByBelt';
+import type { CohortRetentionRow } from '../gym/fetchMemberRetentionByCohort';
 import type { RetentionAggregateSnapshot } from '../gym/fetchRetentionAggregate';
 import { deriveBuckets } from '../gym/retentionAggregateView';
 import { computeChurnRiskByTenureFromAggregate } from '../gym/churnRiskByTenure';
@@ -86,6 +91,12 @@ export type MonthlySourceExportInputs = {
   targetNetMargin: number;
   retentionRates: RetentionMonth[] | null; // fetchMemberRetentionRates() → null when not seeded
   snapshot: RetentionAggregateSnapshot | null; // fetchLatestRetentionAggregate() → null on error/unseeded
+  // Churn-by-belt monthly series (member_retention_by_belt) — per (period, segment, belt_band)
+  // active/lost counts, always non-null; null when unconfigured/unseeded. NO suppression on this table.
+  beltRetention: BeltRetentionRow[] | null;
+  // Per-cohort new/returning/lost RATE flow (member_retention_by_cohort). Counts are number|null:
+  // a suppressed row carries all three as null (masked small cell) — carried through verbatim, never 0.
+  cohortRetention: CohortRetentionRow[] | null;
   thresholdDays: number; // useRetentionSettings().silentChurnThresholdDays
   generatedAt: string; // ISO 8601, injected — point-in-time snapshot (state-read == file-write)
   businessName?: string;
@@ -98,6 +109,12 @@ function shiftMonth(periodMonth: string, deltaMonths: number): string {
   const ny = Math.floor(total / 12);
   const nm = ((total % 12) + 12) % 12;
   return `${ny}-${String(nm + 1).padStart(2, '0')}`;
+}
+
+// Max 'YYYY-MM' over a list (string comparison is correct for zero-padded ISO months). null when
+// empty. Used for the belt/cohort-rate as_of anchors — robust even if a series isn't period-sorted.
+function maxPeriodMonth(months: string[]): string | null {
+  return months.length > 0 ? months.reduce((a, b) => (b > a ? b : a)) : null;
 }
 
 // The latest rollup month strictly BEFORE the current calendar month = latest COMPLETE month.
@@ -167,6 +184,8 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     targetNetMargin,
     retentionRates,
     snapshot,
+    beltRetention,
+    cohortRetention,
     thresholdDays,
     generatedAt,
     businessName = DEFAULT_BUSINESS_NAME,
@@ -553,6 +572,61 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     missing.push('cohort_recency_histogram:not_live');
   }
 
+  // ---- BELT RETENTION (optional; net-new fetch — churn by belt band) ----
+  // Per (period, segment, belt_band) active/lost membership counts, passed straight through from the
+  // live member_retention_by_belt series (fetchMemberRetentionByBelt). NO derivation, NO suppression:
+  // this table publishes small band counts as-is, so an absent (period, segment, band) cell is a line
+  // GAP (a missing row), never a fabricated 0. Retention-domain — gated on the fetched series, NOT
+  // financialLive; optional (never feeds usable_for_attack_plan).
+  const beltLive = Boolean(beltRetention && beltRetention.length > 0);
+  let beltRetentionBlock: Record<string, unknown> | undefined;
+  const beltLatestMonth = beltLive ? maxPeriodMonth(beltRetention!.map((r) => r.periodMonth)) : null;
+  if (beltLive) {
+    beltRetentionBlock = {
+      rows: beltRetention!.map((r) => ({
+        period_month: r.periodMonth,
+        segment: r.segment,
+        belt_band: r.beltBand,
+        active_count: r.activeCount,
+        lost_count: r.lostCount,
+      })),
+    };
+  } else {
+    missing.push('belt_retention:not_live');
+  }
+
+  // ---- COHORT RETENTION RATES (optional; net-new fetch — per-cohort new/returning/lost flow) ----
+  // The per-cohort membership RATE flow (fetchMemberRetentionByCohort) — DISTINCT from C1's
+  // cohort_recency_histogram (the age-cohort recency/risk histogram). SUPPRESSION is the correctness
+  // trap: a suppressed row carries new/returning/lost as null (masked small cell). Null is passed
+  // THROUGH verbatim — never coalesced to 0, never dropped, never rate-divided. No retention_rate is
+  // derived here; only raw counts + the `suppressed` flag are carried. An all-suppressed series is
+  // still LIVE (present rows, honestly masked) — only null/empty is not_live.
+  const cohortRatesLive = Boolean(cohortRetention && cohortRetention.length > 0);
+  const cohortRatesLatestMonth = cohortRatesLive
+    ? maxPeriodMonth(cohortRetention!.map((r) => r.periodMonth))
+    : null;
+  const cohortRatesNote =
+    'Per-cohort new/returning/lost flow. Suppressed rows carry null counts (masked small cells) — ' +
+    'null means "hidden", NOT zero; do not sum or rate-divide across them. DISTINCT from ' +
+    'cohort_recency_histogram, which is the age-cohort RECENCY/risk histogram — do not conflate.';
+  let cohortRetentionRatesBlock: Record<string, unknown> | undefined;
+  if (cohortRatesLive) {
+    cohortRetentionRatesBlock = {
+      note: cohortRatesNote,
+      rows: cohortRetention!.map((r) => ({
+        period_month: r.periodMonth,
+        cohort_band: r.cohortBand,
+        new_members: r.newMembers, // number | null — null ⇔ suppressed, carried verbatim
+        returning_members: r.returningMembers,
+        lost_members: r.lostMembers,
+        suppressed: r.suppressed,
+      })),
+    };
+  } else {
+    missing.push('cohort_retention_rates:not_live');
+  }
+
   // Required domains for a usable Attack Plan file: financial + membership retention.
   const usableForAttackPlan = financialLive && retentionLive;
 
@@ -633,6 +707,18 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
             'do not conflate them.',
         }
       : { source: 'not_live' },
+    belt_retention: beltLive
+      ? {
+          source: 'live',
+          latest_month: beltLatestMonth,
+          note:
+            'Per (period, segment, belt_band) active/lost counts. No suppression — an absent cell is a ' +
+            'line gap, never 0.',
+        }
+      : { source: 'not_live' },
+    cohort_retention_rates: cohortRatesLive
+      ? { source: 'live', latest_month: cohortRatesLatestMonth, note: cohortRatesNote }
+      : { source: 'not_live' },
   };
 
   // ---- SCOPE (what this export is DESIGNED to cover) ----
@@ -653,6 +739,10 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     // tenure/cohort — pre-migration or edge-mismatch). Each reconciles 1:1 with its own code.
     tenure_bands: Boolean(snapshot?.tenureBands),
     cohort_recency_histogram: Boolean(snapshot?.cohorts),
+    // Net-new retention fetches (optional; independent monthly series). Gate on the fetched series,
+    // NOT financialLive; never feed usable_for_attack_plan.
+    belt_retention: beltLive,
+    cohort_retention_rates: cohortRatesLive,
   };
   const coveredDomains = Object.keys(domainPresence);
   const scope = {
@@ -688,11 +778,18 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     // divergence check below — they introduce no new period token beyond attendance_snapshot's.
     tenure_bands: snapshot?.tenureBands ? snapshot.asOf : null, // 'YYYY-MM-DD'
     cohort_recency_histogram: snapshot?.cohorts ? snapshot.asOf : null, // 'YYYY-MM-DD'
+    // Independent monthly retention series (net-new fetches) — a MONTH anchor (their latest row's
+    // period_month), which can legitimately lag the financial/retention months. Added to the
+    // divergence check below on purpose: an as_of_divergence when they lag is the DESIRED signal.
+    belt_retention: beltLatestMonth, // 'YYYY-MM' | null
+    cohort_retention_rates: cohortRatesLatestMonth, // 'YYYY-MM' | null
   };
   const periodAnchors: [string, string][] = [];
   if (financialLive && scorecardMonth) periodAnchors.push(['financial', scorecardMonth]);
   if (lastRetentionMonth) periodAnchors.push(['retention_rates', lastRetentionMonth]);
   if (snapshot) periodAnchors.push(['attendance_snapshot', snapshot.asOf.slice(0, 7)]);
+  if (beltLatestMonth) periodAnchors.push(['belt_retention', beltLatestMonth]);
+  if (cohortRatesLatestMonth) periodAnchors.push(['cohort_retention_rates', cohortRatesLatestMonth]);
   const distinctPeriods = new Set(periodAnchors.map(([, token]) => token));
   const warnings: string[] = [];
   if (distinctPeriods.size > 1) {
@@ -735,6 +832,8 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     ...(attendanceSnapshot ? { attendance_snapshot: attendanceSnapshot } : {}),
     ...(tenureBands ? { tenure_bands: tenureBands } : {}),
     ...(cohortRecencyHistogram ? { cohort_recency_histogram: cohortRecencyHistogram } : {}),
+    ...(beltRetentionBlock ? { belt_retention: beltRetentionBlock } : {}),
+    ...(cohortRetentionRatesBlock ? { cohort_retention_rates: cohortRetentionRatesBlock } : {}),
     missing_or_unavailable: missing,
   };
 }

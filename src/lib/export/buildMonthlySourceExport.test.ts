@@ -16,6 +16,8 @@ import {
   computeChurnRiskByCohortFromAggregate,
 } from '../gym/churnRiskByCohort';
 import { computeChurnRiskByTenureFromAggregate } from '../gym/churnRiskByTenure';
+import type { BeltRetentionRow } from '../gym/fetchMemberRetentionByBelt';
+import type { CohortRetentionRow } from '../gym/fetchMemberRetentionByCohort';
 
 // ---- minimal SoT-shaped fixtures (only the fields the builder reads) ----
 function rollup(
@@ -162,6 +164,23 @@ function degenerateOwnerStatus(): MonthlySourceExportInputs['ownerDistributionSt
   return { status: 'on_target', targetAmount: 0, actualAmount: 0, windowStart: null, windowEnd: null };
 }
 
+// Live belt series ending at 2026-06 (max period == financial/retention month ⇒ no divergence in fullLive).
+function beltRows(): BeltRetentionRow[] {
+  return [
+    { periodMonth: '2026-05', segment: 'adults', beltBand: 'White', activeCount: 40, lostCount: 3 },
+    { periodMonth: '2026-06', segment: 'adults', beltBand: 'White', activeCount: 42, lostCount: 2 },
+    { periodMonth: '2026-06', segment: 'kids', beltBand: 'Gray', activeCount: 25, lostCount: 1 },
+  ];
+}
+// Live cohort-rate series ending at 2026-06, mixing a normal row and a SUPPRESSED row (all-null counts).
+function cohortRateRows(): CohortRetentionRow[] {
+  return [
+    { periodMonth: '2026-05', cohortBand: 'adults16plus', newMembers: 5, returningMembers: 90, lostMembers: 4, suppressed: false },
+    { periodMonth: '2026-06', cohortBand: 'adults16plus', newMembers: 6, returningMembers: 92, lostMembers: 3, suppressed: false },
+    { periodMonth: '2026-06', cohortBand: 'youth3to15', newMembers: null, returningMembers: null, lostMembers: null, suppressed: true },
+  ];
+}
+
 const BASE: MonthlySourceExportInputs = {
   model: model(),
   financialTxnCount: 0,
@@ -177,6 +196,8 @@ const BASE: MonthlySourceExportInputs = {
   targetNetMargin: 0,
   retentionRates: null,
   snapshot: null,
+  beltRetention: null,
+  cohortRetention: null,
   thresholdDays: 21,
   generatedAt: '2026-07-06T14:00:00Z',
 };
@@ -332,6 +353,8 @@ function fullLive(): MonthlySourceExportInputs {
       retMonth('2026-06', { retentionRate: 0.93 }),
     ],
     snapshot: snap({ '2': 120, '10': 41 }, { overflow: 5, unknown: 8, dues: { totalMonthly: 2400 } }),
+    beltRetention: beltRows(),
+    cohortRetention: cohortRateRows(),
   };
 }
 
@@ -530,6 +553,8 @@ describe('buildMonthlySourceExport', () => {
       'attendance_snapshot',
       'tenure_bands',
       'cohort_recency_histogram',
+      'belt_retention',
+      'cohort_retention_rates',
     ]);
     expect(out.scope.present_domains).toEqual(out.scope.covered_domains); // all live
     expect(out.scope.absent_domains).toEqual([]);
@@ -555,6 +580,8 @@ describe('buildMonthlySourceExport', () => {
       'financial_levers',
       'owner_distributions',
       'membership_retention',
+      'belt_retention',
+      'cohort_retention_rates',
     ]);
     expect(out.scope.absent_domains).toEqual([
       'forecast',
@@ -588,6 +615,8 @@ describe('buildMonthlySourceExport', () => {
       attendance_snapshot: '2026-07-06',
       tenure_bands: '2026-07-06', // shares attendance's snapshot day — no new divergence token
       cohort_recency_histogram: '2026-07-06', // ditto
+      belt_retention: '2026-06', // independent monthly series — max period row
+      cohort_retention_rates: '2026-06',
     });
     expect(out.warnings).toHaveLength(1);
     expect(out.warnings[0]).toMatch(/as_of_divergence/);
@@ -1026,6 +1055,164 @@ describe('buildMonthlySourceExport', () => {
     const out = buildMonthlySourceExport(input) as any;
     expect(out.tenure_bands).toBeDefined();
     expect(out.cohort_recency_histogram).toBeDefined();
+  });
+
+  it('C6. belt_retention + cohort_retention_rates present & correct off live series', () => {
+    const input = fullLive();
+    const out = buildMonthlySourceExport(input) as any;
+
+    // belt: rows passed through verbatim (snake_cased), active/lost carried
+    expect(out.belt_retention.rows).toEqual([
+      { period_month: '2026-05', segment: 'adults', belt_band: 'White', active_count: 40, lost_count: 3 },
+      { period_month: '2026-06', segment: 'adults', belt_band: 'White', active_count: 42, lost_count: 2 },
+      { period_month: '2026-06', segment: 'kids', belt_band: 'Gray', active_count: 25, lost_count: 1 },
+    ]);
+    // cohort rates: rows passed through incl. the suppressed row's null triplet
+    expect(out.cohort_retention_rates.rows).toEqual([
+      { period_month: '2026-05', cohort_band: 'adults16plus', new_members: 5, returning_members: 90, lost_members: 4, suppressed: false },
+      { period_month: '2026-06', cohort_band: 'adults16plus', new_members: 6, returning_members: 92, lost_members: 3, suppressed: false },
+      { period_month: '2026-06', cohort_band: 'youth3to15', new_members: null, returning_members: null, lost_members: null, suppressed: true },
+    ]);
+    expect(out.cohort_retention_rates.note).toMatch(/Suppressed rows carry null counts/);
+
+    // month anchors + provenance
+    expect(out.as_of.belt_retention).toBe('2026-06');
+    expect(out.as_of.cohort_retention_rates).toBe('2026-06');
+    expect(out.provenance.belt_retention).toEqual({
+      source: 'live',
+      latest_month: '2026-06',
+      note: expect.stringMatching(/No suppression/),
+    });
+    expect(out.provenance.cohort_retention_rates.source).toBe('live');
+    expect(out.provenance.cohort_retention_rates.latest_month).toBe('2026-06');
+    // no divergence — belt/cohort align on the retention month
+    expect(out.warnings).toEqual([]);
+    expect(out.missing_or_unavailable).toEqual([]);
+  });
+
+  it('C7. SUPPRESSION — null counts pass through verbatim, never coalesced to 0; all-suppressed still live', () => {
+    const input = fullLive();
+    input.cohortRetention = [
+      { periodMonth: '2026-06', cohortBand: 'adults16plus', newMembers: 7, returningMembers: 88, lostMembers: 5, suppressed: false },
+      { periodMonth: '2026-06', cohortBand: 'youth3to15', newMembers: null, returningMembers: null, lostMembers: null, suppressed: true },
+    ];
+    const out = buildMonthlySourceExport(input) as any;
+    const suppressed = out.cohort_retention_rates.rows.find((r: any) => r.cohort_band === 'youth3to15');
+    expect(suppressed.new_members).toBeNull();
+    expect(suppressed.returning_members).toBeNull();
+    expect(suppressed.lost_members).toBeNull();
+    expect(suppressed.suppressed).toBe(true);
+    // normal row counts intact
+    const normal = out.cohort_retention_rates.rows.find((r: any) => r.cohort_band === 'adults16plus');
+    expect(normal).toEqual({
+      period_month: '2026-06',
+      cohort_band: 'adults16plus',
+      new_members: 7,
+      returning_members: 88,
+      lost_members: 5,
+      suppressed: false,
+    });
+    // serialized JSON carries the null, NOT a fabricated 0
+    const json = JSON.stringify(out.cohort_retention_rates);
+    expect(json).toContain('"new_members":null');
+    expect(json).not.toMatch(/"new_members":0\b/);
+
+    // an ALL-suppressed series is still LIVE (block present, no not_live code)
+    const allSup = fullLive();
+    allSup.cohortRetention = [
+      { periodMonth: '2026-06', cohortBand: 'adults16plus', newMembers: null, returningMembers: null, lostMembers: null, suppressed: true },
+      { periodMonth: '2026-06', cohortBand: 'youth3to15', newMembers: null, returningMembers: null, lostMembers: null, suppressed: true },
+    ];
+    const out2 = buildMonthlySourceExport(allSup) as any;
+    expect(out2.cohort_retention_rates).toBeDefined();
+    expect(out2.cohort_retention_rates.rows).toHaveLength(2);
+    expect(out2.missing_or_unavailable).not.toContain('cohort_retention_rates:not_live');
+  });
+
+  it('C8. belt null → belt block omitted + code; cohort rates still present (per-field, 1:1)', () => {
+    const out = buildMonthlySourceExport({ ...fullLive(), beltRetention: null }) as any;
+    expect(out.belt_retention).toBeUndefined();
+    expect(out.missing_or_unavailable).toContain('belt_retention:not_live');
+    expect(out.provenance.belt_retention).toEqual({ source: 'not_live' });
+    expect(out.as_of.belt_retention).toBeNull();
+    expect(out.scope.absent_domains).toContain('belt_retention');
+    expect(out.cohort_retention_rates).toBeDefined();
+    expect(out.scope.absent_domains).not.toContain('cohort_retention_rates');
+    // optional — usability unaffected
+    expect(out.usable_for_attack_plan).toBe(true);
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+  });
+
+  it('C9. cohort rates null → cohort_retention_rates omitted + code; belt still present (symmetric)', () => {
+    const out = buildMonthlySourceExport({ ...fullLive(), cohortRetention: null }) as any;
+    expect(out.cohort_retention_rates).toBeUndefined();
+    expect(out.missing_or_unavailable).toContain('cohort_retention_rates:not_live');
+    expect(out.provenance.cohort_retention_rates).toEqual({ source: 'not_live' });
+    expect(out.as_of.cohort_retention_rates).toBeNull();
+    expect(out.scope.absent_domains).toContain('cohort_retention_rates');
+    expect(out.belt_retention).toBeDefined();
+    expect(out.usable_for_attack_plan).toBe(true);
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+  });
+
+  it('C10. both null (also empty []) → both codes; usability unchanged; 1:1', () => {
+    const out = buildMonthlySourceExport({ ...fullLive(), beltRetention: [], cohortRetention: null }) as any;
+    expect(out.belt_retention).toBeUndefined(); // empty [] is not_live too
+    expect(out.cohort_retention_rates).toBeUndefined();
+    expect(out.missing_or_unavailable).toContain('belt_retention:not_live');
+    expect(out.missing_or_unavailable).toContain('cohort_retention_rates:not_live');
+    expect(out.usable_for_attack_plan).toBe(true);
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+  });
+
+  it('C11. divergence — belt/cohort months lag the financial/retention month → warning lists them', () => {
+    const input = fullLive();
+    // both series end at 2026-04, older than the 2026-06 financial/retention months
+    input.beltRetention = [
+      { periodMonth: '2026-04', segment: 'adults', beltBand: 'White', activeCount: 38, lostCount: 2 },
+    ];
+    input.cohortRetention = [
+      { periodMonth: '2026-04', cohortBand: 'adults16plus', newMembers: 4, returningMembers: 85, lostMembers: 3, suppressed: false },
+    ];
+    const out = buildMonthlySourceExport(input) as any;
+    expect(out.as_of.belt_retention).toBe('2026-04');
+    expect(out.as_of.cohort_retention_rates).toBe('2026-04');
+    expect(out.warnings).toHaveLength(1);
+    expect(out.warnings[0]).toMatch(/as_of_divergence/);
+    expect(out.warnings[0]).toContain('belt_retention=2026-04');
+    expect(out.warnings[0]).toContain('cohort_retention_rates=2026-04');
+  });
+
+  it('C12. PII belt-and-suspenders — decoy fields on fetched rows never serialized', () => {
+    const input = fullLive();
+    (input.beltRetention as any) = [
+      {
+        periodMonth: '2026-06',
+        segment: 'adults',
+        beltBand: 'White',
+        activeCount: 40,
+        lostCount: 3,
+        memberName: 'DECOY_BELT_NAME', // must NOT leak
+        clientId: 'DECOY_CLIENT_ID',
+      },
+    ];
+    (input.cohortRetention as any) = [
+      {
+        periodMonth: '2026-06',
+        cohortBand: 'adults16plus',
+        newMembers: 5,
+        returningMembers: 90,
+        lostMembers: 4,
+        suppressed: false,
+        dob: 'DECOY_DOB',
+      },
+    ];
+    const json = JSON.stringify(buildMonthlySourceExport(input));
+    expect(json).not.toContain('DECOY_BELT_NAME');
+    expect(json).not.toContain('DECOY_CLIENT_ID');
+    expect(json).not.toContain('DECOY_DOB');
+    expect(json).not.toContain('memberName');
+    expect(json).not.toContain('clientId');
   });
 
   it('10. generated_at is the injected value; builder is deterministic', () => {
