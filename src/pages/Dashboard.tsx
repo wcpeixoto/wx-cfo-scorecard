@@ -17,6 +17,7 @@ import IncomeExpenseCard from '../components/IncomeExpenseCard';
 import PayrollEfficiencyCard from '../components/PayrollEfficiencyCard';
 import CashReserveCalendarCard from '../components/CashReserveCalendarCard';
 import { ExportSourceJsonCard } from '../components/ExportSourceJsonCard';
+import { UnclassifiedCategoriesCard } from '../components/UnclassifiedCategoriesCard';
 import KpiCards from '../components/KpiCards';
 import TopCategoriesCard from '../components/TopCategoriesCard';
 import PeriodDropdown from '../components/PeriodDropdown';
@@ -4561,6 +4562,8 @@ export default function Dashboard() {
                     ownerPayReserveFloor={ownerPayReserveFloor}
                     targetNetMargin={businessRules.targetNetMargin}
                   />
+
+                  <UnclassifiedCategoriesCard txns={baseTxns} />
                 </div>
               </div>
               </div>{/* end data wrapper */}

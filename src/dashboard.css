@@ -935,6 +935,25 @@ body {
   font-size: 13px;
   color: var(--negative);
 }
+/* Unclassified categories card (Settings → Data) — read-only detector list. */
+.unclassified-category-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.unclassified-category-list strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.unclassified-category-raw {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
 
 .kpi-grid {
   display: grid;
