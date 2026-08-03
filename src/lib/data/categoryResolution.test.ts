@@ -138,6 +138,35 @@ describe('resolveCategory — registry layer', () => {
   it('is case-sensitive for registry names (exact-match contract)', () => {
     expect(resolveCategory('payroll').effective).toBe('unclassified');
   });
+
+  it("resolves 'Sales Refunds' through the registry as variable", () => {
+    expect(resolveCategory('Sales Refunds')).toEqual({
+      parent: 'Sales Refunds',
+      effective: 'variable',
+      source: 'registry',
+      reserved: false,
+    });
+  });
+
+  it("resolves 'Sales Refunds' subcategories through the parent entry", () => {
+    expect(resolveCategory('Sales Refunds:Class Packs')).toMatchObject({
+      parent: 'Sales Refunds',
+      effective: 'variable',
+      source: 'registry',
+    });
+  });
+
+  it("does NOT apply the 'Sales Refunds' entry to refunds nested under Business Income", () => {
+    // Registry lookup is keyed on parentCategoryName, and Tier-1 runs first — a
+    // 'Business Income:Sales Refunds' category resolves as reserved income and
+    // never consults this entry. Pinned because the names invite the assumption.
+    expect(resolveCategory('Business Income:Sales Refunds')).toEqual({
+      parent: 'Business Income',
+      effective: 'income',
+      source: 'tier1',
+      reserved: true,
+    });
+  });
 });
 
 describe('resolveCategory — unclassified', () => {
@@ -198,6 +227,17 @@ describe('summarizeUnclassifiedCategories', () => {
       'Alpha Fund',
       'Zeta Fund',
     ]);
+  });
+
+  it("never lists 'Sales Refunds' as unclassified", () => {
+    const txns: Txn[] = [
+      txn('Sales Refunds'),
+      txn('Sales Refunds:Class Packs'),
+      txn('Donations'),
+    ];
+    const parents = summarizeUnclassifiedCategories(txns).map((s) => s.parent);
+    expect(parents).not.toContain('Sales Refunds');
+    expect(parents).toEqual(['Donations']);
   });
 
   it('returns [] when every category classifies', () => {
