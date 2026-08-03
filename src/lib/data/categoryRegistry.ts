@@ -150,6 +150,10 @@ export const CATEGORY_REGISTRY: Record<string, CategoryMeta> = {
     bucket: 'variable',
     notes: 'signal for lead quality and billing clarity',
   },
+  'Sales Refunds': {
+    bucket: 'variable',
+    notes: 'sales refunds and allowances; revenue-linked',
+  },
   'Merchant Fees': {
     bucket: 'variable',
     notes: 'scales directly with revenue',
