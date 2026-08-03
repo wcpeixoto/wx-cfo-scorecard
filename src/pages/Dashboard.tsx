@@ -3063,6 +3063,12 @@ export default function Dashboard() {
     ? 'Import Quicken-style report CSVs into shared storage. Each shared import replaces the current shared dataset and becomes the only active analysis source.'
     : 'Import Quicken-style report CSVs directly into browser-local storage. Imported transactions are the only active analysis source.';
   const clearImportedDataLabel = sharedPersistenceEnabled ? 'Clear shared imported data' : 'Clear local imported data';
+  // Destructive-action gate. Clearing wipes the whole imported store — in shared mode that is
+  // every device on this workspace, and the only recovery is re-importing a full Quicken export.
+  // Mode-aware because "every device" is false for a browser-local clear.
+  const clearImportedDataConfirmMessage = sharedPersistenceEnabled
+    ? `Delete all ${storedImportedTransactionCount.toLocaleString()} imported transactions from SHARED storage?\n\nThis removes them for every device using this workspace, not just this browser. It cannot be undone — recovering means re-importing a full Quicken export.`
+    : `Delete all ${storedImportedTransactionCount.toLocaleString()} imported transactions from this browser?\n\nIt cannot be undone — recovering means re-importing a full Quicken export.`;
   const sourcePrecedenceLabel = sharedPersistenceEnabled ? 'Shared imported dataset only' : 'Browser-local imported dataset only';
   const importedSourceStatus = importedDataSet
     ? lastImportSummary?.storageScope === 'shared'
@@ -4127,7 +4133,11 @@ export default function Dashboard() {
                         <button
                           type="button"
                           className="ghost-btn"
-                          onClick={() => void handleClearImportedData()}
+                          onClick={() => {
+                            if (window.confirm(clearImportedDataConfirmMessage)) {
+                              void handleClearImportedData();
+                            }
+                          }}
                           disabled={importLoading || storedImportedTransactionCount === 0}
                         >
                           {clearImportedDataLabel}
