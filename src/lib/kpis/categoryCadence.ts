@@ -63,7 +63,12 @@ const PERIODIC_PARENTS = new Set<string>([
 
 const EVENT_PARENTS = new Set<string>([
   'COGS',
+  // Quicken rename 2026-08: 'Customer Refunds' → 'Sales Refunds'. Both listed —
+  // historical Bank of America rows and any un-renamed export still use the old
+  // label, and dropping it would silently fall those rows through to the
+  // statistical fallback cadence.
   'Customer Refunds',
+  'Sales Refunds',
   'Interest Paid',
   'Depreciation',
 ]);

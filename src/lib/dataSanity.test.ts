@@ -48,8 +48,11 @@ function wodifyRefundsRow(date: string, rawAmount: number, payee = 'Processor Gr
 function merchantFeesRow(date: string, rawAmount: number): Txn {
   return txn({ date, account: 'Wodify', category: 'Merchant Fees', payee: 'Stripe', rawAmount });
 }
-function customerRefundsRow(date: string, rawAmount: number): Txn {
-  return txn({ date, account: 'Wodify', category: 'Customer Refunds', payee: 'Stripe', rawAmount });
+// 'Sales Refunds' is the current live label (Quicken rename 2026-08, 29 rows).
+// See the added 'Customer Refunds' (pre-rename label) case below — the check
+// must match both, not just whichever one this default factory builds.
+function salesRefundsRow(date: string, rawAmount: number): Txn {
+  return txn({ date, account: 'Wodify', category: 'Sales Refunds', payee: 'Stripe', rawAmount });
 }
 function closingTxn(date: string): Txn {
   return txn({ date, account: 'BofA', category: 'Office Supplies', payee: 'Staples', rawAmount: -50 });
@@ -61,7 +64,26 @@ describe('Wodify gross-up reconciliation', () => {
       wodifyFeesRow('2025-06-30', 1000),
       wodifyRefundsRow('2025-06-30', 500),
       merchantFeesRow('2025-06-30', -1000),
-      customerRefundsRow('2025-06-30', -500),
+      salesRefundsRow('2025-06-30', -500),
+      closingTxn('2025-07-15'),
+    ];
+    const check = findWodifyCheck(txns);
+    expect(check.passed).toBe(true);
+    expect(check.detail).toBeUndefined();
+  });
+
+  it("pre-rename label 'Customer Refunds' still reconciles (backward compat)", () => {
+    // Regression pin for the 2026-08 Quicken rename fix: dataSanity.ts matches
+    // BOTH 'Customer Refunds' (retired) and 'Sales Refunds' (current) rather than
+    // swapping the literal, so historical Bank of America rows and any un-renamed
+    // export keep reconciling. This is the exact case that silently broke —
+    // the old fixture used the same stale label as the buggy code, so both
+    // agreed with each other and CI stayed green through the actual rename.
+    const txns: Txn[] = [
+      wodifyFeesRow('2025-06-30', 1000),
+      wodifyRefundsRow('2025-06-30', 500),
+      merchantFeesRow('2025-06-30', -1000),
+      txn({ date: '2025-06-30', account: 'Wodify', category: 'Customer Refunds', payee: 'Stripe', rawAmount: -500 }),
       closingTxn('2025-07-15'),
     ];
     const check = findWodifyCheck(txns);
@@ -120,7 +142,7 @@ describe('Wodify gross-up reconciliation', () => {
   });
 
   it('miscategorization-but-net-zero fails (revSide != outSide)', () => {
-    // Total Wodify net is $0, but a sign-flipped Customer Refunds row (+500
+    // Total Wodify net is $0, but a sign-flipped Sales Refunds row (+500
     // where it should be -500) breaks the side balance. An offsetting extra
     // $500 in Merchant Fees keeps net at zero — exactly the case a naive
     // single-net-sum check would miss but the two-sided check catches
@@ -130,7 +152,7 @@ describe('Wodify gross-up reconciliation', () => {
       wodifyFeesRow('2025-05-31', 1000),
       wodifyRefundsRow('2025-05-31', 500),
       merchantFeesRow('2025-05-31', -2000),
-      customerRefundsRow('2025-05-31', +500), // SIGN-FLIPPED
+      salesRefundsRow('2025-05-31', +500), // SIGN-FLIPPED
       closingTxn('2025-06-01'),
     ];
 
