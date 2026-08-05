@@ -171,7 +171,10 @@ function checkWodifyGrossUpReconciliation(txns: Txn[]): SanityCheck {
       }
     } else if (t.category === 'Merchant Fees') {
       b.merchantFees += t.rawAmount;
-    } else if (t.category === 'Customer Refunds') {
+    } else if (t.category === 'Customer Refunds' || t.category === 'Sales Refunds') {
+      // Quicken rename 2026-08: 'Customer Refunds' → 'Sales Refunds' (29 live rows).
+      // Match both — historical Bank of America rows and any un-renamed export still
+      // use the old label; a bare swap would silently drop them from this reconciliation.
       b.customerRefunds += t.rawAmount;
     }
   }
