@@ -42,6 +42,7 @@ function statusLabel(live: boolean | null): string {
 
 export function ExportSourceJsonCard({
   model,
+  scorecardAnchoredModel,
   financialTxnCount,
   currentCalendarMonth,
   financialBasis,
@@ -55,6 +56,12 @@ export function ExportSourceJsonCard({
   targetNetMargin,
 }: {
   model: DashboardModel;
+  // The same model re-anchored on the scorecard month (Dashboard computes it). The export reads its
+  // transaction-derived Big Picture blocks — movers / trajectory signals / expense slices — so a
+  // lagged import can't ship the calendar month's values under a scorecard-month claim. This is the
+  // same object as `model` whenever there is no lag, leaving those three blocks at their normal-case
+  // values; the export's kpi_cards correction is separate and applies either way.
+  scorecardAnchoredModel: DashboardModel;
   financialTxnCount: number;
   currentCalendarMonth: string;
   financialBasis: FinancialBasis;
@@ -115,6 +122,7 @@ export function ExportSourceJsonCard({
       setRetention({ rates, snapshot, belt, cohortRates, loaded: true });
       const payload = buildMonthlySourceExport({
         model,
+        scorecardAnchoredModel,
         financialTxnCount,
         currentCalendarMonth,
         financialBasis,
@@ -147,6 +155,7 @@ export function ExportSourceJsonCard({
     }
   }, [
     model,
+    scorecardAnchoredModel,
     financialTxnCount,
     currentCalendarMonth,
     financialBasis,
