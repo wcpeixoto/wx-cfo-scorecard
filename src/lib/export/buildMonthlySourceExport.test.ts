@@ -5,7 +5,8 @@ import {
   latestCompleteMonth,
   type MonthlySourceExportInputs,
 } from './buildMonthlySourceExport';
-import type { DashboardModel, ScenarioPoint } from '../data/contract';
+import type { DashboardModel, ScenarioPoint, Txn } from '../data/contract';
+import { computeDashboardModel } from '../kpis/compute';
 import type { RetentionMonth } from '../gym/memberRetentionSeries';
 import type { RetentionAggregateSnapshot } from '../gym/fetchRetentionAggregate';
 import { deriveBuckets } from '../gym/retentionAggregateView';
@@ -181,8 +182,11 @@ function cohortRateRows(): CohortRetentionRow[] {
   ];
 }
 
+const BASE_MODEL = model();
 const BASE: MonthlySourceExportInputs = {
-  model: model(),
+  model: BASE_MODEL,
+  // No import lag in the fixtures ⇒ the caller hands back the same model object (see Dashboard).
+  scorecardAnchoredModel: BASE_MODEL,
   financialTxnCount: 0,
   currentCalendarMonth: '2026-07',
   financialBasis: 'operating',
@@ -216,11 +220,9 @@ function shiftMonthToken(start: string, delta: number): string {
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
 }
 
-// A fully-live input: financial through 2026-06, retention series, live snapshot, projected forecast.
-function fullLive(): MonthlySourceExportInputs {
-  return {
-    ...BASE,
-    model: model({
+// The fully-live DashboardModel: financial through 2026-06 with a partial 2026-07.
+function fullLiveModel(): DashboardModel {
+  return model({
       monthlyRollups: [
         rollup('2025-06', 8000, 6000, { savings: 0.25, tx: 40 }), // YoY partner
         rollup('2026-05', 9000, 7000, { savings: 0.22, tx: 44 }), // prior month
@@ -229,17 +231,18 @@ function fullLive(): MonthlySourceExportInputs {
       ],
       kpiComparisonByTimeframe: { ttm: ttmEntry(110000, 85000, 25000, 0.23) },
       // Dashboard signals — real values for deterministic assertions.
+      // compute.ts's real buildKpis ids/labels/formats, carrying the CALENDAR-anchored values it
+      // would produce (the partial 2026-07 vs 2026-06). The export must NOT serialize these numbers
+      // — only their id / label / format — and must re-anchor the values on the scorecard month.
       kpiCards: [
-        {
-          id: 'revenue',
-          label: 'Revenue',
-          value: 10000,
-          previousValue: 9000,
-          deltaPercent: 0.1,
-          trend: 'up',
-          sentiment: 'up',
-          format: 'currency',
-        },
+        { id: 'income', label: 'Revenue', value: 3000, previousValue: 10000, deltaPercent: -70,
+          trend: 'down', sentiment: 'down', format: 'currency' },
+        { id: 'expense', label: 'Expenses', value: 2000, previousValue: 7500, deltaPercent: -73.33,
+          trend: 'down', sentiment: 'up', format: 'currency' },
+        { id: 'net', label: 'Net Cash Flow', value: 1000, previousValue: 2500, deltaPercent: -60,
+          trend: 'down', sentiment: 'down', format: 'currency' },
+        { id: 'savingsRate', label: 'Savings Rate', value: 33.33, previousValue: 25, deltaPercent: 33.32,
+          trend: 'up', sentiment: 'up', format: 'percent' },
       ],
       movers: [
         {
@@ -281,7 +284,18 @@ function fullLive(): MonthlySourceExportInputs {
         { month: '2026-07', revenue: 10200, expenses: 7600, netCashFlow: 2600, status: 'projected' },
         { month: '2026-08', revenue: 10400, expenses: 7700, netCashFlow: 2700, status: 'projected' },
       ],
-    }),
+  });
+}
+
+// A fully-live input: financial through 2026-06, retention series, live snapshot, projected forecast.
+function fullLive(): MonthlySourceExportInputs {
+  const liveModel = fullLiveModel();
+  return {
+    ...BASE,
+    model: liveModel,
+    // No import lag here (data runs through 2026-06, current calendar month is 2026-07), so the
+    // scorecard month IS previousCalendarMonth and Dashboard hands back the same model object.
+    scorecardAnchoredModel: liveModel,
     financialTxnCount: 146,
     // Composed projection (future months only; must not overlap actuals through 2026-06). Cash climbs,
     // so it never runs out within the horizon.
@@ -698,18 +712,55 @@ describe('buildMonthlySourceExport', () => {
 
   it('19. dashboard signals — deterministic serialized values, sparkline dropped', () => {
     const out = buildMonthlySourceExport(fullLive()) as any;
+    // Anchored on scorecard_month (2026-06) vs its own prior month (2026-05) — NOT the partial
+    // 2026-07 the model's own kpiCards describe. id / label / format still come off the model card.
     expect(out.kpi_cards).toEqual([
       {
-        id: 'revenue',
+        id: 'income',
         label: 'Revenue',
-        value: 10000,
-        previous_value: 9000,
-        delta_percent: 0.1,
+        value: 10000, // 2026-06 revenue
+        previous_value: 9000, // 2026-05 revenue
+        delta_percent: 11.11111111111111,
         trend: 'up',
         sentiment: 'up',
         format: 'currency',
       },
+      {
+        id: 'expense',
+        label: 'Expenses',
+        value: 7500,
+        previous_value: 7000,
+        delta_percent: 7.142857142857142,
+        trend: 'up', // expenses rose
+        sentiment: 'down', // ...which is unfavorable — the lower-is-better inversion
+        format: 'currency',
+      },
+      {
+        id: 'net',
+        label: 'Net Cash Flow',
+        value: 2500,
+        previous_value: 2000,
+        delta_percent: 25,
+        trend: 'up',
+        sentiment: 'up',
+        format: 'currency',
+      },
+      {
+        id: 'savingsRate',
+        // summarizeRollups recomputes the rate as netCashFlow/revenue*100 (25.00 / 22.22) rather
+        // than reading the rollup's stored field — exactly what buildKpis does at this anchor.
+        label: 'Savings Rate',
+        value: 25,
+        previous_value: 22.22,
+        delta_percent: 12.511251125112516,
+        trend: 'up',
+        sentiment: 'up',
+        format: 'percent',
+      },
     ]);
+    // none of the model's own calendar-anchored card values leaked through
+    expect(out.kpi_cards.map((c: any) => c.value)).not.toContain(3000); // partial 2026-07 revenue
+    expect(out.warnings).toEqual([]); // all four card ids mapped
     expect(out.category_movers).toEqual([
       {
         category: 'Facilities',
@@ -1243,5 +1294,258 @@ describe('buildMonthlySourceExport', () => {
     const b = buildMonthlySourceExport(input) as any;
     expect(a.generated_at).toBe('2026-07-06T14:00:00Z');
     expect(a).toEqual(b); // no Date.now()/new Date() → identical output for identical input
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // #557 — LAGGED IMPORT. One explicit case: it is September 2026 and the newest imported financial
+  // data is July 2026, so scorecard_month is 2026-07 while the dashboard's own model is anchored on
+  // the calendar (August / September). Every block the payload declares as-of scorecard_month must
+  // describe JULY and July's own comparison period — never August (empty) and never September.
+  //
+  // Both sides run through the REAL computeDashboardModel, so "equals the canonical output for that
+  // month" is proved against canonical code, not against hand-typed expectations.
+  // ---------------------------------------------------------------------------------------------
+  describe('C13. lagged import — current calendar month 2026-09, newest data 2026-07', () => {
+    const CURRENT_CALENDAR_MONTH = '2026-09'; // "today"
+    const SCORECARD_MONTH = '2026-07'; // newest complete month WITH DATA
+    const COMPARISON_MONTH = '2026-06'; // its intended comparison period
+    const EMPTY_MONTH = '2026-08'; // the calendar-anchored month the model would use
+
+    function laggedTxn(id: string, month: string, category: string, rawAmount: number) {
+      return {
+        id,
+        date: `${month}-15`,
+        month,
+        type: rawAmount > 0 ? 'income' : 'expense',
+        amount: Math.abs(rawAmount),
+        category,
+        rawAmount,
+      } as Txn;
+    }
+
+    // 13 months, 2025-07 .. 2026-07. NOTHING in 2026-08 or 2026-09 — that is the lag.
+    // July is made materially different from June (+$5,000 revenue, +$2,500 Marketing) so a
+    // June-vs-July mix-up cannot pass by coincidence.
+    function laggedTxns(): Txn[] {
+      const out: Txn[] = [];
+      const months = [
+        '2025-07', '2025-08', '2025-09', '2025-10', '2025-11', '2025-12',
+        '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07',
+      ];
+      months.forEach((m, i) => {
+        out.push(laggedTxn(`rev-${m}`, m, 'Business Income:Memberships', 10000 + i * 100));
+        out.push(laggedTxn(`rent-${m}`, m, 'Rent', -(3000 + i * 10)));
+        out.push(laggedTxn(`mkt-${m}`, m, 'Marketing', -(1000 + i * 50)));
+      });
+      out.push(laggedTxn('rev-extra', SCORECARD_MONTH, 'Business Income:Memberships', 5000));
+      out.push(laggedTxn('mkt-extra', SCORECARD_MONTH, 'Marketing', -2500));
+      return out;
+    }
+
+    const OPTIONS = { cashFlowMode: 'operating', currentCashBalance: 50000 } as const;
+
+    // What Dashboard computes today: anchored on the calendar month.
+    function calendarAnchoredModel(): DashboardModel {
+      return computeDashboardModel(laggedTxns(), {
+        ...OPTIONS,
+        anchorMonth: EMPTY_MONTH, // previousCalendarMonth
+        thisMonthAnchor: CURRENT_CALENDAR_MONTH,
+      });
+    }
+    // What Dashboard now also computes for the export: the same canonical model, re-anchored.
+    function scorecardAnchoredModel(): DashboardModel {
+      return computeDashboardModel(laggedTxns(), {
+        ...OPTIONS,
+        anchorMonth: SCORECARD_MONTH,
+        thisMonthAnchor: '2026-08', // the month AFTER the scorecard month
+      });
+    }
+
+    function laggedInput(): MonthlySourceExportInputs {
+      return {
+        ...BASE,
+        model: calendarAnchoredModel(),
+        scorecardAnchoredModel: scorecardAnchoredModel(),
+        financialTxnCount: laggedTxns().length,
+        currentCalendarMonth: CURRENT_CALENDAR_MONTH,
+        retentionRates: [retMonth('2026-07')],
+      };
+    }
+
+    it('scorecard_month is the complete month, not the calendar month', () => {
+      const out = buildMonthlySourceExport(laggedInput()) as any;
+      expect(out.scorecard_month).toBe(SCORECARD_MONTH);
+      expect(out.as_of.financial).toBe(SCORECARD_MONTH);
+      expect(out.as_of.dashboard_signals).toBe(SCORECARD_MONTH);
+      // the fixture really is lagged: the model's own anchor is a month with no data
+      expect(calendarAnchoredModel().monthlyRollups.some((r) => r.month === EMPTY_MONTH)).toBe(false);
+    });
+
+    it('every kpi_card equals the canonical card for the scorecard month', () => {
+      const out = buildMonthlySourceExport(laggedInput()) as any;
+      // The canonical cards for 2026-07: computeDashboardModel's OWN buildKpis output with
+      // thisMonth = 2026-07 (so lastMonth = 2026-06). This is the reference, not a hand-typed value.
+      const canonical = computeDashboardModel(laggedTxns(), {
+        ...OPTIONS,
+        anchorMonth: COMPARISON_MONTH,
+        thisMonthAnchor: SCORECARD_MONTH,
+      }).kpiCards;
+      expect(canonical.length).toBe(4);
+      expect(out.kpi_cards).toEqual(
+        canonical.map((c) => ({
+          id: c.id,
+          label: c.label,
+          value: c.value,
+          previous_value: c.previousValue,
+          delta_percent: c.deltaPercent,
+          trend: c.trend,
+          sentiment: c.sentiment,
+          format: c.format,
+        })),
+      );
+
+      // ...and it is genuinely July-vs-June, not August or September.
+      const rollupFor = (m: string) =>
+        out.financial_monthly.find((r: any) => r.month === m);
+      const revenueCard = out.kpi_cards.find((c: any) => c.id === 'income');
+      expect(revenueCard.value).toBe(rollupFor(SCORECARD_MONTH).revenue);
+      expect(revenueCard.previous_value).toBe(rollupFor(COMPARISON_MONTH).revenue);
+      // the calendar-anchored model reports an empty month — that must NOT be what shipped
+      expect(calendarAnchoredModel().kpiCards.every((c) => c.value === 0)).toBe(true);
+      expect(out.kpi_cards.some((c: any) => c.value !== 0)).toBe(true);
+    });
+
+    it('category_movers compare the scorecard month against its prior month', () => {
+      const out = buildMonthlySourceExport(laggedInput()) as any;
+      const canonical = scorecardAnchoredModel().movers;
+      expect(canonical.length).toBeGreaterThan(0);
+      expect(out.category_movers).toEqual(
+        canonical.map((m) => ({
+          category: m.category,
+          current: m.current,
+          previous: m.previous,
+          delta: m.delta,
+          delta_percent: m.deltaPercent,
+          priority_score: m.priorityScore,
+        })),
+      );
+      // July Marketing = 1000 + 12*50 + 2500 = 4100; June Marketing = 1000 + 11*50 = 1550.
+      const marketing = out.category_movers.find((m: any) => m.category === 'Marketing');
+      expect(marketing.current).toBe(4100); // July, NOT August (0)
+      expect(marketing.previous).toBe(1550); // June, NOT July
+      // what the un-fixed path would have shipped: an empty August against July
+      const stale = calendarAnchoredModel().movers.find((m) => m.category === 'Marketing');
+      expect(stale?.current).toBe(0);
+      expect(stale?.previous).toBe(4100);
+    });
+
+    it('top_expense_categories are the scorecard month, not an empty calendar month', () => {
+      const out = buildMonthlySourceExport(laggedInput()) as any;
+      expect(calendarAnchoredModel().expenseSlices).toEqual([]); // August has no txns
+      expect(out.top_expense_categories.length).toBeGreaterThan(0);
+      expect(out.top_expense_categories).toEqual(
+        scorecardAnchoredModel().expenseSlices.map((s) => ({
+          name: s.name,
+          value: s.value,
+          share: s.share,
+        })),
+      );
+      const marketing = out.top_expense_categories.find((s: any) => s.name === 'Marketing');
+      expect(marketing.value).toBe(4100); // July's Marketing spend
+    });
+
+    it('trajectory_signals windows end on the scorecard month', () => {
+      const out = buildMonthlySourceExport(laggedInput()) as any;
+      const byId = (id: string) => out.trajectory_signals.find((t: any) => t.id === id);
+      // Last Month (YoY): July 2026 vs July 2025 — not August (which has no data at all).
+      expect(byId('monthlyTrend').current_start_month).toBe(SCORECARD_MONTH);
+      expect(byId('monthlyTrend').current_end_month).toBe(SCORECARD_MONTH);
+      expect(byId('monthlyTrend').previous_end_month).toBe('2025-07');
+      expect(byId('monthlyTrend').has_sufficient_history).toBe(true);
+      // Momentum: the three months ENDING July (May–Jul), vs the three before it (Feb–Apr).
+      expect(byId('shortTermTrend').current_start_month).toBe('2026-05');
+      expect(byId('shortTermTrend').current_end_month).toBe(SCORECARD_MONTH);
+      expect(byId('shortTermTrend').previous_end_month).toBe('2026-04');
+      // Annual: TTM ending July.
+      expect(byId('longTermTrend').current_end_month).toBe(SCORECARD_MONTH);
+      // no window anywhere in the block ends on the empty calendar month
+      out.trajectory_signals.forEach((t: any) => {
+        expect(t.current_end_month).not.toBe(EMPTY_MONTH);
+        expect(t.current_end_month).not.toBe(CURRENT_CALENDAR_MONTH);
+      });
+      // what the un-fixed path would have shipped: a null/empty August window
+      expect(calendarAnchoredModel().trajectorySignals[0].currentEndMonth).toBeNull();
+    });
+
+    it('no corrected block reports the empty month or the in-progress month', () => {
+      const out = buildMonthlySourceExport(laggedInput()) as any;
+      expect(out.financial_monthly.every((r: any) => r.month <= SCORECARD_MONTH)).toBe(true);
+      const serialized = JSON.stringify({
+        kpi_cards: out.kpi_cards,
+        category_movers: out.category_movers,
+        top_expense_categories: out.top_expense_categories,
+        trajectory_signals: out.trajectory_signals,
+      });
+      expect(serialized).not.toContain(EMPTY_MONTH);
+      expect(serialized).not.toContain(CURRENT_CALENDAR_MONTH);
+    });
+
+    it('no import lag ⇒ the same model object, and the three model-backed blocks keep their normal-case values', () => {
+      // Dashboard hands back `model` itself when scorecard_month === previousCalendarMonth. Only the
+      // scorecardAnchoredModel-backed blocks (movers / trajectory_signals / top_expense_categories)
+      // are asserted unchanged here. kpi_cards is deliberately NOT among them — it is re-anchored off
+      // the partial current calendar month in every case, lag or no lag.
+      const noLagModel = computeDashboardModel(laggedTxns(), {
+        ...OPTIONS,
+        anchorMonth: COMPARISON_MONTH,
+        thisMonthAnchor: SCORECARD_MONTH,
+      });
+      const shared = {
+        ...BASE,
+        model: noLagModel,
+        scorecardAnchoredModel: noLagModel,
+        financialTxnCount: laggedTxns().length,
+        currentCalendarMonth: SCORECARD_MONTH, // "today" is July; June is the scorecard month
+        retentionRates: [retMonth('2026-06')],
+      };
+      const out = buildMonthlySourceExport(shared) as any;
+      expect(out.scorecard_month).toBe(COMPARISON_MONTH);
+      // the model's own blocks are already correct at this anchor and pass straight through
+      expect(out.category_movers).toEqual(
+        noLagModel.movers.map((m) => ({
+          category: m.category,
+          current: m.current,
+          previous: m.previous,
+          delta: m.delta,
+          delta_percent: m.deltaPercent,
+          priority_score: m.priorityScore,
+        })),
+      );
+      expect(out.trajectory_signals[0].current_end_month).toBe(COMPARISON_MONTH);
+      expect(out.top_expense_categories).toEqual(
+        noLagModel.expenseSlices.map((s) => ({ name: s.name, value: s.value, share: s.share })),
+      );
+      // ...while kpi_cards still differs from the model's own cards: those describe the partial
+      // current calendar month (2026-07), the export describes scorecard_month (2026-06).
+      const revenueCard = out.kpi_cards.find((c: any) => c.id === 'income');
+      const modelRevenueCard = noLagModel.kpiCards.find((c) => c.id === 'income');
+      expect(revenueCard.value).not.toBe(modelRevenueCard!.value);
+      expect(revenueCard.value).toBe(
+        out.financial_monthly.find((r: any) => r.month === COMPARISON_MONTH).revenue,
+      );
+    });
+
+    it('an unmappable KPI card id is dropped and reported, never shipped at the wrong anchor', () => {
+      const input = laggedInput();
+      const patched = input.scorecardAnchoredModel;
+      (patched as any).kpiCards = [
+        ...patched.kpiCards,
+        { id: 'mysteryMetric', label: 'Mystery', value: 42, previousValue: 1,
+          deltaPercent: 4100, trend: 'up', sentiment: 'up', format: 'number' },
+      ];
+      const out = buildMonthlySourceExport(input) as any;
+      expect(out.kpi_cards.map((c: any) => c.id)).toEqual(['income', 'expense', 'net', 'savingsRate']);
+      expect(out.warnings.join(' ')).toContain('kpi_cards_incomplete: mysteryMetric');
+    });
   });
 });

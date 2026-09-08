@@ -23,6 +23,25 @@
 //   - cohort retention rates ← fetchMemberRetentionByCohort rows (per-cohort new/returning/lost flow;
 //     suppressed rows carry null counts VERBATIM — never coalesced to 0; DISTINCT from the recency histogram)
 //
+// SCORECARD-MONTH ANCHORING (#557). Every block the payload declares as `as_of.financial` /
+// `as_of.dashboard_signals` must describe `scorecard_month` — the latest COMPLETE month WITH DATA.
+// The Big Picture model is anchored on the real CALENDAR month instead, so when an import lags those
+// two diverge and the export silently ships the wrong (or an empty) month under a scorecard-month
+// claim. Two mechanisms fix that, both reusing canonical computations verbatim:
+//   - kpi_cards ← computeKpiComparisons(model.monthlyRollups, _, scorecardMonth).thisMonth — the same
+//     exported selector the model uses, re-anchored on the scorecard month (see buildScorecardKpiCards).
+//   - category_movers / trajectory_signals / top_expense_categories ← `scorecardAnchoredModel`, a
+//     second computeDashboardModel() pass the CALLER runs anchored on the scorecard month. They are
+//     transaction-derived (category names live in txns, not in monthlyRollups), so this pure builder
+//     cannot re-anchor them itself without breaking the PII boundary.
+//
+// When there is NO import lag the scorecard month already IS the model's own anchor, so Dashboard
+// reuses the same model object and skips the second computeDashboardModel pass entirely — these
+// three scorecardAnchoredModel-backed blocks then serialize exactly the values they always did.
+// kpi_cards is NOT in that set: it still receives the intentional scorecard-month correction in
+// every case, lag or no lag, because model.kpiCards describes the partial CURRENT calendar month
+// even when nothing is lagging. That change is the point of this fix, not a regression.
+//
 // STRICT FACTUAL/PII BOUNDARY: only aggregate numbers, category names, counts, rates, and dates are
 // read. Transaction rows, payees, memos, accounts, member identities, DOBs, ages, import summaries,
 // and source filenames are NEVER touched (the builder simply doesn't reference model.topPayees etc.).
@@ -46,6 +65,7 @@ import type {
   MonthlyRollup,
   ScenarioPoint,
 } from '../data/contract';
+import { computeKpiComparisons, sentimentFromDelta } from '../kpis/compute';
 import type { RetentionMonth } from '../gym/memberRetentionSeries';
 import { realRetentionMonths } from '../gym/memberRetentionSeries';
 import type { BeltRetentionRow } from '../gym/fetchMemberRetentionByBelt';
@@ -66,6 +86,15 @@ export type FinancialBasis = 'operating' | 'total';
 
 export type MonthlySourceExportInputs = {
   model: DashboardModel;
+  // The SAME DashboardModel re-computed with its anchor on `scorecard_month` instead of the current
+  // calendar month. Only the transaction-derived, calendar-anchored Big Picture blocks are read off
+  // it — `movers`, `trajectorySignals`, `expenseSlices` — because those cannot be re-anchored from
+  // monthlyRollups alone (they are keyed by category, which only exists on txns; the builder never
+  // receives txns). Everything else keeps reading `model`, so runway's point-in-time cash and the
+  // model's authoritative TTM window are untouched. With no import lag the caller passes `model`
+  // itself (the anchors already match), and these three blocks then carry their normal-case values
+  // unchanged. kpi_cards is re-anchored here regardless — see buildScorecardKpiCards.
+  scorecardAnchoredModel: DashboardModel;
   financialTxnCount: number; // baseTxns.length — the financial live/empty gate
   currentCalendarMonth: string; // 'YYYY-MM' injected from getCurrentCalendarMonthToken()
   financialBasis: FinancialBasis; // profitabilityCashFlowMode
@@ -168,9 +197,71 @@ function metricComparison(
   };
 }
 
+// Card id -> the KpiTimeframeComparison metric that card reports. The ids are compute.ts's own fixed
+// buildKpis ids and are already load-bearing elsewhere in the app (Dashboard.tsx keys the
+// lower-is-better inversion off `id === 'expense'` the same way).
+const KPI_CARD_METRIC_BY_ID: Record<string, 'revenue' | 'expenses' | 'netCashFlow' | 'savingsRate'> = {
+  income: 'revenue',
+  expense: 'expenses',
+  net: 'netCashFlow',
+  savingsRate: 'savingsRate',
+};
+
+// The four KPI cards re-anchored on the scorecard month, vs that month's own prior month.
+//
+// model.kpiCards is buildKpis(aggregations.thisMonth, aggregations.lastMonth), and those two
+// timeframes anchor on the real CALENDAR month (compute.ts:2093 + Dashboard's
+// thisMonthAnchor: currentCalendarMonth) — so they describe the in-progress month, never
+// scorecard_month. Same defect metricComparison() above was written to dodge for financial_comparisons.
+//
+// NOTHING is recomputed here. Values come from computeKpiComparisons — the SAME exported selector
+// compute.ts itself calls — pointed at the scorecard month, which makes its `thisMonth` block
+// (scorecardMonth vs scorecardMonth-1) bit-identical to what buildKpis would emit at that anchor:
+//   value/previous_value  compareMetric's round2(summarizeRollups(...)) == buildKpis' round2(agg...)
+//   delta_percent         compareMetric's pctDelta == buildKpis' pctDelta, same inputs
+//   trend                 sentimentFromDelta(d) is byte-identical to compute.ts's private
+//                         trendFromDelta(d) (compute.ts:70 vs :80 with lowerIsBetter=false)
+//   sentiment             the same exported sentimentFromDelta, inverted for expenses
+// id / label / format are carried straight off the model's own cards, so a card added to buildKpis
+// later flows through here unchanged (and is reported in `unmappedIds` until it is mapped above).
+function buildScorecardKpiCards(
+  modelCards: DashboardModel['kpiCards'],
+  monthlyRollups: MonthlyRollup[],
+  scorecardMonth: string,
+): { cards: Record<string, unknown>[]; unmappedIds: string[] } {
+  const comparison = computeKpiComparisons(monthlyRollups, undefined, scorecardMonth).thisMonth;
+  const cards: Record<string, unknown>[] = [];
+  const unmappedIds: string[] = [];
+  modelCards.forEach((card) => {
+    const metricKey = KPI_CARD_METRIC_BY_ID[card.id];
+    if (!metricKey) {
+      // Unknown card id: emitting it would mean shipping the calendar-anchored value under a
+      // scorecard-month claim. Drop it and say so in `warnings` rather than lie.
+      unmappedIds.push(card.id);
+      return;
+    }
+    const metric = comparison[metricKey];
+    // Raw difference (not compareMetric's rounded `delta`) so trend/sentiment take exactly the input
+    // buildKpis gives trendFromDelta / sentimentFromDelta.
+    const delta = metric.current - metric.previous;
+    cards.push({
+      id: card.id,
+      label: card.label,
+      value: metric.current,
+      previous_value: metric.previous,
+      delta_percent: metric.percentChange,
+      trend: sentimentFromDelta(delta), // sign of the change (arrow glyph)
+      sentiment: sentimentFromDelta(delta, card.id === 'expense'), // favorability; inverts for expenses
+      format: card.format,
+    });
+  });
+  return { cards, unmappedIds };
+}
+
 export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Record<string, unknown> {
   const {
     model,
+    scorecardAnchoredModel,
     financialTxnCount,
     currentCalendarMonth,
     financialBasis,
@@ -268,7 +359,10 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
       percent_funded: rw.percentFunded,
     };
 
-    topExpenseCategories = model.expenseSlices.map((s) => ({
+    // Scorecard-anchored (#557): model.expenseSlices is built from the CALENDAR-anchored context
+    // month's txns, so on a lagged import it reports the wrong month — and goes to [], silently
+    // claiming the scorecard month had no expenses at all.
+    topExpenseCategories = scorecardAnchoredModel.expenseSlices.map((s) => ({
       name: s.name,
       value: s.value,
       share: s.share,
@@ -285,23 +379,24 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
   // reconciles 1:1 with `missing_or_unavailable`. uncategorized_warning may be present-but-null when
   // live (no warning) — a null field, NOT a missing domain, so it never pushes a code.
   let kpiCards: Record<string, unknown>[] | undefined;
+  let unmappedKpiCardIds: string[] = [];
   let categoryMovers: Record<string, unknown>[] | undefined;
   let trajectorySignals: Record<string, unknown>[] | undefined;
   let suggestedMargins: Record<string, unknown> | undefined;
   let uncategorizedWarning: Record<string, unknown> | null | undefined;
-  if (financialLive) {
-    kpiCards = model.kpiCards.map((c) => ({
-      id: c.id,
-      label: c.label,
-      value: c.value,
-      previous_value: c.previousValue,
-      delta_percent: c.deltaPercent,
-      trend: c.trend, // sign of the change (arrow glyph)
-      sentiment: c.sentiment, // favorability; may invert vs trend for lower-is-better metrics
-      format: c.format,
-    }));
+  if (financialLive && scorecardMonth) {
+    // Scorecard-anchored (#557) — see buildScorecardKpiCards. model.kpiCards describes the
+    // in-progress calendar month; these describe scorecardMonth vs scorecardMonth-1.
+    const scorecardCards = buildScorecardKpiCards(
+      scorecardAnchoredModel.kpiCards,
+      model.monthlyRollups,
+      scorecardMonth,
+    );
+    kpiCards = scorecardCards.cards;
+    unmappedKpiCardIds = scorecardCards.unmappedIds;
     // sparkline intentionally dropped — an intra-category series is noise for the attack plan.
-    categoryMovers = model.movers.map((m) => ({
+    // Scorecard-anchored (#557): movers are txn-derived off the calendar-anchored context month.
+    categoryMovers = scorecardAnchoredModel.movers.map((m) => ({
       category: m.category,
       current: m.current,
       previous: m.previous,
@@ -309,7 +404,9 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
       delta_percent: m.deltaPercent,
       priority_score: m.priorityScore,
     }));
-    trajectorySignals = model.trajectorySignals.map((t) => ({
+    // Scorecard-anchored (#557): trajectory windows are derived from thisMonthAnchor - 1, i.e. the
+    // last complete CALENDAR month, which on a lagged import is a month with no data.
+    trajectorySignals = scorecardAnchoredModel.trajectorySignals.map((t) => ({
       id: t.id,
       label: t.label,
       timeframe: t.timeframe,
@@ -808,6 +905,14 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
   if (cohortRatesLatestMonth) periodAnchors.push(['cohort_retention_rates', cohortRatesLatestMonth]);
   const distinctPeriods = new Set(periodAnchors.map(([, token]) => token));
   const warnings: string[] = [];
+  if (unmappedKpiCardIds.length > 0) {
+    // A KPI card compute.ts emits that this export cannot re-anchor on the scorecard month. Dropped
+    // rather than shipped at the wrong anchor — recorded so the omission is never silent.
+    warnings.push(
+      `kpi_cards_incomplete: ${unmappedKpiCardIds.join(', ')} omitted — no scorecard-month mapping ` +
+        'for these card ids, so their values could not be anchored to scorecard_month.',
+    );
+  }
   if (distinctPeriods.size > 1) {
     warnings.push(
       `as_of_divergence: blocks anchor to different periods (${periodAnchors

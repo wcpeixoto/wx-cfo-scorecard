@@ -17,6 +17,7 @@ import IncomeExpenseCard from '../components/IncomeExpenseCard';
 import PayrollEfficiencyCard from '../components/PayrollEfficiencyCard';
 import CashReserveCalendarCard from '../components/CashReserveCalendarCard';
 import { ExportSourceJsonCard } from '../components/ExportSourceJsonCard';
+import { latestCompleteMonth } from '../lib/export/buildMonthlySourceExport';
 import { UnclassifiedCategoriesCard } from '../components/UnclassifiedCategoriesCard';
 import KpiCards from '../components/KpiCards';
 import TopCategoriesCard from '../components/TopCategoriesCard';
@@ -1544,6 +1545,43 @@ export default function Dashboard() {
     },
     [currentCalendarMonth, currentCashBalance, baseTxns, previousCalendarMonth, profitabilityCashFlowMode]
   );
+  // The monthly source export declares its Big Picture blocks as-of `scorecard_month` — the latest
+  // COMPLETE month that HAS DATA. `model` is anchored on the real calendar month instead, so once an
+  // import lags (e.g. it's September and the newest data is July) the model's transaction-derived
+  // blocks describe August: movers compare an empty month, and expenseSlices goes to [] — shipped
+  // under a scorecard-month claim. Re-run the SAME canonical model anchored on the scorecard month
+  // for the export to read (#557).
+  //
+  // Anchors mirror what Dashboard passes above, shifted back: anchorMonth = the scorecard month
+  // (drives movers / expenseSlices via contextMonth) and thisMonthAnchor = the month after it
+  // (drives the trajectory windows via thisMonthAnchor - 1). kpi_cards is NOT fixed by this pass —
+  // buildKpis reads the `thisMonth` aggregation, which at this anchor is the empty next month; the
+  // export re-anchors those four cards itself from monthlyRollups.
+  //
+  // With no lag the scorecard month IS previousCalendarMonth, making these anchors identical to
+  // `model`'s — so we hand back `model` itself and skip the second pass entirely.
+  const exportScorecardMonth = useMemo(
+    () => latestCompleteMonth(model.monthlyRollups, currentCalendarMonth),
+    [model.monthlyRollups, currentCalendarMonth]
+  );
+  const scorecardAnchoredModel = useMemo(() => {
+    if (!exportScorecardMonth || exportScorecardMonth === previousCalendarMonth) return model;
+    const nextAfterScorecard = addMonthsToToken(exportScorecardMonth, 1);
+    if (!nextAfterScorecard) return model;
+    return computeDashboardModel(baseTxns, {
+      cashFlowMode: profitabilityCashFlowMode,
+      anchorMonth: exportScorecardMonth,
+      thisMonthAnchor: nextAfterScorecard,
+      currentCashBalance,
+    });
+  }, [
+    model,
+    exportScorecardMonth,
+    previousCalendarMonth,
+    baseTxns,
+    profitabilityCashFlowMode,
+    currentCashBalance,
+  ]);
   const efficiencyResult = useMemo(
     () => computeEfficiencyOpportunities(model, baseTxns),
     [model, baseTxns]
@@ -4560,6 +4598,7 @@ export default function Dashboard() {
 
                   <ExportSourceJsonCard
                     model={model}
+                    scorecardAnchoredModel={scorecardAnchoredModel}
                     financialTxnCount={baseTxns.length}
                     currentCalendarMonth={currentCalendarMonth}
                     financialBasis={profitabilityCashFlowMode}
