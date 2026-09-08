@@ -8,20 +8,15 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useRetentionSettings } from '../context/RetentionSettingsContext';
-import { fetchMemberRetentionRates } from '../lib/gym/fetchMemberRetentionRates';
-import { fetchLatestRetentionAggregate } from '../lib/gym/fetchRetentionAggregate';
-import { fetchMemberRetentionByBelt, type BeltRetentionRow } from '../lib/gym/fetchMemberRetentionByBelt';
-import {
-  fetchMemberRetentionByCohort,
-  type CohortRetentionRow,
-} from '../lib/gym/fetchMemberRetentionByCohort';
+import type { BeltRetentionRow } from '../lib/gym/fetchMemberRetentionByBelt';
+import type { CohortRetentionRow } from '../lib/gym/fetchMemberRetentionByCohort';
 import { realRetentionMonths, type RetentionMonth } from '../lib/gym/memberRetentionSeries';
 import type { RetentionAggregateSnapshot } from '../lib/gym/fetchRetentionAggregate';
+import { latestCompleteMonth, type FinancialBasis } from '../lib/export/buildMonthlySourceExport';
 import {
-  buildMonthlySourceExport,
-  latestCompleteMonth,
-  type FinancialBasis,
-} from '../lib/export/buildMonthlySourceExport';
+  collectMonthlySourceExportPayload,
+  fetchRetentionSources,
+} from '../lib/export/collectMonthlySourceExport';
 import type { DashboardModel, ScenarioPoint } from '../lib/data/contract';
 import type { EfficiencyOpportunitiesResult } from '../lib/kpis/efficiencyOpportunities';
 import type { WhatNeedsAttentionResult } from '../lib/kpis/digHere';
@@ -95,12 +90,7 @@ export function ExportSourceJsonCard({
   // in-session import can't leave a stale file. A null result is "not live", never a fabricated value.
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      fetchMemberRetentionRates().catch(() => null),
-      fetchLatestRetentionAggregate().catch(() => null),
-      fetchMemberRetentionByBelt().catch(() => null),
-      fetchMemberRetentionByCohort().catch(() => null),
-    ]).then(([rates, snapshot, belt, cohortRates]) => {
+    void fetchRetentionSources().then(({ rates, snapshot, belt, cohortRates }) => {
       if (!cancelled) setRetention({ rates, snapshot, belt, cohortRates, loaded: true });
     });
     return () => {
@@ -112,15 +102,9 @@ export function ExportSourceJsonCard({
     setExporting(true);
     try {
       // ALWAYS re-fetch on click — the mount probe can go stale after an in-session Member
-      // Retention Rates import. The fresh result feeds both the payload and the status lines.
-      const [rates, snapshot, belt, cohortRates] = await Promise.all([
-        fetchMemberRetentionRates().catch(() => null),
-        fetchLatestRetentionAggregate().catch(() => null),
-        fetchMemberRetentionByBelt().catch(() => null),
-        fetchMemberRetentionByCohort().catch(() => null),
-      ]);
-      setRetention({ rates, snapshot, belt, cohortRates, loaded: true });
-      const payload = buildMonthlySourceExport({
+      // Retention Rates import. The shared collector does the same four fetches automatic
+      // snapshot persistence uses, so the downloaded file and the stored row can never diverge.
+      const { payload, retention: fresh } = await collectMonthlySourceExportPayload({
         model,
         scorecardAnchoredModel,
         financialTxnCount,
@@ -134,13 +118,10 @@ export function ExportSourceJsonCard({
         ownerPayProjection,
         ownerPayReserveFloor,
         targetNetMargin,
-        retentionRates: rates,
-        snapshot,
-        beltRetention: belt,
-        cohortRetention: cohortRates,
         thresholdDays: silentChurnThresholdDays,
-        generatedAt: new Date().toISOString(),
       });
+      // Refresh the status lines from the same fetch that fed the payload.
+      setRetention({ ...fresh, loaded: true });
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');

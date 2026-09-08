@@ -18,6 +18,8 @@ import PayrollEfficiencyCard from '../components/PayrollEfficiencyCard';
 import CashReserveCalendarCard from '../components/CashReserveCalendarCard';
 import { ExportSourceJsonCard } from '../components/ExportSourceJsonCard';
 import { latestCompleteMonth } from '../lib/export/buildMonthlySourceExport';
+import { useScorecardSnapshotPersistence } from '../hooks/useScorecardSnapshotPersistence';
+import { forecastBootstrapFailed } from '../lib/data/scorecardSnapshot';
 import { UnclassifiedCategoriesCard } from '../components/UnclassifiedCategoriesCard';
 import KpiCards from '../components/KpiCards';
 import TopCategoriesCard from '../components/TopCategoriesCard';
@@ -995,6 +997,19 @@ export default function Dashboard() {
     );
   })();
   const [sharedAccountSettingsReady, setSharedAccountSettingsReady] = useState(!sharedPersistenceEnabled);
+  // Scorecard-snapshot readiness (#558). These exist ONLY to gate automatic snapshot persistence;
+  // nothing renders off them. Each is set on the SUCCESS path only — never in a `finally` — so a
+  // failed or cancelled loader can never satisfy the persistence barrier and overwrite a good
+  // snapshot with fallback values.
+  const [sharedAccountSettingsLoadFailed, setSharedAccountSettingsLoadFailed] = useState(false);
+  const [workspaceSettingsSettled, setWorkspaceSettingsSettled] = useState(!sharedPersistenceEnabled);
+  // SETTLED, not "has rows": a workspace with no forecast contracts/events is a valid completed
+  // state whose payload correctly reports `forecast:not_available`. Gating on a non-empty
+  // projection would suppress the snapshot entirely for that workspace.
+  const [forecastSettled, setForecastSettled] = useState(!sharedPersistenceEnabled);
+  // Generation token for automatic persistence. Bumped once per SUCCESSFUL source import; Clear
+  // Data deliberately never touches it.
+  const [snapshotImportStamp, setSnapshotImportStamp] = useState(0);
   const [sharedAccountSettingsHasRemoteData, setSharedAccountSettingsHasRemoteData] = useState(false);
   const [businessRules, setBusinessRules] = useState<BusinessRules>(() => ({ ...DEFAULT_BUSINESS_RULES }));
   const forecastScenarioPresets = useMemo(
@@ -1147,6 +1162,10 @@ export default function Dashboard() {
         }
       } catch (sharedSettingsError) {
         console.warn('Shared account settings unavailable, using browser-local settings.', sharedSettingsError);
+        // Ready (the UI proceeds on the localStorage fallback) but NOT loaded — snapshot
+        // persistence must not run off fallback account settings, which drive cash balance and
+        // which accounts feed the forecast.
+        if (!cancelled) setSharedAccountSettingsLoadFailed(true);
       } finally {
         if (!cancelled) {
           setSharedAccountSettingsReady(true);
@@ -1179,6 +1198,8 @@ export default function Dashboard() {
           // Row exists — use it, ensure any stale localStorage is gone.
           setBusinessRules(remote);
           clearLocalStorageBusinessRules();
+          // A non-null row is unambiguous success (#558).
+          setWorkspaceSettingsSettled(true);
         } else {
           // No row yet — check for localStorage migration.
           const legacyValues = migrateLocalStorageBusinessRules();
@@ -1191,6 +1212,22 @@ export default function Dashboard() {
           // Write the resolved settings to Supabase (creates the row).
           await saveSharedWorkspaceSettings(initial);
           clearLocalStorageBusinessRules();
+
+          // Snapshot readiness (#558). The locked helpers cannot report success: the reader
+          // returns `null` for BOTH "no row yet" and "read failed", and the writer swallows write
+          // failures. So this path proves the row exists by reading it back through the same
+          // locked reader — a non-null result is the only typed success signal available without
+          // editing sharedPersistence.ts. It also installs the read-back row so in-memory rules
+          // can never diverge from what the DB actually holds (e.g. the initial read failed
+          // transiently, a row already existed, and the upsert above merged into it).
+          const confirmed = await getSharedWorkspaceSettings();
+          if (cancelled) return;
+          if (confirmed !== null) {
+            setBusinessRules(confirmed);
+            setWorkspaceSettingsSettled(true);
+          } else {
+            console.warn('[workspace-settings] Could not confirm the settings row; snapshot persistence stays gated.');
+          }
         }
       } catch (workspaceSettingsError) {
         // Non-fatal: in-memory defaults remain correct.
@@ -1244,13 +1281,24 @@ export default function Dashboard() {
     const horizonAtLoad = forecastRangeMonths;
 
     (async () => {
+      // Snapshot readiness (#558): this pass only GATHERS facts; the pure, unit-tested
+      // forecastBootstrapFailed() decides. The locked readers return `[]` for a successful empty
+      // result and `null` for a failure; saveSharedRenewalEvents catches its own exceptions and
+      // returns `false`, so its boolean — not the catch below — is the regeneration signal. The UI
+      // tolerates every failure here and keeps rendering on defaults, but a snapshot must not be
+      // persisted off defaulted or stale forecast inputs.
+      let contractsRead: RenewalContract[] | null = null;
+      const regenResults: boolean[] = [];
+      let eventsRead: Awaited<ReturnType<typeof getSharedForecastEvents>> = null;
+      let threw = false;
       let contracts: RenewalContract[] = [];
       try {
-        const remoteContracts = await getSharedRenewalContracts();
+        contractsRead = await getSharedRenewalContracts();
         if (cancelled) return;
-        contracts = remoteContracts ?? [];
+        contracts = contractsRead ?? [];
         setForecastContracts(contracts);
       } catch (contractsErr) {
+        threw = true;
         // Non-fatal: continue to refetch forecast_events below so
         // existing manual-event behavior doesn't regress.
         console.warn('[renewal-contracts] Load failed; skipping regeneration.', contractsErr);
@@ -1260,8 +1308,10 @@ export default function Dashboard() {
         if (cancelled) return;
         try {
           const events = generateRenewalEvents(contract, horizonAtLoad, todayAtLoad);
-          await saveSharedRenewalEvents(contract.id, events);
+          regenResults.push(await saveSharedRenewalEvents(contract.id, events));
         } catch (regenErr) {
+          // Only generator errors reach here (the save helper swallows its own).
+          regenResults.push(false);
           // Per-contract failures are non-fatal so a single bad
           // contract doesn't block other contracts or the refetch.
           console.warn(`[renewal-events] Regenerate failed for contract ${contract.id}:`, regenErr);
@@ -1269,10 +1319,11 @@ export default function Dashboard() {
       }
 
       try {
-        const events = await getSharedForecastEvents();
+        eventsRead = await getSharedForecastEvents();
         if (cancelled) return;
-        if (events !== null) setForecastEvents(events);
+        if (eventsRead !== null) setForecastEvents(eventsRead);
       } catch (err) {
+        threw = true;
         // Non-fatal: in-memory empty default remains correct.
         console.warn('[forecast-events] Load failed, using empty defaults.', err);
       }
@@ -1285,6 +1336,14 @@ export default function Dashboard() {
       // a fresh pass.
       if (!cancelled) {
         renewalRegenerationCompletedRef.current = true;
+        // State mirror of the completed ref (#558), gated on SUCCESS. The ref alone cannot gate
+        // an effect — flipping it does not re-render — so snapshot readiness needs this as state.
+        // A cancelled run returns early above and never reaches here; a failed read, a thrown
+        // read, or a regeneration that returned false fails the predicate. None can satisfy the
+        // barrier. The completed ref itself is still set: the existing loop-guard is unchanged.
+        if (!forecastBootstrapFailed({ contractsRead, regenResults, eventsRead, threw })) {
+          setForecastSettled(true);
+        }
       }
     })();
 
@@ -2687,6 +2746,67 @@ export default function Dashboard() {
     () => computeWhatNeedsAttention(baseTxns),
     [baseTxns]
   );
+
+  // ── Automatic scorecard-snapshot persistence (#558) ────────────────────────
+  //
+  // Persists the SAME payload the manual export downloads: once after a fully hydrated boot, and
+  // once after each successful source import. Declared here because every payload input is in
+  // scope by this point.
+  //
+  // The barrier requires every boot loader to have SUCCEEDED, not merely settled:
+  //   - `bootLoadError === null` because loadImportedState clears isInitializing in a `finally`,
+  //     so `!isInitializing` is true even when the load threw.
+  //   - `!sharedAccountSettingsLoadFailed` because that loader falls back to localStorage on
+  //     error, and a fallback cash balance would poison runway + forecast.
+  //   - forecast is gated on SETTLED, never on a non-empty projection — an empty forecast is a
+  //     valid completed state whose payload reports `forecast:not_available`.
+  //   - `financialUsable` mirrors the builder's own financialLive gate, so a boot with no usable
+  //     complete month never overwrites a valid row. This is also what makes Clear Data a no-op
+  //     on top of it issuing no token.
+  const snapshotFinancialUsable =
+    baseTxns.length > 0 && latestCompleteMonth(model.monthlyRollups, currentCalendarMonth) !== null;
+  const snapshotReadiness = useMemo(
+    () => ({
+      importedDataLoaded: !isInitializing && bootLoadError === null,
+      accountSettingsLoaded: sharedAccountSettingsReady && !sharedAccountSettingsLoadFailed,
+      workspaceSettingsSettled,
+      forecastSettled,
+      financialUsable: snapshotFinancialUsable,
+    }),
+    [
+      isInitializing,
+      bootLoadError,
+      sharedAccountSettingsReady,
+      sharedAccountSettingsLoadFailed,
+      workspaceSettingsSettled,
+      forecastSettled,
+      snapshotFinancialUsable,
+    ],
+  );
+  // One token for the completed boot, then one per successful import. Ordinary rerenders leave it
+  // unchanged, so they can never trigger a write.
+  const snapshotToken = `boot:${snapshotImportStamp}`;
+  useScorecardSnapshotPersistence({
+    readiness: snapshotReadiness,
+    token: snapshotToken,
+    importId: lastImportSummary?.importId ?? null,
+    sources: {
+      model,
+      scorecardAnchoredModel,
+      financialTxnCount: baseTxns.length,
+      currentCalendarMonth,
+      financialBasis: profitabilityCashFlowMode,
+      scenarioProjection,
+      scenarioRunOutMonth: todayRunOutNegativeCashMonth,
+      efficiencyResult,
+      whatNeedsAttention,
+      ownerDistributionStatus,
+      ownerPayProjection,
+      ownerPayReserveFloor,
+      targetNetMargin: businessRules.targetNetMargin,
+      thresholdDays: silentChurnThresholdDays,
+    },
+  });
   const cashTrendResult = useMemo(
     () => computeCashTrend(model.monthlyRollups),
     [model.monthlyRollups]
@@ -2873,6 +2993,10 @@ export default function Dashboard() {
         const summary = await importQuickenReportCsv(file);
         setLastImportSummary(summary);
         await loadImportedState();
+        // Snapshot trigger (#558) — a token bump, NOT a direct persist call: this handler's
+        // `model` closure is the pre-import one. The gated effect runs after React commits the
+        // new dataset and every derived value has recomputed.
+        setSnapshotImportStamp((n) => n + 1);
       } catch (importCsvError) {
         const message = importCsvError instanceof Error ? importCsvError.message : 'Could not import CSV file.';
         setImportError(message);
@@ -2930,6 +3054,7 @@ export default function Dashboard() {
     setRetentionImportError(null);
     try {
       await upsertMemberRetentionRates(rows);
+      setSnapshotImportStamp((n) => n + 1); // snapshot trigger (#558)
       setRetentionImportDone({
         count: rows.length,
         firstMonth: preview.firstMonth ?? rows[0].periodMonth,
@@ -2990,6 +3115,7 @@ export default function Dashboard() {
     try {
       const summary = await postBeltImport({ retention, current68, previous69 }, beltImportSecret);
       setBeltImportSummary(summary);
+      setSnapshotImportStamp((n) => n + 1); // snapshot trigger (#558)
       setBeltImportSecret(''); // clear the transient secret after a successful POST
     } catch (err) {
       if (err instanceof BeltImportError) {
