@@ -1,10 +1,15 @@
 # sync-wodify-retention Edge Function
 
-Server-side half of the first bounded live Silent Churn + Attendance Health
-slice (`RETENTION_FINISH_PLAN.md` §6). Fetches Wodify `/clients`, computes a
-**non-PII aggregate**, and persists one snapshot row to
-`public.wodify_retention_aggregate`. The browser never calls Wodify and never
-sees the key.
+Server-side Wodify retention snapshot writer. The WO-2 v3 candidate adds a
+paged, aggregate-only student census while preserving the existing Silent
+Churn, Attendance Health, tenure, cohort, dues, and diagnostic payload. The
+browser never calls Wodify and never sees either data credential.
+
+> **WO-2 v3 is implemented locally but is not deployed and its SQL is not
+> applied.** `mode=page` and `mode=finalize` become operative only after the
+> additive canonical-schema delta and the name-scoped function deployment are separately
+> reviewed and explicitly authorized. The historical live-state record below
+> describes the pre-WO-2 deployment, not this local candidate.
 
 > **TENURE AGGREGATE-EXTENSION PULL DONE (2026-06-11) — DISARMED again; canonical identity
 > `ezbr_sha256 3ae170006fa0ca27ed9bb23b9e4c7f8482b83cdd616ab2da245e5893cf6a2719`.**
@@ -28,14 +33,144 @@ sees the key.
 > function's platform version counter project-wide while `ezbr_sha256` + `updated_at` stay unmoved —
 > identify deployments by **`ezbr_sha256` + `updated_at`, never version**.
 
-## Thin-shell design + reuse boundary
+## Slice 1 operational contract (candidate, 2026-09-09)
 
-`index.ts` does only the request gate + fetch + persist. **All** normalization and
-aggregation lives in `src/lib/gym/wodifyRetentionAggregate.ts`, and the pure
-request-gate helpers (`classifySyncError`, `verifyTriggerSecret`) in
-`src/lib/gym/wodifyRetentionSync.ts` — both type-checked by `npm run build` and
-covered by `npm test`
-(`src/lib/gym/wodifyRetentionAggregate.test.ts`, `src/lib/gym/wodifyRetentionSync.test.ts`).
+The canonical, self-contained SQL is `supabase/wodify_retention_schema.sql`.
+Its marked `BEGIN STUDENT CENSUS DELTA` / `END STUDENT CENSUS DELTA` block is
+the additive payload for an existing canonical schema. All ten final census fields
+are nullable with no default, so historical rows remain unknown, not zero.
+Drafts contain only counts plus run/page/time metadata. RLS is enabled, all
+PUBLIC/anon/authenticated privileges are revoked, and only service-role DML is
+granted. This work does not reconcile migration history.
+
+Each request has a **55-second server-side deadline**, covering list/detail
+HTTP, response bodies, sequential 500ms waits, bounded detail retries, draft
+reads, cleanup and writes. Each Wodify fetch additionally times out at 15 seconds.
+Detail 408/5xx, network errors and malformed JSON have at most three attempts;
+429 aborts immediately. A malformed detail, an unclassified client or exhausted
+detail retries rejects the page without storing a new draft. List requests are
+not retried. Census pages contain at most 25 rows and page numbers must be 1..200
+(a numeric bound, not guaranteed 5,000-client runtime capacity: the one-hour
+freshness window and workflow timeout can bind first); overfull pages, empty nonterminal pages, an unterminated
+page 200, malformed pagination/rows, invalid identifiers
+and unrecognized wire statuses fail closed. Identifiers are transient in memory
+only: duplicates within a page and within the final full-list request reject.
+
+The workflow serializes scheduled/manual runs with one concurrency group and
+does not cancel an active run. It invokes pages sequentially with bounded curl
+connect/total timeouts, stops on any failed page and calls finalize only after a
+terminal page. Finalize requires complete page coverage, conserved counts,
+zero failed/unclassified clients, and every page collected within **one hour**
+and on the current gym-local date. Freshness is checked again immediately before
+the final write. Replacing a draft refreshes its collection timestamp; retrying
+only some pages cannot make the remaining old pages fresh.
+
+**Population identity limit:** matching scanned/active totals and complete page
+numbers do not prove that independent requests observed the same clients.
+Concurrent additions/removals or reordering can substitute equal-sized populations
+between census pages and the final scan. There is no documented upstream snapshot
+token used here, and no cross-request identifiers or fingerprints are stored.
+Within-request duplicate detection and freshness reduce detectable failures but
+cannot establish cross-request identity. This census is a bounded collection,
+not a proven atomic upstream snapshot. The legacy attendance, tenure and cohort
+histograms still describe raw clients and remain unchanged. Current dashboard
+views consume only the separate versioned student payload described below.
+
+### Reviewed deployment and read-back sequence (not executed here)
+
+1. Independent Reviewer checks exact function/module/workflow/schema bytes and
+   tests. Under the coordinator's later release, freshly read the CFO project's
+   function identity (`ezbr_sha256`, `updated_at`, JWT mode), existing schema,
+   grants/policies and current aggregate. Capture the same-day human-written
+   `silent_dues_snapshot` for comparison. Historical values below are not a live
+   baseline. Target only project `gzgxcvjvoivlwaksnmxy`.
+2. Apply only the reviewed additive SQL block to that existing schema. Verify
+   the ten nullable/no-default fields, draft primary key/checks, RLS and effective
+   role privileges. No migration repair, db pull/push or baseline reconstruction.
+   Rehearse the self-contained schema and delta in a disposable database when
+   one is available. The final local candidate was tested on PostgreSQL 17 in
+   network-isolated container cfo-census-validation-20260909, fresh database
+   cfo_student_final_20260909: original schema + original draft SQL + exact final
+   delta + canonical reapplication; history, dues, nullable fields, zero, RLS,
+   browser-denied grants, service-role CRUD and page bounds passed.
+3. Deploy only `sync-wodify-retention` with its reviewed shared-module graph and
+   JWT verification retained. Read back deployed bytes/identity. Do not deploy
+   unrelated functions or change secrets/settings as an implied part of this step.
+4. Under the separately released supervised run, use a fresh UUID and the workflow
+   sequence: pages 1..terminal, then finalize with that UUID. Every page must pass
+   its under-60s acceptance check. Stop on any failure; never finalize a partial
+   run. Confirm response conservation and zero unclassified/detail failures.
+5. Independently read the persisted aggregate by workspace/day and match its
+   `fetched_at` to the finalize response, student/path/guardian totals, completed
+   pages, legacy histograms and diagnostics. Compare the captured same-day human
+   dues value exactly; for a new day it remains null until a human writes it.
+   Verify draft denial for browser roles and weekly workflow readiness. Browser-check
+   the three current student cards, unknown attendance and their unavailable/zero
+   states, plus historical class-plan source labels.
+
+Recovery: failed pages/finalize validation never publish partial final counts;
+use a new UUID for a replacement run. Old drafts expire for publication after
+one hour and are cleaned after seven days during a later successful finalize.
+Same-day final writes merge only supplied columns, preserving human dues.
+A transport timeout after sending a database write has an uncertain commit
+outcome: cancellation cannot undo a database commit. Independently read the
+workspace/day row before retrying; never infer rollback from a client timeout.
+The upsert remains idempotent. Concurrency is workflow-level only; manual direct
+invocations must also be serialized by the operator.
+
+## Slice 2 student payload and dashboard
+
+During each classified page pass, only admitted active students contribute to
+`student_retention`: version 1, collection day, student total, unknown attendance,
+global recency bins, tenure bins and active age bins. It contains no inactive or
+lapsed counts. The same deterministic raw normalizer and band definitions are
+reused; no new attendance rule is introduced. Drafts store this counts-only JSON
+alongside page counters. Finalize strictly validates each draft and merges every
+bin, including unknown age/tenure/recency and overflow, into one final payload.
+It never derives student numerators from the independent raw-client scan.
+
+The frontend reads `student_retention`, census totals and date from the same
+latest row. It requires version/date/total agreement, nonnegative safe-integer
+counts, exact keys and band definitions, exact per-day partition conservation,
+complete census pages, zero failures/unclassified clients and path conservation.
+Missing, malformed, prior-version, future-dated or more-than-14-day-old data
+makes all three current student cards explicitly unavailable. It never searches
+older rows for a non-null student payload and never substitutes sample/raw counts.
+A valid zero remains zero. Valid weekly snapshots display their as-of date.
+
+Attendance Health always discloses the whole-gym student total and the current
+selection's attendance-known rate base and missing-attendance count. Filtering
+also labels the selected total separately. The display-only missing-attendance
+setting controls extra notes, never these audit counts or rate denominators.
+`ambiguous_no_signin_with_membership` counts only no-group clients with zero
+sign-ins and `has_membership=true`; it does not include Guardian-role clients
+and does not change classification.
+
+Attendance Health (including its existing age/tenure selections), Risk by Time
+as Member and by Age Group use only this payload. Existing attendance-known
+denominators and the unknown-recency setting remain unchanged. Historical
+Evolution and Belt rates retain their formulas and period-specific Class Plan
+Member Retention report sources; they are labeled class-plan members. The
+current student census does not establish historical student identity. Hidden
+dues/Member Movement remain hidden and raw inactive/source tables remain intact.
+
+Census page size 25 means fixed cadence is 12.5 seconds, leaving 42.5 seconds
+for HTTP and persistence within the 55-second budget. A full-page handler test
+with 25 Active clients and one-second simulated HTTP responses completes in
+37.5 seconds, sequentially. This is a headroom test, not evidence of real Wodify
+latency. Finalize uses separate 100-row bulk pages, at most 50, with no detail
+requests; its 55-second deadline still applies. Workflow remains bounded to one
+hour. The schema tolerates legacy 100-row drafts for nondestructive upgrades,
+but runtime finalize requires 25-row drafts with a valid versioned payload.
+
+## Shared implementation
+
+`index.ts` owns only request gating, sequential HTTP, and persistence. Existing
+retention normalization stays in `src/lib/gym/wodifyRetentionAggregate.ts`;
+student classification, page summaries, finalize validation, and the complete
+persistence-row merge live in `src/lib/gym/wodifyStudentCensus.ts`; request-gate
+helpers stay in `src/lib/gym/wodifyRetentionSync.ts`. All three shared modules
+are type-checked by `npm run build` and covered by `npm test`.
 The aggregate module imports the locked
 date primitives `parseYmdLocal` and `wholeDaysBetween` from
 `src/lib/gym/silentChurn.ts` and **never forks them**. It deliberately does not
@@ -137,38 +272,46 @@ call** — and **nuanced**, not a clean pass:
   generic `500` (**fail closed**); `x-sync-trigger-secret` header missing or not
   matching (constant-time digest compare) → `403`; then `WODIFY_API_KEY`,
   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` are read from the environment, any
-  missing → generic `500` (never reveals which).
-- Paginates `GET https://api.wodify.com/v1/clients?page=N&pageSize=100` with the
-  `x-api-key` header, records under `clients`, looping while
-  `pagination.has_more` (hard cap `MAX_PAGES = 50`). If the cap is hit while
-  `has_more` is still true, `dataQuality.reachedPageCap` flags the partial
-  snapshot — never a silent truncation. Request shape matches the §5 probes
-  (`scripts/wodify/clientsRecencyProbe.ts`).
-- Calls `computeRetentionAggregate(rows, { asOf, fetchedAt, pagesFetched, reachedPageCap })`.
+  missing → generic `500` (never reveals which). A malformed body or invalid
+  `run_id`/page is rejected `400` before any data call.
+- `mode=page` accepts a UUID `run_id` and positive integer `page`, fetches exactly
+  `GET /clients?page=N&page_size=25`, and calls `GET /clients/{id}` sequentially
+  only for rows whose wire status is exactly `Active`. It upserts one counts-only
+  draft by `(run_id,page)` and returns the same counts plus `page`, `pageSize`, and
+  `hasMore`; no ID or detail value crosses the response/persistence boundary.
+- `mode=finalize` accepts the UUID `run_id`, re-fetches the complete fast
+  `/clients` list, and calls
+  `computeRetentionAggregate(rows, { asOf, fetchedAt, pagesFetched, reachedPageCap })`.
   Since the §6 aggregate extension this also bins ACTIVE members into per-tenure-band
   recency histograms from `member_since` (normalized by the same
   ISO-slice → `1900-01-01`-sentinel → `parseYmdLocal` rule; unusable or after-`asOf`
   starts route to the unknown-tenure bucket, never dropped). Band edges live in
   `src/lib/gym/tenureBands.ts` (dependency-free, shared with the SPA card — one
-  definition; imported with the proven explicit-`.ts` Option-A form).
-- Persists the aggregate via the Supabase REST API using the **service-role**
+  definition; imported with the proven explicit-`.ts` Option-A form). It then
+  requires exactly one terminal page, a complete 1..terminal sequence, exact
+  row/active conservation, zero unclassified clients, and zero detail failures.
+- Only after those gates pass, persists the aggregate via the Supabase REST API using the **service-role**
   key (bypasses RLS; never browser-exposed). **Idempotent upsert** keyed on
   `(workspace_id, as_of)` — PostgREST `on_conflict=workspace_id,as_of` +
   `Prefer: resolution=merge-duplicates`, backed by the unique constraint in
   `wodify_retention_schema.sql`. A same-day re-pull **replaces** the day's row
-  instead of duplicating it; rows still accumulate across days.
-- Returns a **counts-only** summary (`activeTotal`, `unknown`, `tenure` — per-band
-  active totals, a count per band id — `diagnostics`, `dataQuality`) — never raw rows.
+  instead of duplicating it; rows still accumulate across days. The payload is
+  the complete existing aggregate plus the new census totals; same-day upserts
+  continue to omit and therefore preserve `silent_dues_snapshot`.
+- A finalize validation failure returns `409` with a fixed code and the two
+  conflicting aggregate counters; it does not write the final table.
 - On any error → `502 { "error": "sync_failed", "code": <class> }`, where `code`
-  is a fixed-vocabulary class — `wodify_clients_http_<status>`,
-  `persist_http_<status>`, `bad_asof`, `timeout`, `parse_error`, `network_error`,
-  or `unknown` (see `classifySyncError`). It is **never** a raw error message,
+  is a fixed-vocabulary class — Wodify list/detail HTTP status, census
+  persist/read/cleanup status, final persist status, `bad_asof`, `timeout`,
+  `parse_error`, `network_error`, or `unknown` (see `classifySyncError`). It is
+  **never** a raw error message,
   URL, query string, header, row, or secret. **Nothing is logged** — the bundle
   still contains zero `console.*` calls; the `code` is returned in-body only.
 
 ## Privacy guarantees (the member-PII anon-key blocker)
 
-- Raw `/clients` rows are transient in memory only — never logged or persisted.
+- Raw `/clients` and `/clients/{id}` rows are transient in memory only — never
+  logged, persisted, or returned.
 - The persisted row holds **no PII**: no id, name, exact member date, or dues.
   Every column is a snapshot-level date, a count, or a counts-only histogram
   (days-absent / tenure-band — `member_since` is read for BANDING only and never
@@ -177,7 +320,7 @@ call** — and **nuanced**, not a clean pass:
 - `monthlyDuesAtRisk` is always `null` + `missingMonthlyDues: true` — `/clients`
   carries no dues, and a fabricated `$0` is never emitted.
 
-## Trigger model + deploy (deployed; first live invoke DONE 2026-06-07 — now disarmed)
+## Historical trigger model + deploy record (pre-WO-2; do not use as the WO-2 invocation contract)
 
 The function is **deployed** (JWT-verified, `verify_jwt: true`). The first authorized invoke
 ran once on **2026-06-07** and the function is now **disarmed** (no key set). Manual /
