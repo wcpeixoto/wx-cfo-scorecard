@@ -178,7 +178,7 @@ export function RetentionEvolutionCard() {
                     <li className="db-tooltip-body">
                       Month-over-month <strong>membership / renewal</strong>{' '}
                       {metric === 'churn' ? 'churn' : 'retention'} from Wodify's "Member Retention Rates"
-                      report: of the members active at the start of a month, the share{' '}
+                      Class Plan report: of the class-plan members active at the start of a month, the share{' '}
                       {metric === 'churn'
                         ? 'whose membership lapsed by month-end (the complement of retention).'
                         : 'still active at month-end.'}
@@ -203,7 +203,7 @@ export function RetentionEvolutionCard() {
             {!isLive && <span className="gym-sample-badge">Sample data</span>}
           </div>
           <p className="gym-card-subtitle">
-            Average {metricLabel} {avgLabel}
+            Class-plan members · Average {metricLabel} {avgLabel}
           </p>
         </div>
         <div className="retention-evolution-controls">

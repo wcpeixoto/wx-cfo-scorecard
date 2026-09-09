@@ -5479,16 +5479,17 @@ export default function Dashboard() {
                           <div className="rules-row">
                             <div className="rules-row-info">
                               <span className="rules-row-label">
-                                Exclude parent/guardian accounts
+                                Hide students without recorded attendance
                               </span>
                               <span className="rules-row-sub">
-                                On = hides parent/guardian (no class check-in) accounts from the
-                                Retention cards (default). Rates always exclude them either way.
+                                On = hides extra details about students without recorded attendance
+                                (default). The audit counts stay visible; rates always use students
+                                with known attendance.
                               </span>
                             </div>
                             <div className="rules-row-control">
                               <label className="settings-switch">
-                                <span className="sr-only">Exclude parent/guardian accounts from Retention cards</span>
+                                <span className="sr-only">Hide details about students without recorded attendance on Retention cards</span>
                                 <input
                                   type="checkbox"
                                   checked={excludeUnknownRecency}

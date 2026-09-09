@@ -5,6 +5,7 @@
 // imports the module FRESH (resetModules) to capture the stubbed config.
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { buildStudentRetentionAggregate } from './studentRetentionAggregate';
 
 // Mirrors a live wodify_retention_aggregate row: snake_case columns, a jsonb
 // histogram whose INNER keys are camelCase. active_total 412 = 255 healthy-ish + …
@@ -114,6 +115,23 @@ afterEach(() => {
 });
 
 describe('fetchLatestRetentionAggregate — mapping + failure modes', () => {
+  it('reads students only from the selected row and never from the older dues row', async () => {
+    stubConfiguredEnv();
+    const now = new Date();
+    const asOf = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+    const student = buildStudentRetentionAggregate([], asOf);
+    const current = { ...VALID_ROW, as_of: asOf, active_total: 4,
+      student_total: 0, guardian_only_total: 4, student_retention: student,
+      unclassified_total: 0, detail_clients_failed: 0, pages_expected: 1, pages_completed: 1,
+      students_by_path: { member: 0, dependent: 0, guardian_with_signin: 0, no_group_with_signin: 0 } };
+    const http = installFetch({ ok: true, body: [current] });
+    const { fetchLatestRetentionAggregate } = await loadModule();
+    expect((await fetchLatestRetentionAggregate())?.students?.studentTotal).toBe(0);
+    expect(http).toHaveBeenCalledTimes(2);
+    installFetch({ ok: true, body: [{ ...current, student_retention: null }] },
+      { ok: true, body: [{ ...current, silent_dues_snapshot: VALID_DUES }] });
+    expect((await fetchLatestRetentionAggregate())?.students).toBeNull();
+  });
   it('maps a valid snake_case row (camelCase histogram) → snapshot', async () => {
     stubConfiguredEnv();
     const fetchFn = installFetch({ ok: true, body: [VALID_ROW] });
@@ -121,6 +139,7 @@ describe('fetchLatestRetentionAggregate — mapping + failure modes', () => {
 
     const snap = await fetchLatestRetentionAggregate();
     expect(snap).toEqual({
+      students: null,
       asOf: '2026-06-07',
       activeTotal: 412,
       inactiveTotal: null, // VALID_ROW predates the §6 census column → null → sample census

@@ -24,6 +24,7 @@
 //     so we filter to the same workspace and never need the authenticated role.
 
 import type { DerivableAggregate } from './retentionAggregateView';
+import { studentRetentionFromRow, type StudentRetentionAggregate } from './studentRetentionAggregate';
 import { parseYmdLocal } from './silentChurn';
 import type { SilentDuesSnapshot } from './silentChurnDuesView';
 import { TENURE_BANDS, UNKNOWN_TENURE_ID } from './tenureBands';
@@ -46,6 +47,7 @@ const WORKSPACE_ID = 'default';
 // The non-PII slice of the snapshot the Attendance Health live path needs: the
 // derivable counts plus the snapshot date for the "Live · as of {asOf}" badge.
 export type RetentionAggregateSnapshot = DerivableAggregate & {
+  students: StudentRetentionAggregate | null;
   asOf: string; // YYYY-MM-DD — the snapshot's gym-local day
   activeTotal: number; // active members scanned this snapshot (server's own total)
   // Member Movement census (binary — Active/Inactive is all /clients supports).
@@ -88,6 +90,8 @@ export type RetentionAggregateSnapshot = DerivableAggregate & {
 // Loosely-typed shape of the REST row — every field is validated before use, since
 // the histogram is jsonb and could in principle be malformed.
 type AggregateRow = {
+  student_retention?: unknown;
+  student_total?: unknown;
   as_of?: unknown;
   active_total?: unknown;
   inactive_total?: unknown;
@@ -417,6 +421,7 @@ export async function fetchLatestRetentionAggregate(
     asOf,
     activeTotal: asCount(row.active_total),
     inactiveTotal: asCountOrNull(row.inactive_total),
+    students: studentRetentionFromRow(row),
     unknownStatus: asCount(row.unknown_status),
     unknown: asCount(row.unknown_count),
     daysAbsentHistogram: {
