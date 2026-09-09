@@ -104,12 +104,15 @@ are request-local aggregate counts only: no detail values, IDs, names, source
 roles, response bodies, headers or credentials are emitted or persisted. Page
 success responses, persisted rows and finalize behavior are unchanged.
 
-For an explicitly authorized one-page check, manually dispatch **Tenure Snapshot
-Clock** with `page_one_only=true`. This separate diagnostic step invokes page 1
-exactly once, prints only a validated aggregate failure payload or the existing
+For an explicitly authorized single-page check, manually dispatch **Tenure Snapshot
+Clock** with `diagnostic_page` set to an integer from **1 through 200**. The job
+generates a fresh run UUID internally and invokes exactly that page once. Invalid
+nonzero inputs fail before any request. The diagnostic prints only a validated
+aggregate failure payload or the existing
 aggregate success-summary fields, and then stops. A failing page fails the job;
 a passing page succeeds and may persist its normal page draft. Neither outcome
-requests page 2, finalize, or final-snapshot read-back. The input defaults to false
+requests another page, finalize, or final-snapshot read-back. The run UUID is never
+printed. The input defaults to `0` (omitted or `0` means the normal full manual run)
 and is considered only for manual dispatch; Monday scheduled runs retain their
 existing complete page/finalize/read-back command path.
 

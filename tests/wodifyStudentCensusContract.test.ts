@@ -21,19 +21,20 @@ const workflow = readFileSync(
 const steps = workflow.split(/^      - name: /m).slice(1);
 const script = (step: string) => step.split('        run: |\n')[1].replace(/^          /gm, '').trim();
 
-describe('manual page-one diagnostic isolation', () => {
+describe('manual single-page diagnostic isolation', () => {
   it('keeps the scheduled command paths byte-identical to the reviewed census baseline', () => {
     expect(workflow).toContain("- cron: '0 12 * * 1'");
-    expect(workflow).toContain('type: boolean\n        required: false\n        default: false');
+    expect(workflow).toContain('type: number\n        required: false\n        default: 0');
     expect(steps).toHaveLength(4);
-    expect(steps[0]).toContain("if: ${{ github.event_name == 'workflow_dispatch' && inputs.page_one_only }}");
+    expect(steps[0]).toContain("if: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic_page != 0 }}");
+    expect(steps[0]).toContain('DIAGNOSTIC_PAGE: ${{ inputs.diagnostic_page }}');
     const expectedHashes = [
       'deb92662c2b4d1c801d7d3a3d3fc8aa306e604afaee75f440e9786c097316205',
       '9a06d7e0a593c188ec101dd8031874679a83371e7d0eed340af3e6362115d9f9',
       '714923b4d4dde9cf7b2c97d42dc8c27c02b829d9ad0985852a5ca4a5369b0817',
     ]; // run blocks at c4a27b87e68e72ebba42da420eef7e424df2ca66
     steps.slice(1).forEach((step, i) => {
-      expect(step).toContain("if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.page_one_only) }}");
+      expect(step).toContain("if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.diagnostic_page != 0) }}");
       expect(createHash('sha256').update(script(step)).digest('hex')).toBe(expectedHashes[i]);
     });
   });
@@ -47,12 +48,15 @@ describe('manual page-one diagnostic isolation', () => {
     unclassified_reasons: reasons, detail_http_status_counts: { '503': 1 },
   };
   const summary = {
-    page: 1, pageSize: 25, hasMore: true, rowsSeen: 1, activeClientsSeen: 1,
+    page: 200, pageSize: 25, hasMore: true, rowsSeen: 1, activeClientsSeen: 1,
     studentTotal: 1, guardianOnly: 0, unclassified: 0, detailCallsMade: 1, detailClientsFailed: 0,
   };
 
   it.each([
     ['200', { ok: true, mode: 'page', ...summary, private: 'private-secret' }, 0, summary, 0],
+    ['200', { ok: true, mode: 'page', ...summary, page: 1 }, 0, { ...summary, page: 1 }, 0],
+    ['200', { ok: true, mode: 'page', ...summary, page: 137 }, 0, { ...summary, page: 137 }, 0],
+    ['200', { ok: true, mode: 'page', ...summary, page: 199 }, 1, { error: 'invalid_page_summary' }, 0],
     ['409', { ...failure, private: 'private-secret', unclassified_reasons: { ...reasons, private: 'private-secret' },
       detail_http_status_counts: { '503': 1, private: 'private-secret' } }, 1, failure, 0],
     ['409', { ...failure, unclassified_total: 'private-secret' }, 1, { error: 'invalid_page_diagnostic' }, 0],
@@ -61,14 +65,15 @@ describe('manual page-one diagnostic isolation', () => {
     ['502', { error: 'private-secret' }, 1, { error: 'invalid_page_diagnostic' }, 0],
     ['200', { ok: true, mode: 'page', ...summary, rowsSeen: 'private-secret' }, 1, { error: 'invalid_page_summary' }, 0],
     ['000', {}, 1, { error: 'page_transport_failed' }, 28],
-  ])('invokes page 1 once and stops safely for response %s (%#)', (status, body, exit, expected, curlExit) => {
-    const dir = mkdtempSync(join(tmpdir(), 'cfo-page-one-test-'));
+  ])('invokes only the requested page and stops safely for response %s (%#)', (status, body, exit, expected, curlExit) => {
+    const dir = mkdtempSync(join(tmpdir(), 'cfo-single-page-test-'));
+    const requested = (expected as { page?: number }).page ?? 200;
     try {
       // Run the actual workflow shell, replacing only transport and UUID source.
       // No network, credentials, or production invocation is involved.
       const result = spawnSync('bash', [], {
         cwd: dir, encoding: 'utf8',
-        env: { ...process.env, TEST_BODY: JSON.stringify(body), TEST_STATUS: status,
+        env: { ...process.env, DIAGNOSTIC_PAGE: String(requested), TEST_BODY: JSON.stringify(body), TEST_STATUS: status,
           TEST_CURL_EXIT: String(curlExit), VITE_SUPABASE_URL: 'https://private.invalid',
           VITE_SUPABASE_ANON_KEY: 'private-secret', SYNC_TRIGGER_SECRET: 'private-secret' },
         input: `
@@ -91,12 +96,25 @@ describe('manual page-one diagnostic isolation', () => {
       expect(result.stderr).toBe('');
       expect(JSON.parse(result.stdout)).toEqual(expected);
       expect(result.stdout).not.toContain('private');
+      expect(result.stdout).not.toContain('11111111-1111-4111-8111-111111111111');
       expect(readFileSync(join(dir, 'calls'), 'utf8')).toBe('call\n');
       expect(JSON.parse(readFileSync(join(dir, 'request.json'), 'utf8'))).toEqual({
-        mode: 'page', page: 1, run_id: '11111111-1111-4111-8111-111111111111',
+        mode: 'page', page: requested, run_id: '11111111-1111-4111-8111-111111111111',
       });
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
+
+  it.each(['-1', '201', '1.5', 'private', '', '0', '01', '1e2'])(
+    'rejects invalid diagnostic input %s before requesting anything', (input) => {
+      const result = spawnSync('bash', [], {
+        encoding: 'utf8', env: { ...process.env, DIAGNOSTIC_PAGE: input },
+        input: `curl() { echo unexpected-request; return 99; }\n${script(steps[0])}`,
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toBe('');
+      expect(result.stdout.trim()).toBe('{"error":"invalid_diagnostic_page"}');
+    },
+  );
 });
 
 describe('paged census persistence contract', () => {
