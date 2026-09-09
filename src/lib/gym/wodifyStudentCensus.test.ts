@@ -73,6 +73,34 @@ function aggregate(clientsScanned: number, activeTotal: number): RetentionAggreg
 
 describe('classifyActiveClientDetail', () => {
   it.each([
+    ['', 0, 1, { kind: 'student', path: 'no_group_with_signin' }, null],
+    ['  ', 0, 3, { kind: 'student', path: 'no_group_with_signin' }, null],
+    ['', 0, 0, { kind: 'guardian_only', ambiguousNoSigninWithMembership: true }, null],
+    ['', 0, undefined, { kind: 'unclassified' }, 'invalid_no_group_signins'],
+    ['', 0, '0', { kind: 'unclassified' }, 'invalid_no_group_signins'],
+    ['', 7, 1, { kind: 'unclassified' }, 'unrecognized_group_role'],
+    ['  ', 7, 0, { kind: 'unclassified' }, 'unrecognized_group_role'],
+    ['Unexpected', 0, 1, { kind: 'unclassified' }, 'unrecognized_group_role'],
+    [' Unexpected ', 7, 0, { kind: 'unclassified' }, 'unrecognized_group_role'],
+    ['', '0', 1, { kind: 'unclassified' }, 'unrecognized_group_role'],
+    ['', null, 1, { kind: 'unclassified' }, 'unrecognized_group_role'],
+    ['', false, 1, { kind: 'unclassified' }, 'unrecognized_group_role'],
+    ['', undefined, 1, { kind: 'unclassified' }, 'unrecognized_group_role'],
+    [null, 0, 1, { kind: 'unclassified' }, 'unrecognized_group_role'],
+    [undefined, 0, 1, { kind: 'unclassified' }, 'unrecognized_group_role'],
+  ])('admits only the numeric-zero and normalized-empty-role sentinel (%#)', (group_role, group_id, total_class_sign_ins, expected, reason) => {
+    const observer = vi.fn();
+    const raw = { group: { group_role, group_id }, total_class_sign_ins, has_membership: true };
+    expect(classifyActiveClientDetail(raw)).toEqual(expected);
+    expect(classifyActiveClientDetail(raw, observer)).toEqual(expected);
+    if (reason === null) expect(observer).not.toHaveBeenCalled();
+    else {
+      expect(observer).toHaveBeenCalledTimes(1);
+      expect(observer).toHaveBeenCalledWith(reason);
+    }
+  });
+
+  it.each([
     [null, { kind: 'unclassified' }, 'invalid_detail_record'],
     [{ client: [] }, { kind: 'unclassified' }, 'invalid_detail_record'],
     [{}, { kind: 'unclassified' }, 'invalid_no_group_signins'],

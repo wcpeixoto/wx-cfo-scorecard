@@ -14,8 +14,9 @@ export const CENSUS_MAX_AGE_MS = 60 * 60 * 1000;
 // Aluno = group_role ∈ (Member, Dependent)
 //         OU (Guardian OU sem grupo) com ≥1 sign-in registrado
 // Somente responsável = (Guardian OU sem grupo) com 0 sign-ins registrados
+// Sem grupo inclui group_role string vazia após trim + group_id numérico 0.
 // Não classificado = role inesperado, OU grupo presente sem role,
-//         OU sign-in ausente/inválido, OU detalhe que falhou
+//         exceto o sentinel acima, OU sign-in ausente/inválido, OU detalhe que falhou
 
 export type StudentPath =
   | 'member'
@@ -165,7 +166,11 @@ export function classifyActiveClientDetail(
   }
 
   const groupRaw = detail.group;
-  const hasNoGroup = !hasOwn(detail, 'group') || groupRaw === null || groupRaw === undefined;
+  const isNoGroupSentinel = isRecord(groupRaw)
+    && typeof groupRaw.group_role === 'string'
+    && groupRaw.group_role.trim() === ''
+    && groupRaw.group_id === 0;
+  const hasNoGroup = !hasOwn(detail, 'group') || groupRaw === null || groupRaw === undefined || isNoGroupSentinel;
   if (hasNoGroup) {
     const signIns = detail.total_class_sign_ins;
     if (typeof signIns !== 'number' || !Number.isInteger(signIns) || signIns < 0) {
@@ -179,8 +184,8 @@ export function classifyActiveClientDetail(
     };
   }
 
-  // A present group must be an object with a recognized role. Empty/malformed
-  // groups are not treated as "no group" because that would hide source drift.
+  // Outside the exact sentinel above, present groups require a recognized role;
+  // other empty/malformed groups remain unclassified rather than hiding drift.
   if (!isRecord(groupRaw) || !hasOwn(groupRaw, 'group_role')) {
     onUnclassified?.('invalid_group_or_missing_role');
     return { kind: 'unclassified' };

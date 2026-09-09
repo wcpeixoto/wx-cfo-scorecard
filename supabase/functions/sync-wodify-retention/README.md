@@ -78,6 +78,14 @@ views consume only the separate versioned student payload described below.
 
 ### Page-failure diagnostics
 
+A present group is treated as Wodify's no-group sentinel only when `group_role`
+is a string that trims to empty **and** `group_id` is numeric `0`. It then follows
+the existing no-group rule: at least one valid sign-in means student; zero means
+guardian-only; missing/invalid sign-ins remain unclassified with
+`invalid_no_group_signins`. String `"0"`, other falsy IDs, a nonzero ID with an
+empty role, and any nonempty unrecognized role do not qualify. Their existing
+unclassified behavior and reason codes remain unchanged.
+
 An otherwise completed page with unclassified clients or failed details still
 returns HTTP **409**, `error: "page_classification_failed"`, and writes no draft.
 Its response also contains `unclassified_total`, `detail_clients_failed`,
