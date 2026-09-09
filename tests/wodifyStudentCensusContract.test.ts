@@ -51,29 +51,48 @@ describe('manual single-page diagnostic isolation', () => {
     page: 200, pageSize: 25, hasMore: true, rowsSeen: 1, activeClientsSeen: 1,
     studentTotal: 1, guardianOnly: 0, unclassified: 0, detailCallsMade: 1, detailClientsFailed: 0,
   };
+  const invalidSummary = { origin: 'workflow_response_validation', error: 'invalid_page_summary', http_status: 200 };
+  const invalidDiagnostic = { origin: 'workflow_response_validation', error: 'invalid_page_diagnostic', http_status: 409 };
+  const unrecognized = { origin: 'gateway_or_unrecognized_response', error: 'unrecognized_http_response', http_status: 502 };
 
   it.each([
     ['200', { ok: true, mode: 'page', ...summary, private: 'private-secret' }, 0, summary, 0],
     ['200', { ok: true, mode: 'page', ...summary, page: 1 }, 0, { ...summary, page: 1 }, 0],
     ['200', { ok: true, mode: 'page', ...summary, page: 137 }, 0, { ...summary, page: 137 }, 0],
-    ['200', { ok: true, mode: 'page', ...summary, page: 199 }, 1, { error: 'invalid_page_summary' }, 0],
+    ['200', { ok: true, mode: 'page', ...summary, page: 41 }, 0, { ...summary, page: 41 }, 0],
+    ['200', { ok: true, mode: 'page', ...summary, page: 199 }, 1, invalidSummary, 0],
     ['409', { ...failure, private: 'private-secret', unclassified_reasons: { ...reasons, private: 'private-secret' },
-      detail_http_status_counts: { '503': 1, private: 'private-secret' } }, 1, failure, 0],
-    ['409', { ...failure, unclassified_total: 'private-secret' }, 1, { error: 'invalid_page_diagnostic' }, 0],
-    ['409', { ...failure, unclassified_reasons: { ...reasons, invalid_detail_record: 'private-secret' } }, 1, { error: 'invalid_page_diagnostic' }, 0],
-    ['409', { ...failure, detail_http_status_counts: { '503': 'private-secret' } }, 1, { error: 'invalid_page_diagnostic' }, 0],
-    ['502', { error: 'private-secret' }, 1, { error: 'invalid_page_diagnostic' }, 0],
-    ['200', { ok: true, mode: 'page', ...summary, rowsSeen: 'private-secret' }, 1, { error: 'invalid_page_summary' }, 0],
-    ['000', {}, 1, { error: 'page_transport_failed' }, 28],
+      detail_http_status_counts: { '503': 1, private: 'private-secret' } }, 1, { ...failure, origin: 'edge_classification', http_status: 409 }, 0],
+    ['409', { ...failure, unclassified_total: 'private-secret' }, 1, invalidDiagnostic, 0],
+    ['409', { ...failure, unclassified_reasons: { ...reasons, invalid_detail_record: 'private-secret' } }, 1, invalidDiagnostic, 0],
+    ['409', { ...failure, detail_http_status_counts: { '503': 'private-secret' } }, 1, invalidDiagnostic, 0],
+    ['502', { error: 'private-secret' }, 1, unrecognized, 0],
+    ['502', '<html>private gateway error</html>', 1, unrecognized, 0],
+    ['400', { error: 'invalid_request', private: 'private-secret' }, 1,
+      { origin: 'edge_request_validation', error: 'invalid_request', http_status: 400 }, 0],
+    ['403', { error: 'forbidden', private: 'private-secret' }, 1,
+      { origin: 'edge_function', error: 'forbidden', http_status: 403 }, 0],
+    ['500', { error: 'internal_error' }, 1,
+      { origin: 'edge_function', error: 'internal_error', http_status: 500 }, 0],
+    ['502', { error: 'sync_failed', code: 'wodify_clients_http_503', private: 'private-secret' }, 1,
+      { origin: 'upstream_wodify', error: 'sync_failed', code: 'wodify_clients_http_503', http_status: 502 }, 0],
+    ['502', { error: 'sync_failed', code: 'parse_error' }, 1,
+      { origin: 'edge_function', error: 'sync_failed', code: 'parse_error', http_status: 502 }, 0],
+    ['502', { error: 'sync_failed', code: 'private-secret' }, 1, unrecognized, 0],
+    ['502', { error: 'sync_failed', code: 'wodify_clients_http_503_private' }, 1, unrecognized, 0],
+    ['401', { code: 401, message: 'private-secret' }, 1, { ...unrecognized, http_status: 401 }, 0],
+    ['200', { ok: true, mode: 'page', ...summary, rowsSeen: 'private-secret' }, 1, invalidSummary, 0],
+    ['000', {}, 1, { origin: 'workflow_transport', error: 'page_transport_failed' }, 28],
+    ['private', {}, 1, { origin: 'workflow_response_validation', error: 'invalid_http_status' }, 0],
   ])('invokes only the requested page and stops safely for response %s (%#)', (status, body, exit, expected, curlExit) => {
     const dir = mkdtempSync(join(tmpdir(), 'cfo-single-page-test-'));
-    const requested = (expected as { page?: number }).page ?? 200;
+    const requested = (expected as { page?: number }).page ?? 41;
     try {
       // Run the actual workflow shell, replacing only transport and UUID source.
       // No network, credentials, or production invocation is involved.
       const result = spawnSync('bash', [], {
         cwd: dir, encoding: 'utf8',
-        env: { ...process.env, DIAGNOSTIC_PAGE: String(requested), TEST_BODY: JSON.stringify(body), TEST_STATUS: status,
+        env: { ...process.env, DIAGNOSTIC_PAGE: String(requested), TEST_BODY: typeof body === 'string' ? body : JSON.stringify(body), TEST_STATUS: status,
           TEST_CURL_EXIT: String(curlExit), VITE_SUPABASE_URL: 'https://private.invalid',
           VITE_SUPABASE_ANON_KEY: 'private-secret', SYNC_TRIGGER_SECRET: 'private-secret' },
         input: `
@@ -112,7 +131,7 @@ describe('manual single-page diagnostic isolation', () => {
       });
       expect(result.status).toBe(1);
       expect(result.stderr).toBe('');
-      expect(result.stdout.trim()).toBe('{"error":"invalid_diagnostic_page"}');
+      expect(result.stdout.trim()).toBe('{"origin":"workflow_input","error":"invalid_diagnostic_page"}');
     },
   );
 });

@@ -116,6 +116,36 @@ printed. The input defaults to `0` (omitted or `0` means the normal full manual 
 and is considered only for manual dispatch; Monday scheduled runs retain their
 existing complete page/finalize/read-back command path.
 
+Diagnostic failures now identify their reporting boundary with a fixed `origin`
+and, when an HTTP response was received, its numeric `http_status`:
+
+- `workflow_input`: the local diagnostic page bound check failed before curl.
+- `workflow_transport`: curl failed; no HTTP origin is inferred.
+- `edge_request_validation`: HTTP 400 with the function's `invalid_request` error.
+- `edge_classification`: the valid HTTP 409 aggregate contract above.
+- `upstream_wodify`: HTTP 502 with `sync_failed` and an allowlisted
+  `wodify_clients_http_NNN` or `wodify_detail_http_NNN` code.
+- `edge_function`: another recognized function error/status pair or a fixed
+  allowlisted sync code. `timeout`, `network_error` and `parse_error` do not by
+  themselves identify which dependency failed.
+- `workflow_response_validation`: a received page summary/409 payload failed
+  the workflow's aggregate contract, or the HTTP status itself was malformed.
+- `gateway_or_unrecognized_response`: the status is preserved but the body does
+  not match a known function contract. This includes gateway-like responses;
+  it does not prove that the gateway caused the failure.
+
+Only fixed origin/error values, bounded numeric HTTP statuses, allowlisted
+function codes, and validated aggregate counts reach logs. Unrecognized messages,
+HTML, response headers and raw bodies remain unprinted. Origins are inferred
+from matching known response contracts, not from new server tracing metadata.
+
+Diagnostic run `34416975969` accepted page 41 and reached curl, then printed the
+old `invalid_page_diagnostic` fallback for an unmatched non-200 response. That
+fallback discarded the HTTP status and cannot establish local input rejection
+or systematic page-41 failure. Any earlier systematic-page conclusion is
+retracted: the original 502 remains unexplained, and retries remain open to the
+operator after review. This diagnostic plumbing change does not retry it.
+
 ### Reviewed deployment and read-back sequence (not executed here)
 
 1. Independent Reviewer checks exact function/module/workflow/schema bytes and

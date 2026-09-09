@@ -44,7 +44,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ ! "$DIAGNOSTIC_PAGE" =~ ^([1-9]|[1-9][0-9]|1[0-9]{2}|200)$ ]]; then
-            echo '{"error":"invalid_diagnostic_page"}'
+            echo '{"origin":"workflow_input","error":"invalid_diagnostic_page"}'
             exit 1
           fi
           RUN_ID=$(cat /proc/sys/kernel/random/uuid)
@@ -59,14 +59,19 @@ jobs:
             -H "Content-Type: application/json" \
             --data-binary @request.json -o page-response.json \
             --write-out '%{http_code}' 2>/dev/null); then
-            echo '{"error":"page_transport_failed"}'
+            echo '{"origin":"workflow_transport","error":"page_transport_failed"}'
+            exit 1
+          fi
+          if [[ ! "$HTTP_STATUS" =~ ^[1-5][0-9]{2}$ ]]; then
+            echo '{"origin":"workflow_response_validation","error":"invalid_http_status"}'
             exit 1
           fi
           if [ "$HTTP_STATUS" != "200" ]; then
-            if jq -ce '
+            if jq -ce --argjson http_status "$HTTP_STATUS" '
               def count: type == "number" and . >= 0 and . <= 9007199254740991 and floor == .;
-              select(type == "object" and .error == "page_classification_failed")
-              | {error: "page_classification_failed", unclassified_total, detail_clients_failed,
+              select($http_status == 409 and type == "object" and .error == "page_classification_failed")
+              | {origin: "edge_classification", http_status: $http_status,
+                 error: "page_classification_failed", unclassified_total, detail_clients_failed,
                  unclassified_reasons: (.unclassified_reasons | {
                    invalid_detail_record, invalid_no_group_signins, invalid_group_or_missing_role,
                    unrecognized_group_role, invalid_guardian_signins, invalid_client_id, detail_fetch_failed
@@ -79,7 +84,33 @@ jobs:
             ' page-response.json > page-diagnostic.json 2>/dev/null; then
               cat page-diagnostic.json
             else
-              echo '{"error":"invalid_page_diagnostic"}'
+              # Recognize only the function's fixed error vocabulary. A status
+              # alone cannot prove whether an unmatched body came from a gateway.
+              if jq -ce --argjson http_status "$HTTP_STATUS" '
+                {origin: "gateway_or_unrecognized_response", error: "unrecognized_http_response",
+                 http_status: $http_status} as $unrecognized
+                | if type != "object" then $unrecognized
+                  elif $http_status == 400 and .error == "invalid_request" then
+                    {origin: "edge_request_validation", error: "invalid_request", http_status: $http_status}
+                  elif $http_status == 409 and .error == "page_classification_failed" then
+                    {origin: "workflow_response_validation", error: "invalid_page_diagnostic", http_status: $http_status}
+                  elif ($http_status == 403 and .error == "forbidden")
+                    or ($http_status == 405 and .error == "method_not_allowed")
+                    or ($http_status == 500 and .error == "internal_error") then
+                    {origin: "edge_function", error, http_status: $http_status}
+                  elif $http_status == 502 and .error == "sync_failed" and (.code | type) == "string" then
+                    if (.code | test("^wodify_(clients|detail)_http_[1-5][0-9]{2}$")) then
+                      {origin: "upstream_wodify", error: "sync_failed", code, http_status: $http_status}
+                    elif (.code | test("^(census_(persist|read|cleanup)_http_[1-5][0-9]{2}|persist_http_[1-5][0-9]{2}|bad_asof|timeout|parse_error|network_error|unknown)$")) then
+                      {origin: "edge_function", error: "sync_failed", code, http_status: $http_status}
+                    else $unrecognized end
+                  else $unrecognized end
+              ' page-response.json > page-diagnostic.json 2>/dev/null; then
+                cat page-diagnostic.json
+              else
+                jq -nc --argjson http_status "$HTTP_STATUS" \
+                  '{origin:"gateway_or_unrecognized_response",error:"unrecognized_http_response",http_status:$http_status}'
+              fi
             fi
             exit 1
           fi
@@ -99,7 +130,7 @@ jobs:
             cat page-diagnostic.json
             exit 0
           fi
-          echo '{"error":"invalid_page_summary"}'
+          echo '{"origin":"workflow_response_validation","error":"invalid_page_summary","http_status":200}'
           exit 1
 
       - name: Build paged census and finalize snapshot
