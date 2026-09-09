@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseExcludeUnknownRecency } from './RetentionSettingsContext';
 
-// "Exclude parent/guardian accounts" default-ON semantics: the toggle is ON unless
+// Hide missing-attendance details: default-ON semantics, the toggle is ON unless
 // an explicit boolean `false` is stored. Absence (new browser), a threshold-only or
 // legacy blob (migration), a non-boolean value, or malformed JSON all resolve to
 // true. A NEW key (`excludeUnknownRecency`) — the legacy `includeUnknownInRetention`

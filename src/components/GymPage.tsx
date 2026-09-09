@@ -1,15 +1,6 @@
-// Retention — top-level nav item routed at /gym/retention (the path keeps its
-// /gym prefix; a Gym sidebar group can return when sibling subpages are real).
-// The Watch cards (Silent Churn, Attendance Health) read the live Wodify
-// aggregate when a snapshot is available and fall back to the sample fixture
-// otherwise; Member Movement's census (active/inactive — binary, §6 rescope)
-// reads live the same way while its join-cohort intake stays sample. Churn Risk
-// by Tenure reads the snapshot's per-band tenure histogram (§6 aggregate
-// extension, sourced from Wodify member_since) and stays on sample until a
-// gated re-pull populates that column. The three remaining
-// Patterns cards stay as shells with an honest parked/blocked gate note — not
-// built, gated on a data policy or API access (see RETENTION_FINISH_PLAN.md).
-// Overview / Membership / Classes are hidden for now.
+// Current attendance/tenure/age views use one validated active-student payload.
+// Missing, incompatible or expired census data renders unavailable. Hidden dues
+// and Member Movement retain their existing definitions and stay unrendered.
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import ReactApexChart from 'react-apexcharts';
@@ -22,12 +13,10 @@ import {
   computeSilentChurn,
 } from '../lib/gym/silentChurn';
 import {
-  computeChurnRiskByTenure,
   computeChurnRiskByTenureFromAggregate,
   type TenureBandRisk,
 } from '../lib/gym/churnRiskByTenure';
 import {
-  SAMPLE_COHORT_HISTOGRAM,
   computeChurnRiskByCohortFromAggregate,
   type CohortRisk,
 } from '../lib/gym/churnRiskByCohort';
@@ -44,16 +33,12 @@ import {
   fetchLatestRetentionAggregate,
   type RetentionAggregateSnapshot,
 } from '../lib/gym/fetchRetentionAggregate';
+import type { StudentRetentionAggregate } from '../lib/gym/studentRetentionAggregate';
 import { RetentionEvolutionCard } from './RetentionEvolutionCard';
 import { MemberRetentionByBeltCard } from './MemberRetentionByBeltCard';
 
 export function GymPage() {
-  // RETENTION_FINISH_PLAN.md §6: fetch the live Wodify aggregate ONCE here at page
-  // level and share the single snapshot with every card that reads it (Silent
-  // Churn + Attendance Health, plus Member Movement's census), so they derive from
-  // the SAME snapshot and their live badges render the SAME as-of. A failed / empty
-  // / unconfigured read leaves `snapshot` null and every card falls back to its
-  // sample fixture — the live snapshot is optional, never a render error.
+  // Fetch once; all current student cards share this exact row/date.
   const [snapshot, setSnapshot] = useState<RetentionAggregateSnapshot | null>(null);
 
   useEffect(() => {
@@ -64,8 +49,7 @@ export function GymPage() {
         if (!cancelled && snap) setSnapshot(snap);
       })
       .catch(() => {
-        // Unreachable / non-OK / malformed → stay on the sample fixture. A missing
-        // live snapshot is an expected state, not a failure worth surfacing.
+        // Unreachable / non-OK / malformed → explicit student-unavailable cards.
       });
     return () => {
       cancelled = true;
@@ -86,7 +70,7 @@ export function GymPage() {
           <section className="gym-section">
             <div className="gym-card-grid">
               <div className="retention-hero-split">
-                <AttendanceHealthCard snapshot={snapshot} />
+                {snapshot?.students ? <AttendanceHealthCard snapshot={snapshot.students} /> : <StudentUnavailable title="Attendance Health" full />}
                 <RetentionEvolutionCard />
               </div>
             </div>
@@ -97,14 +81,24 @@ export function GymPage() {
               connected yet). */}
           <section className="gym-section">
             <div className="gym-card-grid">
-              <ChurnRiskByTenureCard snapshot={snapshot} />
-              <CohortRetentionCard snapshot={snapshot} />
+              {snapshot?.students ? <ChurnRiskByTenureCard snapshot={snapshot.students} /> : <StudentUnavailable title="Risk by Time as Member" />}
+              {snapshot?.students ? <CohortRetentionCard snapshot={snapshot.students} /> : <StudentUnavailable title="by Age Group" />}
               <MemberRetentionByBeltCard />
             </div>
           </section>
         </div>
       </div>
     </div>
+  );
+}
+
+function StudentUnavailable({ title, full = false }: { title: string; full?: boolean }) {
+  return (
+    <article className={`card gym-card ${full ? 'gym-card--full attendance-health-card' : 'gym-card--half'}`}>
+      <header className="gym-card-head"><h3 className="gym-card-title">{title}</h3></header>
+      <p className="gym-card-subtitle">Students · unavailable</p>
+      <p className="gym-card-subtitle">A complete student attendance snapshot is not available.</p>
+    </article>
   );
 }
 
@@ -376,22 +370,9 @@ function SilentChurnCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | 
   );
 }
 
-// Attendance Health — full-width secondary signal below the Silent Churn hero.
-// Buckets ACTIVE members by recency at the LIVE resolved threshold (Healthy
-// 0–7d · Watch 8…T−1d · Silent ≥T). The Watch count is the hero: members
-// drifting but not yet churned. Deterministic — the copy only rephrases
-// code-computed counts.
-//
-// RETENTION_FINISH_PLAN.md §6: derives its buckets from the non-PII
-// daysAbsentHistogram via deriveBuckets (same WATCH_FLOOR_DAYS + threshold rule,
-// precedence-correct at every threshold). The
-// `snapshot` is fetched ONCE at page level (GymPage) and passed to both Watch
-// cards, so this card's live "Silent" bucket and the live Silent Churn count read
-// the SAME snapshot and agree by construction. Loading / error / empty /
-// unconfigured all fall back to the SAMPLE fixture and the "Sample data" badge —
-// the live snapshot is optional, never a render error. Churn Risk by Tenure now
-// reads the same snapshot's per-band tenure histogram (§6 aggregate extension);
-// Member Movement's census reads it too (its intake stays sample).
+// Attendance Health derives the same student recency bins used by tenure/age.
+// The parent admits the versioned payload once; unavailable data never reaches
+// these cards and never falls back to sample/raw-client values.
 
 // The kebab-menu drill-down selection: whole gym, or one tenure/age cohort.
 type AttendanceSelection =
@@ -416,7 +397,7 @@ function bandBuckets(
   };
 }
 
-function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
+function AttendanceHealthCard({ snapshot }: { snapshot: StudentRetentionAggregate }) {
   const { silentChurnThresholdDays, excludeUnknownRecency } = useRetentionSettings();
 
   // Drill-down selection — the kebab (⋮) menu filters the donut to a single
@@ -446,28 +427,23 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
   // computeAttendanceHealth (the UNCHANGED original path). A tenure/age cohort reads
   // that one band's slice of the SAME classification from the existing per-band
   // computes — healthy = known − watch − silent, unknown = the band's recency-unknowns
-  // — so a filtered donut can never disagree with the rate cards. `live` tracks the
-  // selected dimension's data (tenure/age can be live or sample independently).
+  // — so a filtered donut can never disagree with the rate cards.
   const { result, live } = useMemo(() => {
     if (selection.kind === 'all') {
       return {
-        result: snapshot
-          ? deriveBuckets(snapshot, silentChurnThresholdDays)
-          : computeAttendanceHealth(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
-        live: !!snapshot,
+        result: deriveBuckets(snapshot, silentChurnThresholdDays),
+        live: true,
       };
     }
     if (selection.kind === 'tenure') {
-      const tenureLive = !!snapshot?.tenureBands;
-      const t = snapshot?.tenureBands
-        ? computeChurnRiskByTenureFromAggregate(snapshot.tenureBands, silentChurnThresholdDays)
-        : computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY);
+      const tenureLive = true;
+      const t = computeChurnRiskByTenureFromAggregate(snapshot.tenureBands, silentChurnThresholdDays);
       const band = t.bands.find((b) => b.id === selection.bandId) ?? t.unknownTenure;
       return { result: bandBuckets(band, t.thresholdDays), live: tenureLive };
     }
-    const cohortLive = !!snapshot?.cohorts;
+    const cohortLive = true;
     const c = computeChurnRiskByCohortFromAggregate(
-      snapshot?.cohorts ?? SAMPLE_COHORT_HISTOGRAM,
+      snapshot.cohorts,
       silentChurnThresholdDays,
     );
     const band = c.bands.find((b) => b.id === selection.bandId) ?? c.unknownCohort;
@@ -568,7 +544,7 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
         <div className="attendance-health-titlerow">
           <div className="attendance-health-titlewrap">
             <h3 className="gym-card-title">Attendance Health</h3>
-            {!live && <span className="gym-sample-badge">Sample data</span>}
+            <span className="gym-card-subtitle">Students · as of {snapshot.asOf}</span>
           </div>
           <div className="action-dropdown attendance-health-menu" ref={menuRef}>
             <button
@@ -594,7 +570,7 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
                       setMenuOpen(false);
                     }}
                   >
-                    All members
+                    All students
                   </button>
                 </li>
                 <li className="action-dropdown-group" role="presentation">
@@ -653,7 +629,7 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
       <div className="attendance-health-body">
         {knownActive === 0 ? (
           <p className="attendance-health-empty">
-            No attendance-known active members at the {thresholdDays}-day threshold right now.
+            {snapshot.studentTotal === 0 ? '0 active students in this snapshot.' : 'No attendance-known students in this selection.'}
           </p>
         ) : (
           <div className="attendance-donut-layout">
@@ -667,7 +643,7 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
               <div className="attendance-donut-center" aria-hidden="true">
                 <span className="attendance-donut-center-value">{highRiskPct ?? 0}%</span>
                 <span className="attendance-donut-center-label">
-                  {silent} {silent === 1 ? 'client' : 'clients'}
+                  {silent} {silent === 1 ? 'student' : 'students'}
                   <br />
                   at high risk
                 </span>
@@ -727,14 +703,18 @@ function AttendanceHealthCard({ snapshot }: { snapshot: RetentionAggregateSnapsh
           </div>
         )}
 
+        <p className="attendance-health-dataquality">
+          {snapshot.studentTotal} active students in whole gym.{' '}
+          {selection.kind !== 'all' && <>Selected: {knownActive + unknown} students · </>}
+          {knownActive} attendance-known (rate base) · {unknown} missing attendance.
+        </p>
+
         <p className="attendance-health-insight">{insight}</p>
 
         {!excludeUnknownRecency && unknown > 0 && (
           <p className="attendance-health-dataquality">
-            Unknown = active accounts with no Wodify attendance or class sign-in
-            on record — typically guardian/parent billing accounts (the child
-            trains; the paying adult never signs in), staff accounts, or legacy
-            members from before digital check-in. Structural blanks, not churn —
+            Unknown = active students without a usable recent attendance date.
+            Missing attendance is an unresolved data state, not churn —
             held out of Healthy / Reconnect / High Risk rather than mislabeled.
           </p>
         )}
@@ -857,34 +837,21 @@ function RateMetricDropdown({
 // This matches the Attendance Health donut's high-risk headline. Deterministic: the
 // copy only rephrases code-computed counts and rates; it never authors the call.
 //
-// Dual-source (§6 aggregate extension): with a snapshot carrying the per-band
-// tenure histogram (validated against this build's band edges — see
-// fetchRetentionAggregate), the card derives the SAME result shape live via
-// computeChurnRiskByTenureFromAggregate (deriveBuckets per band, one hero rule).
-// Σ band silent here === the live Silent Churn
-// count at the same threshold by construction. A snapshot without tenure data
-// (pre-migration row, or a contract mismatch) falls back to the sample fixture —
-// the tenure flip is data-gated, not deploy-gated. The live caveat note carries
-// the two disclosed member_since caveats (records-era undercount; staff
-// accounts) — honesty notes, not defects.
-function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
+// Student counts and recency partitions are validated together before rendering.
+function ChurnRiskByTenureCard({ snapshot }: { snapshot: StudentRetentionAggregate }) {
   const { silentChurnThresholdDays, excludeUnknownRecency } = useRetentionSettings();
   const titleTooltipId = useId();
   // Header-dropdown metric; resets to High risk on every mount.
   const [rateMetric, setRateMetric] = useState<RateMetric>('highRisk');
 
-  const tenureBands = snapshot?.tenureBands ?? null;
+  const tenureBands = snapshot.tenureBands;
   const result = useMemo(
     () =>
-      tenureBands
-        ? computeChurnRiskByTenureFromAggregate(tenureBands, silentChurnThresholdDays)
-        : computeChurnRiskByTenure(SAMPLE_GYM_MEMBERS, silentChurnThresholdDays, FIXTURE_TODAY),
+      computeChurnRiskByTenureFromAggregate(tenureBands, silentChurnThresholdDays),
     [tenureBands, silentChurnThresholdDays],
   );
-  // Live only when the snapshot actually carries a usable tenure histogram — the
-  // other live cards may already be live off this snapshot while this card is
-  // still honestly Sample (pre-tenure row → tenureBands null).
-  const liveAsOf = tenureBands && snapshot ? snapshot.asOf : null;
+  // All three student dimensions were admitted together by the reader.
+  const liveAsOf = snapshot.asOf;
 
   const { activeTotal, bands, unknownTenure } = result;
 
@@ -906,7 +873,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
   // rate; only the bar width is rescaled.
   const barRates = [
     ...bands.map(bandRate),
-    unknownTenure.activeTotal > 0 ? unknownTenure.riskRate : null,
+    unknownTenure.activeTotal > 0 ? bandRate(unknownTenure) : null,
   ].filter((r): r is number => r !== null);
   const barCeiling =
     barRates.length > 0
@@ -952,7 +919,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
             >
               <ul className="db-tooltip-list">
                 <li className="db-tooltip-body">
-                  Tenure counts from each member&rsquo;s start date in our current
+                  Tenure counts from each student&rsquo;s start date in our current
                   records (Wodify&rsquo;s &ldquo;Client Since&rdquo;). Members whose
                   history predates these records can show shorter tenure than their
                   real one, and staff accounts carry account-setup dates rather than
@@ -961,16 +928,13 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
               </ul>
             </div>
           </div>
-          {!liveAsOf && (
-            <span className="gym-sample-badge">Sample data</span>
-          )}
         </div>
-        <p className="gym-card-subtitle">Which member stages are most at risk?</p>
+        <p className="gym-card-subtitle">Students · as of {liveAsOf}</p>
       </header>
 
       <div className="churn-tenure-body">
         {activeTotal === 0 || !heroBand ? (
-          <p className="churn-tenure-empty">No active members to analyze right now.</p>
+          <p className="churn-tenure-empty">{activeTotal === 0 ? '0 active students in this snapshot.' : 'No attendance-known students in the labeled tenure groups.'}</p>
         ) : null}
 
         <div className="churn-tenure-table">
@@ -997,7 +961,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
                   {unknownTenure.label}
                 </span>
                 <span className="churn-tenure-col churn-tenure-col--rate">
-                  {rateCell(unknownTenure.riskRate)}
+                  {rateCell(bandRate(unknownTenure))}
                 </span>
               </li>
             )}
@@ -1006,7 +970,7 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
 
         {!excludeUnknownRecency && unknownRecencyTotal > 0 && (
           <p className="churn-tenure-base-note">
-            {RATE_METRIC_LABELS[rateMetric]} rates among attendance-known members in each cohort.
+            {RATE_METRIC_LABELS[rateMetric]} rates among attendance-known students in each cohort.
           </p>
         )}
       </div>
@@ -1014,43 +978,24 @@ function ChurnRiskByTenureCard({ snapshot }: { snapshot: RetentionAggregateSnaps
   );
 }
 
-// Retention by Age Group (Cohort Retention Card — RETENTION_FINISH_PLAN.md §6–§9,
-// rev.3 client_status basis). Two reads in one card: Read 1 — cohort health
-// (Healthy/Watch/Silent + high-risk rate per age cohort, active members), re-derived
-// at the owner threshold via computeChurnRiskByCohortFromAggregate (same
-// deriveBuckets + known-base + hero rules as Churn-by-Tenure); Read 2 — lapsed
-// (inactive) members per cohort. Deterministic: copy only rephrases code-computed
-// counts/rates; it never authors the at-risk call.
-//
-// Dual-source: with a snapshot carrying cohort_histogram (validated against this
-// build's COHORT_BANDS — see fetchRetentionAggregate) it reads the live
-// snapshot; otherwise it renders the clearly-synthetic SAMPLE_COHORT_HISTOGRAM
-// through the SAME adapter (the shared member fixture has no DOB, so the sample is
-// a static histogram, not a fixture compute). The cohort flip is data-gated.
-//
-// §7 STRUCTURAL-HONESTY caveat (footer): client_status Inactive has no
-// never-membered guard — the never-membered (guardian/staff/legacy) population
-// skews into Adults 16+ — so cohort-lapsed must never be read as "memberships
-// ended." Copy over the deterministic numbers; the card never authors the call.
-function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapshot | null }) {
+// Active-student age groups only. Inactive/lapsed student counts are not measured.
+function CohortRetentionCard({ snapshot }: { snapshot: StudentRetentionAggregate }) {
   const { silentChurnThresholdDays, excludeUnknownRecency } = useRetentionSettings();
   const titleTooltipId = useId();
   // Header-dropdown metric; resets to High risk on every mount.
   const [rateMetric, setRateMetric] = useState<RateMetric>('highRisk');
 
-  const cohorts = snapshot?.cohorts ?? null;
+  const cohorts = snapshot.cohorts;
   const result = useMemo(
     () =>
       computeChurnRiskByCohortFromAggregate(
-        cohorts ?? SAMPLE_COHORT_HISTOGRAM,
+        cohorts,
         silentChurnThresholdDays,
       ),
     [cohorts, silentChurnThresholdDays],
   );
-  // Live only when the snapshot actually carries a usable cohort histogram — other
-  // cards may already be live off this snapshot while this one is honestly Sample
-  // (pre-cohort row → cohorts null).
-  const liveAsOf = cohorts && snapshot ? snapshot.asOf : null;
+  // All three student dimensions were admitted together by the reader.
+  const liveAsOf = snapshot.asOf;
 
   const { activeTotal, bands } = result;
 
@@ -1111,27 +1056,20 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
                   exact ages, or individual records are stored or shown.
                 </li>
                 <li className="db-tooltip-body">
-                  Age groups come from each member&rsquo;s date of birth (age ranges
-                  only — birthdates never leave our system). &ldquo;Lapsed&rdquo;
-                  counts everyone whose membership is inactive today; because inactive
-                  profiles can include never-enrolled accounts (a parent/guardian,
-                  staff, or a legacy profile) that skew into Adults 16+, read it as
-                  &ldquo;inactive in this age group,&rdquo; not &ldquo;memberships
-                  ended.&rdquo;
+                  Age groups come from each student&rsquo;s date of birth (age ranges
+                  only — birthdates never leave the server). Only active students
+                  are included; guardian-only profiles are excluded.
                 </li>
               </ul>
             </div>
           </div>
-          {!liveAsOf && (
-            <span className="gym-sample-badge">Sample data</span>
-          )}
         </div>
-        <p className="gym-card-subtitle">Do kids, teens, and adults retain differently?</p>
+        <p className="gym-card-subtitle">Students · as of {liveAsOf}</p>
       </header>
 
       <div className="cohort-age-body">
         {activeTotal === 0 || !heroBand ? (
-          <p className="cohort-age-empty">No active members to analyze right now.</p>
+          <p className="cohort-age-empty">{activeTotal === 0 ? '0 active students in this snapshot.' : 'No attendance-known students in the labeled age groups.'}</p>
         ) : null}
 
         <div className="cohort-age-table">
@@ -1153,7 +1091,7 @@ function CohortRetentionCard({ snapshot }: { snapshot: RetentionAggregateSnapsho
 
         {!excludeUnknownRecency && unknownRecencyTotal > 0 && (
           <p className="cohort-age-base-note">
-            {RATE_METRIC_LABELS[rateMetric]} rates among attendance-known members in each group.
+            {RATE_METRIC_LABELS[rateMetric]} rates among attendance-known students in each group.
           </p>
         )}
       </div>

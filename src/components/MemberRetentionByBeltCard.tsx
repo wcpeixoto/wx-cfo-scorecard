@@ -72,7 +72,7 @@ export function MemberRetentionByBeltCard() {
                 >
                   <ul className="db-tooltip-list">
                     <li className="db-tooltip-body">
-                      Monthly membership <strong>churn rate</strong> (lapsed ÷ active) for each belt band,
+                      Monthly class-plan membership <strong>churn rate</strong> (lapsed ÷ active) for each belt band,
                       smoothed over a trailing 3-month window so a single small band's month-to-month
                       noise doesn't dominate.
                     </li>
@@ -86,7 +86,7 @@ export function MemberRetentionByBeltCard() {
             </h3>
             {!isLive && <span className="gym-sample-badge">Sample data</span>}
           </div>
-          <p className="gym-card-subtitle">Trailing 3-month membership churn per belt band</p>
+          <p className="gym-card-subtitle">Class-plan members · trailing 3-month churn per belt band</p>
         </div>
         <div className="retention-evolution-controls">
           <div className="segmented-toggle" role="group" aria-label="Adults or kids">

@@ -23,13 +23,12 @@ type RetentionSettingsValue = {
   // Always a resolved, clamped value (1–365, default 21).
   silentChurnThresholdDays: number;
   setSilentChurnThresholdDays: (value: number) => void;
-  // "Exclude parent/guardian accounts" view toggle. DEFAULT ON. The
-  // attendance-recency "unknown" population (active accounts with no readable
-  // class check-in — staff-confirmed parent/guardian billing accounts) is ALWAYS
-  // held out of every retention rate denominator (the known base); this toggle is
-  // DISPLAY-ONLY — it controls whether that population's count/tile/row/note is
-  // shown in the in-scope cards. ON hides it (one quiet audit line discloses N);
-  // OFF shows it as informational. It never reclassifies anyone and never changes
+  // "Hide students without recorded attendance" view toggle. DEFAULT ON.
+  // Students without a usable attendance date remain in the student total but
+  // are always held out of attendance-based rate denominators (the known base).
+  // DISPLAY-ONLY: ON hides extra informational notes; OFF shows them. Attendance
+  // Health's total/known/missing audit counts stay visible in both states.
+  // Missing attendance does not identify guardians. This never reclassifies anyone or changes
   // a denominator, so the absolute Healthy/Watch/Silent/active counts are
   // identical in both states. It does NOT affect Member Movement (whose unknown is
   // unrecognized client_status, a different population).

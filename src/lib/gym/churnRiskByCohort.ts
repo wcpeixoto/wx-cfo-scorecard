@@ -23,6 +23,7 @@ import { resolveSilentChurnThresholdDays } from './silentChurn';
 import { deriveBuckets } from './retentionAggregateView';
 import { COHORT_BANDS, UNKNOWN_COHORT_ID } from './cohortBands';
 import type { CohortEntry, CohortHistogram } from './wodifyRetentionAggregate';
+import type { StudentCohorts } from './studentRetentionAggregate';
 
 const UNKNOWN_COHORT_LABEL = 'Unknown age';
 
@@ -39,13 +40,13 @@ export type CohortRisk = {
   atRisk: number; // watch + silent — identical in both bases; the toggle only re-bases the rate
   riskRate: number | null; // FULL base: atRisk / activeTotal; null when no active members
   riskRateKnown: number | null; // KNOWN base: atRisk / knownActiveTotal; null when no known actives
-  lapsed: number; // Read 2 — inactive (lapsed) members in this cohort
+  lapsed: number | null; // Not measured by the active-student census.
 };
 
 export type ChurnRiskByCohortResult = {
   thresholdDays: number; // resolved threshold the active buckets were cut at
   activeTotal: number; // Σ cohort.activeTotal incl. unknownCohort
-  lapsedTotal: number; // Σ cohort.lapsed incl. unknownCohort === inactiveTotal (MM parity)
+  lapsedTotal: number | null; // null for active-only student payloads
   bands: CohortRisk[]; // one per COHORT_BANDS entry, in band order
   unknownCohort: CohortRisk; // members with no derivable cohort (bad/sentinel DOB) — never dropped
   heroBandId: string | null; // FULL-base hero: cohort with the highest full-base at-risk rate
@@ -82,12 +83,12 @@ function selectHeroCohortId(bands: CohortRisk[], useKnownBase: boolean): string 
 // (the deriveBuckets pattern Churn-by-Tenure uses). The unknown-cohort bucket
 // arrives as a first-class entry — surfaced, never dropped.
 export function computeChurnRiskByCohortFromAggregate(
-  cohort: CohortHistogram,
+  cohort: CohortHistogram | StudentCohorts,
   thresholdDays: number,
 ): ChurnRiskByCohortResult {
   const resolvedThreshold = resolveSilentChurnThresholdDays(thresholdDays);
 
-  const toCohortRisk = (id: string, label: string, entry: CohortEntry | undefined): CohortRisk => {
+  const toCohortRisk = (id: string, label: string, entry: CohortEntry | { active: CohortEntry['active'] } | undefined): CohortRisk => {
     // The fetch layer validates every expected cohort key is present; an absent
     // entry here is defensively treated as an empty cohort, never a crash.
     const e = entry ?? {
@@ -117,7 +118,7 @@ export function computeChurnRiskByCohortFromAggregate(
       atRisk,
       riskRate: derived.activeTotal === 0 ? null : atRisk / derived.activeTotal,
       riskRateKnown: knownActiveTotal === 0 ? null : atRisk / knownActiveTotal,
-      lapsed: e.lapsed,
+      lapsed: 'lapsed' in e && typeof e.lapsed === 'number' ? e.lapsed : null,
     };
   };
 
@@ -130,7 +131,8 @@ export function computeChurnRiskByCohortFromAggregate(
 
   const activeTotal =
     bands.reduce((sum, b) => sum + b.activeTotal, 0) + unknownCohort.activeTotal;
-  const lapsedTotal = bands.reduce((sum, b) => sum + b.lapsed, 0) + unknownCohort.lapsed;
+  const lapsedTotal = [...bands, unknownCohort].some((b) => b.lapsed === null)
+    ? null : bands.reduce((sum, b) => sum + b.lapsed!, 0) + unknownCohort.lapsed!;
 
   return {
     thresholdDays: resolvedThreshold,
