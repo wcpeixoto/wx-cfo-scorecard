@@ -5,7 +5,10 @@
 // imports the module FRESH (resetModules) to capture the stubbed config.
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { buildStudentRetentionAggregate } from './studentRetentionAggregate';
+import { buildStudentRetentionAggregate, mergeStudentRetentionAggregates } from './studentRetentionAggregate';
+import { deriveBuckets } from './retentionAggregateView';
+import { computeChurnRiskByTenureFromAggregate } from './churnRiskByTenure';
+import { computeChurnRiskByCohortFromAggregate } from './churnRiskByCohort';
 
 // Mirrors a live wodify_retention_aggregate row: snake_case columns, a jsonb
 // histogram whose INNER keys are camelCase. active_total 412 = 255 healthy-ish + …
@@ -115,6 +118,27 @@ afterEach(() => {
 });
 
 describe('fetchLatestRetentionAggregate — mapping + failure modes', () => {
+  it('keeps student totals, unknown recency and silent counts consistent across dashboard adapters', () => {
+    const asOf = '2026-09-09';
+    const first = buildStudentRetentionAggregate([
+      { client_status: 'Active', last_attendance: '2026-09-08', member_since: '2026-08-01', date_of_birth: '2020-01-01' },
+      { client_status: 'Active', last_attendance: '2026-08-01', member_since: '2020-01-01', date_of_birth: '1990-01-01' },
+    ], asOf);
+    const second = buildStudentRetentionAggregate([{ client_status: 'Active' }], asOf);
+    const merged = mergeStudentRetentionAggregates([first, second], asOf);
+    const overall = deriveBuckets(merged, 21);
+    const tenure = computeChurnRiskByTenureFromAggregate(merged.tenureBands, 21);
+    const age = computeChurnRiskByCohortFromAggregate(merged.cohorts, 21);
+    expect(overall).toMatchObject({ activeTotal: 3, healthy: 1, silent: 1, unknown: 1 });
+    expect(tenure.activeTotal).toBe(3);
+    expect(age.activeTotal).toBe(3);
+    expect(age.lapsedTotal).toBeNull();
+    expect(age.unknownCohort.unknownRecency).toBe(1);
+    expect(tenure.unknownTenure.unknownRecency).toBe(1);
+    expect(tenure.bands.reduce((n, b) => n + b.silent, 0)).toBe(overall.silent);
+    expect(age.bands.reduce((n, b) => n + b.silent, 0)).toBe(overall.silent);
+    expect(deriveBuckets(buildStudentRetentionAggregate([], asOf), 21).activeTotal).toBe(0);
+  });
   it('reads students only from the selected row and never from the older dues row', async () => {
     stubConfiguredEnv();
     const now = new Date();

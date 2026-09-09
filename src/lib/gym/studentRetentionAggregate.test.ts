@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { buildStudentRetentionAggregate, mergeStudentRetentionAggregates, parseStudentRetentionAggregate, studentRetentionFromRow } from './studentRetentionAggregate';
-import { deriveBuckets } from './retentionAggregateView';
-import { computeChurnRiskByTenureFromAggregate } from './churnRiskByTenure';
-import { computeChurnRiskByCohortFromAggregate } from './churnRiskByCohort';
 
 const asOf = '2026-09-09';
 const first = buildStudentRetentionAggregate([
@@ -26,25 +23,19 @@ describe('student retention contract', () => {
     expect(studentRetentionFromRow({ ...row, active_total: 5 }, today)).toBeNull();
     expect(studentRetentionFromRow({ ...row, as_of: '2026-09-10' }, today)).toBeNull();
   });
-  it('merges exact recency partitions and keeps unknowns in all views', () => {
+  it('merges exact recency partitions and keeps unknown counts', () => {
     expect(parseStudentRetentionAggregate(merged, asOf, 3)).toEqual(merged);
-    const overall = deriveBuckets(merged, 21);
-    const tenure = computeChurnRiskByTenureFromAggregate(merged.tenureBands, 21);
-    const age = computeChurnRiskByCohortFromAggregate(merged.cohorts, 21);
-    expect(overall).toMatchObject({ activeTotal: 3, healthy: 1, silent: 1, unknown: 1 });
-    expect(tenure.activeTotal).toBe(3);
-    expect(age.activeTotal).toBe(3);
-    expect(age.lapsedTotal).toBeNull();
-    expect(age.unknownCohort.unknownRecency).toBe(1);
-    expect(tenure.unknownTenure.unknownRecency).toBe(1);
-    expect(tenure.bands.reduce((n, b) => n + b.silent, 0)).toBe(overall.silent);
-    expect(age.bands.reduce((n, b) => n + b.silent, 0)).toBe(overall.silent);
+    expect(merged.studentTotal).toBe(3);
+    expect(merged.unknown).toBe(1);
+    expect(merged.daysAbsentHistogram.countsByDaysAbsent).toEqual({ '1': 1, '39': 1 });
+    expect(merged.cohorts.cohorts.unknownCohort.active.unknownRecency).toBe(1);
+    expect(merged.tenureBands.bands.unknownTenure.unknownRecency).toBe(1);
   });
 
   it('preserves a real zero instead of converting it to unavailable', () => {
     const zero = buildStudentRetentionAggregate([], asOf);
     expect(parseStudentRetentionAggregate(zero, asOf, 0)).toEqual(zero);
-    expect(deriveBuckets(zero, 21).activeTotal).toBe(0);
+    expect(zero.studentTotal).toBe(0);
   });
 
   it.each([undefined, null, {}, { ...merged, version: 0 }, { ...merged, version: 2 }])('rejects missing or old payloads (%#)', (value) => {
