@@ -143,8 +143,51 @@ Diagnostic run `34416975969` accepted page 41 and reached curl, then printed the
 old `invalid_page_diagnostic` fallback for an unmatched non-200 response. That
 fallback discarded the HTTP status and cannot establish local input rejection
 or systematic page-41 failure. Any earlier systematic-page conclusion is
-retracted: the original 502 remains unexplained, and retries remain open to the
-operator after review. This diagnostic plumbing change does not retry it.
+retracted. Subsequently, valid isolated run `34417952517` on function v28 returned
+`{origin:edge_function,error:sync_failed,code:parse_error,http_status:502}`.
+Same-page recurrence strongly favors a deterministic contract failure; only the
+isolated run establishes `parse_error`, because the earlier body was hidden.
+The exact cause remains unknown and blind retries are not justified. The workflow
+is disabled manually during this diagnostic build/review. Do not enable or invoke
+it as part of publishing this code. **PR #559 requires a fresh full independent
+review before merge.**
+
+### Page parse-origin metadata (candidate, not yet deployed)
+
+A propagated `mode=page` SyntaxError still returns HTTP 502 with
+`error: "sync_failed"` and `code: "parse_error"`. Its additional safe fields are:
+
+- `parse_stage`: fixed call-site enum. `clients_json_decode` identifies invalid
+  outer JSON; `clients_envelope`, `clients_pagination`, `clients_row`,
+  `clients_identifier`, and `clients_duplicate` identify valid-JSON contract
+  checks. `clients_fetch`/`clients_body_read` identify earlier operations;
+  `page_build_draft`, `page_persist_draft`, and `page_success_response` identify
+  unexpected internal SyntaxErrors at those calls.
+- `outer_json_valid`: true when the outer upstream body decoded successfully,
+  false for JSON decode failure, null when no decoded-body evidence applies.
+- `response_content_type`: lowercased media type with parameters discarded,
+  restricted to `application/json`, `text/html`, `text/plain`, `other`, or
+  `missing`; null when no response metadata applies. Arbitrary header text is
+  never reflected.
+- `response_body_bytes`: exact consumed response-body byte length, including
+  UTF-8 multibyte characters/BOM, not JavaScript string length or Content-Length.
+  This measures bytes delivered by fetch after any HTTP decompression. Ordinary
+  lengths through 64 MiB are exact; larger/unsafe lengths yield null with
+  `response_body_bytes_overflow: true`, never a silently capped count. Null with
+  overflow false means not applicable. The bound controls diagnostic output only;
+  it does not truncate or change JSON parsing.
+
+The shared decoder also tags `detail_json_decode`/`detail_body_read` internally.
+Existing detail retries still catch those failures: three exhausted attempts
+remain the existing aggregate page 409, not a new 502. Request JSON rejection
+remains HTTP 400. Classification, successful payloads, persistence and finalize
+outcomes are unchanged. JSON decoding retains Response.json UTF-8/BOM semantics.
+
+The manual workflow logs new metadata only with the exact allowlisted 502
+parse-error contract. Missing/malformed metadata is omitted while retaining the
+legacy safe `parse_error` code. No stack, arbitrary exception text, URL, raw body,
+identifier, record value, or other header is logged. Scheduled/full-run shell
+blocks and their output remain unchanged.
 
 ### Reviewed deployment and read-back sequence (not executed here)
 

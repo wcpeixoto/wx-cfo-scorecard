@@ -47,6 +47,8 @@ const WODIFY_TIMEOUT_MS = 15_000;
 const DETAIL_MAX_ATTEMPTS = 3;
 const DETAIL_CADENCE_MS = 500;
 
+import { parseUpstreamJson, WodifyParseError, type ParseStage } from '../../../src/lib/gym/wodifyParseDiagnostics.ts';
+
 const RETENTION_TABLE = 'wodify_retention_aggregate';
 const CENSUS_RUNS_TABLE = 'wodify_census_runs';
 const GYM_TZ = 'America/New_York';
@@ -100,9 +102,9 @@ async function fetchClientsPage(apiKey: string, requestedPage: number, deadline:
   });
   if (!res.ok) throw new Error(`wodify_clients_http_${res.status}`);
 
-  const body: unknown = await deadline.run(res.json());
+  const { body, metadata } = await parseUpstreamJson(res, 'clients_json_decode', (operation) => deadline.run(operation));
   if (!isRecord(body) || !Array.isArray(body.clients) || !isRecord(body.pagination)) {
-    throw new SyntaxError('invalid clients envelope');
+    throw new WodifyParseError('clients_envelope', metadata);
   }
   const page = body.pagination.page;
   const pageSize = body.pagination.page_size;
@@ -114,16 +116,17 @@ async function fetchClientsPage(apiKey: string, requestedPage: number, deadline:
     || body.clients.length > pageSizeRequested
     || (hasMore && (body.clients.length === 0 || requestedPage === maxPages))
   ) {
-    throw new SyntaxError('invalid clients pagination');
+    throw new WodifyParseError('clients_pagination', metadata);
   }
 
   const seen = new Set<string>();
   for (const row of body.clients) {
     if (!isRecord(row) || (row.client_status !== 'Active' && row.client_status !== 'Inactive')) {
-      throw new SyntaxError('invalid clients row');
+      throw new WodifyParseError('clients_row', metadata);
     }
     const id = normalizeClientId(row.id);
-    if (id === null || seen.has(id)) throw new SyntaxError('invalid or duplicate clients row');
+    if (id === null) throw new WodifyParseError('clients_identifier', metadata);
+    if (seen.has(id)) throw new WodifyParseError('clients_duplicate', metadata);
     seen.add(id);
   }
 
@@ -203,7 +206,8 @@ async function fetchClientDetail(
       }
 
       try {
-        return { ok: true, detail: await deadline.run(res.json()), callsMade };
+        const { body } = await parseUpstreamJson(res, 'detail_json_decode', (operation) => deadline.run(operation));
+        return { ok: true, detail: body, callsMade };
       } catch {
         if (attempt === DETAIL_MAX_ATTEMPTS) return { ok: false, callsMade };
       }
@@ -465,6 +469,7 @@ function finalizeResponse(aggregate: RetentionAggregate, census: ReturnType<type
 export async function handleRequest(req: Request): Promise<Response> {
   const startedAt = new Date().toISOString();
   const deadline = new SyncDeadline(REQUEST_DEADLINE_MS);
+  let pageParseStage: ParseStage | null = null;
   try {
     if (req.method !== 'POST') {
       return jsonResponse(405, { error: 'method_not_allowed' });
@@ -494,6 +499,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     }
 
     if (input.mode === 'page') {
+      pageParseStage = 'clients_fetch';
       const clientsPage = await fetchClientsPage(apiKey, input.page, deadline);
       const diagnostics: PageFailureDiagnostics = {
         unclassified_reasons: {
@@ -507,6 +513,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         },
         detail_http_status_counts: {},
       };
+      pageParseStage = 'page_build_draft';
       const draft = await buildCensusDraft(apiKey, clientsPage, deadline, startedAt, diagnostics);
       if (draft.unclassified !== 0 || draft.detailClientsFailed !== 0) {
         return jsonResponse(409, {
@@ -516,7 +523,9 @@ export async function handleRequest(req: Request): Promise<Response> {
           ...diagnostics,
         });
       }
+      pageParseStage = 'page_persist_draft';
       await persistCensusDraft(supabaseUrl, serviceKey, input.runId, draft, deadline);
+      pageParseStage = 'page_success_response';
       return jsonResponse(200, pageResponse(draft));
     }
 
@@ -554,6 +563,10 @@ export async function handleRequest(req: Request): Promise<Response> {
     );
     return jsonResponse(200, finalizeResponse(aggregate, validated));
   } catch (err) {
+    if (pageParseStage !== null && err instanceof SyntaxError) {
+      const parsed = err instanceof WodifyParseError ? err : new WodifyParseError(pageParseStage);
+      return jsonResponse(502, { error: 'sync_failed', code: 'parse_error', ...parsed.diagnostic() });
+    }
     return jsonResponse(502, { error: 'sync_failed', code: classifySyncError(err) });
   } finally {
     deadline.dispose();

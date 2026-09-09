@@ -99,7 +99,21 @@ jobs:
                     or ($http_status == 500 and .error == "internal_error") then
                     {origin: "edge_function", error, http_status: $http_status}
                   elif $http_status == 502 and .error == "sync_failed" and (.code | type) == "string" then
-                    if (.code | test("^wodify_(clients|detail)_http_[1-5][0-9]{2}$")) then
+                    if .code == "parse_error"
+                      and (.parse_stage | type) == "string"
+                      and (.parse_stage | test("^(clients_fetch|clients_body_read|detail_body_read|clients_json_decode|clients_envelope|clients_pagination|clients_row|clients_identifier|clients_duplicate|detail_json_decode|page_build_draft|page_persist_draft|page_success_response)$"))
+                      and ((.outer_json_valid | type) == "boolean" or .outer_json_valid == null)
+                      and (.response_content_type | IN(null,"application/json","text/html","text/plain","other","missing"))
+                      and (.response_body_bytes_overflow | type) == "boolean"
+                      and (if .response_body_bytes == null then
+                        .response_body_bytes_overflow == true or .outer_json_valid == null
+                      else (.response_body_bytes | type) == "number"
+                        and .response_body_bytes >= 0 and .response_body_bytes <= 67108864
+                        and (.response_body_bytes | floor) == .response_body_bytes
+                        and .response_body_bytes_overflow == false end) then
+                      {origin: "edge_function", error: "sync_failed", code: "parse_error", http_status: $http_status,
+                       parse_stage, outer_json_valid, response_content_type, response_body_bytes, response_body_bytes_overflow}
+                    elif (.code | test("^wodify_(clients|detail)_http_[1-5][0-9]{2}$")) then
                       {origin: "upstream_wodify", error: "sync_failed", code, http_status: $http_status}
                     elif (.code | test("^(census_(persist|read|cleanup)_http_[1-5][0-9]{2}|persist_http_[1-5][0-9]{2}|bad_asof|timeout|parse_error|network_error|unknown)$")) then
                       {origin: "edge_function", error: "sync_failed", code, http_status: $http_status}

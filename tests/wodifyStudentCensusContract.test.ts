@@ -54,6 +54,10 @@ describe('manual single-page diagnostic isolation', () => {
   const invalidSummary = { origin: 'workflow_response_validation', error: 'invalid_page_summary', http_status: 200 };
   const invalidDiagnostic = { origin: 'workflow_response_validation', error: 'invalid_page_diagnostic', http_status: 409 };
   const unrecognized = { origin: 'gateway_or_unrecognized_response', error: 'unrecognized_http_response', http_status: 502 };
+  const parseFailure = { error: 'sync_failed', code: 'parse_error', parse_stage: 'clients_pagination',
+    outer_json_valid: true, response_content_type: 'application/json', response_body_bytes: 83,
+    response_body_bytes_overflow: false };
+  const legacyParseFailure = { origin: 'edge_function', error: 'sync_failed', code: 'parse_error', http_status: 502 };
 
   it.each([
     ['200', { ok: true, mode: 'page', ...summary, private: 'private-secret' }, 0, summary, 0],
@@ -78,6 +82,15 @@ describe('manual single-page diagnostic isolation', () => {
       { origin: 'upstream_wodify', error: 'sync_failed', code: 'wodify_clients_http_503', http_status: 502 }, 0],
     ['502', { error: 'sync_failed', code: 'parse_error' }, 1,
       { origin: 'edge_function', error: 'sync_failed', code: 'parse_error', http_status: 502 }, 0],
+    ['502', { ...parseFailure, private: 'private-secret' }, 1, { ...parseFailure, origin: 'edge_function', http_status: 502 }, 0],
+    ['502', { ...parseFailure, parse_stage: 'private-stage' }, 1, legacyParseFailure, 0],
+    ['502', { ...parseFailure, response_content_type: 'application/json; private-secret' }, 1, legacyParseFailure, 0],
+    ['502', { ...parseFailure, response_body_bytes: 'private-secret' }, 1, legacyParseFailure, 0],
+    ['502', { ...parseFailure, response_body_bytes: -1 }, 1, legacyParseFailure, 0],
+    ['502', { ...parseFailure, response_body_bytes: 67108865 }, 1, legacyParseFailure, 0],
+    ['502', { ...parseFailure, response_body_bytes: null, response_body_bytes_overflow: true }, 1,
+      { ...parseFailure, response_body_bytes: null, response_body_bytes_overflow: true, origin: 'edge_function', http_status: 502 }, 0],
+    ['502', { ...parseFailure, outer_json_valid: 'private-secret' }, 1, legacyParseFailure, 0],
     ['502', { error: 'sync_failed', code: 'private-secret' }, 1, unrecognized, 0],
     ['502', { error: 'sync_failed', code: 'wodify_clients_http_503_private' }, 1, unrecognized, 0],
     ['401', { code: 401, message: 'private-secret' }, 1, { ...unrecognized, http_status: 401 }, 0],

@@ -89,18 +89,36 @@ describe('census HTTP failure and publication boundary', () => {
   });
 
   it.each([
-    [null],
-    [{ id: 1 }],
-    [{ ...active, id: null }],
-    [{ ...active, client_status: 'active' }],
-    [active, { ...active, id: '1' }],
-    Array.from({ length: 101 }, (_, i) => ({ ...active, id: i + 1 })),
-  ])('rejects malformed/duplicate list rows before details or persistence (%#)', async (...clients) => {
+    ['clients_row', [null]],
+    ['clients_row', [{ id: 1 }]],
+    ['clients_identifier', [{ ...active, id: null }]],
+    ['clients_row', [{ ...active, client_status: 'active' }]],
+    ['clients_duplicate', [active, { ...active, id: '1' }]],
+    ['clients_pagination', Array.from({ length: 101 }, (_, i) => ({ ...active, id: i + 1 }))],
+  ])('rejects malformed/duplicate list rows before details or persistence (%#)', async (stage, clients) => {
     const http = vi.fn().mockResolvedValue(response(page(clients)));
     vi.stubGlobal('fetch', http);
     const out = await handleRequest(request());
     expect(out.status).toBe(502);
-    expect(await out.json()).toEqual({ error: 'sync_failed', code: 'parse_error' });
+    expect(await out.json()).toEqual({ error: 'sync_failed', code: 'parse_error', parse_stage: stage,
+      outer_json_valid: true, response_content_type: 'text/plain',
+      response_body_bytes: new TextEncoder().encode(JSON.stringify(page(clients as unknown[]))).byteLength,
+      response_body_bytes_overflow: false });
+    expect(http).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['clients_json_decode', '{"private":"é秘密"', false],
+    ['clients_envelope', JSON.stringify({ private: 'é秘密' }), true],
+    ['clients_pagination', JSON.stringify(page([], 2)), true],
+  ])('reports %s without returning body or arbitrary content-type values', async (stage, raw, valid) => {
+    const http = vi.fn().mockResolvedValue(new Response(raw, { headers: { 'Content-Type': 'private/secret; token=private' } }));
+    vi.stubGlobal('fetch', http);
+    const out = await handleRequest(request());
+    expect(out.status).toBe(502);
+    expect(await out.json()).toEqual({ error: 'sync_failed', code: 'parse_error', parse_stage: stage,
+      outer_json_valid: valid, response_content_type: 'other', response_body_bytes: new TextEncoder().encode(raw).byteLength,
+      response_body_bytes_overflow: false });
     expect(http).toHaveBeenCalledTimes(1);
   });
 
@@ -139,6 +157,23 @@ describe('census HTTP failure and publication boundary', () => {
     await vi.advanceTimersByTimeAsync(500);
     expect((await pending).status).toBe(409);
     expect(http).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps three malformed detail JSON attempts on the existing 409 failure path', async () => {
+    const http = vi.fn().mockResolvedValueOnce(response(page([active])))
+      .mockImplementation(async () => new Response('private invalid JSON'));
+    vi.stubGlobal('fetch', http);
+    const pending = handleRequest(request());
+    await vi.advanceTimersByTimeAsync(1_500);
+    const out = await pending;
+    expect(out.status).toBe(409);
+    const body = await out.json();
+    expect(body).toMatchObject({ error: 'page_classification_failed', unclassified_total: 1,
+      detail_clients_failed: 1, unclassified_reasons: { detail_fetch_failed: 1 }, detail_http_status_counts: {} });
+    expect(body).not.toHaveProperty('parse_stage');
+    expect(JSON.stringify(body)).not.toContain('private');
+    expect(http).toHaveBeenCalledTimes(4);
+    expect(http.mock.calls.some(([, init]) => init.method === 'POST')).toBe(false);
   });
 
   it('reports only aggregate reasons and failed HTTP attempts on the existing page 409', async () => {
@@ -193,7 +228,7 @@ describe('census HTTP failure and publication boundary', () => {
     let resolveBody!: (value: unknown) => void;
     const body = new Promise((resolve) => { resolveBody = resolve; });
     const http = vi.fn().mockResolvedValueOnce(response(page([active])))
-      .mockResolvedValueOnce({ ok: true, status: 200, json: () => body });
+      .mockResolvedValueOnce({ ok: true, status: 200, headers: new Headers(), arrayBuffer: () => body });
     vi.stubGlobal('fetch', http);
     const pending = handleRequest(request());
     await vi.advanceTimersByTimeAsync(55_000);
@@ -201,7 +236,7 @@ describe('census HTTP failure and publication boundary', () => {
     expect(out.status).toBe(502);
     expect(await out.json()).toEqual({ error: 'sync_failed', code: 'timeout' });
     expect(http.mock.calls[1][1].signal.aborted).toBe(true);
-    resolveBody({ group: { group_role: 'Member' } });
+    resolveBody(new TextEncoder().encode(JSON.stringify({ group: { group_role: 'Member' } })).buffer);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(http).toHaveBeenCalledTimes(2);
   });
