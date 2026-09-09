@@ -76,6 +76,35 @@ not a proven atomic upstream snapshot. The legacy attendance, tenure and cohort
 histograms still describe raw clients and remain unchanged. Current dashboard
 views consume only the separate versioned student payload described below.
 
+### Page-failure diagnostics
+
+An otherwise completed page with unclassified clients or failed details still
+returns HTTP **409**, `error: "page_classification_failed"`, and writes no draft.
+Its response also contains `unclassified_total`, `detail_clients_failed`,
+`unclassified_reasons`, and `detail_http_status_counts`. Reasons are fixed keys:
+`invalid_detail_record`, `invalid_no_group_signins`, `invalid_group_or_missing_role`,
+`unrecognized_group_role`, `invalid_guardian_signins`, `invalid_client_id`, and
+`detail_fetch_failed`. Each unclassified client contributes to one reason; the
+reason counts sum to `unclassified_total`. These observe the existing rejection
+branches without changing classification.
+
+HTTP status counts include every non-2xx detail attempt, including retries that
+later succeed. Network failures and malformed JSON do not invent an HTTP failure
+status; exhausted attempts still contribute to `detail_fetch_failed`. The existing
+immediate 429 abort and whole-request timeout paths remain unchanged. Diagnostics
+are request-local aggregate counts only: no detail values, IDs, names, source
+roles, response bodies, headers or credentials are emitted or persisted. Page
+success responses, persisted rows and finalize behavior are unchanged.
+
+For an explicitly authorized one-page check, manually dispatch **Tenure Snapshot
+Clock** with `page_one_only=true`. This separate diagnostic step invokes page 1
+exactly once, prints only a validated aggregate failure payload or the existing
+aggregate success-summary fields, and then stops. A failing page fails the job;
+a passing page succeeds and may persist its normal page draft. Neither outcome
+requests page 2, finalize, or final-snapshot read-back. The input defaults to false
+and is considered only for manual dispatch; Monday scheduled runs retain their
+existing complete page/finalize/read-back command path.
+
 ### Reviewed deployment and read-back sequence (not executed here)
 
 1. Independent Reviewer checks exact function/module/workflow/schema bytes and

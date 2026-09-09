@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { computeRetentionAggregate, type RetentionAggregate } from './wodifyRetentionAggregate';
 import { buildStudentRetentionAggregate, mergeStudentRetentionAggregates } from './studentRetentionAggregate';
 import {
@@ -72,6 +72,32 @@ function aggregate(clientsScanned: number, activeTotal: number): RetentionAggreg
 }
 
 describe('classifyActiveClientDetail', () => {
+  it.each([
+    [null, { kind: 'unclassified' }, 'invalid_detail_record'],
+    [{ client: [] }, { kind: 'unclassified' }, 'invalid_detail_record'],
+    [{}, { kind: 'unclassified' }, 'invalid_no_group_signins'],
+    [{ group: null, total_class_sign_ins: '0' }, { kind: 'unclassified' }, 'invalid_no_group_signins'],
+    [{ group: [] }, { kind: 'unclassified' }, 'invalid_group_or_missing_role'],
+    [{ group: {} }, { kind: 'unclassified' }, 'invalid_group_or_missing_role'],
+    [{ group: { group_role: 'Unexpected' } }, { kind: 'unclassified' }, 'unrecognized_group_role'],
+    [{ group: { group_role: 'Guardian' }, total_class_sign_ins: -1 }, { kind: 'unclassified' }, 'invalid_guardian_signins'],
+    [{ group: { group_role: 'Member' }, total_class_sign_ins: 'invalid' }, { kind: 'student', path: 'member' }, null],
+    [{ group: { group_role: 'Dependent' } }, { kind: 'student', path: 'dependent' }, null],
+    [{ group: { group_role: 'Guardian' }, total_class_sign_ins: 1 }, { kind: 'student', path: 'guardian_with_signin' }, null],
+    [{ total_class_sign_ins: 1 }, { kind: 'student', path: 'no_group_with_signin' }, null],
+    [{ total_class_sign_ins: 0, has_membership: true }, { kind: 'guardian_only', ambiguousNoSigninWithMembership: true }, null],
+    [{ group: { group_role: 'Guardian' }, total_class_sign_ins: 0 }, { kind: 'guardian_only', ambiguousNoSigninWithMembership: false }, null],
+  ])('observes only the existing failure branch without changing classification (%#)', (raw, expected, reason) => {
+    const observer = vi.fn();
+    expect(classifyActiveClientDetail(raw)).toEqual(expected);
+    expect(classifyActiveClientDetail(raw, observer)).toEqual(expected);
+    if (reason === null) expect(observer).not.toHaveBeenCalled();
+    else {
+      expect(observer).toHaveBeenCalledTimes(1);
+      expect(observer).toHaveBeenCalledWith(reason);
+    }
+  });
+
   it('always counts Member and Dependent as students, independent of sign-ins', () => {
     expect(classifyActiveClientDetail({
       group: { group_role: 'Member' },

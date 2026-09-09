@@ -146,16 +146,30 @@ function normalizeGroupRole(raw: unknown): 'member' | 'dependent' | 'guardian' |
   return null;
 }
 
-/** Classify one successfully fetched active-client detail without retaining PII. */
-export function classifyActiveClientDetail(raw: unknown): CensusClassification {
+export type UnclassifiedDetailReason =
+  | 'invalid_detail_record'
+  | 'invalid_no_group_signins'
+  | 'invalid_group_or_missing_role'
+  | 'unrecognized_group_role'
+  | 'invalid_guardian_signins';
+
+/** The optional observer counts failure branches; classification is unchanged. */
+export function classifyActiveClientDetail(
+  raw: unknown,
+  onUnclassified?: (reason: UnclassifiedDetailReason) => void,
+): CensusClassification {
   const detail = normalizeDetailRecord(raw);
-  if (detail === null) return { kind: 'unclassified' };
+  if (detail === null) {
+    onUnclassified?.('invalid_detail_record');
+    return { kind: 'unclassified' };
+  }
 
   const groupRaw = detail.group;
   const hasNoGroup = !hasOwn(detail, 'group') || groupRaw === null || groupRaw === undefined;
   if (hasNoGroup) {
     const signIns = detail.total_class_sign_ins;
     if (typeof signIns !== 'number' || !Number.isInteger(signIns) || signIns < 0) {
+      onUnclassified?.('invalid_no_group_signins');
       return { kind: 'unclassified' };
     }
     if (signIns >= 1) return { kind: 'student', path: 'no_group_with_signin' };
@@ -168,10 +182,14 @@ export function classifyActiveClientDetail(raw: unknown): CensusClassification {
   // A present group must be an object with a recognized role. Empty/malformed
   // groups are not treated as "no group" because that would hide source drift.
   if (!isRecord(groupRaw) || !hasOwn(groupRaw, 'group_role')) {
+    onUnclassified?.('invalid_group_or_missing_role');
     return { kind: 'unclassified' };
   }
   const role = normalizeGroupRole(groupRaw.group_role);
-  if (role === null) return { kind: 'unclassified' };
+  if (role === null) {
+    onUnclassified?.('unrecognized_group_role');
+    return { kind: 'unclassified' };
+  }
   if (role === 'member' || role === 'dependent') {
     // These two roles are independently sufficient under the literal
     // definition; their classification never depends on the sign-in value.
@@ -179,6 +197,7 @@ export function classifyActiveClientDetail(raw: unknown): CensusClassification {
   }
   const signIns = detail.total_class_sign_ins;
   if (typeof signIns !== 'number' || !Number.isInteger(signIns) || signIns < 0) {
+    onUnclassified?.('invalid_guardian_signins');
     return { kind: 'unclassified' };
   }
   if (signIns >= 1) return { kind: 'student', path: 'guardian_with_signin' };

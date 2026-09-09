@@ -27,6 +27,7 @@ import {
   validateAndMergeCensus,
   type CensusObservation,
   type CensusPageDraft,
+  type UnclassifiedDetailReason,
 } from '../../../src/lib/gym/wodifyStudentCensus.ts';
 import {
   classifySyncError,
@@ -163,6 +164,14 @@ type DetailFetchResult =
   | { ok: true; detail: unknown; callsMade: number }
   | { ok: false; callsMade: number };
 
+// Request-local, counts-only diagnostics. Never added to persisted drafts or
+// success responses. HTTP counts include non-2xx attempts, including retries;
+// network/JSON failures have no failed HTTP status to count.
+type PageFailureDiagnostics = {
+  unclassified_reasons: Record<UnclassifiedDetailReason | 'invalid_client_id' | 'detail_fetch_failed', number>;
+  detail_http_status_counts: Record<string, number>;
+};
+
 // Sequential caller with a fixed inter-call cadence. 429 aborts the whole page
 // so the workflow stops and no draft/final row can be written. Timeouts, network
 // errors, malformed JSON, and 5xx responses get at most three attempts.
@@ -170,6 +179,7 @@ async function fetchClientDetail(
   apiKey: string,
   clientId: string,
   deadline: SyncDeadline,
+  diagnostics: PageFailureDiagnostics,
 ): Promise<DetailFetchResult> {
   let callsMade = 0;
 
@@ -181,6 +191,10 @@ async function fetchClientDetail(
         headers: { 'x-api-key': apiKey, accept: 'application/json' },
         signal: AbortSignal.timeout(WODIFY_TIMEOUT_MS),
       });
+      if (!res.ok) {
+        const status = String(res.status);
+        diagnostics.detail_http_status_counts[status] = (diagnostics.detail_http_status_counts[status] ?? 0) + 1;
+      }
       if (res.status === 429) throw new Error('wodify_detail_http_429');
       if (!res.ok) {
         const retryable = res.status === 408 || res.status >= 500;
@@ -208,6 +222,7 @@ async function buildCensusDraft(
   page: WodifyClientsPage,
   deadline: SyncDeadline,
   createdAt: string,
+  diagnostics: PageFailureDiagnostics,
 ): Promise<CensusPageDraft> {
   const observations: CensusObservation[] = [];
   const students: RawWodifyClient[] = []; // request-local only; persistence holds counts
@@ -219,6 +234,7 @@ async function buildCensusDraft(
 
     const clientId = normalizeClientId(row.id);
     if (clientId === null) {
+      diagnostics.unclassified_reasons.invalid_client_id += 1;
       observations.push({
         classification: { kind: 'unclassified' },
         detailCallsMade: 0,
@@ -227,8 +243,9 @@ async function buildCensusDraft(
       continue;
     }
 
-    const fetched = await fetchClientDetail(apiKey, clientId, deadline);
+    const fetched = await fetchClientDetail(apiKey, clientId, deadline, diagnostics);
     if (!fetched.ok) {
+      diagnostics.unclassified_reasons.detail_fetch_failed += 1;
       observations.push({
         classification: { kind: 'unclassified' },
         detailCallsMade: fetched.callsMade,
@@ -236,7 +253,9 @@ async function buildCensusDraft(
       });
       continue;
     }
-    const classification = classifyActiveClientDetail(fetched.detail);
+    const classification = classifyActiveClientDetail(fetched.detail, (reason) => {
+      diagnostics.unclassified_reasons[reason] += 1;
+    });
     if (classification.kind === 'student') students.push(row);
     observations.push({
       classification,
@@ -476,9 +495,26 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     if (input.mode === 'page') {
       const clientsPage = await fetchClientsPage(apiKey, input.page, deadline);
-      const draft = await buildCensusDraft(apiKey, clientsPage, deadline, startedAt);
+      const diagnostics: PageFailureDiagnostics = {
+        unclassified_reasons: {
+          invalid_detail_record: 0,
+          invalid_no_group_signins: 0,
+          invalid_group_or_missing_role: 0,
+          unrecognized_group_role: 0,
+          invalid_guardian_signins: 0,
+          invalid_client_id: 0,
+          detail_fetch_failed: 0,
+        },
+        detail_http_status_counts: {},
+      };
+      const draft = await buildCensusDraft(apiKey, clientsPage, deadline, startedAt, diagnostics);
       if (draft.unclassified !== 0 || draft.detailClientsFailed !== 0) {
-        return jsonResponse(409, { error: 'page_classification_failed' });
+        return jsonResponse(409, {
+          error: 'page_classification_failed',
+          unclassified_total: draft.unclassified,
+          detail_clients_failed: draft.detailClientsFailed,
+          ...diagnostics,
+        });
       }
       await persistCensusDraft(supabaseUrl, serviceKey, input.runId, draft, deadline);
       return jsonResponse(200, pageResponse(draft));

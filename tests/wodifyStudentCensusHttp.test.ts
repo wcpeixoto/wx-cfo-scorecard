@@ -84,6 +84,8 @@ describe('census HTTP failure and publication boundary', () => {
     expect(parseStudentRetentionAggregate(written.student_retention, '2026-09-09', 2)).not.toBeNull();
     expect(written.student_retention.daysAbsentHistogram.countsByDaysAbsent).toEqual({ '1': 2 });
     expect(written.student_retention.cohorts.cohorts.adults16plus).not.toHaveProperty('lapsed');
+    expect(written).not.toHaveProperty('unclassified_reasons');
+    expect(written).not.toHaveProperty('detail_http_status_counts');
   });
 
   it.each([
@@ -137,6 +139,54 @@ describe('census HTTP failure and publication boundary', () => {
     await vi.advanceTimersByTimeAsync(500);
     expect((await pending).status).toBe(409);
     expect(http).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports only aggregate reasons and failed HTTP attempts on the existing page 409', async () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({ ...active, id: i + 1 }));
+    const http = vi.fn().mockResolvedValueOnce(response(page(rows)))
+      .mockResolvedValueOnce(response(null))
+      .mockResolvedValueOnce(response({ total_class_sign_ins: 'private-value' }))
+      .mockResolvedValueOnce(response({ group: {}, email: 'private@example.invalid' }))
+      .mockResolvedValueOnce(response({ group: { group_role: 'private-role' } }))
+      .mockResolvedValueOnce(response({ group: { group_role: 'Guardian' }, total_class_sign_ins: null }))
+      .mockResolvedValueOnce(response({ private: 'http-body' }, 404))
+      .mockResolvedValueOnce(response({}, 503))
+      .mockResolvedValueOnce(response({}, 503))
+      .mockResolvedValueOnce(response({}, 503))
+      .mockRejectedValueOnce(new TypeError('private network URL'))
+      .mockRejectedValueOnce(new TypeError('private network URL'))
+      .mockRejectedValueOnce(new TypeError('private network URL'))
+      .mockResolvedValueOnce(new Response('invalid-json'))
+      .mockResolvedValueOnce(new Response('invalid-json'))
+      .mockResolvedValueOnce(new Response('invalid-json'))
+      // A failed HTTP attempt still counts when that client's retry succeeds.
+      .mockResolvedValueOnce(response({}, 503))
+      .mockResolvedValueOnce(response({ group: { group_role: 'Member' } }));
+    vi.stubGlobal('fetch', http);
+    const pending = handleRequest(request());
+    await vi.advanceTimersByTimeAsync(8_500);
+    const out = await pending;
+    expect(out.status).toBe(409);
+    const diagnostic = await out.json();
+    expect(diagnostic).toEqual({
+      error: 'page_classification_failed',
+      unclassified_total: 9,
+      detail_clients_failed: 4,
+      unclassified_reasons: {
+        invalid_detail_record: 1,
+        invalid_no_group_signins: 1,
+        invalid_group_or_missing_role: 1,
+        unrecognized_group_role: 1,
+        invalid_guardian_signins: 1,
+        invalid_client_id: 0,
+        detail_fetch_failed: 4,
+      },
+      detail_http_status_counts: { '404': 1, '503': 4 },
+    });
+    expect(Object.values(diagnostic.unclassified_reasons).reduce((sum: number, n) => sum + Number(n), 0))
+      .toBe(diagnostic.unclassified_total);
+    expect(http).toHaveBeenCalledTimes(18);
+    expect(http.mock.calls.some(([, init]) => init.method === 'POST')).toBe(false);
   });
 
   it('aborts a stalled response body at the whole-request deadline and never writes later', async () => {

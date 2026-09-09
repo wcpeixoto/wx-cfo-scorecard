@@ -14,7 +14,13 @@ name: Tenure Snapshot Clock
 "on":
   schedule:
     - cron: '0 12 * * 1'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      page_one_only:
+        description: 'Diagnose page 1 once; never continue or finalize'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -28,7 +34,70 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - name: Diagnose page one only
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.page_one_only }}
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SYNC_TRIGGER_SECRET: ${{ secrets.SYNC_TRIGGER_SECRET }}
+        run: |
+          set -euo pipefail
+          RUN_ID=$(cat /proc/sys/kernel/random/uuid)
+          jq -nc --arg run_id "$RUN_ID" '{mode:"page", run_id:$run_id, page:1}' > request.json
+          # Capture the body privately. No curl/parser error text reaches logs.
+          if ! HTTP_STATUS=$(curl --connect-timeout 10 --max-time 65 -s -X POST \
+            "$VITE_SUPABASE_URL/functions/v1/sync-wodify-retention" \
+            -H "Authorization: Bearer $VITE_SUPABASE_ANON_KEY" \
+            -H "apikey: $VITE_SUPABASE_ANON_KEY" \
+            -H "x-sync-trigger-secret: $SYNC_TRIGGER_SECRET" \
+            -H "Content-Type: application/json" \
+            --data-binary @request.json -o page-response.json \
+            --write-out '%{http_code}' 2>/dev/null); then
+            echo '{"error":"page_transport_failed"}'
+            exit 1
+          fi
+          if [ "$HTTP_STATUS" != "200" ]; then
+            if jq -ce '
+              def count: type == "number" and . >= 0 and . <= 9007199254740991 and floor == .;
+              select(type == "object" and .error == "page_classification_failed")
+              | {error: "page_classification_failed", unclassified_total, detail_clients_failed,
+                 unclassified_reasons: (.unclassified_reasons | {
+                   invalid_detail_record, invalid_no_group_signins, invalid_group_or_missing_role,
+                   unrecognized_group_role, invalid_guardian_signins, invalid_client_id, detail_fetch_failed
+                 }),
+                 detail_http_status_counts: (.detail_http_status_counts
+                   | with_entries(select(.key | test("^[1-5][0-9]{2}$"))))}
+              | select((.unclassified_total | count) and (.detail_clients_failed | count)
+                and (.unclassified_reasons | all(.[]; count))
+                and (.detail_http_status_counts | all(.[]; count)))
+            ' page-response.json > page-diagnostic.json 2>/dev/null; then
+              cat page-diagnostic.json
+            else
+              echo '{"error":"invalid_page_diagnostic"}'
+            fi
+            exit 1
+          fi
+          # Only the existing aggregate page-summary fields may reach stdout.
+          if jq -ce '
+            def count: type == "number" and . >= 0 and . <= 9007199254740991 and floor == .;
+            select(type == "object" and .ok == true and .mode == "page")
+            | {page, pageSize, hasMore, rowsSeen, activeClientsSeen, studentTotal,
+               guardianOnly, unclassified, detailCallsMade, detailClientsFailed}
+            | select(.page == 1 and .pageSize == 25 and (.hasMore | type) == "boolean"
+              and ([.rowsSeen, .activeClientsSeen, .studentTotal, .guardianOnly,
+                    .unclassified, .detailCallsMade, .detailClientsFailed] | all(.[]; count))
+              and .rowsSeen <= 25 and .rowsSeen >= .activeClientsSeen
+              and .activeClientsSeen == (.studentTotal + .guardianOnly + .unclassified)
+              and .unclassified == 0 and .detailClientsFailed == 0)
+          ' page-response.json > page-diagnostic.json 2>/dev/null; then
+            cat page-diagnostic.json
+            exit 0
+          fi
+          echo '{"error":"invalid_page_summary"}'
+          exit 1
+
       - name: Build paged census and finalize snapshot
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.page_one_only) }}
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
@@ -107,6 +176,7 @@ jobs:
           echo "Finalize ok: $(jq -c '{ok, asOf, activeTotal, studentTotal, guardianOnlyTotal, unclassifiedTotal, pagesExpected, pagesCompleted}' response.json)"
 
       - name: Assert finalize response
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.page_one_only) }}
         run: |
           set -euo pipefail
           jq -e \
@@ -126,6 +196,7 @@ jobs:
           echo "Finalize asserts passed: $(jq -c '{activeTotal, studentTotal, guardianOnlyTotal, unclassifiedTotal, detailClientsFailed, pagesExpected, pagesCompleted}' response.json)"
 
       - name: Read back complete persisted snapshot
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.page_one_only) }}
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
