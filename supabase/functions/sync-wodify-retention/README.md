@@ -51,7 +51,7 @@ Detail 408/5xx, network errors and malformed JSON have at most three attempts;
 detail retries rejects the page without storing a new draft. List requests are
 not retried. Census pages contain at most 25 rows and page numbers must be 1..200
 (a numeric bound, not guaranteed 5,000-client runtime capacity: the one-hour
-freshness window and workflow timeout can bind first); overfull pages, empty nonterminal pages, an unterminated
+freshness window and workflow timeout can bind first); overfull pages, short nonterminal pages, an unterminated
 page 200, malformed pagination/rows, invalid identifiers
 and unrecognized wire statuses fail closed. Identifiers are transient in memory
 only: duplicates within a page and within the final full-list request reject.
@@ -189,7 +189,44 @@ legacy safe `parse_error` code. No stack, arbitrary exception text, URL, raw bod
 identifier, record value, or other header is logged. Scheduled/full-run shell
 blocks and their output remain unchanged.
 
-### Pagination observations (prospective v30 candidate, not deployed)
+### Returned-count pagination correction (prospective v31, not deployed)
+
+Live v30 was confirmed current read-only before this build. The page-41 probe
+established 21 returned rows, `page_size=21`, and boolean `has_more=false`.
+Forty full census pages plus that terminal page total **40 × 25 + 21 = 1,021**
+rows if the population is unchanged, not 1,025. This is dated evidence, not a
+hard-coded stop or acceptance total.
+
+`CENSUS_PAGE_SIZE=25` is request capacity; response `pagination.page_size` is
+the count returned and must strictly equal `clients.length`, at most capacity.
+`has_more` must be a boolean. Only false means terminal; shortness never does.
+True requires a full page and must not occur at the maximum page. Terminal
+short, full and empty pages are valid when their returned counts match: an empty
+terminal is an explicit upstream end marker, not an inferred one. Page echo,
+sequence coverage, exactly one terminal and whole-population reconciliation
+remain required. Separate bulk retention fetches retain capacity **100**, with
+the same response-count invariant; they are not census detail pages.
+
+Persisted current-census drafts enforce safe nonnegative `pageSize=rowsSeen`
+through 25 and a full nonterminal page. The new migration
+`20260910005116_wodify_census_returned_page_size.sql` changes only the named
+page-size constraint; it does not edit migration `20260909140516` or its history.
+Existing 25/25 drafts survive unchanged. Legacy size-100 rows remain stored under
+the existing conservation checks but remain ineligible for census finalize.
+Both workflow success guards follow the same contract. The full-run guard hash
+changes deliberately; schedule, concurrency, authorization, dynamic page loop,
+finalize and readback scripts remain otherwise unchanged. Workflow remains disabled.
+
+Diagnostic fields/privacy are unchanged. The ordered failure enum now mirrors
+the corrected predicate: `page_mismatch`, `page_size_row_count_mismatch`,
+`page_size_exceeds_requested`, `has_more_type`, `row_count_exceeds_requested`,
+`short_nonterminal`, `max_page_nonterminal`. The last two retain the predicate's
+truthiness for malformed values, which also fail the boolean/type check.
+Independent review and disposable local migration validation precede any live
+schema/function change. No retry or production run is part of this build.
+PR #559 still requires a fresh whole-PR review before merge.
+
+### Pagination observations (deployed in v30; historical probe contract)
 
 The read-only function inventory confirmed v29 remains current during this build.
 The actual v29 page-41 probe, run `34419644471`, reported `clients_pagination`,
@@ -315,7 +352,8 @@ with 25 Active clients and one-second simulated HTTP responses completes in
 latency. Finalize uses separate 100-row bulk pages, at most 50, with no detail
 requests; its 55-second deadline still applies. Workflow remains bounded to one
 hour. The schema tolerates legacy 100-row drafts for nondestructive upgrades,
-but runtime finalize requires 25-row drafts with a valid versioned payload.
+but runtime finalize accepts only returned counts 0..25 with a valid versioned
+payload, exactly matching rows_seen and requiring 25 for nonterminal pages.
 
 ## Shared implementation
 

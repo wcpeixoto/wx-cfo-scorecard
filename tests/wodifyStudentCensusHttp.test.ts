@@ -13,13 +13,13 @@ let handleRequest: (req: Request) => Promise<Response>;
 const runId = '8d4e4e10-9fa6-4bbf-b5e7-7d78a0c0e811';
 const now = '2026-09-09T12:00:00.000Z';
 const response = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
-const page = (clients: unknown[], n = 1, hasMore = false, pageSize = 25) => ({
+const page = (clients: unknown[], n = 1, hasMore = false, pageSize = clients.length) => ({
   clients, pagination: { page: n, page_size: pageSize, has_more: hasMore },
 });
 const active = { id: 1, client_status: 'Active', last_attendance: '2026-09-08' };
 const storedDraft = {
   student_retention: buildStudentRetentionAggregate([active], '2026-09-09'),
-  created_at: now, page: 1, page_size: 25, has_more: false, rows_seen: 1,
+  created_at: now, page: 1, page_size: 1, has_more: false, rows_seen: 1,
   active_clients_seen: 1, student_total: 1, student_member: 1,
   student_dependent: 0, student_guardian_with_signin: 0, student_no_group_with_signin: 0,
   guardian_only: 0, unclassified: 0, ambiguous_no_signin_with_membership: 0,
@@ -41,7 +41,16 @@ beforeEach(async () => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('census HTTP failure and publication boundary', () => {
-  it('preserves the v29 predicate across types, missing fields, row counts and the cap', async () => {
+  it.each([0, 21, 25])('persists a valid terminal page of %s rows', async (rows) => {
+    const http = vi.fn().mockResolvedValueOnce(response(page(Array.from({ length: rows }, (_, id) => ({ id: id + 1, client_status: 'Inactive' })), 41)))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }));
+    vi.stubGlobal('fetch', http);
+    const out = await handleRequest(request('page', 41));
+    expect(out.status).toBe(200);
+    expect(await out.json()).toMatchObject({ pageSize: rows, rowsSeen: rows, hasMore: false });
+    expect(JSON.parse(http.mock.calls[1][1].body)).toMatchObject({ page_size: rows, rows_seen: rows, has_more: false });
+  });
+  it('enforces returned-size semantics across types, missing fields, row counts and the cap', async () => {
     const shapes: Record<string, unknown>[] = [
       {}, { page: 41, page_size: 25, has_more: false },
       ...[null, false, true, 0, 1.5, 42, '41', '25', 'false', 'true', 'private-secret', [], { private: 'secret' }]
@@ -51,9 +60,8 @@ describe('census HTTP failure and publication boundary', () => {
     ];
     for (const pagination of shapes) for (const rows of [0, 1, 25, 26]) {
       const requested = pagination.page === 200 ? 200 : 41;
-      // Exact v29 acceptance predicate, independent of the observation helper.
-      const rejected = pagination.page !== requested || pagination.page_size !== 25 || typeof pagination.has_more !== 'boolean'
-        || rows > 25 || Boolean(pagination.has_more && (rows === 0 || requested === 200));
+      const rejected = pagination.page !== requested || pagination.page_size !== rows || (pagination.page_size as number) > 25 || typeof pagination.has_more !== 'boolean'
+        || rows > 25 || Boolean(pagination.has_more && (pagination.page_size !== 25 || requested === 200));
       const http = vi.fn().mockResolvedValueOnce(response({ pagination,
         clients: Array.from({ length: rows }, (_, id) => ({ id: id + 1, client_status: 'Inactive' })) }))
         .mockResolvedValueOnce(new Response(null, { status: 201 }));
@@ -136,7 +144,7 @@ describe('census HTTP failure and publication boundary', () => {
       outer_json_valid: true, response_content_type: 'text/plain',
       response_body_bytes: new TextEncoder().encode(JSON.stringify(page(clients as unknown[]))).byteLength,
       response_body_bytes_overflow: false,
-      ...(stage === 'clients_pagination' ? { pagination: observePagination(page([]).pagination, (clients as unknown[]).length, 1, 25, 200) } : {}) });
+      ...(stage === 'clients_pagination' ? { pagination: observePagination(page(clients as unknown[]).pagination, (clients as unknown[]).length, 1, 25, 200) } : {}) });
     expect(http).toHaveBeenCalledTimes(1);
   });
 
@@ -276,15 +284,16 @@ describe('census HTTP failure and publication boundary', () => {
   });
 
   it('rejects duplicate identities across pages during the independent final scan', async () => {
-    const http = vi.fn().mockResolvedValueOnce(response(page([active], 1, true, 100)))
-      .mockResolvedValueOnce(response(page([active], 2, false, 100)));
+    const full = Array.from({ length: 100 }, (_, i) => ({ ...active, id: i + 1 }));
+    const http = vi.fn().mockResolvedValueOnce(response(page(full, 1, true)))
+      .mockResolvedValueOnce(response(page([active], 2, false)));
     vi.stubGlobal('fetch', http);
     expect((await handleRequest(request('finalize'))).status).toBe(502);
     expect(http).toHaveBeenCalledTimes(2);
   });
 
   it.each(['2026-09-09T10:59:59Z', 'invalid'])('does not publish stale drafts (%s)', async (created_at) => {
-    const http = vi.fn().mockResolvedValueOnce(response(page([active], 1, false, 100)))
+    const http = vi.fn().mockResolvedValueOnce(response(page([active], 1, false)))
       .mockResolvedValueOnce(response([{ ...storedDraft, created_at }]));
     vi.stubGlobal('fetch', http);
     expect((await handleRequest(request('finalize'))).status).toBe(409);
@@ -292,7 +301,7 @@ describe('census HTTP failure and publication boundary', () => {
   });
 
   it('publishes a fresh complete run, preserving legacy aggregates and the same-day dues payload', async () => {
-    const http = vi.fn().mockResolvedValueOnce(response(page([active], 1, false, 100)))
+    const http = vi.fn().mockResolvedValueOnce(response(page([active], 1, false)))
       .mockResolvedValueOnce(response([storedDraft]))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(null, { status: 201 }));

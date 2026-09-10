@@ -23,29 +23,30 @@ const steps = workflow.split(/^      - name: /m).slice(1);
 const script = (step: string) => step.split('        run: |\n')[1].replace(/^          /gm, '').trim();
 
 describe('manual single-page diagnostic isolation', () => {
-  it('retains the exact v29 pagination predicate before adding observations at the same throw', () => {
+  it('pins the returned-count pagination predicate and its diagnostic observation', () => {
     expect(edgeFunction).toContain(`  if (
     page !== requestedPage
-    || pageSize !== pageSizeRequested
+    || pageSize !== body.clients.length
+    || pageSize > pageSizeRequested
     || typeof hasMore !== 'boolean'
     || body.clients.length > pageSizeRequested
-    || (hasMore && (body.clients.length === 0 || requestedPage === maxPages))
+    || (hasMore && (pageSize !== pageSizeRequested || requestedPage === maxPages))
   ) {
     throw new WodifyParseError('clients_pagination', metadata,
       observePagination(body.pagination, body.clients.length, requestedPage, pageSizeRequested, maxPages));
   }`);
   });
-  it('keeps the scheduled command paths byte-identical to the reviewed census baseline', () => {
+  it('pins the updated returned-count full-run guard and preserves schedule/dispatch selection', () => {
     expect(workflow).toContain("- cron: '0 12 * * 1'");
     expect(workflow).toContain('type: number\n        required: false\n        default: 0');
     expect(steps).toHaveLength(4);
     expect(steps[0]).toContain("if: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic_page != 0 }}");
     expect(steps[0]).toContain('DIAGNOSTIC_PAGE: ${{ inputs.diagnostic_page }}');
     const expectedHashes = [
-      'deb92662c2b4d1c801d7d3a3d3fc8aa306e604afaee75f440e9786c097316205',
+      'a7cf386b778154014d05c046bc48127c6a4498afc411853d17025d940156afce',
       '9a06d7e0a593c188ec101dd8031874679a83371e7d0eed340af3e6362115d9f9',
       '714923b4d4dde9cf7b2c97d42dc8c27c02b829d9ad0985852a5ca4a5369b0817',
-    ]; // run blocks at c4a27b87e68e72ebba42da420eef7e424df2ca66
+    ]; // Only the first block changes for returned-count validation; other blocks retain the baseline.
     steps.slice(1).forEach((step, i) => {
       expect(step).toContain("if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.diagnostic_page != 0) }}");
       expect(createHash('sha256').update(script(step)).digest('hex')).toBe(expectedHashes[i]);
@@ -61,7 +62,7 @@ describe('manual single-page diagnostic isolation', () => {
     unclassified_reasons: reasons, detail_http_status_counts: { '503': 1 },
   };
   const summary = {
-    page: 200, pageSize: 25, hasMore: true, rowsSeen: 1, activeClientsSeen: 1,
+    page: 200, pageSize: 1, hasMore: false, rowsSeen: 1, activeClientsSeen: 1,
     studentTotal: 1, guardianOnly: 0, unclassified: 0, detailCallsMade: 1, detailClientsFailed: 0,
   };
   const invalidSummary = { origin: 'workflow_response_validation', error: 'invalid_page_summary', http_status: 200 };
@@ -75,6 +76,10 @@ describe('manual single-page diagnostic isolation', () => {
   const safeParseFailure = { ...parseFailure, origin: 'edge_function', http_status: 502 };
 
   it.each([
+    ...[0, 21, 25].map((rows) => ['200', { ok: true, mode: 'page', ...summary, page: 41, rowsSeen: rows,
+      pageSize: rows, activeClientsSeen: 0, studentTotal: 0, detailCallsMade: 0 }, 0,
+      { ...summary, page: 41, rowsSeen: rows, pageSize: rows, activeClientsSeen: 0, studentTotal: 0, detailCallsMade: 0 }, 0]),
+    ['200', { ok: true, mode: 'page', ...summary, page: 41, pageSize: 21, rowsSeen: 21, hasMore: true }, 1, invalidSummary, 0],
     ['502', { ...parseFailure, pagination: { ...pagination, private: 'private-secret' } }, 1, { ...safeParseFailure, pagination }, 0],
     ...[
       { page_type: 'private-secret' }, { page_digit_string: 'private-secret' }, { page_digit_string: '41\n' },
@@ -211,10 +216,10 @@ describe('paged census persistence contract', () => {
   it('orchestrates page then finalize without moving data credentials into Actions', () => {
     expect(workflow).toContain('cancel-in-progress: false');
     expect(workflow).toContain('timeout-minutes: 60');
-    expect(workflow).toContain('and .pageSize == 25');
+    expect(workflow).toContain('and .pageSize == .rowsSeen');
     expect(workflow).toContain('"$PAGE" -gt 200');
     expect(migration).toContain('page between 1 and 200');
-    expect(migration).toContain('page_size in (25, 100)');
+    expect(migration).toContain('page_size between 0 and 25 and page_size = rows_seen');
     expect(workflow.match(/curl --fail-with-body --connect-timeout 10 --max-time /g)).toHaveLength(3);
     expect(workflow).toContain("'{mode:\"page\", run_id:$run_id, page:$page}'");
     expect(workflow).toContain("'{mode:\"finalize\", run_id:$run_id}'");

@@ -42,7 +42,7 @@ function draft(
       .filter((o) => o.classification.kind === 'student').map(() => ({ client_status: 'Active' })), '2026-09-09'),
     createdAt: '2026-09-09T11:59:00.000Z',
     page,
-    pageSize: CENSUS_PAGE_SIZE,
+    pageSize: rowsSeen,
     hasMore,
     rowsSeen,
     observations,
@@ -242,10 +242,24 @@ describe('summarizeCensusPage', () => {
 
 describe('validateAndMergeCensus', () => {
   const goodDrafts = [
-    draft(1, true, [student('member'), guardianOnly()], 3),
+    draft(1, true, [student('member'), guardianOnly()], 25),
     draft(2, false, [student('dependent')], 2),
   ];
-  const goodAggregate = aggregate(5, 3);
+  const goodAggregate = aggregate(27, 3);
+
+  it.each([0, 21, 25])('accepts a terminal page of %s rows and preserves conservation', (rows) => {
+    expect(validateAndMergeCensus([draft(1, true, [], 25), draft(2, false, [], rows)], aggregate(25 + rows, 0)).ok).toBe(true);
+  });
+  it.each([
+    { pageSize: 21, rowsSeen: 21, hasMore: true },
+    { pageSize: 25, rowsSeen: 21, hasMore: false },
+    { pageSize: 26, rowsSeen: 26, hasMore: false },
+    { pageSize: -1, rowsSeen: 0, hasMore: false },
+    { pageSize: 1.5, rowsSeen: 1, hasMore: false },
+    { pageSize: Number.MAX_SAFE_INTEGER + 1, rowsSeen: 0, hasMore: false },
+  ])('rejects invalid stored pagination %#', (fields) => {
+    expect(validateAndMergeCensus([{ ...draft(1, false, [], 0), ...fields }], aggregate(0, 0)).ok).toBe(false);
+  });
 
   it('merges all pages and passes every conservation gate', () => {
     const result = validateAndMergeCensus(goodDrafts, goodAggregate);
@@ -291,8 +305,8 @@ describe('validateAndMergeCensus', () => {
   it.each([
     ['missing page', [goodDrafts[1]], 'missing_page'],
     ['two terminals', [draft(1, false, [student('member')], 3), goodDrafts[1]], 'terminal_page_count'],
-    ['page above terminal', [draft(1, false, [student('member')], 3), draft(2, true, [student('dependent')], 2)], 'page_above_terminal'],
-    ['rows_seen mismatch', [goodDrafts[0], { ...goodDrafts[1], rowsSeen: 1 }], 'rows_seen_mismatch'],
+    ['page above terminal', [draft(1, false, [student('member')], 3), draft(2, true, [student('dependent')], 25)], 'page_above_terminal'],
+    ['rows_seen mismatch', [goodDrafts[0], { ...goodDrafts[1], rowsSeen: 1, pageSize: 1 }], 'rows_seen_mismatch'],
     ['active_clients_seen mismatch', [goodDrafts[0], { ...goodDrafts[1], activeClientsSeen: 0 }], 'active_clients_seen_mismatch'],
     ['unclassified', [goodDrafts[0], draft(2, false, [unclassified()], 2)], 'unclassified_not_zero'],
     ['detail failure', [goodDrafts[0], { ...goodDrafts[1], detailClientsFailed: 1 }], 'detail_clients_failed_not_zero'],
@@ -315,7 +329,7 @@ describe('validateAndMergeCensus', () => {
   it('rejects preserved legacy drafts and incomplete student aggregates', () => {
     const legacy = validateAndMergeCensus(goodDrafts.map((d) => ({ ...d, pageSize: 100 })), goodAggregate);
     expect(legacy.ok).toBe(false);
-    if (!legacy.ok) expect(legacy.conflict.code).toBe('page_size_mismatch');
+    if (!legacy.ok) expect(legacy.conflict.code).toBe('invalid_draft');
     const missing = validateAndMergeCensus([{ ...goodDrafts[0], studentAggregate: null }, goodDrafts[1]], goodAggregate);
     expect(missing.ok).toBe(false);
     if (!missing.ok) expect(missing.conflict.code).toBe('invalid_student_aggregate');

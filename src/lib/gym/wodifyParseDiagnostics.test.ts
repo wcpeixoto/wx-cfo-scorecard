@@ -4,10 +4,10 @@ const run = <T>(operation: Promise<T>) => operation;
 
 describe('pagination observations never coerce the contract', () => {
   it.each([
-    [{}, ['page_mismatch', 'page_size_mismatch', 'has_more_type']],
-    [{ page: 2, page_size: 25, has_more: false }, ['page_mismatch']],
-    [{ page: 1, page_size: 24, has_more: false }, ['page_size_mismatch']],
-    [{ page: 1, page_size: 25, has_more: null }, ['has_more_type']],
+    [{}, ['page_mismatch', 'page_size_row_count_mismatch', 'has_more_type']],
+    [{ page: 2, page_size: 1, has_more: false }, ['page_mismatch']],
+    [{ page: 1, page_size: 24, has_more: false }, ['page_size_row_count_mismatch']],
+    [{ page: 1, page_size: 1, has_more: null }, ['has_more_type']],
   ])('lists all failed predicates in fixed order (%#)', (fields, expected) => {
     expect(observePagination(fields, 1, 1, 25, 200).pagination_failures).toEqual(expected);
   });
@@ -16,12 +16,12 @@ describe('pagination observations never coerce the contract', () => {
       page_present: true, page_type: 'string', page_integer: null, page_digit_string: '041',
       page_size_present: true, page_size_type: 'number', page_size_integer: 25, page_size_digit_string: null,
       has_more_present: true, has_more_type: 'string', has_more_boolean: null, has_more_string_boolean: 'false',
-      client_row_count: 0, pagination_failures: ['page_mismatch', 'has_more_type', 'empty_nonterminal'],
+      client_row_count: 0, pagination_failures: ['page_mismatch', 'page_size_row_count_mismatch', 'has_more_type'],
     });
     expect(observePagination({}, 0, 1, 25, 200)).toMatchObject({ page_present: false, page_type: 'missing',
       page_size_present: false, page_size_type: 'missing', has_more_present: false, has_more_type: 'missing' });
   });
-  it.each([null, true, 1.5, Number.MAX_SAFE_INTEGER + 1, '1234567', '12\n', '-1', 'private-secret', ['private-secret'], { private: 'secret' }])(
+  it.each([null, true, 1.5, Number.MAX_SAFE_INTEGER + 1, '1234567', '12\n', '-1', 'private-secret', ['private-secret'], { private: 'secret' }, { valueOf: null, toString: null }])(
     'does not reflect unsafe scalar values or nested content (%#)', (value) => {
       const out = observePagination({ page: value, page_size: value, has_more: value, private: 'secret' }, 0, 200, 25, 200);
       expect(out.page_integer).toBeNull();
@@ -31,10 +31,12 @@ describe('pagination observations never coerce the contract', () => {
     });
   it('mirrors each row/cap predicate and preserves valid empty and short terminal observations', () => {
     expect(observePagination({ page: 200, page_size: 25, has_more: true }, 0, 200, 25, 200).pagination_failures)
-      .toEqual(['empty_nonterminal', 'max_page_nonterminal']);
+      .toEqual(['page_size_row_count_mismatch', 'max_page_nonterminal']);
     expect(observePagination({ page: 200, page_size: 25, has_more: true }, 26, 200, 25, 200).pagination_failures)
-      .toEqual(['row_count_exceeds_requested', 'max_page_nonterminal']);
-    for (const rows of [0, 1, 25]) expect(observePagination({ page: 41, page_size: 25, has_more: false }, rows, 41, 25, 200).pagination_failures).toEqual([]);
+      .toEqual(['page_size_row_count_mismatch', 'row_count_exceeds_requested', 'max_page_nonterminal']);
+    for (const rows of [0, 1, 21, 25]) expect(observePagination({ page: 41, page_size: rows, has_more: false }, rows, 41, 25, 200).pagination_failures).toEqual([]);
+    expect(observePagination({ page: 41, page_size: 21, has_more: true }, 21, 41, 25, 200).pagination_failures).toEqual(['short_nonterminal']);
+    expect(observePagination({ page: 41, page_size: 26, has_more: false }, 26, 41, 25, 200).pagination_failures).toEqual(['page_size_exceeds_requested', 'row_count_exceeds_requested']);
   });
 });
 

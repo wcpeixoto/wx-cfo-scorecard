@@ -110,8 +110,8 @@ jobs:
                       and ($p.has_more_string_boolean == null or ($p.has_more_type == "string" and ($p.has_more_string_boolean | IN("true","false"))))
                       and ($p.client_row_count | safe_integer) and $p.client_row_count >= 0
                       and ($p.pagination_failures | type) == "array" and ($p.pagination_failures | length) >= 1
-                      and ($p.pagination_failures | length) <= 6
-                      and ($p.pagination_failures | all(.[]; IN("page_mismatch","page_size_mismatch","has_more_type","row_count_exceeds_requested","empty_nonterminal","max_page_nonterminal")))
+                      and ($p.pagination_failures | length) <= 7
+                      and ($p.pagination_failures | all(.[]; IN("page_mismatch","page_size_row_count_mismatch","page_size_exceeds_requested","has_more_type","row_count_exceeds_requested","short_nonterminal","max_page_nonterminal")))
                       and ($p.pagination_failures | unique | length) == ($p.pagination_failures | length)
                       then {pagination:$p} else {} end end;
                 {origin: "gateway_or_unrecognized_response", error: "unrecognized_http_response",
@@ -162,7 +162,8 @@ jobs:
             select(type == "object" and .ok == true and .mode == "page")
             | {page, pageSize, hasMore, rowsSeen, activeClientsSeen, studentTotal,
                guardianOnly, unclassified, detailCallsMade, detailClientsFailed}
-            | select(.page == $requested_page and .pageSize == 25 and (.hasMore | type) == "boolean"
+            | select(.page == $requested_page and (.pageSize | count) and .pageSize == .rowsSeen and .pageSize <= 25
+              and (.hasMore | type) == "boolean" and (if .hasMore then .pageSize == 25 and .page < 200 else true end)
               and ([.rowsSeen, .activeClientsSeen, .studentTotal, .guardianOnly,
                     .unclassified, .detailCallsMade, .detailClientsFailed] | all(.[]; count))
               and .rowsSeen <= 25 and .rowsSeen >= .activeClientsSeen
@@ -205,7 +206,9 @@ jobs:
               '.ok == true
                and .mode == "page"
                and .page == $page
-               and .pageSize == 25
+               and (.pageSize | type) == "number" and .pageSize >= 0 and .pageSize <= 25
+               and (.pageSize | floor) == .pageSize and .pageSize == .rowsSeen
+               and (if .hasMore then .pageSize == 25 and .page < 200 else true end)
                and (.hasMore | type) == "boolean"
                and (.studentsByPath | type) == "object"
                and (.studentsByPath | length) == 4

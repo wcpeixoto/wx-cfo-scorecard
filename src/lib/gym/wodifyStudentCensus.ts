@@ -343,13 +343,14 @@ export function validateAndMergeCensus(
   now: Date = new Date(aggregate.fetchedAt),
 ): FinalizeValidationResult {
   for (const draft of drafts) {
-    const counters = [draft.page, draft.rowsSeen, draft.activeClientsSeen,
+    const counters = [draft.page, draft.pageSize, draft.rowsSeen, draft.activeClientsSeen,
       draft.studentTotal, ...Object.values(draft.studentsByPath), draft.guardianOnly,
       draft.unclassified, draft.ambiguousNoSigninWithMembership,
       draft.detailCallsMade, draft.detailClientsFailed];
     if (counters.some((n) => !Number.isSafeInteger(n) || n < 0)
       || draft.page < 1 || draft.page > CENSUS_MAX_PAGES
-      || draft.rowsSeen > CENSUS_PAGE_SIZE || (draft.hasMore && draft.rowsSeen === 0)
+      || draft.pageSize > CENSUS_PAGE_SIZE || draft.pageSize !== draft.rowsSeen
+      || (draft.hasMore && (draft.pageSize !== CENSUS_PAGE_SIZE || draft.page === CENSUS_MAX_PAGES))
       || typeof draft.hasMore !== 'boolean') {
       return reject('invalid_draft', 'valid', 0, 'expected', 1);
     }
@@ -381,17 +382,6 @@ export function validateAndMergeCensus(
     if (!uniquePages.has(page)) {
       return reject('missing_page', 'pagesPresent', uniquePages.size, 'pagesExpected', terminalPage);
     }
-  }
-
-  const wrongPageSize = drafts.find((draft) => draft.pageSize !== CENSUS_PAGE_SIZE);
-  if (wrongPageSize) {
-    return reject(
-      'page_size_mismatch',
-      'pageSize',
-      wrongPageSize.pageSize,
-      'expectedPageSize',
-      CENSUS_PAGE_SIZE,
-    );
   }
 
   if (aggregate.dataQuality.reachedPageCap) {

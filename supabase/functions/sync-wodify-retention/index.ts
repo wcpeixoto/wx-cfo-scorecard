@@ -111,10 +111,11 @@ async function fetchClientsPage(apiKey: string, requestedPage: number, deadline:
   const hasMore = body.pagination.has_more;
   if (
     page !== requestedPage
-    || pageSize !== pageSizeRequested
+    || pageSize !== body.clients.length
+    || pageSize > pageSizeRequested
     || typeof hasMore !== 'boolean'
     || body.clients.length > pageSizeRequested
-    || (hasMore && (body.clients.length === 0 || requestedPage === maxPages))
+    || (hasMore && (pageSize !== pageSizeRequested || requestedPage === maxPages))
   ) {
     throw new WodifyParseError('clients_pagination', metadata,
       observePagination(body.pagination, body.clients.length, requestedPage, pageSizeRequested, maxPages));

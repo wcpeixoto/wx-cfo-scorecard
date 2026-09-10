@@ -265,7 +265,7 @@ create table if not exists public.wodify_census_runs (
   run_id uuid not null,
   page integer not null check (page between 1 and 200),
   created_at timestamptz not null default now(),
-  page_size integer not null check (page_size in (25, 100)),
+  page_size integer not null,
   student_retention jsonb null,
   has_more boolean not null,
   rows_seen integer not null check (rows_seen >= 0),
@@ -299,7 +299,7 @@ create index if not exists wodify_census_runs_created_at_idx
   on public.wodify_census_runs (created_at);
 
 -- Preserve old count-only drafts; runtime rejects size=100 or missing student
--- payloads. New collection uses 25 only.
+-- payloads. Current census page_size is rows returned, with requested capacity 25.
 alter table public.wodify_census_runs
   add column if not exists student_retention jsonb null;
 alter table public.wodify_census_runs
@@ -307,7 +307,12 @@ alter table public.wodify_census_runs
   drop constraint if exists wodify_census_runs_page_size_check;
 alter table public.wodify_census_runs
   add constraint wodify_census_runs_page_check check (page between 1 and 200),
-  add constraint wodify_census_runs_page_size_check check (page_size in (25, 100));
+  add constraint wodify_census_runs_page_size_check check (
+    page_size = 100 or (
+      page_size between 0 and 25 and page_size = rows_seen
+      and (not has_more or (page_size = 25 and page < 200))
+    )
+  );
 
 alter table public.wodify_census_runs enable row level security;
 

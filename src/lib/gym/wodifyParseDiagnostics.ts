@@ -15,7 +15,7 @@ export type PaginationDiagnostic = {
   page_size_present: boolean; page_size_type: JsonFieldType; page_size_integer: number | null; page_size_digit_string: string | null;
   has_more_present: boolean; has_more_type: JsonFieldType; has_more_boolean: boolean | null; has_more_string_boolean: 'true' | 'false' | null;
   client_row_count: number;
-  pagination_failures: ('page_mismatch' | 'page_size_mismatch' | 'has_more_type' | 'row_count_exceeds_requested' | 'empty_nonterminal' | 'max_page_nonterminal')[];
+  pagination_failures: ('page_mismatch' | 'page_size_row_count_mismatch' | 'page_size_exceeds_requested' | 'has_more_type' | 'row_count_exceeds_requested' | 'short_nonterminal' | 'max_page_nonterminal')[];
 };
 
 /** Observe only after the original predicate failed; this never decides acceptance. */
@@ -28,11 +28,14 @@ export function observePagination(pagination: Record<string, unknown>, rows: num
   const page = pagination.page, pageSize = pagination.page_size, hasMore = pagination.has_more;
   const failures: PaginationDiagnostic['pagination_failures'] = [];
   if (page !== requested) failures.push('page_mismatch');
-  if (pageSize !== size) failures.push('page_size_mismatch');
+  if (pageSize !== rows) failures.push('page_size_row_count_mismatch');
+  // The fetch check reaches this comparison only after strict equality to an
+  // array length has established a number. Never coerce malformed objects here.
+  if (typeof pageSize === 'number' && pageSize > size) failures.push('page_size_exceeds_requested');
   if (typeof hasMore !== 'boolean') failures.push('has_more_type');
   if (rows > size) failures.push('row_count_exceeds_requested');
   // Deliberately mirror the original truthiness, including wrong-type values.
-  if (hasMore && rows === 0) failures.push('empty_nonterminal');
+  if (hasMore && pageSize !== size) failures.push('short_nonterminal');
   if (hasMore && requested === max) failures.push('max_page_nonterminal');
   return {
     page_present: present('page'), page_type: kind('page'), page_integer: integer(page), page_digit_string: digits(page),
