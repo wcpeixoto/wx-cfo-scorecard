@@ -21,7 +21,7 @@ describe('pagination observations never coerce the contract', () => {
     expect(observePagination({}, 0, 1, 25, 200)).toMatchObject({ page_present: false, page_type: 'missing',
       page_size_present: false, page_size_type: 'missing', has_more_present: false, has_more_type: 'missing' });
   });
-  it.each([null, true, 1.5, Number.MAX_SAFE_INTEGER + 1, '1234567', '12\n', '-1', 'private-secret', ['private-secret'], { private: 'secret' }, { valueOf: null, toString: null }])(
+  it.each<unknown>([null, true, 1.5, Number.MAX_SAFE_INTEGER + 1, '1234567', '12\n', '-1', 'private-secret', ['private-secret'], { private: 'secret' }, { valueOf: null, toString: null }])(
     'does not reflect unsafe scalar values or nested content (%#)', (value) => {
       const out = observePagination({ page: value, page_size: value, has_more: value, private: 'secret' }, 0, 200, 25, 200);
       expect(out.page_integer).toBeNull();
