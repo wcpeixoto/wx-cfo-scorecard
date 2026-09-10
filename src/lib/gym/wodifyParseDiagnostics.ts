@@ -9,6 +9,39 @@ export type ParseMetadata = {
   response_body_bytes_overflow: boolean;
 };
 export const MAX_DIAGNOSTIC_BODY_BYTES = 64 * 1024 * 1024;
+type JsonFieldType = 'missing' | 'null' | 'boolean' | 'number' | 'string' | 'array' | 'object';
+export type PaginationDiagnostic = {
+  page_present: boolean; page_type: JsonFieldType; page_integer: number | null; page_digit_string: string | null;
+  page_size_present: boolean; page_size_type: JsonFieldType; page_size_integer: number | null; page_size_digit_string: string | null;
+  has_more_present: boolean; has_more_type: JsonFieldType; has_more_boolean: boolean | null; has_more_string_boolean: 'true' | 'false' | null;
+  client_row_count: number;
+  pagination_failures: ('page_mismatch' | 'page_size_mismatch' | 'has_more_type' | 'row_count_exceeds_requested' | 'empty_nonterminal' | 'max_page_nonterminal')[];
+};
+
+/** Observe only after the original predicate failed; this never decides acceptance. */
+export function observePagination(pagination: Record<string, unknown>, rows: number, requested: number, size: number, max: number): PaginationDiagnostic {
+  const present = (key: string) => Object.prototype.hasOwnProperty.call(pagination, key);
+  const kind = (key: string): JsonFieldType => !present(key) ? 'missing'
+    : pagination[key] === null ? 'null' : Array.isArray(pagination[key]) ? 'array' : typeof pagination[key] as JsonFieldType;
+  const integer = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) ? value : null;
+  const digits = (value: unknown) => typeof value === 'string' && value.length >= 1 && value.length <= 6 && !/[^0-9]/.test(value) ? value : null;
+  const page = pagination.page, pageSize = pagination.page_size, hasMore = pagination.has_more;
+  const failures: PaginationDiagnostic['pagination_failures'] = [];
+  if (page !== requested) failures.push('page_mismatch');
+  if (pageSize !== size) failures.push('page_size_mismatch');
+  if (typeof hasMore !== 'boolean') failures.push('has_more_type');
+  if (rows > size) failures.push('row_count_exceeds_requested');
+  // Deliberately mirror the original truthiness, including wrong-type values.
+  if (hasMore && rows === 0) failures.push('empty_nonterminal');
+  if (hasMore && requested === max) failures.push('max_page_nonterminal');
+  return {
+    page_present: present('page'), page_type: kind('page'), page_integer: integer(page), page_digit_string: digits(page),
+    page_size_present: present('page_size'), page_size_type: kind('page_size'), page_size_integer: integer(pageSize), page_size_digit_string: digits(pageSize),
+    has_more_present: present('has_more'), has_more_type: kind('has_more'), has_more_boolean: typeof hasMore === 'boolean' ? hasMore : null,
+    has_more_string_boolean: hasMore === 'true' || hasMore === 'false' ? hasMore : null,
+    client_row_count: rows, pagination_failures: failures,
+  };
+}
 export const NO_RESPONSE_METADATA: ParseMetadata = {
   outer_json_valid: null, response_content_type: null,
   response_body_bytes: null, response_body_bytes_overflow: false,
@@ -18,10 +51,11 @@ export function bodyByteMetadata(length: number): Pick<ParseMetadata, 'response_
   return { response_body_bytes: overflow ? null : length, response_body_bytes_overflow: overflow };
 }
 export class WodifyParseError extends SyntaxError {
-  constructor(readonly stage: ParseStage, readonly metadata: ParseMetadata = NO_RESPONSE_METADATA) {
+  constructor(readonly stage: ParseStage, readonly metadata: ParseMetadata = NO_RESPONSE_METADATA, readonly pagination?: PaginationDiagnostic) {
     super('wodify parse diagnostic');
   }
-  diagnostic() { return { parse_stage: this.stage, ...this.metadata }; }
+  diagnostic() { return { parse_stage: this.stage, ...this.metadata,
+    ...(this.stage === 'clients_pagination' && this.pagination ? { pagination: this.pagination } : {}) }; }
 }
 
 export function safeContentType(raw: string | null): ParseMetadata['response_content_type'] {

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildStudentRetentionAggregate, parseStudentRetentionAggregate } from '../src/lib/gym/studentRetentionAggregate';
+import { observePagination } from '../src/lib/gym/wodifyParseDiagnostics';
 
 // Synthetic fixtures only. Exercise the actual handler and its persistence
 // boundary without invoking Deno.serve or any network/service credentials.
@@ -24,8 +25,8 @@ const storedDraft = {
   guardian_only: 0, unclassified: 0, ambiguous_no_signin_with_membership: 0,
   detail_calls_made: 1, detail_clients_failed: 0,
 };
-const request = (mode = 'page') => new Request('https://example.invalid/sync', {
-  method: 'POST', body: JSON.stringify({ mode, run_id: runId, page: 1 }),
+const request = (mode = 'page', requestedPage = 1) => new Request('https://example.invalid/sync', {
+  method: 'POST', body: JSON.stringify({ mode, run_id: runId, page: requestedPage }),
 });
 
 beforeEach(async () => {
@@ -40,6 +41,37 @@ beforeEach(async () => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('census HTTP failure and publication boundary', () => {
+  it('preserves the v29 predicate across types, missing fields, row counts and the cap', async () => {
+    const shapes: Record<string, unknown>[] = [
+      {}, { page: 41, page_size: 25, has_more: false },
+      ...[null, false, true, 0, 1.5, 42, '41', '25', 'false', 'true', 'private-secret', [], { private: 'secret' }]
+        .flatMap((value) => ['page', 'page_size', 'has_more'].map((field) => ({ page: 41, page_size: 25, has_more: false, [field]: value }))),
+      ...['page', 'page_size', 'has_more'].map((field) => Object.fromEntries(Object.entries({ page: 41, page_size: 25, has_more: false }).filter(([key]) => key !== field))),
+      { page: 200, page_size: 25, has_more: true }, { page: 200, page_size: 25, has_more: false },
+    ];
+    for (const pagination of shapes) for (const rows of [0, 1, 25, 26]) {
+      const requested = pagination.page === 200 ? 200 : 41;
+      // Exact v29 acceptance predicate, independent of the observation helper.
+      const rejected = pagination.page !== requested || pagination.page_size !== 25 || typeof pagination.has_more !== 'boolean'
+        || rows > 25 || Boolean(pagination.has_more && (rows === 0 || requested === 200));
+      const http = vi.fn().mockResolvedValueOnce(response({ pagination,
+        clients: Array.from({ length: rows }, (_, id) => ({ id: id + 1, client_status: 'Inactive' })) }))
+        .mockResolvedValueOnce(new Response(null, { status: 201 }));
+      vi.stubGlobal('fetch', http);
+      const out = await handleRequest(request('page', requested));
+      expect(out.status, JSON.stringify({ pagination, rows })).toBe(rejected ? 502 : 200);
+      const result = await out.json();
+      if (rejected) {
+        expect(result.parse_stage).toBe('clients_pagination');
+        expect(result.pagination).toEqual(observePagination(pagination, rows, requested, 25, 200));
+        expect(JSON.stringify(result)).not.toMatch(/private|secret/);
+        expect(http).toHaveBeenCalledTimes(1);
+      } else {
+        expect(result).not.toHaveProperty('pagination');
+        expect(http).toHaveBeenCalledTimes(2);
+      }
+    }
+  });
   it('collects a full 25-Active page sequentially with practical deadline headroom', async () => {
     let inFlight = 0;
     let maxInFlight = 0;
@@ -103,7 +135,8 @@ describe('census HTTP failure and publication boundary', () => {
     expect(await out.json()).toEqual({ error: 'sync_failed', code: 'parse_error', parse_stage: stage,
       outer_json_valid: true, response_content_type: 'text/plain',
       response_body_bytes: new TextEncoder().encode(JSON.stringify(page(clients as unknown[]))).byteLength,
-      response_body_bytes_overflow: false });
+      response_body_bytes_overflow: false,
+      ...(stage === 'clients_pagination' ? { pagination: observePagination(page([]).pagination, (clients as unknown[]).length, 1, 25, 200) } : {}) });
     expect(http).toHaveBeenCalledTimes(1);
   });
 
@@ -118,7 +151,8 @@ describe('census HTTP failure and publication boundary', () => {
     expect(out.status).toBe(502);
     expect(await out.json()).toEqual({ error: 'sync_failed', code: 'parse_error', parse_stage: stage,
       outer_json_valid: valid, response_content_type: 'other', response_body_bytes: new TextEncoder().encode(raw).byteLength,
-      response_body_bytes_overflow: false });
+      response_body_bytes_overflow: false,
+      ...(stage === 'clients_pagination' ? { pagination: observePagination(page([], 2).pagination, 0, 1, 25, 200) } : {}) });
     expect(http).toHaveBeenCalledTimes(1);
   });
 

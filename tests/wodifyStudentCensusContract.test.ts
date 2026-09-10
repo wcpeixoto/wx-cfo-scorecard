@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { observePagination } from '../src/lib/gym/wodifyParseDiagnostics';
 
 const migration = readFileSync(
   new URL('../supabase/wodify_retention_schema.sql', import.meta.url),
@@ -22,6 +23,18 @@ const steps = workflow.split(/^      - name: /m).slice(1);
 const script = (step: string) => step.split('        run: |\n')[1].replace(/^          /gm, '').trim();
 
 describe('manual single-page diagnostic isolation', () => {
+  it('retains the exact v29 pagination predicate before adding observations at the same throw', () => {
+    expect(edgeFunction).toContain(`  if (
+    page !== requestedPage
+    || pageSize !== pageSizeRequested
+    || typeof hasMore !== 'boolean'
+    || body.clients.length > pageSizeRequested
+    || (hasMore && (body.clients.length === 0 || requestedPage === maxPages))
+  ) {
+    throw new WodifyParseError('clients_pagination', metadata,
+      observePagination(body.pagination, body.clients.length, requestedPage, pageSizeRequested, maxPages));
+  }`);
+  });
   it('keeps the scheduled command paths byte-identical to the reviewed census baseline', () => {
     expect(workflow).toContain("- cron: '0 12 * * 1'");
     expect(workflow).toContain('type: number\n        required: false\n        default: 0');
@@ -58,8 +71,22 @@ describe('manual single-page diagnostic isolation', () => {
     outer_json_valid: true, response_content_type: 'application/json', response_body_bytes: 83,
     response_body_bytes_overflow: false };
   const legacyParseFailure = { origin: 'edge_function', error: 'sync_failed', code: 'parse_error', http_status: 502 };
+  const pagination = observePagination({ page: '41', page_size: 25, has_more: 'false' }, 0, 41, 25, 200);
+  const safeParseFailure = { ...parseFailure, origin: 'edge_function', http_status: 502 };
 
   it.each([
+    ['502', { ...parseFailure, pagination: { ...pagination, private: 'private-secret' } }, 1, { ...safeParseFailure, pagination }, 0],
+    ...[
+      { page_type: 'private-secret' }, { page_digit_string: 'private-secret' }, { page_digit_string: '41\n' },
+      { page_digit_string: '1234567' }, { page_integer: 9007199254740992 }, { page_present: false },
+      { has_more_string_boolean: 'private-secret' }, { has_more_boolean: 'private-secret' },
+      { client_row_count: -1 }, { client_row_count: 9007199254740992 },
+      { pagination_failures: ['private-secret'] }, { pagination_failures: ['page_mismatch', 'page_mismatch'] },
+      { pagination_failures: [] },
+    ].map((invalid) => ['502', { ...parseFailure, pagination: { ...pagination, ...invalid } }, 1, safeParseFailure, 0]),
+    ['502', { ...parseFailure, parse_stage: 'clients_row', pagination }, 1, { ...safeParseFailure, parse_stage: 'clients_row' }, 0],
+    ['502', { ...parseFailure, pagination: observePagination({}, 0, 41, 25, 200) }, 1,
+      { ...safeParseFailure, pagination: observePagination({}, 0, 41, 25, 200) }, 0],
     ['200', { ok: true, mode: 'page', ...summary, private: 'private-secret' }, 0, summary, 0],
     ['200', { ok: true, mode: 'page', ...summary, page: 1 }, 0, { ...summary, page: 1 }, 0],
     ['200', { ok: true, mode: 'page', ...summary, page: 137 }, 0, { ...summary, page: 137 }, 0],

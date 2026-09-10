@@ -152,7 +152,7 @@ is disabled manually during this diagnostic build/review. Do not enable or invok
 it as part of publishing this code. **PR #559 requires a fresh full independent
 review before merge.**
 
-### Page parse-origin metadata (candidate, not yet deployed)
+### Page parse-origin metadata (deployed in v29)
 
 A propagated `mode=page` SyntaxError still returns HTTP 502 with
 `error: "sync_failed"` and `code: "parse_error"`. Its additional safe fields are:
@@ -188,6 +188,47 @@ parse-error contract. Missing/malformed metadata is omitted while retaining the
 legacy safe `parse_error` code. No stack, arbitrary exception text, URL, raw body,
 identifier, record value, or other header is logged. Scheduled/full-run shell
 blocks and their output remain unchanged.
+
+### Pagination observations (prospective v30 candidate, not deployed)
+
+The read-only function inventory confirmed v29 remains current during this build.
+The actual v29 page-41 probe, run `34419644471`, reported `clients_pagination`,
+valid outer JSON, `application/json`, and 45,950 response-body bytes. It did not
+identify which predicate failed. Forty census pages of 25 rows mean 1,000 rows
+were processed; that does not establish why page 41 failed. The current contract
+already accepts short pages and empty terminal pages with `has_more=false`.
+
+Only at the existing `clients_pagination` throw, the candidate adds a `pagination`
+object. The acceptance predicate itself is unchanged. For each expected field
+`page`, `page_size`, and `has_more`, it reports a `_present` flag and `_type` from
+`missing|null|boolean|number|string|array|object`. Missing refers to absent own
+JSON properties. `page_integer`/`page_size_integer` reflect only safe integers;
+their `_digit_string` counterparts reflect only 1–6 ASCII digits, preserving
+leading zeros without coercing the contract. All other values are null.
+`has_more_boolean` reflects only booleans; `has_more_string_boolean` reflects
+only the exact strings `"true"` and `"false"`, otherwise null. `client_row_count`
+is the array length, a nonnegative safe integer. No other upstream keys or values
+are reflected.
+
+`pagination_failures` lists every failed predicate in this fixed order:
+`page_mismatch`, `page_size_mismatch`, `has_more_type`,
+`row_count_exceeds_requested`, `empty_nonterminal`, `max_page_nonterminal`.
+The final two mirror the existing truthiness check, including truthy wrong-type
+`has_more` values; they are not restricted to boolean true. This observation does
+not repair, reinterpret or retry the contract. Invalid pages still fail 502
+before detail calls or persistence, exactly as v29.
+
+The manual diagnostic logs this nested object only for the validated 502
+`sync_failed`/`parse_error`/`clients_pagination` contract with valid outer JSON.
+It projects only fixed fields and validates all scalar bounds, types and reason
+enums. Missing/invalid observations are omitted, retaining prior safe parse
+metadata; arbitrary strings, keys and row contents never reach the log. Other
+parse stages cannot emit pagination observations. Scheduled/full-manual run
+blocks remain byte-identical. Workflow stays disabled during build/review.
+Independent review must precede deployment and the single authorized page-41
+probe; no terminal-page fix or retry is authorized. If that probe succeeds where
+v29 failed, stop and investigate potential behavior drift. **PR #559 still needs
+a fresh whole-PR independent review before merge.**
 
 ### Reviewed deployment and read-back sequence (not executed here)
 

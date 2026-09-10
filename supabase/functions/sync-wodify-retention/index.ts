@@ -47,7 +47,7 @@ const WODIFY_TIMEOUT_MS = 15_000;
 const DETAIL_MAX_ATTEMPTS = 3;
 const DETAIL_CADENCE_MS = 500;
 
-import { parseUpstreamJson, WodifyParseError, type ParseStage } from '../../../src/lib/gym/wodifyParseDiagnostics.ts';
+import { observePagination, parseUpstreamJson, WodifyParseError, type ParseStage } from '../../../src/lib/gym/wodifyParseDiagnostics.ts';
 
 const RETENTION_TABLE = 'wodify_retention_aggregate';
 const CENSUS_RUNS_TABLE = 'wodify_census_runs';
@@ -116,7 +116,8 @@ async function fetchClientsPage(apiKey: string, requestedPage: number, deadline:
     || body.clients.length > pageSizeRequested
     || (hasMore && (body.clients.length === 0 || requestedPage === maxPages))
   ) {
-    throw new WodifyParseError('clients_pagination', metadata);
+    throw new WodifyParseError('clients_pagination', metadata,
+      observePagination(body.pagination, body.clients.length, requestedPage, pageSizeRequested, maxPages));
   }
 
   const seen = new Set<string>();

@@ -87,6 +87,33 @@ jobs:
               # Recognize only the function's fixed error vocabulary. A status
               # alone cannot prove whether an unmatched body came from a gateway.
               if jq -ce --argjson http_status "$HTTP_STATUS" '
+                def safe_integer: type == "number" and . >= -9007199254740991 and . <= 9007199254740991 and floor == .;
+                def field($present; $kind):
+                  ($present | type) == "boolean"
+                  and ($kind | IN("missing","null","boolean","number","string","array","object"))
+                  and ($present == ($kind != "missing"));
+                def number_observation($kind; $integer; $digits):
+                  ($integer == null or ($kind == "number" and ($integer | safe_integer)))
+                  and ($digits == null or ($kind == "string" and ($digits | type) == "string"
+                    and ($digits | test("^[0-9]{1,6}\\z"))));
+                def safe_pagination:
+                  if .parse_stage != "clients_pagination" or .outer_json_valid != true or (.pagination | type) != "object" then {}
+                  else .pagination | {page_present,page_type,page_integer,page_digit_string,
+                    page_size_present,page_size_type,page_size_integer,page_size_digit_string,
+                    has_more_present,has_more_type,has_more_boolean,has_more_string_boolean,
+                    client_row_count,pagination_failures} as $p
+                    | if field($p.page_present;$p.page_type) and field($p.page_size_present;$p.page_size_type)
+                      and field($p.has_more_present;$p.has_more_type)
+                      and number_observation($p.page_type;$p.page_integer;$p.page_digit_string)
+                      and number_observation($p.page_size_type;$p.page_size_integer;$p.page_size_digit_string)
+                      and (if $p.has_more_type == "boolean" then ($p.has_more_boolean | type) == "boolean" else $p.has_more_boolean == null end)
+                      and ($p.has_more_string_boolean == null or ($p.has_more_type == "string" and ($p.has_more_string_boolean | IN("true","false"))))
+                      and ($p.client_row_count | safe_integer) and $p.client_row_count >= 0
+                      and ($p.pagination_failures | type) == "array" and ($p.pagination_failures | length) >= 1
+                      and ($p.pagination_failures | length) <= 6
+                      and ($p.pagination_failures | all(.[]; IN("page_mismatch","page_size_mismatch","has_more_type","row_count_exceeds_requested","empty_nonterminal","max_page_nonterminal")))
+                      and ($p.pagination_failures | unique | length) == ($p.pagination_failures | length)
+                      then {pagination:$p} else {} end end;
                 {origin: "gateway_or_unrecognized_response", error: "unrecognized_http_response",
                  http_status: $http_status} as $unrecognized
                 | if type != "object" then $unrecognized
@@ -111,8 +138,9 @@ jobs:
                         and .response_body_bytes >= 0 and .response_body_bytes <= 67108864
                         and (.response_body_bytes | floor) == .response_body_bytes
                         and .response_body_bytes_overflow == false end) then
-                      {origin: "edge_function", error: "sync_failed", code: "parse_error", http_status: $http_status,
-                       parse_stage, outer_json_valid, response_content_type, response_body_bytes, response_body_bytes_overflow}
+                      (safe_pagination) as $pagination
+                      | {origin: "edge_function", error: "sync_failed", code: "parse_error", http_status: $http_status,
+                       parse_stage, outer_json_valid, response_content_type, response_body_bytes, response_body_bytes_overflow} + $pagination
                     elif (.code | test("^wodify_(clients|detail)_http_[1-5][0-9]{2}$")) then
                       {origin: "upstream_wodify", error: "sync_failed", code, http_status: $http_status}
                     elif (.code | test("^(census_(persist|read|cleanup)_http_[1-5][0-9]{2}|persist_http_[1-5][0-9]{2}|bad_asof|timeout|parse_error|network_error|unknown)$")) then
