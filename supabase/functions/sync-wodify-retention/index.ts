@@ -1,29 +1,11 @@
-// sync-wodify-retention Edge Function (RETENTION_FINISH_PLAN.md §6).
+// sync-wodify-retention Edge Function (WO-2 v3).
 //
-// THIN SHELL by design — the only logic here is the request gate + fetch +
-// persist. All normalization/aggregation lives in the typechecked, vitest-covered
-// src/lib/gym/wodifyRetentionAggregate.ts, and the pure gate helpers
-// (classifySyncError / verifyTriggerSecret) in src/lib/gym/wodifyRetentionSync.ts,
-// so the Deno shell holds no untypechecked business logic. The shared-module
-// import across the runtime boundary is RESOLVED via Option A (explicit `.ts`
-// import + allowImportingTsExtensions, #435) — esbuild inlines it and the
-// Supabase deploy/eszip bundler resolves it. Mirrors ai-proxy: dependency-free
-// raw `fetch`, no SDK, secrets server-side only, never logs bodies or the key
-// (zero `console.*` — the 502 diagnostic `code` is returned in-body only).
-//
-// Request gate (strict order): non-POST → 405 (before any secret/env/Wodify
-// work, preserving the Step 0 probe) → SYNC_TRIGGER_SECRET unset → 500 (FAIL
-// CLOSED) → x-sync-trigger-secret header mismatch → 403 (constant-time compare)
-// → WODIFY_API_KEY/SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY missing → 500 → fetch.
-//
-// Flow: gate → paginate Wodify /clients → computeRetentionAggregate → persist the
-// NON-PII aggregate row via the Supabase REST API (service role). Raw /clients
-// rows are transient in memory; they are never logged or persisted. The browser
-// never calls Wodify and never sees the key.
-//
-// GATED: not invoked live in this PR. First live invoke requires Reviewer audit +
-// Wesley's explicit authorization to set SYNC_TRIGGER_SECRET + WODIFY_API_KEY and
-// run it with the x-sync-trigger-secret header (README).
+// The scheduled pull is split into bounded page requests. mode=page fetches one
+// /clients page, calls detail only for exact-Active clients, and upserts a
+// counts-only draft. mode=finalize independently rebuilds the existing complete
+// retention aggregate, fail-closed validates every draft, and only then upserts
+// the final aggregate row. No person-level value is logged, persisted, or
+// returned. Wodify and service-role credentials remain server-side.
 
 import {
   cohortActiveTotals,
@@ -34,27 +16,51 @@ import {
   type RetentionAggregate,
 } from '../../../src/lib/gym/wodifyRetentionAggregate.ts';
 import {
+  CENSUS_PAGE_SIZE,
+  CENSUS_MAX_PAGES,
+  buildRetentionPersistenceRow,
+  classifyActiveClientDetail,
+  isExactlyActiveClient,
+  normalizeClientId,
+  parseCensusRequest,
+  summarizeCensusPage,
+  validateAndMergeCensus,
+  type CensusObservation,
+  type CensusPageDraft,
+  type UnclassifiedDetailReason,
+} from '../../../src/lib/gym/wodifyStudentCensus.ts';
+import {
   classifySyncError,
+  SyncDeadline,
   gymLocalDay,
   verifyTriggerSecret,
 } from '../../../src/lib/gym/wodifyRetentionSync.ts';
+import { buildStudentRetentionAggregate, parseStudentRetentionAggregate } from '../../../src/lib/gym/studentRetentionAggregate.ts';
 
-// Wodify /clients request — the exact proven shape from the §5 probes
-// (scripts/wodify/clientsRecencyProbe.ts #429): page/pageSize params, records
-// under `clients`, pagination via top-level `pagination.has_more`.
 const WODIFY_BASE_URL = 'https://api.wodify.com/v1';
 const CLIENTS_PATH = '/clients';
-const PAGE_SIZE = 100; // Wodify caps at 100/page
-const MAX_PAGES = 50; // hard safety cap (~5000 clients) so a stuck has_more can't loop forever
-const WODIFY_TIMEOUT_MS = 15000;
+const MAX_PAGES = CENSUS_MAX_PAGES;
+const BULK_PAGE_SIZE = 100;
+const BULK_MAX_PAGES = 50;
+const REQUEST_DEADLINE_MS = 55_000;
+const WODIFY_TIMEOUT_MS = 15_000;
+const DETAIL_MAX_ATTEMPTS = 3;
+const DETAIL_CADENCE_MS = 500;
+
+import { observePagination, parseUpstreamJson, WodifyParseError, type ParseStage } from '../../../src/lib/gym/wodifyParseDiagnostics.ts';
 
 const RETENTION_TABLE = 'wodify_retention_aggregate';
-
-// The gym's IANA business-day zone. asOf is resolved to this zone (not the UTC
-// Edge runtime) so the (workspace_id, as_of) idempotency key and the recency
-// day-diff anchor bucket to the day the gym is actually open. Single gym → a
-// const, not env/config (no premature abstraction).
+const CENSUS_RUNS_TABLE = 'wodify_census_runs';
 const GYM_TZ = 'America/New_York';
+
+type UnknownRecord = Record<string, unknown>;
+type WodifyListRow = RawWodifyClient & { id?: unknown };
+type WodifyClientsPage = {
+  rows: WodifyListRow[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -63,82 +69,248 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-// Paginate all /clients pages. Returns raw rows (transient) + the page count +
-// reachedPageCap (true if we stopped at MAX_PAGES with has_more still true, so the
-// snapshot is partial — surfaced, never silently truncated). Throws with an HTTP
-// status only — never the response body (it could echo PII).
-async function fetchAllClients(
-  apiKey: string,
-): Promise<{ rows: RawWodifyClient[]; pagesFetched: number; reachedPageCap: boolean }> {
-  const rows: RawWodifyClient[] = [];
-  let pagesFetched = 0;
-  let reachedPageCap = false;
-
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const url = new URL(WODIFY_BASE_URL + CLIENTS_PATH);
-    url.searchParams.set('page', String(page));
-    url.searchParams.set('pageSize', String(PAGE_SIZE));
-
-    const res = await fetch(url, {
-      headers: { 'x-api-key': apiKey, accept: 'application/json' }, // key never logged
-      signal: AbortSignal.timeout(WODIFY_TIMEOUT_MS),
-    });
-    if (!res.ok) throw new Error(`wodify_clients_http_${res.status}`); // status only
-
-    const body = await res.json();
-    const pageRows: unknown[] = Array.isArray(body?.clients) ? body.clients : [];
-    for (const r of pageRows) rows.push(r as RawWodifyClient);
-    pagesFetched += 1;
-
-    const hasMore = body?.pagination?.has_more === true;
-    if (!hasMore || pageRows.length === 0) break;
-    // More pages remain but this was the last allowed page — flag the partial snapshot.
-    if (page === MAX_PAGES) reachedPageCap = true;
-  }
-
-  return { rows, pagesFetched, reachedPageCap };
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-// Persist the NON-PII aggregate via the Supabase REST API using the service-role
-// key (bypasses RLS; never exposed to the browser). IDEMPOTENT UPSERT keyed on
-// (workspace_id, as_of): a same-day re-pull REPLACES the day's row instead of
-// duplicating it — PostgREST `on_conflict` + `Prefer: resolution=merge-duplicates`,
-// backed by the unique constraint in wodify_retention_schema.sql. Needs service-role
-// INSERT + UPDATE on the table.
-async function persistAggregate(
+function integerField(record: UnknownRecord, key: string): number {
+  const value = record[key];
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new SyntaxError('invalid aggregate counter');
+  }
+  return value;
+}
+
+function booleanField(record: UnknownRecord, key: string): boolean {
+  const value = record[key];
+  if (typeof value !== 'boolean') throw new SyntaxError('invalid aggregate boolean');
+  return value;
+}
+
+// Fetch exactly one Wodify page. The real pagination envelope exposes only
+// page, page_size, and has_more; all three are validated instead of inferring a
+// total page/client count.
+async function fetchClientsPage(apiKey: string, requestedPage: number, deadline: SyncDeadline,
+  pageSizeRequested = CENSUS_PAGE_SIZE, maxPages = MAX_PAGES): Promise<WodifyClientsPage> {
+  const url = new URL(WODIFY_BASE_URL + CLIENTS_PATH);
+  url.searchParams.set('page', String(requestedPage));
+  url.searchParams.set('page_size', String(pageSizeRequested));
+
+  const res = await deadline.fetch(url, {
+    headers: { 'x-api-key': apiKey, accept: 'application/json' },
+    signal: AbortSignal.timeout(WODIFY_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`wodify_clients_http_${res.status}`);
+
+  const { body, metadata } = await parseUpstreamJson(res, 'clients_json_decode', (operation) => deadline.run(operation));
+  if (!isRecord(body) || !Array.isArray(body.clients) || !isRecord(body.pagination)) {
+    throw new WodifyParseError('clients_envelope', metadata);
+  }
+  const page = body.pagination.page;
+  const pageSize = body.pagination.page_size;
+  const hasMore = body.pagination.has_more;
+  if (
+    page !== requestedPage
+    || pageSize !== body.clients.length
+    || pageSize > pageSizeRequested
+    || typeof hasMore !== 'boolean'
+    || body.clients.length > pageSizeRequested
+    || (hasMore && (pageSize !== pageSizeRequested || requestedPage === maxPages))
+  ) {
+    throw new WodifyParseError('clients_pagination', metadata,
+      observePagination(body.pagination, body.clients.length, requestedPage, pageSizeRequested, maxPages));
+  }
+
+  const seen = new Set<string>();
+  for (const row of body.clients) {
+    if (!isRecord(row) || (row.client_status !== 'Active' && row.client_status !== 'Inactive')) {
+      throw new WodifyParseError('clients_row', metadata);
+    }
+    const id = normalizeClientId(row.id);
+    if (id === null) throw new WodifyParseError('clients_identifier', metadata);
+    if (seen.has(id)) throw new WodifyParseError('clients_duplicate', metadata);
+    seen.add(id);
+  }
+
+  return {
+    rows: body.clients as WodifyListRow[],
+    page,
+    pageSize,
+    hasMore,
+  };
+}
+
+// Current fast-path aggregate fetch: page through /clients without detail calls,
+// preserving computeRetentionAggregate's existing semantics exactly.
+async function fetchAllClients(
+  apiKey: string,
+  deadline: SyncDeadline,
+): Promise<{ rows: RawWodifyClient[]; pagesFetched: number; reachedPageCap: boolean }> {
+  const rows: RawWodifyClient[] = [];
+  const seen = new Set<string>(); // transient, only within this request
+
+  for (let page = 1; page <= BULK_MAX_PAGES; page += 1) {
+    const result = await fetchClientsPage(apiKey, page, deadline, BULK_PAGE_SIZE, BULK_MAX_PAGES);
+    for (const row of result.rows) {
+      const id = normalizeClientId(row.id)!;
+      if (seen.has(id)) throw new SyntaxError('duplicate clients row');
+      seen.add(id);
+    }
+    rows.push(...result.rows);
+    if (!result.hasMore) {
+      return { rows, pagesFetched: page, reachedPageCap: false };
+    }
+  }
+
+  return { rows, pagesFetched: BULK_MAX_PAGES, reachedPageCap: true };
+}
+
+type DetailFetchResult =
+  | { ok: true; detail: unknown; callsMade: number }
+  | { ok: false; callsMade: number };
+
+// Request-local, counts-only diagnostics. Never added to persisted drafts or
+// success responses. HTTP counts include non-2xx attempts, including retries;
+// network/JSON failures have no failed HTTP status to count.
+type PageFailureDiagnostics = {
+  unclassified_reasons: Record<UnclassifiedDetailReason | 'invalid_client_id' | 'detail_fetch_failed', number>;
+  detail_http_status_counts: Record<string, number>;
+};
+
+// Sequential caller with a fixed inter-call cadence. 429 aborts the whole page
+// so the workflow stops and no draft/final row can be written. Timeouts, network
+// errors, malformed JSON, and 5xx responses get at most three attempts.
+async function fetchClientDetail(
+  apiKey: string,
+  clientId: string,
+  deadline: SyncDeadline,
+  diagnostics: PageFailureDiagnostics,
+): Promise<DetailFetchResult> {
+  let callsMade = 0;
+
+  for (let attempt = 1; attempt <= DETAIL_MAX_ATTEMPTS; attempt += 1) {
+    await deadline.wait(DETAIL_CADENCE_MS);
+    callsMade += 1;
+    try {
+      const res = await deadline.fetch(`${WODIFY_BASE_URL}${CLIENTS_PATH}/${encodeURIComponent(clientId)}`, {
+        headers: { 'x-api-key': apiKey, accept: 'application/json' },
+        signal: AbortSignal.timeout(WODIFY_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        const status = String(res.status);
+        diagnostics.detail_http_status_counts[status] = (diagnostics.detail_http_status_counts[status] ?? 0) + 1;
+      }
+      if (res.status === 429) throw new Error('wodify_detail_http_429');
+      if (!res.ok) {
+        const retryable = res.status === 408 || res.status >= 500;
+        if (retryable && attempt < DETAIL_MAX_ATTEMPTS) continue;
+        return { ok: false, callsMade };
+      }
+
+      try {
+        const { body } = await parseUpstreamJson(res, 'detail_json_decode', (operation) => deadline.run(operation));
+        return { ok: true, detail: body, callsMade };
+      } catch {
+        if (attempt === DETAIL_MAX_ATTEMPTS) return { ok: false, callsMade };
+      }
+    } catch (err) {
+      deadline.check();
+      if (err instanceof Error && err.message === 'wodify_detail_http_429') throw err;
+      if (attempt === DETAIL_MAX_ATTEMPTS) return { ok: false, callsMade };
+    }
+  }
+
+  return { ok: false, callsMade };
+}
+
+async function buildCensusDraft(
+  apiKey: string,
+  page: WodifyClientsPage,
+  deadline: SyncDeadline,
+  createdAt: string,
+  diagnostics: PageFailureDiagnostics,
+): Promise<CensusPageDraft> {
+  const observations: CensusObservation[] = [];
+  const students: RawWodifyClient[] = []; // request-local only; persistence holds counts
+
+  // Deliberately sequential. Inactive and unknown-status rows never cause a
+  // detail request; exact Active is the only admitted status.
+  for (const row of page.rows) {
+    if (!isExactlyActiveClient(row.client_status)) continue;
+
+    const clientId = normalizeClientId(row.id);
+    if (clientId === null) {
+      diagnostics.unclassified_reasons.invalid_client_id += 1;
+      observations.push({
+        classification: { kind: 'unclassified' },
+        detailCallsMade: 0,
+        detailFailed: true,
+      });
+      continue;
+    }
+
+    const fetched = await fetchClientDetail(apiKey, clientId, deadline, diagnostics);
+    if (!fetched.ok) {
+      diagnostics.unclassified_reasons.detail_fetch_failed += 1;
+      observations.push({
+        classification: { kind: 'unclassified' },
+        detailCallsMade: fetched.callsMade,
+        detailFailed: true,
+      });
+      continue;
+    }
+    const classification = classifyActiveClientDetail(fetched.detail, (reason) => {
+      diagnostics.unclassified_reasons[reason] += 1;
+    });
+    if (classification.kind === 'student') students.push(row);
+    observations.push({
+      classification,
+      detailCallsMade: fetched.callsMade,
+      detailFailed: false,
+    });
+  }
+
+  return summarizeCensusPage({
+    studentAggregate: buildStudentRetentionAggregate(students, gymLocalDay(new Date(createdAt), GYM_TZ)),
+    createdAt,
+    page: page.page,
+    pageSize: page.pageSize,
+    hasMore: page.hasMore,
+    rowsSeen: page.rows.length,
+    observations,
+  });
+}
+
+async function persistCensusDraft(
   supabaseUrl: string,
   serviceKey: string,
-  agg: RetentionAggregate,
+  runId: string,
+  draft: CensusPageDraft,
+  deadline: SyncDeadline,
 ): Promise<void> {
   const row = {
-    workspace_id: 'default', // explicit conflict target (matches the column default + anon read policy)
-    source: agg.source,
-    as_of: agg.asOf,
-    fetched_at: agg.fetchedAt,
-    active_total: agg.activeTotal,
-    inactive_total: agg.inactiveTotal, // Member Movement census (§6, binary rescope)
-    days_absent_histogram: agg.daysAbsentHistogram,
-    // Churn-by-Tenure (§6 aggregate extension): per-band recency counts +
-    // bandEdges contract. Counts only — non-PII like every other column.
-    tenure_band_histogram: agg.tenureBandHistogram,
-    // Cohort Retention (§9 rev.3): per-age-cohort active recency + lapsed counts +
-    // cohortEdges contract. Counts only, age derived server-side from date_of_birth.
-    cohort_histogram: agg.cohortHistogram,
-    unknown_count: agg.unknown,
-    monthly_dues_at_risk: agg.silentChurn.monthlyDuesAtRisk,
-    missing_monthly_dues: agg.silentChurn.missingMonthlyDues,
-    wodify_at_risk_count: agg.diagnostics.wodifyAtRiskCount,
-    unknown_status: agg.dataQuality.unknownStatus,
-    future_last_check_in: agg.dataQuality.futureLastCheckIn,
-    pages_fetched: agg.dataQuality.pagesFetched,
-    reached_page_cap: agg.dataQuality.reachedPageCap,
-    clients_scanned: agg.dataQuality.clientsScanned,
+    student_retention: draft.studentAggregate,
+    created_at: draft.createdAt,
+    run_id: runId,
+    page: draft.page,
+    page_size: draft.pageSize,
+    has_more: draft.hasMore,
+    rows_seen: draft.rowsSeen,
+    active_clients_seen: draft.activeClientsSeen,
+    student_total: draft.studentTotal,
+    student_member: draft.studentsByPath.member,
+    student_dependent: draft.studentsByPath.dependent,
+    student_guardian_with_signin: draft.studentsByPath.guardian_with_signin,
+    student_no_group_with_signin: draft.studentsByPath.no_group_with_signin,
+    guardian_only: draft.guardianOnly,
+    unclassified: draft.unclassified,
+    ambiguous_no_signin_with_membership: draft.ambiguousNoSigninWithMembership,
+    detail_calls_made: draft.detailCallsMade,
+    detail_clients_failed: draft.detailClientsFailed,
   };
 
-  // on_conflict names the unique key so PostgREST emits ON CONFLICT … DO UPDATE;
-  // resolution=merge-duplicates makes the POST an upsert (latest pull wins).
-  const url = `${supabaseUrl}/rest/v1/${RETENTION_TABLE}?on_conflict=workspace_id,as_of`;
-  const res = await fetch(url, {
+  const url = `${supabaseUrl}/rest/v1/${CENSUS_RUNS_TABLE}?on_conflict=run_id,page`;
+  const res = await deadline.fetch(url, {
     method: 'POST',
     headers: {
       apikey: serviceKey,
@@ -148,80 +320,259 @@ async function persistAggregate(
     },
     body: JSON.stringify(row),
   });
-  if (!res.ok) throw new Error(`persist_http_${res.status}`); // status only
+  if (!res.ok) throw new Error(`census_persist_http_${res.status}`);
 }
 
-Deno.serve(async (req: Request): Promise<Response> => {
+async function readCensusDrafts(
+  supabaseUrl: string,
+  serviceKey: string,
+  runId: string,
+  deadline: SyncDeadline,
+): Promise<CensusPageDraft[]> {
+  const url = new URL(`${supabaseUrl}/rest/v1/${CENSUS_RUNS_TABLE}`);
+  url.searchParams.set('run_id', `eq.${runId}`);
+  url.searchParams.set(
+    'select',
+    'student_retention,created_at,page,page_size,has_more,rows_seen,active_clients_seen,student_total,student_member,student_dependent,student_guardian_with_signin,student_no_group_with_signin,guardian_only,unclassified,ambiguous_no_signin_with_membership,detail_calls_made,detail_clients_failed',
+  );
+  url.searchParams.set('order', 'page.asc');
+  url.searchParams.set('limit', String(MAX_PAGES + 1));
+
+  const res = await deadline.fetch(url, {
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      accept: 'application/json',
+    },
+  });
+  if (!res.ok) throw new Error(`census_read_http_${res.status}`);
+
+  const body: unknown = await deadline.run(res.json());
+  if (!Array.isArray(body)) throw new SyntaxError('invalid census rows');
+  return body.map((raw): CensusPageDraft => {
+    if (!isRecord(raw)) throw new SyntaxError('invalid census row');
+    return {
+      studentAggregate: parseStudentRetentionAggregate(raw.student_retention,
+        isRecord(raw.student_retention) ? raw.student_retention.asOf : '', raw.student_total),
+      createdAt: typeof raw.created_at === 'string' ? raw.created_at : '',
+      page: integerField(raw, 'page'),
+      pageSize: integerField(raw, 'page_size'),
+      hasMore: booleanField(raw, 'has_more'),
+      rowsSeen: integerField(raw, 'rows_seen'),
+      activeClientsSeen: integerField(raw, 'active_clients_seen'),
+      studentTotal: integerField(raw, 'student_total'),
+      studentsByPath: {
+        member: integerField(raw, 'student_member'),
+        dependent: integerField(raw, 'student_dependent'),
+        guardian_with_signin: integerField(raw, 'student_guardian_with_signin'),
+        no_group_with_signin: integerField(raw, 'student_no_group_with_signin'),
+      },
+      guardianOnly: integerField(raw, 'guardian_only'),
+      unclassified: integerField(raw, 'unclassified'),
+      ambiguousNoSigninWithMembership: integerField(raw, 'ambiguous_no_signin_with_membership'),
+      detailCallsMade: integerField(raw, 'detail_calls_made'),
+      detailClientsFailed: integerField(raw, 'detail_clients_failed'),
+    };
+  });
+}
+
+async function cleanupExpiredDrafts(
+  supabaseUrl: string,
+  serviceKey: string,
+  currentRunId: string,
+  now: Date,
+  deadline: SyncDeadline,
+): Promise<void> {
+  const cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const url = new URL(`${supabaseUrl}/rest/v1/${CENSUS_RUNS_TABLE}`);
+  url.searchParams.set('created_at', `lt.${cutoff}`);
+  // Never weaken the just-validated run, even if an unusually old run is being
+  // finalized. A later finalize can clean it once it is no longer current.
+  url.searchParams.set('run_id', `neq.${currentRunId}`);
+
+  const res = await deadline.fetch(url, {
+    method: 'DELETE',
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      Prefer: 'return=minimal',
+    },
+  });
+  if (!res.ok) throw new Error(`census_cleanup_http_${res.status}`);
+}
+
+async function persistAggregate(
+  supabaseUrl: string,
+  serviceKey: string,
+  row: ReturnType<typeof buildRetentionPersistenceRow>,
+  deadline: SyncDeadline,
+): Promise<void> {
+  const url = `${supabaseUrl}/rest/v1/${RETENTION_TABLE}?on_conflict=workspace_id,as_of`;
+  const res = await deadline.fetch(url, {
+    method: 'POST',
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal,resolution=merge-duplicates',
+    },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) throw new Error(`persist_http_${res.status}`);
+}
+
+function pageResponse(draft: CensusPageDraft): unknown {
+  return {
+    ok: true,
+    mode: 'page',
+    page: draft.page,
+    pageSize: draft.pageSize,
+    hasMore: draft.hasMore,
+    rowsSeen: draft.rowsSeen,
+    activeClientsSeen: draft.activeClientsSeen,
+    studentTotal: draft.studentTotal,
+    studentsByPath: draft.studentsByPath,
+    guardianOnly: draft.guardianOnly,
+    unclassified: draft.unclassified,
+    ambiguousNoSigninWithMembership: draft.ambiguousNoSigninWithMembership,
+    detailCallsMade: draft.detailCallsMade,
+    detailClientsFailed: draft.detailClientsFailed,
+  };
+}
+
+function finalizeResponse(aggregate: RetentionAggregate, census: ReturnType<typeof validateAndMergeCensus>): unknown {
+  if (!census.ok) throw new Error('unreachable invalid census');
+  return {
+    ok: true,
+    mode: 'finalize',
+    asOf: aggregate.asOf,
+    fetchedAt: aggregate.fetchedAt,
+    activeTotal: aggregate.activeTotal,
+    inactiveTotal: aggregate.inactiveTotal,
+    unknown: aggregate.unknown,
+    tenure: tenureBandActiveTotals(aggregate.tenureBandHistogram),
+    cohort: cohortActiveTotals(aggregate.cohortHistogram),
+    cohortLapsed: cohortLapsedTotals(aggregate.cohortHistogram),
+    missingMonthlyDues: aggregate.silentChurn.missingMonthlyDues,
+    diagnostics: aggregate.diagnostics,
+    dataQuality: aggregate.dataQuality,
+    studentTotal: census.totals.studentTotal,
+    guardianOnlyTotal: census.totals.guardianOnlyTotal,
+    studentsByPath: census.totals.studentsByPath,
+    unclassifiedTotal: census.totals.unclassifiedTotal,
+    ambiguousNoSigninWithMembership: census.totals.ambiguousNoSigninWithMembership,
+    detailCallsMade: census.totals.detailCallsMade,
+    detailClientsFailed: census.totals.detailClientsFailed,
+    pagesExpected: census.totals.pagesExpected,
+    pagesCompleted: census.totals.pagesCompleted,
+  };
+}
+
+export async function handleRequest(req: Request): Promise<Response> {
+  const startedAt = new Date().toISOString();
+  const deadline = new SyncDeadline(REQUEST_DEADLINE_MS);
+  let pageParseStage: ParseStage | null = null;
   try {
-    // 1. Method guard FIRST — non-POST short-circuits before any secret / env /
-    //    Wodify work, preserving the Step 0 (GET → 405) reachability probe.
     if (req.method !== 'POST') {
       return jsonResponse(405, { error: 'method_not_allowed' });
     }
 
-    // 2. Structural trigger gate. verify_jwt (platform) only proves the caller
-    //    holds the PUBLIC anon JWT (it ships in the SPA bundle); this shared
-    //    secret is what actually authorizes an invoke. FAIL CLOSED if it is not
-    //    configured server-side — never fall open to an unguarded endpoint.
     const triggerSecret = Deno.env.get('SYNC_TRIGGER_SECRET');
-    if (!triggerSecret) {
-      return jsonResponse(500, { error: 'internal_error' });
-    }
-    // 3. Constant-time compare of the provided header against the secret.
-    //    Missing or mismatched → generic 403 (never reveal which).
+    if (!triggerSecret) return jsonResponse(500, { error: 'internal_error' });
     const providedSecret = req.headers.get('x-sync-trigger-secret') ?? '';
     if (!(await verifyTriggerSecret(triggerSecret, providedSecret))) {
       return jsonResponse(403, { error: 'forbidden' });
     }
 
-    // 4. Only after the trigger gate passes do we read the data secrets.
+    let rawRequest: unknown;
+    try {
+      rawRequest = await deadline.run(req.json());
+    } catch {
+      return jsonResponse(400, { error: 'invalid_request' });
+    }
+    const input = parseCensusRequest(rawRequest);
+    if (input === null) return jsonResponse(400, { error: 'invalid_request' });
+
     const apiKey = Deno.env.get('WODIFY_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!apiKey || !supabaseUrl || !serviceKey) {
-      // Generic — never reveal which secret is missing.
       return jsonResponse(500, { error: 'internal_error' });
     }
 
-    // asOf = the gym's local business day (the day-diff anchor); fetchedAt stays
-    // a true UTC instant. Both member dates and this anchor pass through the same
-    // parseYmdLocal in the aggregate, so the whole-day math is internally
-    // consistent.
-    const asOf = gymLocalDay(new Date(), GYM_TZ);
-    const fetchedAt = new Date().toISOString();
+    if (input.mode === 'page') {
+      pageParseStage = 'clients_fetch';
+      const clientsPage = await fetchClientsPage(apiKey, input.page, deadline);
+      const diagnostics: PageFailureDiagnostics = {
+        unclassified_reasons: {
+          invalid_detail_record: 0,
+          invalid_no_group_signins: 0,
+          invalid_group_or_missing_role: 0,
+          unrecognized_group_role: 0,
+          invalid_guardian_signins: 0,
+          invalid_client_id: 0,
+          detail_fetch_failed: 0,
+        },
+        detail_http_status_counts: {},
+      };
+      pageParseStage = 'page_build_draft';
+      const draft = await buildCensusDraft(apiKey, clientsPage, deadline, startedAt, diagnostics);
+      if (draft.unclassified !== 0 || draft.detailClientsFailed !== 0) {
+        return jsonResponse(409, {
+          error: 'page_classification_failed',
+          unclassified_total: draft.unclassified,
+          detail_clients_failed: draft.detailClientsFailed,
+          ...diagnostics,
+        });
+      }
+      pageParseStage = 'page_persist_draft';
+      await persistCensusDraft(supabaseUrl, serviceKey, input.runId, draft, deadline);
+      pageParseStage = 'page_success_response';
+      return jsonResponse(200, pageResponse(draft));
+    }
 
-    const { rows, pagesFetched, reachedPageCap } = await fetchAllClients(apiKey);
+    const now = new Date();
+    const asOf = gymLocalDay(now, GYM_TZ);
+    const fetchedAt = now.toISOString();
+    const { rows, pagesFetched, reachedPageCap } = await fetchAllClients(apiKey, deadline);
     const aggregate = computeRetentionAggregate(rows, {
       asOf,
       fetchedAt,
       pagesFetched,
       reachedPageCap,
     });
-    await persistAggregate(supabaseUrl, serviceKey, aggregate);
+    const drafts = await readCensusDrafts(supabaseUrl, serviceKey, input.runId, deadline);
+    const validated = validateAndMergeCensus(drafts, aggregate, new Date());
+    if (!validated.ok) {
+      return jsonResponse(409, {
+        error: 'finalize_validation_failed',
+        code: validated.conflict.code,
+        conflict: {
+          left: validated.conflict.left,
+          right: validated.conflict.right,
+        },
+      });
+    }
 
-    // Counts-only summary back to the caller — NO raw rows, NO PII. The tenure
-    // entry is per-band ACTIVE TOTALS only (a count per band id), so a post-pull
-    // verify can eyeball the band split without reading the table.
-    return jsonResponse(200, {
-      ok: true,
-      asOf: aggregate.asOf,
-      activeTotal: aggregate.activeTotal,
-      inactiveTotal: aggregate.inactiveTotal,
-      unknown: aggregate.unknown,
-      tenure: tenureBandActiveTotals(aggregate.tenureBandHistogram),
-      // Cohort split for the post-pull verify: Σ cohort === activeTotal, and
-      // Σ cohortLapsed === inactiveTotal (Member Movement parity) — eyeballable
-      // without reading the table. Counts only.
-      cohort: cohortActiveTotals(aggregate.cohortHistogram),
-      cohortLapsed: cohortLapsedTotals(aggregate.cohortHistogram),
-      missingMonthlyDues: aggregate.silentChurn.missingMonthlyDues,
-      diagnostics: aggregate.diagnostics,
-      dataQuality: aggregate.dataQuality,
-    });
+    await cleanupExpiredDrafts(supabaseUrl, serviceKey, input.runId, now, deadline);
+    const finalValidation = validateAndMergeCensus(drafts, aggregate, new Date());
+    if (!finalValidation.ok) return jsonResponse(409, { error: 'finalize_validation_failed', code: finalValidation.conflict.code });
+    await persistAggregate(
+      supabaseUrl,
+      serviceKey,
+      buildRetentionPersistenceRow(aggregate, validated.totals),
+      deadline,
+    );
+    return jsonResponse(200, finalizeResponse(aggregate, validated));
   } catch (err) {
-    // Sanitized, fixed-vocabulary diagnostic code in-body — never raw err.message,
-    // URLs, headers, rows, or secrets (see classifySyncError). No logging, so the
-    // function keeps its zero-`console.*` invariant.
+    if (pageParseStage !== null && err instanceof SyntaxError) {
+      const parsed = err instanceof WodifyParseError ? err : new WodifyParseError(pageParseStage);
+      return jsonResponse(502, { error: 'sync_failed', code: 'parse_error', ...parsed.diagnostic() });
+    }
     return jsonResponse(502, { error: 'sync_failed', code: classifySyncError(err) });
+  } finally {
+    deadline.dispose();
   }
-});
+}
+
+Deno.serve(handleRequest);

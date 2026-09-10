@@ -6,11 +6,15 @@ describe('classifySyncError', () => {
     expect(classifySyncError(new Error('wodify_clients_http_401'))).toBe('wodify_clients_http_401');
     expect(classifySyncError(new Error('wodify_clients_http_429'))).toBe('wodify_clients_http_429');
     expect(classifySyncError(new Error('wodify_clients_http_500'))).toBe('wodify_clients_http_500');
+    expect(classifySyncError(new Error('wodify_detail_http_429'))).toBe('wodify_detail_http_429');
   });
 
   it('passes through the status-suffixed persist HTTP code', () => {
     expect(classifySyncError(new Error('persist_http_404'))).toBe('persist_http_404');
     expect(classifySyncError(new Error('persist_http_401'))).toBe('persist_http_401');
+    expect(classifySyncError(new Error('census_persist_http_409'))).toBe('census_persist_http_409');
+    expect(classifySyncError(new Error('census_read_http_500'))).toBe('census_read_http_500');
+    expect(classifySyncError(new Error('census_cleanup_http_403'))).toBe('census_cleanup_http_403');
   });
 
   it('maps the aggregate asOf guard to bad_asof', () => {
@@ -55,6 +59,7 @@ describe('classifySyncError', () => {
     expect(classifySyncError(new Error('wodify_clients_http_'))).toBe('unknown');
     expect(classifySyncError(new Error('wodify_clients_http_abc'))).toBe('unknown');
     expect(classifySyncError(new Error('persist_http_500 https://secret.example/x'))).toBe('unknown');
+    expect(classifySyncError(new Error('wodify_detail_http_429 client=123'))).toBe('unknown');
     expect(classifySyncError(new Error('prefix wodify_clients_http_500'))).toBe('unknown');
   });
 });

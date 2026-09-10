@@ -1,86 +1,344 @@
-# Tenure Snapshot Clock — the cadence mechanism for the accepted Option-A
-# scheduled tenure pull (RETENTION_FINISH_PLAN.md §6). It POSTs the existing
-# `sync-wodify-retention` Edge Function on a weekly schedule so the threshold-free
-# `tenure_band_histogram` snapshot accumulates a fresh `(workspace_id, as_of)` row
-# each week — the second delta endpoint that a future Monthly Critical Groups card
-# needs (nearest ~30d-prior, 21–45d tolerance, else worst-now-only).
+# Weekly Wodify retention snapshot with a bounded, paged student census.
 #
-# ISOLATION (locked-file justification): this workflow shares NO trigger with and
-# never invokes the deploy pipeline. It runs ONLY on `schedule` + `workflow_dispatch`;
-# `deploy-pages.yml` runs on `push:main` + `workflow_dispatch`, and `ci.yml` on
-# `pull_request`. There is no `push` / `workflow_run` / `workflow_call` overlap, and
-# this job neither pushes nor `uses:` any deploy job.
+# Each mode=page request fetches exactly one /clients page and stores only
+# aggregate counters. The terminal page is discovered from hasMore=false; no
+# page or active-client total is projected. mode=finalize independently rebuilds
+# the existing retention aggregate and writes one final row only after every
+# conservation gate passes.
 #
-# AUTH (least-privilege): the function is double-gated — platform `verify_jwt:true`
-# (the legacy anon JWT) PLUS the `x-sync-trigger-secret` header. The Action carries
-# ONLY the minimal invocation credentials below. The function holds WODIFY_API_KEY
-# and SUPABASE_SERVICE_ROLE_KEY internally; this workflow MUST NEVER reference them.
-#
-# REQUIRED GitHub Actions secrets (set separately — not by this PR):
-#   - SYNC_TRIGGER_SECRET    trigger-gate value; must match the function's env value
-#   - VITE_SUPABASE_ANON_KEY legacy anon JWT (the SPA-bundle key, NOT sb_publishable_…)
-#   - VITE_SUPABASE_URL      endpoint base (https://<ref>.supabase.co)
+# The Action carries only invocation credentials. WODIFY_API_KEY and
+# SUPABASE_SERVICE_ROLE_KEY remain inside the Edge Function.
 
 name: Tenure Snapshot Clock
 
-# Quoted to keep YAML 1.1 parsers from coercing the `on` key to boolean true.
 "on":
   schedule:
-    - cron: '0 12 * * 1' # Mondays 12:00 UTC (7am EST / 8am EDT — far from the gym-local midnight as_of boundary)
-  workflow_dispatch: {}
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+    inputs:
+      diagnostic_page:
+        description: 'Diagnose one page (integer 1–200); 0 runs the normal full census'
+        type: number
+        required: false
+        default: 0
 
 permissions:
   contents: read
 
+concurrency:
+  group: wodify-retention-census
+  cancel-in-progress: false
+
 jobs:
   snapshot:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
-      # 1. INVOKE — POST the writer (no request body). --fail-with-body fails the
-      #    job on any non-2xx while still capturing the response for the asserts.
-      - name: Invoke tenure snapshot sync
+      - name: Diagnose one requested page
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic_page != 0 }}
+        env:
+          DIAGNOSTIC_PAGE: ${{ inputs.diagnostic_page }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SYNC_TRIGGER_SECRET: ${{ secrets.SYNC_TRIGGER_SECRET }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$DIAGNOSTIC_PAGE" =~ ^([1-9]|[1-9][0-9]|1[0-9]{2}|200)$ ]]; then
+            echo '{"origin":"workflow_input","error":"invalid_diagnostic_page"}'
+            exit 1
+          fi
+          RUN_ID=$(cat /proc/sys/kernel/random/uuid)
+          jq -nc --arg run_id "$RUN_ID" --argjson page "$DIAGNOSTIC_PAGE" \
+            '{mode:"page", run_id:$run_id, page:$page}' > request.json
+          # Capture the body privately. No curl/parser error text reaches logs.
+          if ! HTTP_STATUS=$(curl --connect-timeout 10 --max-time 65 -s -X POST \
+            "$VITE_SUPABASE_URL/functions/v1/sync-wodify-retention" \
+            -H "Authorization: Bearer $VITE_SUPABASE_ANON_KEY" \
+            -H "apikey: $VITE_SUPABASE_ANON_KEY" \
+            -H "x-sync-trigger-secret: $SYNC_TRIGGER_SECRET" \
+            -H "Content-Type: application/json" \
+            --data-binary @request.json -o page-response.json \
+            --write-out '%{http_code}' 2>/dev/null); then
+            echo '{"origin":"workflow_transport","error":"page_transport_failed"}'
+            exit 1
+          fi
+          if [[ ! "$HTTP_STATUS" =~ ^[1-5][0-9]{2}$ ]]; then
+            echo '{"origin":"workflow_response_validation","error":"invalid_http_status"}'
+            exit 1
+          fi
+          if [ "$HTTP_STATUS" != "200" ]; then
+            if jq -ce --argjson http_status "$HTTP_STATUS" '
+              def count: type == "number" and . >= 0 and . <= 9007199254740991 and floor == .;
+              select($http_status == 409 and type == "object" and .error == "page_classification_failed")
+              | {origin: "edge_classification", http_status: $http_status,
+                 error: "page_classification_failed", unclassified_total, detail_clients_failed,
+                 unclassified_reasons: (.unclassified_reasons | {
+                   invalid_detail_record, invalid_no_group_signins, invalid_group_or_missing_role,
+                   unrecognized_group_role, invalid_guardian_signins, invalid_client_id, detail_fetch_failed
+                 }),
+                 detail_http_status_counts: (.detail_http_status_counts
+                   | with_entries(select(.key | test("^[1-5][0-9]{2}$"))))}
+              | select((.unclassified_total | count) and (.detail_clients_failed | count)
+                and (.unclassified_reasons | all(.[]; count))
+                and (.detail_http_status_counts | all(.[]; count)))
+            ' page-response.json > page-diagnostic.json 2>/dev/null; then
+              cat page-diagnostic.json
+            else
+              # Recognize only the function's fixed error vocabulary. A status
+              # alone cannot prove whether an unmatched body came from a gateway.
+              if jq -ce --argjson http_status "$HTTP_STATUS" '
+                def safe_integer: type == "number" and . >= -9007199254740991 and . <= 9007199254740991 and floor == .;
+                def field($present; $kind):
+                  ($present | type) == "boolean"
+                  and ($kind | IN("missing","null","boolean","number","string","array","object"))
+                  and ($present == ($kind != "missing"));
+                def number_observation($kind; $integer; $digits):
+                  ($integer == null or ($kind == "number" and ($integer | safe_integer)))
+                  and ($digits == null or ($kind == "string" and ($digits | type) == "string"
+                    and ($digits | test("^[0-9]{1,6}\\z"))));
+                def safe_pagination:
+                  if .parse_stage != "clients_pagination" or .outer_json_valid != true or (.pagination | type) != "object" then {}
+                  else .pagination | {page_present,page_type,page_integer,page_digit_string,
+                    page_size_present,page_size_type,page_size_integer,page_size_digit_string,
+                    has_more_present,has_more_type,has_more_boolean,has_more_string_boolean,
+                    client_row_count,pagination_failures} as $p
+                    | if field($p.page_present;$p.page_type) and field($p.page_size_present;$p.page_size_type)
+                      and field($p.has_more_present;$p.has_more_type)
+                      and number_observation($p.page_type;$p.page_integer;$p.page_digit_string)
+                      and number_observation($p.page_size_type;$p.page_size_integer;$p.page_size_digit_string)
+                      and (if $p.has_more_type == "boolean" then ($p.has_more_boolean | type) == "boolean" else $p.has_more_boolean == null end)
+                      and ($p.has_more_string_boolean == null or ($p.has_more_type == "string" and ($p.has_more_string_boolean | IN("true","false"))))
+                      and ($p.client_row_count | safe_integer) and $p.client_row_count >= 0
+                      and ($p.pagination_failures | type) == "array" and ($p.pagination_failures | length) >= 1
+                      and ($p.pagination_failures | length) <= 7
+                      and ($p.pagination_failures | all(.[]; IN("page_mismatch","page_size_row_count_mismatch","page_size_exceeds_requested","has_more_type","row_count_exceeds_requested","short_nonterminal","max_page_nonterminal")))
+                      and ($p.pagination_failures | unique | length) == ($p.pagination_failures | length)
+                      then {pagination:$p} else {} end end;
+                {origin: "gateway_or_unrecognized_response", error: "unrecognized_http_response",
+                 http_status: $http_status} as $unrecognized
+                | if type != "object" then $unrecognized
+                  elif $http_status == 400 and .error == "invalid_request" then
+                    {origin: "edge_request_validation", error: "invalid_request", http_status: $http_status}
+                  elif $http_status == 409 and .error == "page_classification_failed" then
+                    {origin: "workflow_response_validation", error: "invalid_page_diagnostic", http_status: $http_status}
+                  elif ($http_status == 403 and .error == "forbidden")
+                    or ($http_status == 405 and .error == "method_not_allowed")
+                    or ($http_status == 500 and .error == "internal_error") then
+                    {origin: "edge_function", error, http_status: $http_status}
+                  elif $http_status == 502 and .error == "sync_failed" and (.code | type) == "string" then
+                    if .code == "parse_error"
+                      and (.parse_stage | type) == "string"
+                      and (.parse_stage | test("^(clients_fetch|clients_body_read|detail_body_read|clients_json_decode|clients_envelope|clients_pagination|clients_row|clients_identifier|clients_duplicate|detail_json_decode|page_build_draft|page_persist_draft|page_success_response)$"))
+                      and ((.outer_json_valid | type) == "boolean" or .outer_json_valid == null)
+                      and (.response_content_type | IN(null,"application/json","text/html","text/plain","other","missing"))
+                      and (.response_body_bytes_overflow | type) == "boolean"
+                      and (if .response_body_bytes == null then
+                        .response_body_bytes_overflow == true or .outer_json_valid == null
+                      else (.response_body_bytes | type) == "number"
+                        and .response_body_bytes >= 0 and .response_body_bytes <= 67108864
+                        and (.response_body_bytes | floor) == .response_body_bytes
+                        and .response_body_bytes_overflow == false end) then
+                      (safe_pagination) as $pagination
+                      | {origin: "edge_function", error: "sync_failed", code: "parse_error", http_status: $http_status,
+                       parse_stage, outer_json_valid, response_content_type, response_body_bytes, response_body_bytes_overflow} + $pagination
+                    elif (.code | test("^wodify_(clients|detail)_http_[1-5][0-9]{2}$")) then
+                      {origin: "upstream_wodify", error: "sync_failed", code, http_status: $http_status}
+                    elif (.code | test("^(census_(persist|read|cleanup)_http_[1-5][0-9]{2}|persist_http_[1-5][0-9]{2}|bad_asof|timeout|parse_error|network_error|unknown)$")) then
+                      {origin: "edge_function", error: "sync_failed", code, http_status: $http_status}
+                    else $unrecognized end
+                  else $unrecognized end
+              ' page-response.json > page-diagnostic.json 2>/dev/null; then
+                cat page-diagnostic.json
+              else
+                jq -nc --argjson http_status "$HTTP_STATUS" \
+                  '{origin:"gateway_or_unrecognized_response",error:"unrecognized_http_response",http_status:$http_status}'
+              fi
+            fi
+            exit 1
+          fi
+          # Only the existing aggregate page-summary fields may reach stdout.
+          if jq -ce --argjson requested_page "$DIAGNOSTIC_PAGE" '
+            def count: type == "number" and . >= 0 and . <= 9007199254740991 and floor == .;
+            select(type == "object" and .ok == true and .mode == "page")
+            | {page, pageSize, hasMore, rowsSeen, activeClientsSeen, studentTotal,
+               guardianOnly, unclassified, detailCallsMade, detailClientsFailed}
+            | select(.page == $requested_page and (.pageSize | count) and .pageSize == .rowsSeen and .pageSize <= 25
+              and (.hasMore | type) == "boolean" and (if .hasMore then .pageSize == 25 and .page < 200 else true end)
+              and ([.rowsSeen, .activeClientsSeen, .studentTotal, .guardianOnly,
+                    .unclassified, .detailCallsMade, .detailClientsFailed] | all(.[]; count))
+              and .rowsSeen <= 25 and .rowsSeen >= .activeClientsSeen
+              and .activeClientsSeen == (.studentTotal + .guardianOnly + .unclassified)
+              and .unclassified == 0 and .detailClientsFailed == 0)
+          ' page-response.json > page-diagnostic.json 2>/dev/null; then
+            cat page-diagnostic.json
+            exit 0
+          fi
+          echo '{"origin":"workflow_response_validation","error":"invalid_page_summary","http_status":200}'
+          exit 1
+
+      - name: Build paged census and finalize snapshot
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.diagnostic_page != 0) }}
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           SYNC_TRIGGER_SECRET: ${{ secrets.SYNC_TRIGGER_SECRET }}
         run: |
           set -euo pipefail
-          curl --fail-with-body -sS -X POST \
+          RUN_ID=$(cat /proc/sys/kernel/random/uuid)
+          PAGE=1
+
+          while true; do
+            STARTED_AT=$(date +%s)
+            jq -nc --arg run_id "$RUN_ID" --argjson page "$PAGE" \
+              '{mode:"page", run_id:$run_id, page:$page}' > request.json
+
+            curl --fail-with-body --connect-timeout 10 --max-time 65 -sS -X POST \
+              "$VITE_SUPABASE_URL/functions/v1/sync-wodify-retention" \
+              -H "Authorization: Bearer $VITE_SUPABASE_ANON_KEY" \
+              -H "apikey: $VITE_SUPABASE_ANON_KEY" \
+              -H "x-sync-trigger-secret: $SYNC_TRIGGER_SECRET" \
+              -H "Content-Type: application/json" \
+              --data-binary @request.json \
+              -o page-response.json
+
+            ELAPSED=$(( $(date +%s) - STARTED_AT ))
+            jq -e --argjson page "$PAGE" \
+              '.ok == true
+               and .mode == "page"
+               and .page == $page
+               and (.pageSize | type) == "number" and .pageSize >= 0 and .pageSize <= 25
+               and (.pageSize | floor) == .pageSize and .pageSize == .rowsSeen
+               and (if .hasMore then .pageSize == 25 and .page < 200 else true end)
+               and (.hasMore | type) == "boolean"
+               and (.studentsByPath | type) == "object"
+               and (.studentsByPath | length) == 4
+               and (.studentsByPath | has("member"))
+               and (.studentsByPath | has("dependent"))
+               and (.studentsByPath | has("guardian_with_signin"))
+               and (.studentsByPath | has("no_group_with_signin"))
+               and .rowsSeen >= .activeClientsSeen
+               and .activeClientsSeen == (.studentTotal + .guardianOnly + .unclassified)
+               and .studentTotal == ([.studentsByPath[]] | add)
+               and .unclassified == 0
+               and .detailClientsFailed == 0' \
+              page-response.json > /dev/null
+            echo "Page $(jq -c '{page, pageSize, hasMore, rowsSeen, activeClientsSeen, studentTotal, guardianOnly, unclassified, detailCallsMade, detailClientsFailed}' page-response.json) elapsed=${ELAPSED}s"
+
+            if [ "$ELAPSED" -ge 100 ]; then
+              echo "Page exceeded the 100s stop threshold; finalize was not called" >&2
+              exit 1
+            fi
+            if [ "$ELAPSED" -ge 60 ]; then
+              echo "Page missed the under-60s acceptance gate; finalize was not called" >&2
+              exit 1
+            fi
+
+            HAS_MORE=$(jq -r '.hasMore' page-response.json)
+            if [ "$HAS_MORE" = "false" ]; then
+              break
+            fi
+
+            PAGE=$((PAGE + 1))
+            if [ "$PAGE" -gt 200 ]; then
+              echo "Safety page cap reached without a terminal page; finalize was not called" >&2
+              exit 1
+            fi
+          done
+
+          jq -nc --arg run_id "$RUN_ID" \
+            '{mode:"finalize", run_id:$run_id}' > request.json
+          curl --fail-with-body --connect-timeout 10 --max-time 65 -sS -X POST \
             "$VITE_SUPABASE_URL/functions/v1/sync-wodify-retention" \
             -H "Authorization: Bearer $VITE_SUPABASE_ANON_KEY" \
             -H "apikey: $VITE_SUPABASE_ANON_KEY" \
             -H "x-sync-trigger-secret: $SYNC_TRIGGER_SECRET" \
+            -H "Content-Type: application/json" \
+            --data-binary @request.json \
             -o response.json
-          echo "Invoke ok: $(jq -c '{ok, asOf, activeTotal}' response.json)"
+          echo "Finalize ok: $(jq -c '{ok, asOf, activeTotal, studentTotal, guardianOnlyTotal, unclassifiedTotal, pagesExpected, pagesCompleted}' response.json)"
 
-      # 2. ASSERT BODY — guard a green-but-degenerate pull. jq -e exits non-zero
-      #    (→ fails the job) when the expression is false or null. Paths match the
-      #    confirmed 200-body shape (camelCase): a wrong path reads null and would
-      #    false-BLOCK every good run, so these are exact.
-      - name: Assert response body
+      - name: Assert finalize response
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.diagnostic_page != 0) }}
         run: |
           set -euo pipefail
-          jq -e '.ok == true and .activeTotal > 0 and .dataQuality.reachedPageCap == false' \
+          jq -e \
+            '.ok == true
+             and .mode == "finalize"
+             and .activeTotal > 0
+             and .dataQuality.reachedPageCap == false
+             and (.studentsByPath | type) == "object"
+             and (.studentsByPath | length) == 4
+             and .studentTotal == ([.studentsByPath[]] | add)
+             and .studentTotal + .guardianOnlyTotal + .unclassifiedTotal == .activeTotal
+             and .unclassifiedTotal == 0
+             and .detailClientsFailed == 0
+             and .pagesExpected == .pagesCompleted
+             and .pagesCompleted > 0' \
             response.json > /dev/null
-          echo "Body asserts passed: $(jq -c '{ok, activeTotal, reachedPageCap: .dataQuality.reachedPageCap}' response.json)"
+          echo "Finalize asserts passed: $(jq -c '{activeTotal, studentTotal, guardianOnlyTotal, unclassifiedTotal, detailClientsFailed, pagesExpected, pagesCompleted}' response.json)"
 
-      # 3. READ-BACK — prove the row actually LANDED and carries tenure (the delta
-      #    endpoint), not just that the function returned 200. Reuses the anon key,
-      #    no new credential. Table columns are snake_case (as_of / active_total /
-      #    tenure_band_histogram); workspace_id='default' is the writer's literal.
-      - name: Read back persisted snapshot
+      - name: Read back complete persisted snapshot
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.diagnostic_page != 0) }}
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
           set -euo pipefail
           ASOF=$(jq -r '.asOf' response.json)
-          curl --fail-with-body -sS \
-            "$VITE_SUPABASE_URL/rest/v1/wodify_retention_aggregate?select=as_of,active_total,tenure_band_histogram&workspace_id=eq.default&order=as_of.desc&limit=1" \
+          curl --fail-with-body --connect-timeout 10 --max-time 30 -sS \
+            "$VITE_SUPABASE_URL/rest/v1/wodify_retention_aggregate?select=workspace_id,source,as_of,fetched_at,active_total,inactive_total,days_absent_histogram,tenure_band_histogram,cohort_histogram,unknown_count,monthly_dues_at_risk,missing_monthly_dues,silent_dues_snapshot,wodify_at_risk_count,unknown_status,future_last_check_in,pages_fetched,reached_page_cap,clients_scanned,student_total,guardian_only_total,students_by_path,unclassified_total,ambiguous_no_signin_with_membership,detail_calls_made,detail_clients_failed,pages_expected,pages_completed,student_retention&workspace_id=eq.default&as_of=eq.$ASOF&limit=1" \
             -H "apikey: $VITE_SUPABASE_ANON_KEY" \
             -H "Authorization: Bearer $VITE_SUPABASE_ANON_KEY" \
             -o readback.json
-          jq -e --arg asof "$ASOF" \
-            '.[0].as_of == $asof and .[0].active_total > 0 and .[0].tenure_band_histogram != null' \
+
+          jq -e --arg asof "$ASOF" --slurpfile response response.json \
+            'def stamp:
+               sub("\\+00:00$"; "Z")
+               | capture("^(?<whole>[^.]+?)(?:\\.(?<fraction>[0-9]+))?Z$")
+               | .whole + "." + ((.fraction // "") | sub("0+$"; ""));
+             .[0] as $row
+             | $response[0] as $sent
+             | $row.as_of == $asof
+             and $row.workspace_id == "default"
+             and $row.source == "wodify"
+             and ($row.fetched_at | type) == "string"
+             and ($row.fetched_at | stamp) == ($sent.fetchedAt | stamp)
+             and $row.active_total == $sent.activeTotal
+             and $row.active_total > 0
+             and ($row.inactive_total | type) == "number"
+             and ($row.days_absent_histogram | type) == "object"
+             and ($row.tenure_band_histogram | type) == "object"
+             and ($row.cohort_histogram | type) == "object"
+             and ($row.unknown_count | type) == "number"
+             and ($row | has("monthly_dues_at_risk"))
+             and (($row.monthly_dues_at_risk | type) == "null" or ($row.monthly_dues_at_risk | type) == "number")
+             and ($row | has("silent_dues_snapshot"))
+             and (($row.silent_dues_snapshot | type) == "null" or ($row.silent_dues_snapshot | type) == "object")
+             and ($row.missing_monthly_dues | type) == "boolean"
+             and ($row.wodify_at_risk_count | type) == "number"
+             and ($row.unknown_status | type) == "number"
+             and ($row.future_last_check_in | type) == "number"
+             and ($row.pages_fetched | type) == "number"
+             and $row.reached_page_cap == false
+             and ($row.clients_scanned | type) == "number"
+             and $row.student_retention.version == 1
+             and $row.student_retention.asOf == $asof
+             and $row.student_retention.studentTotal == $row.student_total
+             and $row.student_total == $sent.studentTotal
+             and $row.guardian_only_total == $sent.guardianOnlyTotal
+             and $row.unclassified_total == 0
+             and ($row.ambiguous_no_signin_with_membership | type) == "number"
+             and ($row.detail_calls_made | type) == "number"
+             and $row.detail_clients_failed == 0
+             and $row.pages_expected == $sent.pagesExpected
+             and $row.pages_completed == $sent.pagesCompleted
+             and ($row.students_by_path | type) == "object"
+             and ($row.students_by_path | length) == 4
+             and ($row.students_by_path | has("member"))
+             and ($row.students_by_path | has("dependent"))
+             and ($row.students_by_path | has("guardian_with_signin"))
+             and ($row.students_by_path | has("no_group_with_signin"))
+             and $row.student_total == ([$row.students_by_path[]] | add)
+             and $row.student_total + $row.guardian_only_total + $row.unclassified_total == $row.active_total' \
             readback.json > /dev/null
-          echo "Read-back confirmed: row as_of=$ASOF landed with a tenure histogram"
+          echo "Read-back confirmed: complete existing aggregate plus paged student census for as_of=$ASOF"

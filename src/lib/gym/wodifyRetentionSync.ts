@@ -6,15 +6,75 @@
 // runtime and Node/vitest (Web Crypto, TextEncoder, typed arrays) — no Deno-only
 // or Node-only imports — so one definition behaves identically in both.
 
-/**
- * Sanitized, fixed-vocabulary classification of a sync failure, returned in the
- * 502 body as `code`. It is NEVER derived from a raw error message except the two
- * status-suffixed forms below, which carry only a non-sensitive HTTP integer
- * (the function itself throws them, anchored + digits-only). No URL, query
- * string, header, row, or secret can ever reach this value.
+/** One server-side budget includes waits, retries, response bodies and storage.
+ * Abort all in-flight HTTP at expiry and check again before any new write.
  */
+export class SyncDeadline {
+  private readonly controller = new AbortController();
+  private readonly expiresAt: number;
+  private readonly timer: ReturnType<typeof setTimeout>;
+
+  constructor(ms: number) {
+    this.expiresAt = Date.now() + ms;
+    this.timer = setTimeout(() => this.controller.abort(
+      new DOMException('sync deadline', 'TimeoutError'),
+    ), ms);
+  }
+
+  check(): void {
+    if (Date.now() >= this.expiresAt && !this.controller.signal.aborted) {
+      this.controller.abort(new DOMException('sync deadline', 'TimeoutError'));
+    }
+    this.controller.signal.throwIfAborted();
+  }
+
+  async run<T>(operation: Promise<T>): Promise<T> {
+    this.check();
+    const signal = this.controller.signal;
+    let abort!: () => void;
+    const expired = new Promise<never>((_resolve, reject) => {
+      abort = () => reject(signal.reason);
+      signal.addEventListener('abort', abort, { once: true });
+    });
+    try {
+      const result = await Promise.race([operation, expired]);
+      this.check();
+      return result;
+    } finally {
+      signal.removeEventListener('abort', abort);
+    }
+  }
+
+  async fetch(input: string | URL, init: RequestInit = {}): Promise<Response> {
+    this.check();
+    return this.run(fetch(input, {
+      ...init,
+      signal: init.signal
+        ? AbortSignal.any([this.controller.signal, init.signal])
+        : this.controller.signal,
+    }));
+  }
+
+  async wait(ms: number): Promise<void> {
+    this.check();
+    let timer!: ReturnType<typeof setTimeout>;
+    try {
+      await this.run(new Promise<void>((resolve) => { timer = setTimeout(resolve, ms); }));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  dispose(): void { clearTimeout(this.timer); }
+}
+
+/** Sanitized vocabulary only; never return a raw error, URL, row or secret. */
 export type SyncErrorCode =
   | `wodify_clients_http_${number}`
+  | `wodify_detail_http_${number}`
+  | `census_persist_http_${number}`
+  | `census_read_http_${number}`
+  | `census_cleanup_http_${number}`
   | `persist_http_${number}`
   | 'bad_asof'
   | 'timeout'
@@ -32,6 +92,10 @@ export function classifySyncError(err: unknown): SyncErrorCode {
   // Status-only messages thrown by the function itself (index.ts fetch/persist).
   // Anchored + digits-only so an arbitrary message can never pass through.
   if (/^wodify_clients_http_\d+$/.test(message)) return message as SyncErrorCode;
+  if (/^wodify_detail_http_\d+$/.test(message)) return message as SyncErrorCode;
+  if (/^census_persist_http_\d+$/.test(message)) return message as SyncErrorCode;
+  if (/^census_read_http_\d+$/.test(message)) return message as SyncErrorCode;
+  if (/^census_cleanup_http_\d+$/.test(message)) return message as SyncErrorCode;
   if (/^persist_http_\d+$/.test(message)) return message as SyncErrorCode;
 
   // The aggregate's asOf format guard (wodifyRetentionAggregate.ts). Defensive

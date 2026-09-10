@@ -239,3 +239,91 @@ on public.wodify_retention_aggregate
 for select
 to anon
 using (workspace_id = 'default');
+
+-- BEGIN STUDENT CENSUS DELTA (also works on an existing canonical schema).
+-- WO-2 v3: paged, aggregate-only Wodify student census.
+--
+-- The final snapshot columns are nullable so historical rows retain their
+-- original meaning. The run table contains page-level counts only; no client
+-- identifier or other person-level value is persisted.
+
+alter table public.wodify_retention_aggregate
+  add column if not exists student_total integer null,
+  add column if not exists guardian_only_total integer null,
+  add column if not exists students_by_path jsonb null,
+  add column if not exists unclassified_total integer null,
+  add column if not exists ambiguous_no_signin_with_membership integer null,
+  add column if not exists detail_calls_made integer null,
+  add column if not exists detail_clients_failed integer null,
+  add column if not exists pages_expected integer null,
+  add column if not exists pages_completed integer null;
+
+alter table public.wodify_retention_aggregate
+  add column if not exists student_retention jsonb null;
+
+create table if not exists public.wodify_census_runs (
+  run_id uuid not null,
+  page integer not null check (page between 1 and 200),
+  created_at timestamptz not null default now(),
+  page_size integer not null,
+  student_retention jsonb null,
+  has_more boolean not null,
+  rows_seen integer not null check (rows_seen >= 0),
+  active_clients_seen integer not null check (active_clients_seen >= 0),
+  student_total integer not null check (student_total >= 0),
+  student_member integer not null check (student_member >= 0),
+  student_dependent integer not null check (student_dependent >= 0),
+  student_guardian_with_signin integer not null check (student_guardian_with_signin >= 0),
+  student_no_group_with_signin integer not null check (student_no_group_with_signin >= 0),
+  guardian_only integer not null check (guardian_only >= 0),
+  unclassified integer not null check (unclassified >= 0),
+  ambiguous_no_signin_with_membership integer not null
+    check (ambiguous_no_signin_with_membership >= 0),
+  detail_calls_made integer not null check (detail_calls_made >= 0),
+  detail_clients_failed integer not null check (detail_clients_failed >= 0),
+  primary key (run_id, page),
+  check (rows_seen <= page_size),
+  check (active_clients_seen <= rows_seen),
+  check (
+    student_total = student_member
+      + student_dependent
+      + student_guardian_with_signin
+      + student_no_group_with_signin
+  ),
+  check (student_total + guardian_only + unclassified = active_clients_seen),
+  check (ambiguous_no_signin_with_membership <= guardian_only),
+  check (detail_clients_failed <= unclassified)
+);
+
+create index if not exists wodify_census_runs_created_at_idx
+  on public.wodify_census_runs (created_at);
+
+-- Preserve old count-only drafts; runtime rejects size=100 or missing student
+-- payloads. Current census page_size is rows returned, with requested capacity 25.
+alter table public.wodify_census_runs
+  add column if not exists student_retention jsonb null;
+alter table public.wodify_census_runs
+  drop constraint if exists wodify_census_runs_page_check,
+  drop constraint if exists wodify_census_runs_page_size_check;
+alter table public.wodify_census_runs
+  add constraint wodify_census_runs_page_check check (page between 1 and 200),
+  add constraint wodify_census_runs_page_size_check check (
+    page_size = 100 or (
+      page_size between 0 and 25 and page_size = rows_seen
+      and (not has_more or (page_size = 25 and page < 200))
+    )
+  );
+
+alter table public.wodify_census_runs enable row level security;
+
+-- No anon/authenticated policy is created. Grants are also removed so the
+-- page drafts have two independent barriers against browser access.
+revoke all on table public.wodify_census_runs from anon, authenticated;
+revoke all on table public.wodify_census_runs from public;
+revoke all on table public.wodify_census_runs from service_role;
+grant select, insert, update, delete
+  on table public.wodify_census_runs
+  to service_role;
+
+notify pgrst, 'reload schema';
+-- END STUDENT CENSUS DELTA
