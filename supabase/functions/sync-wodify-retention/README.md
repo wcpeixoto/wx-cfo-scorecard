@@ -1,15 +1,24 @@
 # sync-wodify-retention Edge Function
 
-Server-side Wodify retention snapshot writer. The WO-2 v3 candidate adds a
+Server-side Wodify retention snapshot writer. WO-2 v3 adds a
 paged, aggregate-only student census while preserving the existing Silent
 Churn, Attendance Health, tenure, cohort, dues, and diagnostic payload. The
 browser never calls Wodify and never sees either data credential.
 
-> **WO-2 v3 is implemented locally but is not deployed and its SQL is not
-> applied.** `mode=page` and `mode=finalize` become operative only after the
-> additive canonical-schema delta and the name-scoped function deployment are separately
-> reviewed and explicitly authorized. The historical live-state record below
-> describes the pre-WO-2 deployment, not this local candidate.
+> **Production state recorded 2026-09-10:** migration entries **25**
+> `wodify_student_census_wo_2` and **26** `wodify_census_returned_page_size` are
+> applied. `sync-wodify-retention` is **ACTIVE v31**, `verify_jwt: true`.
+> Workflow **Tenure Snapshot Clock** is currently **disabled_manually**.
+> Successful full run **34425569190** completed **41 pages / 1,021 rows**;
+> terminal page: **21 rows, has_more=false**; **397 active = 263 students +
+> 134 guardian-only**, **0 unclassified**, **0 detail failures**.
+> This is the census/backend result for PR #559. The dashboard changes are
+> **not implemented in PR #559**; PR #560 is held until the Monday scheduled run.
+
+### Historical deployment record — June 2026 (not current operating state)
+
+The following disarmed/secrets/deployment statements describe June only; the
+September production banner above supersedes them.
 
 > **TENURE AGGREGATE-EXTENSION PULL DONE (2026-06-11) — DISARMED again; canonical identity
 > `ezbr_sha256 3ae170006fa0ca27ed9bb23b9e4c7f8482b83cdd616ab2da245e5893cf6a2719`.**
@@ -33,7 +42,7 @@ browser never calls Wodify and never sees either data credential.
 > function's platform version counter project-wide while `ezbr_sha256` + `updated_at` stay unmoved —
 > identify deployments by **`ezbr_sha256` + `updated_at`, never version**.
 
-## Slice 1 operational contract (candidate, 2026-09-09)
+## Slice 1 operational contract (deployed, successful full run)
 
 The canonical, self-contained SQL is `supabase/wodify_retention_schema.sql`.
 Its marked `BEGIN STUDENT CENSUS DELTA` / `END STUDENT CENSUS DELTA` block is
@@ -73,8 +82,9 @@ token used here, and no cross-request identifiers or fingerprints are stored.
 Within-request duplicate detection and freshness reduce detectable failures but
 cannot establish cross-request identity. This census is a bounded collection,
 not a proven atomic upstream snapshot. The legacy attendance, tenure and cohort
-histograms still describe raw clients and remain unchanged. Current dashboard
-views consume only the separate versioned student payload described below.
+histograms still describe raw clients and remain unchanged. PR #559 produces the
+separate student payload but does not switch current dashboard consumers to it;
+that frontend work is held in PR #560.
 
 ### Page-failure diagnostics
 
@@ -147,10 +157,10 @@ retracted. Subsequently, valid isolated run `34417952517` on function v28 return
 `{origin:edge_function,error:sync_failed,code:parse_error,http_status:502}`.
 Same-page recurrence strongly favors a deterministic contract failure; only the
 isolated run establishes `parse_error`, because the earlier body was hidden.
-The exact cause remains unknown and blind retries are not justified. The workflow
-is disabled manually during this diagnostic build/review. Do not enable or invoke
-it as part of publishing this code. **PR #559 requires a fresh full independent
-review before merge.**
+These were historical failed probes, not the current result. The later v30 probe
+identified the returned-count terminal contract, corrected in v31; full run
+34425569190 subsequently succeeded as recorded above. The workflow remains
+disabled manually. **PR #559 requires whole-PR independent review before merge.**
 
 ### Page parse-origin metadata (deployed in v29)
 
@@ -186,12 +196,14 @@ outcomes are unchanged. JSON decoding retains Response.json UTF-8/BOM semantics.
 The manual workflow logs new metadata only with the exact allowlisted 502
 parse-error contract. Missing/malformed metadata is omitted while retaining the
 legacy safe `parse_error` code. No stack, arbitrary exception text, URL, raw body,
-identifier, record value, or other header is logged. Scheduled/full-run shell
-blocks and their output remain unchanged.
+identifier, record value, or other header is logged. Scheduled execution and
+manual dispatch with diagnostic_page absent/0 select the same full-run scripts.
+Those scripts changed from earlier commits and are now hash-pinned in the
+workflow contract test; they are not claimed byte-identical across that history.
 
-### Returned-count pagination correction (prospective v31, not deployed)
+### Returned-count pagination correction (deployed v31)
 
-Live v30 was confirmed current read-only before this build. The page-41 probe
+Before the correction, live v30 was confirmed read-only. Its page-41 probe
 established 21 returned rows, `page_size=21`, and boolean `has_more=false`.
 Forty full census pages plus that terminal page total **40 × 25 + 21 = 1,021**
 rows if the population is unchanged, not 1,025. This is dated evidence, not a
@@ -208,9 +220,19 @@ remain required. Separate bulk retention fetches retain capacity **100**, with
 the same response-count invariant; they are not census detail pages.
 
 Persisted current-census drafts enforce safe nonnegative `pageSize=rowsSeen`
-through 25 and a full nonterminal page. The new migration
-`20260910005116_wodify_census_returned_page_size.sql` changes only the named
-page-size constraint; it does not edit migration `20260909140516` or its history.
+through 25 and a full nonterminal page. Production entry **25**
+`wodify_student_census_wo_2` (`20260909140516`) and the canonical schema at that
+stage used `page_size IN (25,100)`. The observed Wodify terminal returns 21, so
+that database check rejected its draft. Applied entry **26**
+`wodify_census_returned_page_size`, represented locally by
+`20260910005116_wodify_census_returned_page_size.sql`, changes only the named
+`wodify_census_runs_page_size_check`: preserve legacy 100; otherwise accept
+0..25 equal to rows_seen, with has_more=true requiring a full 25 and page<200.
+It does not edit entry25 or its history. Entry25 exists in production migration
+history and is represented by the canonical snapshot, but has **no repository
+migration file**. The repository migration directory is **not replayable history**.
+This mixed convention remains separate backlog; do not synthesize entry25 or
+repair migration history as part of PR #559.
 Existing 25/25 drafts survive unchanged. Legacy size-100 rows remain stored under
 the existing conservation checks but remain ineligible for census finalize.
 Both workflow success guards follow the same contract. The full-run guard hash
@@ -222,21 +244,20 @@ the corrected predicate: `page_mismatch`, `page_size_row_count_mismatch`,
 `page_size_exceeds_requested`, `has_more_type`, `row_count_exceeds_requested`,
 `short_nonterminal`, `max_page_nonterminal`. The last two retain the predicate's
 truthiness for malformed values, which also fail the boolean/type check.
-Independent review and disposable local migration validation precede any live
-schema/function change. No retry or production run is part of this build.
-PR #559 still requires a fresh whole-PR review before merge.
+Independent review and disposable local migration validation preceded the applied
+schema/function change and successful full run. PR #559 still requires its
+whole-PR review gate before merge.
 
-### Pagination observations (deployed in v30; historical probe contract)
+### Pagination observations (introduced in v30; current safe payload)
 
-The read-only function inventory confirmed v29 remains current during this build.
-The actual v29 page-41 probe, run `34419644471`, reported `clients_pagination`,
+The historical v29 page-41 probe, run `34419644471`, reported `clients_pagination`,
 valid outer JSON, `application/json`, and 45,950 response-body bytes. It did not
 identify which predicate failed. Forty census pages of 25 rows mean 1,000 rows
-were processed; that does not establish why page 41 failed. The current contract
-already accepts short pages and empty terminal pages with `has_more=false`.
+were processed; that probe alone did not establish why page 41 failed. The later
+v30 observation and deployed v31 correction are described above.
 
-Only at the existing `clients_pagination` throw, the candidate adds a `pagination`
-object. The acceptance predicate itself is unchanged. For each expected field
+Only at the `clients_pagination` throw, the function adds a `pagination`
+object. For each expected field
 `page`, `page_size`, and `has_more`, it reports a `_present` flag and `_type` from
 `missing|null|boolean|number|string|array|object`. Missing refers to absent own
 JSON properties. `page_integer`/`page_size_integer` reflect only safe integers;
@@ -247,27 +268,20 @@ only the exact strings `"true"` and `"false"`, otherwise null. `client_row_count
 is the array length, a nonnegative safe integer. No other upstream keys or values
 are reflected.
 
-`pagination_failures` lists every failed predicate in this fixed order:
-`page_mismatch`, `page_size_mismatch`, `has_more_type`,
-`row_count_exceeds_requested`, `empty_nonterminal`, `max_page_nonterminal`.
-The final two mirror the existing truthiness check, including truthy wrong-type
-`has_more` values; they are not restricted to boolean true. This observation does
-not repair, reinterpret or retry the contract. Invalid pages still fail 502
-before detail calls or persistence, exactly as v29.
+`pagination_failures` uses the single current ordered enum listed in
+"Returned-count pagination correction" above. Invalid pages fail 502 before
+detail calls or persistence; the observer never retries or repairs them.
 
 The manual diagnostic logs this nested object only for the validated 502
 `sync_failed`/`parse_error`/`clients_pagination` contract with valid outer JSON.
 It projects only fixed fields and validates all scalar bounds, types and reason
 enums. Missing/invalid observations are omitted, retaining prior safe parse
 metadata; arbitrary strings, keys and row contents never reach the log. Other
-parse stages cannot emit pagination observations. Scheduled/full-manual run
-blocks remain byte-identical. Workflow stays disabled during build/review.
-Independent review must precede deployment and the single authorized page-41
-probe; no terminal-page fix or retry is authorized. If that probe succeeds where
-v29 failed, stop and investigate potential behavior drift. **PR #559 still needs
-a fresh whole-PR independent review before merge.**
+parse stages cannot emit pagination observations. Scheduled/manual full runs
+share the current hash-pinned scripts; those scripts changed with the terminal
+fix. Workflow remains disabled manually after the successful full run.
 
-### Reviewed deployment and read-back sequence (not executed here)
+### Deployment/read-back procedure (completed for v31; future use requires authorization)
 
 1. Independent Reviewer checks exact function/module/workflow/schema bytes and
    tests. Under the coordinator's later release, freshly read the CFO project's
@@ -275,7 +289,9 @@ a fresh whole-PR independent review before merge.**
    grants/policies and current aggregate. Capture the same-day human-written
    `silent_dues_snapshot` for comparison. Historical values below are not a live
    baseline. Target only project `gzgxcvjvoivlwaksnmxy`.
-2. Apply only the reviewed additive SQL block to that existing schema. Verify
+2. Apply only the specifically reviewed migration for that release, not the
+   canonical snapshot as a blanket production replay. Entries25/26 are already
+   applied for v31 and must not be reapplied. Verify
    the ten nullable/no-default fields, draft primary key/checks, RLS and effective
    role privileges. No migration repair, db pull/push or baseline reconstruction.
    Rehearse the self-contained schema and delta in a disposable database when
@@ -295,9 +311,9 @@ a fresh whole-PR independent review before merge.**
    `fetched_at` to the finalize response, student/path/guardian totals, completed
    pages, legacy histograms and diagnostics. Compare the captured same-day human
    dues value exactly; for a new day it remains null until a human writes it.
-   Verify draft denial for browser roles and weekly workflow readiness. Browser-check
-   the three current student cards, unknown attendance and their unavailable/zero
-   states, plus historical class-plan source labels.
+   Verify draft denial for browser roles and weekly workflow readiness.
+   Browser checks of student cards and historical class-plan source labels belong
+   to PR #560 after its Monday-run hold, not to the completed PR #559 backend run.
 
 Recovery: failed pages/finalize validation never publish partial final counts;
 use a new UUID for a replacement run. Old drafts expire for publication after
@@ -309,7 +325,7 @@ workspace/day row before retrying; never infer rollback from a client timeout.
 The upsert remains idempotent. Concurrency is workflow-level only; manual direct
 invocations must also be serialized by the operator.
 
-## Slice 2 student payload and dashboard
+## Student payload produced by PR #559
 
 During each classified page pass, only admitted active students contribute to
 `student_retention`: version 1, collection day, student total, unknown attendance,
@@ -320,8 +336,13 @@ alongside page counters. Finalize strictly validates each draft and merges every
 bin, including unknown age/tenure/recency and overflow, into one final payload.
 It never derives student numerators from the independent raw-client scan.
 
-The frontend reads `student_retention`, census totals and date from the same
-latest row. It requires version/date/total agreement, nonnegative safe-integer
+### Slice 2 frontend/dashboard — NOT implemented in PR #559
+
+The following describes the separate PR #560 implementation, held until the
+Monday scheduled run. It is not a claim about the current frontend.
+
+That frontend will read `student_retention`, census totals and date from the same
+latest row. Its contract requires version/date/total agreement, nonnegative safe-integer
 counts, exact keys and band definitions, exact per-day partition conservation,
 complete census pages, zero failures/unclassified clients and path conservation.
 Missing, malformed, prior-version, future-dated or more-than-14-day-old data
@@ -354,6 +375,63 @@ requests; its 55-second deadline still applies. Workflow remains bounded to one
 hour. The schema tolerates legacy 100-row drafts for nondestructive upgrades,
 but runtime finalize accepts only returned counts 0..25 with a valid versioned
 payload, exactly matching rows_seen and requiring 25 for nonterminal pages.
+
+### Manual disposable SQL regression test — never production
+
+`tests/wodifyCensusReturnedSize.sql` is a manual PostgreSQL regression test,
+not executed by npm test. The CI contract test separately compares entry26's
+constraint predicate with the canonical snapshot. To run the SQL test, use the
+following exact bash recipe from the repository root with Docker already running
+and postgres:17 already installed. It does not pull images, expose ports, mount
+the host, or create persistent volumes. It reconstructs the affected prior
+canonical schema, seeds 40 synthetic current drafts plus one legacy draft,
+checks row fingerprints around entry26, runs the SQL assertions, reapplies the
+current canonical snapshot and repeats assertions. Any error stops the script;
+only its disposable container is removed and evidence is retained. Never target
+production or substitute a live connection. This recipe is documentation, not
+authorization to run another production operation.
+
+```bash
+#!/bin/bash
+set -euo pipefail
+# Run from the repository root in bash.
+EVIDENCE=$(mktemp -d /private/tmp/cfo-returned-size-evidence.XXXXXX)
+CONTAINER="cfo-returned-size-${EVIDENCE##*.}"
+trap 'docker rm -f "$CONTAINER" >/dev/null' EXIT
+git show bfab91b203c51bd2759c86daece7f891479ddea4:supabase/wodify_retention_schema.sql > "$EVIDENCE/before-schema.sql"
+shasum -a 256 supabase/migrations/20260910005116_wodify_census_returned_page_size.sql tests/wodifyCensusReturnedSize.sql > "$EVIDENCE/candidate-hashes.txt"
+docker run --pull never -d --name "$CONTAINER" --network none --tmpfs /var/lib/postgresql/data -e POSTGRES_HOST_AUTH_METHOD=trust postgres:17 > "$EVIDENCE/container.txt"
+for attempt in $(seq 1 30); do
+  if docker exec "$CONTAINER" pg_isready -U postgres >/dev/null 2>&1; then break; fi
+  sleep 1
+done
+docker exec "$CONTAINER" pg_isready -U postgres
+docker exec -i "$CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 <<'SQL' > "$EVIDENCE/roles.log"
+create role anon;
+create role authenticated;
+create role service_role bypassrls;
+SQL
+docker exec -i "$CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < "$EVIDENCE/before-schema.sql" > "$EVIDENCE/reconstruction.log" 2>&1
+docker exec -i "$CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 <<'SQL' > "$EVIDENCE/seed.log"
+insert into public.wodify_census_runs
+(run_id,page,created_at,page_size,has_more,rows_seen,active_clients_seen,student_total,student_member,student_dependent,student_guardian_with_signin,student_no_group_with_signin,guardian_only,unclassified,ambiguous_no_signin_with_membership,detail_calls_made,detail_clients_failed)
+select '11111111-1111-4111-8111-111111111111',p,'2026-09-09T12:00:00Z',25,true,25,0,0,0,0,0,0,0,0,0,0,0 from generate_series(1,40) p;
+insert into public.wodify_census_runs
+(run_id,page,created_at,page_size,has_more,rows_seen,active_clients_seen,student_total,student_member,student_dependent,student_guardian_with_signin,student_no_group_with_signin,guardian_only,unclassified,ambiguous_no_signin_with_membership,detail_calls_made,detail_clients_failed)
+values ('22222222-2222-4222-8222-222222222222',1,'2026-09-09T12:00:00Z',100,false,21,0,0,0,0,0,0,0,0,0,0,0);
+SQL
+FINGERPRINT="select md5(string_agg(row_to_json(t)::text, ',' order by run_id,page)) from public.wodify_census_runs t;"
+docker exec "$CONTAINER" psql -U postgres -Atc "$FINGERPRINT" > "$EVIDENCE/before-rows.txt"
+docker exec -i "$CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/20260910005116_wodify_census_returned_page_size.sql > "$EVIDENCE/migration.log" 2>&1
+docker exec "$CONTAINER" psql -U postgres -Atc "$FINGERPRINT" > "$EVIDENCE/after-rows.txt"
+cmp "$EVIDENCE/before-rows.txt" "$EVIDENCE/after-rows.txt"
+docker exec -i "$CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < tests/wodifyCensusReturnedSize.sql > "$EVIDENCE/assertions.log" 2>&1
+docker exec "$CONTAINER" psql -U postgres -Atc "select conname,pg_get_constraintdef(oid) from pg_constraint where conrelid='public.wodify_census_runs'::regclass order by conname" > "$EVIDENCE/constraints.txt"
+docker exec -i "$CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/wodify_retention_schema.sql > "$EVIDENCE/canonical-reload.log" 2>&1
+docker exec -i "$CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < tests/wodifyCensusReturnedSize.sql > "$EVIDENCE/canonical-assertions.log" 2>&1
+echo "PASS evidence=$EVIDENCE"
+
+```
 
 ## Shared implementation
 

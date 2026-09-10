@@ -182,6 +182,15 @@ describe('manual single-page diagnostic isolation', () => {
 });
 
 describe('paged census persistence contract', () => {
+  it('keeps migration entry26 and the canonical page-size constraint identical', () => {
+    const entry26 = readFileSync(new URL('../supabase/migrations/20260910005116_wodify_census_returned_page_size.sql', import.meta.url), 'utf8');
+    const predicate = (sql: string) => {
+      const match = sql.match(/add constraint wodify_census_runs_page_size_check check\s*(\([\s\S]*?\));/i);
+      expect(match).not.toBeNull();
+      return match![1].replace(/\s+/g, ' ').trim();
+    };
+    expect(predicate(entry26)).toBe(predicate(migration));
+  });
   it('repeating the same run_id/page replaces the draft instead of duplicating it', () => {
     expect(migration).toMatch(/primary key \(run_id, page\)/i);
     expect(edgeFunction).toContain('?on_conflict=run_id,page');
