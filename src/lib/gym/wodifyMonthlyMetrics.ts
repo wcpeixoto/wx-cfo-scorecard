@@ -514,6 +514,7 @@ export function membershipMetrics(memberships: Rec[], clients: Rec[], months: Mo
     if (fm && inRun.has(fm)) {
       acc.add(fm, 'new_students', 'all', 1);
       acc.add(fm, 'new_students', dimLabel('program', program.get(client)), 1);
+      acc.add(fm, 'new_students', dimLabel('template', first.raw.name), 1);
     }
     for (let i = 1; i < plans.length; i++) {
       const p = plans[i];
@@ -689,7 +690,8 @@ export function invoiceMetrics(details: Rec[], month: MonthKey, todayNy: string)
     const unpaid = num(inv.unpaid_amount) ?? 0;
     acc.add(month, 'billed_paid', 'all', num(inv.paid_amount) ?? 0);
     acc.add(month, 'billed_unpaid', 'all', unpaid);
-    acc.add(month, 'refunds', 'all', num(inv.final_refunded_amount) ?? 0);
+    // Wodify stores refunds as negative amounts; stored as positive dollars refunded.
+    acc.add(month, 'refunds', 'all', Math.abs(num(inv.final_refunded_amount) ?? 0));
     if (inv.is_auto_bill === true && unpaid > 0 && due < todayNy) acc.add(month, 'autopay_failed', 'all', 1);
     for (const line of Array.isArray(inv.invoice_details) ? inv.invoice_details : []) {
       if (!isRecord(line)) continue;

@@ -98,7 +98,7 @@ difference (0 / 1 / 1 / 135 = 137) is exactly the guardian-only clients.
 
 | Key | Formula | Dimensions |
 |---|---|---|
-| `new_students` | Clients whose **first-ever Class Plan** (earliest `start_date`, then id) starts in the month. | `program:<client default_program>` |
+| `new_students` | Clients whose **first-ever Class Plan** (earliest `start_date`, then id) starts in the month. | `program:<client default_program>` (Wodify's signup default — mostly "Adults Intro Classes", weak); `template:<first plan's membership name>` |
 | `rejoins` | Class Plan rows that start a new chain (`renewed_from_membership_id` empty) in the month for a client who had an earlier Class Plan, with a **gap**: no earlier Class Plan of theirs still covers the start day. | — |
 | `plan_switches` | Same, but an earlier Class Plan still covers the start day (overlap, or starts exactly on its `end_date`). Context: neither new nor rejoin. | — |
 | `plan_mix` | Class Plan rows active on the month's last day (today for the current month). | `template:<membership name>` |
@@ -145,8 +145,8 @@ exclude `Voided` and `Deleted` invoices. Amounts in dollars, 2 decimals.
 | `billed_paid` | Σ `paid_amount`. | — |
 | `billed_unpaid` | Σ `unpaid_amount` (as of the run). | — |
 | `autopay_failed` | Invoices with `is_auto_bill = true`, `unpaid_amount > 0` and `payment_due` before today (an attempt has happened). | — |
-| `refunds` | Σ `final_refunded_amount` (attributed to the invoice's due month). | — |
-| `revenue_by_category` | Σ line `post_header_net_revenue` (net of line and header discounts, before tax; refunds reported separately). | `category:<revenue_category>` |
+| `refunds` | Σ \|`final_refunded_amount`\| — Wodify stores refunds as negative amounts; stored as positive dollars refunded, attributed to the invoice's due month. | — |
+| `revenue_by_category` | Σ line `post_header_net_revenue` (net of line and header discounts, before tax and before refunds — refunds are the separate `refunds` metric). | `category:<revenue_category>` |
 
 ## Deferred / not stored
 

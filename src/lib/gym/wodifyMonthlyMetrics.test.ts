@@ -137,6 +137,7 @@ describe('new students, renewals, rejoins and switches', () => {
   it('counts first-ever Class Plans only', () => {
     expect(pick(rows, 'new_students', 'all', '2026-09')).toBe(3); // clients 1, 5, 6
     expect(pick(rows, 'new_students', 'program:Kids BJJ', '2026-09')).toBe(2);
+    expect(pick(rows, 'new_students', 'template:Kids Monthly Unlimited', '2026-09')).toBe(3);
     expect(pick(rows, 'new_students', 'all', '2026-10')).toBe(0); // client 1's renewal is not new
   });
   it('separates rejoins (gap) from plan switches (overlap or contiguous)', () => {
@@ -235,13 +236,15 @@ describe('funnel, sign-ins and invoices', () => {
       inv('Unpaid', '2026-09-03', { unpaid_amount: 100 }),
       inv('Unpaid', '2026-09-29', { unpaid_amount: 100 }), // not yet attempted on "today"
       inv('Voided', '2026-09-04', { unpaid_amount: 100 }),
+      inv('Refunded', '2026-09-05', { final_charge: 0, final_refunded_amount: -364 }),
     ], '2026-09', '2026-09-20');
-    expect(pick(rows, 'invoices_due_count')).toBe(4);
+    expect(pick(rows, 'refunds')).toBe(364);
+    expect(pick(rows, 'invoices_due_count')).toBe(5);
     expect(pick(rows, 'invoices_due_count', 'status:Voided')).toBe(1);
     expect(pick(rows, 'billed_paid')).toBe(100);
     expect(pick(rows, 'billed_unpaid')).toBe(200);
     expect(pick(rows, 'autopay_failed')).toBe(1);
-    expect(pick(rows, 'revenue_by_category', 'category:Membership Sales')).toBe(300);
+    expect(pick(rows, 'revenue_by_category', 'category:Membership Sales')).toBe(400);
   });
   it('groups lead tags', () => {
     expect(tagGroup(['Lead', 'META ADS'])).toBe('META ADS');
