@@ -4,11 +4,11 @@
 //   - the manual "Export source JSON" button (ExportSourceJsonCard), which then Blobs the result
 //   - automatic snapshot persistence (useScorecardSnapshotPersistence), which then upserts it
 //
-// Both therefore fetch the SAME four live retention sources and call the SAME pure builder, so the
+// Both therefore fetch the SAME five live retention sources and call the SAME pure builder, so the
 // downloaded file and the stored row can never describe different data. The Blob/download side
 // effect stays in the UI component — this module does network reads and nothing else.
 //
-// The four fetches are always re-run (never cached across calls) for the reason the manual path
+// The five fetches are always re-run (never cached across calls) for the reason the manual path
 // already documented: a mount-time probe goes stale after an in-session retention import, and a
 // stale probe would silently ship yesterday's numbers. Each fetch fails soft to null, which the
 // builder records as a missing domain rather than fabricating a value.
@@ -17,7 +17,9 @@ import { fetchMemberRetentionRates } from '../gym/fetchMemberRetentionRates';
 import { fetchLatestRetentionAggregate } from '../gym/fetchRetentionAggregate';
 import { fetchMemberRetentionByBelt, type BeltRetentionRow } from '../gym/fetchMemberRetentionByBelt';
 import { fetchMemberRetentionByCohort, type CohortRetentionRow } from '../gym/fetchMemberRetentionByCohort';
+import { fetchStudentMovementRows } from '../gym/fetchStudentMovementRows';
 import type { RetentionMonth } from '../gym/memberRetentionSeries';
+import type { StudentMetricRow } from '../gym/studentMovement';
 import type { RetentionAggregateSnapshot } from '../gym/fetchRetentionAggregate';
 import { buildMonthlySourceExport, type MonthlySourceExportInputs } from './buildMonthlySourceExport';
 
@@ -25,7 +27,7 @@ import { buildMonthlySourceExport, type MonthlySourceExportInputs } from './buil
 // Dashboard-supplied values plus the retention threshold from RetentionSettingsContext.
 export type MonthlySourceExportSources = Omit<
   MonthlySourceExportInputs,
-  'retentionRates' | 'snapshot' | 'beltRetention' | 'cohortRetention' | 'generatedAt'
+  'retentionRates' | 'snapshot' | 'beltRetention' | 'cohortRetention' | 'studentMetrics' | 'generatedAt'
 >;
 
 export type RetentionFetchResult = {
@@ -33,6 +35,9 @@ export type RetentionFetchResult = {
   snapshot: RetentionAggregateSnapshot | null;
   belt: BeltRetentionRow[] | null;
   cohortRates: CohortRetentionRow[] | null;
+  // Wodify monthly student-movement rows (wodify_monthly_metrics, dimension 'all'). null = unreadable
+  // (unconfigured / refused / unreachable); [] = readable but empty.
+  studentMetrics: StudentMetricRow[] | null;
 };
 
 // Injectable for tests; production passes nothing.
@@ -42,13 +47,14 @@ export type CollectDeps = {
 };
 
 export async function fetchRetentionSources(): Promise<RetentionFetchResult> {
-  const [rates, snapshot, belt, cohortRates] = await Promise.all([
+  const [rates, snapshot, belt, cohortRates, studentMetrics] = await Promise.all([
     fetchMemberRetentionRates().catch(() => null),
     fetchLatestRetentionAggregate().catch(() => null),
     fetchMemberRetentionByBelt().catch(() => null),
     fetchMemberRetentionByCohort().catch(() => null),
+    fetchStudentMovementRows().catch(() => null),
   ]);
-  return { rates, snapshot, belt, cohortRates };
+  return { rates, snapshot, belt, cohortRates, studentMetrics };
 }
 
 export async function collectMonthlySourceExportPayload(
@@ -63,6 +69,7 @@ export async function collectMonthlySourceExportPayload(
     snapshot: retention.snapshot,
     beltRetention: retention.belt,
     cohortRetention: retention.cohortRates,
+    studentMetrics: retention.studentMetrics,
     generatedAt: now.toISOString(),
   });
   return { payload, retention };

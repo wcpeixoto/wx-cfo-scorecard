@@ -1,7 +1,7 @@
 // scorecard_snapshots persistence boundary.
 //
 // Shaped around a COMPLETED PAYLOAD, not a DashboardModel: the payload is what the table stores,
-// and building it needs 20 inputs (13 Dashboard values, 4 live retention fetches, a React context
+// and building it needs 21 inputs (13 Dashboard values, 5 live retention fetches, a React context
 // and a clock) that this module has no business knowing about. Callers hand over the finished
 // object from collectMonthlySourceExportPayload().
 //

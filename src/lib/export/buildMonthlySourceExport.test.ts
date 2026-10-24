@@ -19,6 +19,7 @@ import {
 import { computeChurnRiskByTenureFromAggregate } from '../gym/churnRiskByTenure';
 import type { BeltRetentionRow } from '../gym/fetchMemberRetentionByBelt';
 import type { CohortRetentionRow } from '../gym/fetchMemberRetentionByCohort';
+import type { StudentMetricRow } from '../gym/studentMovement';
 
 // ---- minimal SoT-shaped fixtures (only the fields the builder reads) ----
 function rollup(
@@ -182,6 +183,26 @@ function cohortRateRows(): CohortRetentionRow[] {
   ];
 }
 
+// Student-movement rows shaped like wodify_monthly_metrics (dimension 'all'). generatedAt is 2026-07-06, so the
+// reporting month is 2026-06; June was refreshed on Jul 2 (after Jun 30 ended), May on Jun 2. May's base
+// (April) does not exist, so May's churn is null; June's base is May's 200 students (census 2026-05-29).
+function studentRows(): StudentMetricRow[] {
+  const may = '2026-06-02T15:07:40.74178+00:00';
+  const jun = '2026-07-02T15:07:40.74178+00:00';
+  const r = (periodMonth: string, metricKey: StudentMetricRow['metricKey'], value: number, asOf: string, sourceAsOf: string | null = null): StudentMetricRow =>
+    ({ periodMonth, metricKey, value, asOf, sourceAsOf });
+  return [
+    r('2026-05', 'new_students', 10, may),
+    r('2026-05', 'rejoins', 2, may),
+    r('2026-05', 'cancellations', 8, may),
+    r('2026-05', 'active_students', 200, may, '2026-05-29'),
+    r('2026-06', 'new_students', 12, jun),
+    r('2026-06', 'rejoins', 3, jun),
+    r('2026-06', 'cancellations', 10, jun),
+    r('2026-06', 'active_students', 205, jun, '2026-06-26'),
+  ];
+}
+
 const BASE_MODEL = model();
 const BASE: MonthlySourceExportInputs = {
   model: BASE_MODEL,
@@ -202,6 +223,7 @@ const BASE: MonthlySourceExportInputs = {
   snapshot: null,
   beltRetention: null,
   cohortRetention: null,
+  studentMetrics: null,
   thresholdDays: 21,
   generatedAt: '2026-07-06T14:00:00Z',
 };
@@ -369,6 +391,7 @@ function fullLive(): MonthlySourceExportInputs {
     snapshot: snap({ '2': 120, '10': 41 }, { overflow: 5, unknown: 8, dues: { totalMonthly: 2400 } }),
     beltRetention: beltRows(),
     cohortRetention: cohortRateRows(),
+    studentMetrics: studentRows(),
   };
 }
 
@@ -569,6 +592,7 @@ describe('buildMonthlySourceExport', () => {
       'cohort_recency_histogram',
       'belt_retention',
       'cohort_retention_rates',
+      'student_movement',
     ]);
     expect(out.scope.present_domains).toEqual(out.scope.covered_domains); // all live
     expect(out.scope.absent_domains).toEqual([]);
@@ -596,6 +620,7 @@ describe('buildMonthlySourceExport', () => {
       'membership_retention',
       'belt_retention',
       'cohort_retention_rates',
+      'student_movement',
     ]);
     expect(out.scope.absent_domains).toEqual([
       'forecast',
@@ -632,6 +657,7 @@ describe('buildMonthlySourceExport', () => {
       cohort_recency_histogram: '2026-07-06', // ditto
       belt_retention: '2026-06', // independent monthly series — max period row
       cohort_retention_rates: '2026-06',
+      student_movement: '2026-06', // newest month the block reports — its own reporting month
     });
     expect(out.warnings).toHaveLength(1);
     expect(out.warnings[0]).toMatch(/as_of_divergence/);
@@ -1547,5 +1573,174 @@ describe('buildMonthlySourceExport', () => {
       expect(out.kpi_cards.map((c: any) => c.id)).toEqual(['income', 'expense', 'net', 'savingsRate']);
       expect(out.warnings.join(' ')).toContain('kpi_cards_incomplete: mysteryMetric');
     });
+  });
+});
+
+// ── student_movement_monthly (Wodify monthly metrics — the churn read) ──────────────────────────
+describe('buildMonthlySourceExport — student_movement_monthly', () => {
+  const row = (
+    periodMonth: string,
+    metricKey: StudentMetricRow['metricKey'],
+    value: number,
+    asOf: string,
+    sourceAsOf: string | null = null,
+  ): StudentMetricRow => ({ periodMonth, metricKey, value, asOf, sourceAsOf });
+
+  // Production-shaped rows, read from public.wodify_monthly_metrics on 2026-10-24.
+  const BACKFILL = '2026-10-02T22:43:57.434319+00:00';
+  const WEEKLY = '2026-10-19T15:07:40.74178+00:00';
+  const PROD_ROWS: StudentMetricRow[] = [
+    row('2026-08', 'new_students', 22, BACKFILL),
+    row('2026-08', 'rejoins', 4, BACKFILL),
+    row('2026-08', 'cancellations', 17, BACKFILL),
+    row('2026-09', 'new_students', 24, WEEKLY),
+    row('2026-09', 'rejoins', 6, WEEKLY),
+    row('2026-09', 'cancellations', 21, WEEKLY),
+    row('2026-09', 'active_students', 265, WEEKLY, '2026-09-28'),
+    row('2026-10', 'new_students', 5, WEEKLY), // current month — never exported
+    row('2026-10', 'rejoins', 0, WEEKLY),
+    row('2026-10', 'cancellations', 13, WEEKLY),
+    row('2026-10', 'active_students', 257, WEEKLY, '2026-10-12'),
+  ];
+  const build = (over: Partial<MonthlySourceExportInputs>) =>
+    buildMonthlySourceExport({ ...fullLive(), ...over }) as any;
+
+  it('as of 2026-10-24: September is the reporting month — 24 / 6 / 21, churn null (no August count)', () => {
+    const out = build({ studentMetrics: PROD_ROWS, generatedAt: '2026-10-24T16:00:00Z' });
+    const block = out.student_movement_monthly;
+    expect(block).toMatchObject({
+      reporting_month: '2026-09',
+      reporting_month_available: true,
+      source: 'wodify_monthly_metrics',
+      provisional: true,
+    });
+    expect(block.months).toEqual([
+      {
+        month: '2026-08',
+        new_students: 22,
+        rejoins: 4,
+        cancellations: 17,
+        base: null,
+        base_as_of: null,
+        estimated_churn: null,
+        refreshed_at: '2026-10-02T22:43:57.434Z',
+      },
+      {
+        month: '2026-09',
+        new_students: 24,
+        rejoins: 6,
+        cancellations: 21,
+        base: null, // there is no August student count; the census began 2026-09-09
+        base_as_of: null,
+        estimated_churn: null,
+        refreshed_at: '2026-10-19T15:07:40.741Z',
+      },
+    ]);
+    expect(block.months.some((m: any) => m.month === '2026-10')).toBe(false); // current month never exported
+    expect(out.warnings.join(' ')).not.toContain('student_movement_reporting_month_unavailable');
+    expect(out.scope.present_domains).toContain('student_movement');
+    expect(out.provenance.student_movement).toMatchObject({
+      source: 'live',
+      basis: 'wodify_monthly_metrics',
+      provisional: true,
+      reporting_month: '2026-09',
+      reporting_month_available: true,
+    });
+  });
+
+  it('an October whose rows all predate Nov 1 (NY) → reporting_month_available:false, NO fallback to September', () => {
+    const rows = [
+      ...PROD_ROWS.filter((r) => r.periodMonth !== '2026-10'),
+      row('2026-10', 'new_students', 7, '2026-10-26T15:05:00Z'),
+      row('2026-10', 'rejoins', 1, '2026-10-26T15:05:00Z'),
+      row('2026-10', 'cancellations', 15, '2026-10-26T15:05:00Z'),
+      row('2026-10', 'active_students', 255, '2026-10-26T15:05:00Z', '2026-10-26'),
+    ];
+    const out = build({ studentMetrics: rows, generatedAt: '2026-11-02T14:00:00Z' });
+    const block = out.student_movement_monthly;
+    expect(block.reporting_month).toBe('2026-10');
+    expect(block.reporting_month_available).toBe(false);
+    expect(block.months.map((m: any) => m.month)).toEqual(['2026-08', '2026-09']); // no October row at all
+    // The block is present-but-degraded (not a missing domain) and says so in warnings too.
+    expect(out.scope.present_domains).toContain('student_movement');
+    expect(out.missing_or_unavailable).not.toContain('student_movement:not_live');
+    expect(out.warnings.join(' ')).toMatch(/student_movement_reporting_month_unavailable: 2026-10 has not been refreshed/);
+    // September's anchor surfaces as a divergence from the 2026-10 reporting month it cannot stand in for.
+    expect(out.as_of.student_movement).toBe('2026-09');
+  });
+
+  it('after the Nov 1 close, October shows its first estimated churn: cancellations ÷ 265 (base as of 2026-09-28)', () => {
+    const rows = [
+      ...PROD_ROWS.filter((r) => r.periodMonth !== '2026-10'),
+      row('2026-10', 'new_students', 19, '2026-11-01T15:07:00Z'),
+      row('2026-10', 'rejoins', 3, '2026-11-01T15:07:00Z'),
+      row('2026-10', 'cancellations', 18, '2026-11-01T15:07:00Z'),
+    ];
+    const block = build({ studentMetrics: rows, generatedAt: '2026-11-02T14:00:00Z' }).student_movement_monthly;
+    expect(block.reporting_month_available).toBe(true);
+    const oct = block.months[block.months.length - 1];
+    expect(oct).toMatchObject({
+      month: '2026-10',
+      cancellations: 18,
+      base: 265,
+      base_as_of: '2026-09-28',
+      estimated_churn: 0.0679,
+    });
+  });
+
+  it('null rows (unreadable) → block omitted, one missing code, domain absent, no throw', () => {
+    const out = build({ studentMetrics: null });
+    expect(out.student_movement_monthly).toBeUndefined();
+    expect(out.missing_or_unavailable).toContain('student_movement:not_live');
+    expect(out.scope.absent_domains).toContain('student_movement');
+    expect(out.scope.absent_domains.length).toBe(out.missing_or_unavailable.length);
+    expect(out.provenance.student_movement).toEqual({ source: 'not_live' });
+    expect(out.as_of.student_movement).toBeNull();
+    expect(out.usable_for_attack_plan).toBe(true); // optional domain — never gates usability
+  });
+
+  it('readable but empty → block present with the reporting month unavailable and no months', () => {
+    const out = build({ studentMetrics: [] });
+    expect(out.student_movement_monthly).toMatchObject({
+      reporting_month: '2026-06',
+      reporting_month_available: false,
+      months: [],
+    });
+    expect(out.missing_or_unavailable).not.toContain('student_movement:not_live');
+  });
+
+  it('a malformed generatedAt cannot take the export down', () => {
+    const out = build({ studentMetrics: PROD_ROWS, generatedAt: 'not a date' });
+    expect(out.student_movement_monthly).toBeUndefined();
+    expect(out.missing_or_unavailable).toContain('student_movement:not_live');
+  });
+
+  it('carries counts only — no run id, client id or other keys', () => {
+    const block = build({ studentMetrics: PROD_ROWS, generatedAt: '2026-10-24T16:00:00Z' }).student_movement_monthly;
+    expect(Object.keys(block).sort()).toEqual(
+      ['months', 'note', 'provisional', 'reporting_month', 'reporting_month_available', 'source'].sort(),
+    );
+    for (const m of block.months) {
+      expect(Object.keys(m).sort()).toEqual(
+        ['base', 'base_as_of', 'cancellations', 'estimated_churn', 'month', 'new_students', 'refreshed_at', 'rejoins'].sort(),
+      );
+    }
+    expect(JSON.stringify(block)).not.toMatch(/run_id|cancellations_all_clients/);
+  });
+
+  it('membership_retention_monthly is kept but marked as membership continuity, not churn', () => {
+    const out = build({ studentMetrics: PROD_ROWS });
+    expect(out.membership_retention_monthly).toBeDefined();
+    expect(Object.keys(out.membership_retention_monthly[0]).sort()).toEqual(
+      ['active_members', 'lost_members', 'month', 'new_members', 'prior_members', 'retention_rate', 'returning_members'].sort(),
+    );
+    expect(out.provenance.retention_rates).toMatchObject({
+      source: 'live',
+      basis: 'membership_continuity',
+      is_churn: false,
+    });
+    expect(out.provenance.retention_rates.note).toMatch(/NOT student churn/);
+    expect(out.provenance.retention_rates.note).toMatch(/student_movement_monthly/);
+    expect(out.schema_version).toBe('0.1'); // additive block — no version bump, per #550/#551 precedent
   });
 });

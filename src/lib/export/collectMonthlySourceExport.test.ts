@@ -44,6 +44,7 @@ const RETENTION: RetentionFetchResult = {
   snapshot: null,
   belt: null,
   cohortRates: null,
+  studentMetrics: null,
 };
 
 function sources(): MonthlySourceExportSources {
@@ -129,6 +130,34 @@ describe('collectMonthlySourceExportPayload', () => {
     expect(payload.scorecard_month).toBe('2026-06');
     expect(payload.schema_version).toBe('0.1');
     expect(Array.isArray(payload.financial_monthly)).toBe(true);
+  });
+
+  it('3b. fetched student-movement rows reach the payload via the injected clock (file and snapshot share this path)', async () => {
+    const asOf = '2026-07-02T15:07:40.74178+00:00';
+    const withStudents: RetentionFetchResult = {
+      ...RETENTION,
+      studentMetrics: [
+        { periodMonth: '2026-06', metricKey: 'new_students', value: 12, asOf, sourceAsOf: null },
+        { periodMonth: '2026-06', metricKey: 'rejoins', value: 3, asOf, sourceAsOf: null },
+        { periodMonth: '2026-06', metricKey: 'cancellations', value: 10, asOf, sourceAsOf: null },
+      ],
+    };
+    const { payload } = await collectMonthlySourceExportPayload(sources(), {
+      fetchRetention: async () => withStudents,
+      now: () => new Date('2026-07-06T14:00:00Z'),
+    });
+    expect(payload.student_movement_monthly).toMatchObject({
+      reporting_month: '2026-06',
+      reporting_month_available: true,
+      provisional: true,
+    });
+
+    const unreadable = await collectMonthlySourceExportPayload(sources(), {
+      fetchRetention: async () => RETENTION,
+      now: () => new Date('2026-07-06T14:00:00Z'),
+    });
+    expect(unreadable.payload.student_movement_monthly).toBeUndefined();
+    expect(unreadable.payload.missing_or_unavailable).toContain('student_movement:not_live');
   });
 
   it('4. carries the retention results back for the caller status lines', async () => {
