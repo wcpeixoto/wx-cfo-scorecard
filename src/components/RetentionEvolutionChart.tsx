@@ -4,16 +4,15 @@ import type { ApexOptions } from 'apexcharts';
 
 import { chartTokens } from '../lib/ui/chartTokens';
 import {
-  churnPctOf,
   formatMonthLong,
   formatMonthShort,
   type RetentionEvolutionPoint,
-  type RetentionMetric,
 } from '../lib/gym/memberRetentionSeries';
 
+// Membership continuity chart: the share of paying memberships that carried over month to month (the
+// Wodify "Member Retention Rates" report). It is NOT student churn — Student movement owns that.
 type RetentionEvolutionChartProps = {
   points: RetentionEvolutionPoint[];
-  metric: RetentionMetric;
   height?: number;
   // By-age overlay — Youth / Adults points aligned 1:1 to `points` (the All axis). A null slot is a
   // line GAP. When BOTH are supplied the chart renders three distinguishable lines (All + Youth +
@@ -28,22 +27,17 @@ const ALL_COLOR = chartTokens.brand;
 const YOUTH_COLOR = chartTokens.success;
 const ADULTS_COLOR = chartTokens.warning;
 
-// Retention sits in a tight 85–100% band; zero-basing the y-axis would flatten the line. Floor to
-// the nearest 5% below the data min (clamped), cap at 100% (retention can't exceed 100%).
-function retentionYDomain(values: number[]): { min: number; max: number } {
+// Continuity sits in a tight 85–100% band; zero-basing the y-axis would flatten the line. Floor to
+// the nearest 5% below the data min (clamped), cap at 100% (it can't exceed 100%).
+function continuityYDomain(values: number[]): { min: number; max: number } {
   if (values.length === 0) return { min: 80, max: 100 };
   const lo = Math.min(...values);
   const min = Math.max(0, Math.min(90, Math.floor((lo - 4) / 5) * 5));
   return { min, max: 100 };
 }
 
-// Churn sits low (~5–12%); base at 0 and cap a touch above the peak (next 5%, min 10%) so the
-// month-to-month movement stays legible instead of flattening on the floor.
-function churnYDomain(values: number[]): { min: number; max: number } {
-  if (values.length === 0) return { min: 0, max: 15 };
-  const hi = Math.max(...values);
-  return { min: 0, max: Math.min(100, Math.max(10, Math.ceil((hi + 1) / 5) * 5)) };
-}
+// Metric value for a point (or null gap) — the SAME selector drives every line.
+const continuityPct = (p: RetentionEvolutionPoint | null): number | null => (p === null ? null : p.retentionPct);
 
 function tickAmountFor(count: number): number {
   if (count <= 6) return Math.max(1, count - 1);
@@ -53,28 +47,18 @@ function tickAmountFor(count: number): number {
 
 export default function RetentionEvolutionChart({
   points,
-  metric,
   height = 300,
   youth,
   adults,
 }: RetentionEvolutionChartProps) {
-  const isChurn = metric === 'churn';
   const byAge = youth != null && adults != null;
 
   const categories = useMemo(() => points.map((p) => formatMonthShort(p.periodMonth)), [points]);
   const tooltipLabels = useMemo(() => points.map((p) => formatMonthLong(p.periodMonth)), [points]);
 
-  // Metric value for a point (or null gap) — the SAME selector drives every line, so the metric and
-  // timeframe controls move all of them together.
-  const valueOf = useMemo(
-    () => (p: RetentionEvolutionPoint | null): number | null =>
-      p === null ? null : isChurn ? churnPctOf(p) : p.retentionPct,
-    [isChurn],
-  );
-
-  const allValues = useMemo(() => points.map((p) => valueOf(p) as number), [points, valueOf]);
-  const youthValues = useMemo(() => (youth ? youth.map(valueOf) : null), [youth, valueOf]);
-  const adultsValues = useMemo(() => (adults ? adults.map(valueOf) : null), [adults, valueOf]);
+  const allValues = useMemo(() => points.map((p) => continuityPct(p) as number), [points]);
+  const youthValues = useMemo(() => (youth ? youth.map(continuityPct) : null), [youth]);
+  const adultsValues = useMemo(() => (adults ? adults.map(continuityPct) : null), [adults]);
 
   // Y-domain spans every VISIBLE line so a segment line is never clipped (nulls excluded).
   const domainValues = useMemo(() => {
@@ -84,14 +68,11 @@ export default function RetentionEvolutionChart({
     return vals;
   }, [allValues, youthValues, adultsValues]);
 
-  const { min: yMin, max: yMax } = useMemo(
-    () => (isChurn ? churnYDomain(domainValues) : retentionYDomain(domainValues)),
-    [domainValues, isChurn],
-  );
+  const { min: yMin, max: yMax } = useMemo(() => continuityYDomain(domainValues), [domainValues]);
 
   // Per-series mean of the visible metric (nulls excluded) for the By-age legend labels, indexed by
   // seriesIndex [All, Youth, Adults]. null ⇒ no non-null values in the window ⇒ legend shows the
-  // bare name. Tracks the Churn↔Retention toggle because the value arrays already do (via valueOf).
+  // bare name.
   const legendAverages = useMemo<(number | null)[]>(() => {
     const mean = (vals: (number | null)[] | null): number | null => {
       if (!vals) return null;
@@ -192,8 +173,8 @@ export default function RetentionEvolutionChart({
           },
         },
         y: {
-          // Series name ("All" / "Youth" / "Adults" or "Churn" / "Retention") is the label; the
-          // value is the metric percent. Suppressed/absent cohort cells are gaps → render an em dash.
+          // Series name ("All" / "Youth" / "Adults" or "Continuity") is the label; the value is the
+          // continuity percent. Suppressed/absent cohort cells are gaps → render an em dash.
           formatter: (value: number | null) => (value == null ? '—' : `${value}%`),
         },
         marker: { show: true },
@@ -229,8 +210,8 @@ export default function RetentionEvolutionChart({
         { name: 'Adults', data: adultsValues },
       ];
     }
-    return [{ name: isChurn ? 'Churn' : 'Retention', data: allValues }];
-  }, [byAge, isChurn, allValues, youthValues, adultsValues]);
+    return [{ name: 'Continuity', data: allValues }];
+  }, [byAge, allValues, youthValues, adultsValues]);
 
   return (
     // Remount on mode change — ApexCharts does not cleanly switch an existing instance between

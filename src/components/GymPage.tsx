@@ -45,6 +45,7 @@ import {
   type RetentionAggregateSnapshot,
 } from '../lib/gym/fetchRetentionAggregate';
 import { RetentionEvolutionCard } from './RetentionEvolutionCard';
+import { StudentMovementCard } from './StudentMovementCard';
 import { MemberRetentionByBeltCard } from './MemberRetentionByBeltCard';
 
 export function GymPage() {
@@ -77,8 +78,19 @@ export function GymPage() {
     <div className="stack-grid">
       <div className="ta-page">
         <div className="gym-retention">
+          {/* STUDENT MOVEMENT — new / returned / cancelled students and estimated churn for
+              the reporting month (previous New York month), from Wodify's automatic monthly
+              metrics. Provisional while compared with ADHARPY. This is the churn read; the
+              chart below it (RetentionEvolutionCard) is Membership continuity, a different
+              measure of paying memberships — not churn. */}
+          <section className="gym-section">
+            <div className="gym-card-grid">
+              <StudentMovementCard />
+            </div>
+          </section>
+
           {/* WATCH — live signals. Top row: Attendance Health (1/3, donut) in line
-              with the Churn chart (RetentionEvolutionCard, 2/3) via
+              with the Membership continuity chart (RetentionEvolutionCard, 2/3) via
               .retention-hero-split. The donut card carries a kebab (⋮) menu that
               filters the donut to a tenure/age cohort (All = whole gym). Silent
               Churn is HIDDEN — its card + helpers stay defined in this file (not

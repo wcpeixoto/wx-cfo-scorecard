@@ -11,6 +11,7 @@ import { useRetentionSettings } from '../context/RetentionSettingsContext';
 import type { BeltRetentionRow } from '../lib/gym/fetchMemberRetentionByBelt';
 import type { CohortRetentionRow } from '../lib/gym/fetchMemberRetentionByCohort';
 import { realRetentionMonths, type RetentionMonth } from '../lib/gym/memberRetentionSeries';
+import type { StudentMetricRow } from '../lib/gym/studentMovement';
 import type { RetentionAggregateSnapshot } from '../lib/gym/fetchRetentionAggregate';
 import { latestCompleteMonth, type FinancialBasis } from '../lib/export/buildMonthlySourceExport';
 import {
@@ -27,6 +28,7 @@ type RetentionState = {
   snapshot: RetentionAggregateSnapshot | null;
   belt: BeltRetentionRow[] | null;
   cohortRates: CohortRetentionRow[] | null;
+  studentMetrics: StudentMetricRow[] | null;
   loaded: boolean;
 };
 
@@ -81,6 +83,7 @@ export function ExportSourceJsonCard({
     snapshot: null,
     belt: null,
     cohortRates: null,
+    studentMetrics: null,
     loaded: false,
   });
   const [exporting, setExporting] = useState(false);
@@ -90,8 +93,8 @@ export function ExportSourceJsonCard({
   // in-session import can't leave a stale file. A null result is "not live", never a fabricated value.
   useEffect(() => {
     let cancelled = false;
-    void fetchRetentionSources().then(({ rates, snapshot, belt, cohortRates }) => {
-      if (!cancelled) setRetention({ rates, snapshot, belt, cohortRates, loaded: true });
+    void fetchRetentionSources().then(({ rates, snapshot, belt, cohortRates, studentMetrics }) => {
+      if (!cancelled) setRetention({ rates, snapshot, belt, cohortRates, studentMetrics, loaded: true });
     });
     return () => {
       cancelled = true;
@@ -102,7 +105,7 @@ export function ExportSourceJsonCard({
     setExporting(true);
     try {
       // ALWAYS re-fetch on click — the mount probe can go stale after an in-session Member
-      // Retention Rates import. The shared collector does the same four fetches automatic
+      // Retention Rates import. The shared collector does the same five fetches automatic
       // snapshot persistence uses, so the downloaded file and the stored row can never diverge.
       const { payload, retention: fresh } = await collectMonthlySourceExportPayload({
         model,
@@ -168,6 +171,9 @@ export function ExportSourceJsonCard({
   const cohortRatesLive = retention.loaded
     ? Boolean(retention.cohortRates && retention.cohortRates.length > 0)
     : null;
+  // Student movement: live when the Wodify monthly rows were readable — mirrors the builder's domain
+  // presence (the block itself reports whether the reporting month is available).
+  const studentMovementLive = retention.loaded ? retention.studentMetrics !== null : null;
   const requiredMissing = !financialLive || retentionLive === false;
 
   return (
@@ -185,7 +191,7 @@ export function ExportSourceJsonCard({
             Financial: <strong>{statusLabel(financialLive)}</strong>
           </li>
           <li>
-            Membership retention: <strong>{statusLabel(retentionLive)}</strong>
+            Membership continuity: <strong>{statusLabel(retentionLive)}</strong>
           </li>
           <li>
             Attendance snapshot: <strong>{statusLabel(snapshotLive)}</strong>
@@ -197,12 +203,15 @@ export function ExportSourceJsonCard({
             Cohort retention rates: <strong>{statusLabel(cohortRatesLive)}</strong>
           </li>
           <li>
+            Student movement: <strong>{statusLabel(studentMovementLive)}</strong>
+          </li>
+          <li>
             Forecast: <strong>{forecastAvailable ? 'Available' : 'Missing'}</strong>
           </li>
         </ul>
         {requiredMissing && (
           <p className="export-source-warning">
-            Not usable for Attack Plan until live financial and membership retention data are
+            Not usable for Attack Plan until live financial and membership continuity data are
             available.
           </p>
         )}

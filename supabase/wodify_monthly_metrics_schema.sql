@@ -11,9 +11,13 @@
 -- membership id or invoice id is stored anywhere in these tables; the writer
 -- (sync-wodify-metrics) also rejects any row outside the aggregate contract.
 --
--- ACCESS: service_role only (the Edge Function). No anon / authenticated grant
--- and no policy — the monthly report and attack plan read these with SQL. A
--- dashboard read path is a separate WO.
+-- ACCESS: service_role does all writing (the Edge Function). The only browser
+-- (anon) read path is a narrow one for the dashboard's Student movement card:
+-- SELECT on wodify_monthly_metrics, limited by RLS to the four student-movement
+-- metrics in the gym-wide ('all') dimension. wodify_metrics_runs and
+-- wodify_metrics_run_tasks stay service_role only. The monthly report and attack
+-- plan still read everything with SQL. Live migration for the anon read:
+-- supabase/migrations/20261024150000_wodify_monthly_metrics_anon_read.sql.
 
 -- ─── Metrics (long format) ─────────────────────────────────────────────────
 create table if not exists public.wodify_monthly_metrics (
@@ -57,7 +61,7 @@ create table if not exists public.wodify_metrics_run_tasks (
   primary key (run_id, task_key)
 );
 
--- ─── Grants + RLS: service_role only ──────────────────────────────────────
+-- ─── Grants + RLS: service_role writes; anon reads one narrow slice ────────
 revoke all on public.wodify_monthly_metrics from public, anon, authenticated;
 revoke all on public.wodify_metrics_runs from public, anon, authenticated;
 revoke all on public.wodify_metrics_run_tasks from public, anon, authenticated;
@@ -67,6 +71,20 @@ grant select, insert, update, delete on public.wodify_metrics_run_tasks to servi
 alter table public.wodify_monthly_metrics enable row level security;
 alter table public.wodify_metrics_runs enable row level security;
 alter table public.wodify_metrics_run_tasks enable row level security;
+
+-- Dashboard read path (Student movement card): anon SELECT only, rows limited to the four
+-- student-movement metrics in the 'all' dimension. No anon write grant and no write policy.
+-- The run tables above get no anon grant or policy — freshness comes from each row's as_of.
+grant select on public.wodify_monthly_metrics to anon;
+drop policy if exists "wodify_monthly_metrics_anon_read" on public.wodify_monthly_metrics;
+create policy "wodify_monthly_metrics_anon_read"
+  on public.wodify_monthly_metrics
+  for select
+  to anon
+  using (
+    metric_key in ('new_students', 'rejoins', 'cancellations', 'active_students')
+    and dimension = 'all'
+  );
 
 -- ─── Gate token (Vault) ───────────────────────────────────────────────────
 -- Random 64-hex token generated in the database; its value never appears in the

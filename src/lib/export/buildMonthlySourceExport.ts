@@ -12,7 +12,12 @@
 //   - forecast (projection) ← scenarioProjection (composed ScenarioPoint[] with month-end endingCashBalance)
 //     + scenarioRunOutMonth — the SAME forward series the Forecast page renders, NOT the naive
 //     model.cashFlowForecastSeries trend (which carries no ending balance). Both prop-drilled from Dashboard.
-//   - membership retention series ← fetchMemberRetentionRates rows (seed row dropped via realRetentionMonths)
+//   - membership retention series ← fetchMemberRetentionRates rows (seed row dropped via realRetentionMonths).
+//     This is MEMBERSHIP CONTINUITY, not churn — provenance.retention_rates says so (is_churn: false).
+//   - student movement ← buildStudentMovement (the Student movement card's own pure fn) over
+//     wodify_monthly_metrics rows: new / returned / cancelled students + estimated churn for the REPORTING
+//     month (previous New York month) and earlier refreshed months. PROVISIONAL (vs ADHARPY). This is the
+//     churn read; a not-yet-refreshed reporting month is reported as unavailable, never replaced by an older one.
 //   - attendance snapshot ← deriveBuckets(snapshot, thresholdDays) (the Attendance Health card's own fn)
 //   - tenure bands ← computeChurnRiskByTenureFromAggregate(snapshot.tenureBands, thresholdDays) (the
 //     Churn-by-Tenure card's own per-band risk split — active_total + healthy/watch/silent, verbatim)
@@ -70,6 +75,7 @@ import type { RetentionMonth } from '../gym/memberRetentionSeries';
 import { realRetentionMonths } from '../gym/memberRetentionSeries';
 import type { BeltRetentionRow } from '../gym/fetchMemberRetentionByBelt';
 import type { CohortRetentionRow } from '../gym/fetchMemberRetentionByCohort';
+import { buildStudentMovement, type StudentMetricRow } from '../gym/studentMovement';
 import type { RetentionAggregateSnapshot } from '../gym/fetchRetentionAggregate';
 import { deriveBuckets } from '../gym/retentionAggregateView';
 import { computeChurnRiskByTenureFromAggregate } from '../gym/churnRiskByTenure';
@@ -126,6 +132,10 @@ export type MonthlySourceExportInputs = {
   // Per-cohort new/returning/lost RATE flow (member_retention_by_cohort). Counts are number|null:
   // a suppressed row carries all three as null (masked small cell) — carried through verbatim, never 0.
   cohortRetention: CohortRetentionRow[] | null;
+  // Wodify monthly student-movement rows (wodify_monthly_metrics, dimension 'all', the four metrics) —
+  // fetchStudentMovementRows(). null = unreadable → the domain is omitted and recorded as missing.
+  // [] = readable but empty → the block is emitted with reporting_month_available:false.
+  studentMetrics: StudentMetricRow[] | null;
   thresholdDays: number; // useRetentionSettings().silentChurnThresholdDays
   generatedAt: string; // ISO 8601, injected — point-in-time snapshot (state-read == file-write)
   businessName?: string;
@@ -277,6 +287,7 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     snapshot,
     beltRetention,
     cohortRetention,
+    studentMetrics,
     thresholdDays,
     generatedAt,
     businessName = DEFAULT_BUSINESS_NAME,
@@ -733,6 +744,54 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     missing.push('cohort_retention_rates:not_live');
   }
 
+  // ---- STUDENT MOVEMENT (optional; Wodify monthly metrics — the churn read) ----
+  // New / returned / cancelled students and estimated churn, from buildStudentMovement — the SAME pure
+  // function the Student movement card calls, so the card and this block cannot disagree. Retention-domain:
+  // gated on the fetched rows, NOT financialLive; optional (never feeds usable_for_attack_plan).
+  //   - null rows (unreadable)  → block omitted + 'student_movement:not_live'.
+  //   - [] / no refreshed month → block PRESENT with reporting_month_available:false (a present-but-degraded
+  //     state, not a missing domain) and a warning. The reporting month is NEVER filled from an older one.
+  // The block is labelled with its OWN reporting month (previous New York month), which can differ from
+  // scorecard_month. Guarded so a malformed generatedAt can never take the whole export down.
+  const studentView =
+    studentMetrics && Number.isFinite(Date.parse(generatedAt))
+      ? buildStudentMovement(studentMetrics, generatedAt)
+      : null;
+  const studentLatestMonth = studentView
+    ? (studentView.months[studentView.months.length - 1]?.month ?? null)
+    : null;
+  const studentMovementNote =
+    'Wodify automatic monthly counts, students only (guardian-only parents excluded). ' +
+    'estimated_churn = cancellations ÷ base as a 0..1 fraction, where base is the PREVIOUS month’s ' +
+    'student count (base_as_of = its census date); it is null — "unavailable", not zero — when the ' +
+    'previous month has no student count. months lists only REFRESHED months (a run finished after the ' +
+    'month ended). reporting_month is the previous New York calendar month; its numbers exist only when ' +
+    'reporting_month_available is true, and older months are NOT a substitute for it. PROVISIONAL: being ' +
+    'compared with ADHARPY through the November close. Distinct from membership_retention_monthly, which is ' +
+    'membership continuity, not churn.';
+  let studentMovementMonthly: Record<string, unknown> | undefined;
+  if (studentView) {
+    studentMovementMonthly = {
+      reporting_month: studentView.reportingMonth, // 'YYYY-MM' — previous New York calendar month
+      reporting_month_available: studentView.reportingMonthAvailable,
+      source: 'wodify_monthly_metrics',
+      provisional: true,
+      note: studentMovementNote,
+      months: studentView.months.map((m) => ({
+        month: m.month,
+        new_students: m.newStudents,
+        rejoins: m.rejoins,
+        cancellations: m.cancellations,
+        base: m.base, // previous month's student count; null when absent
+        base_as_of: m.baseAsOf, // 'YYYY-MM-DD' census date of that count
+        estimated_churn: m.estimatedChurn, // 0..1; null when the base is missing
+        refreshed_at: m.refreshedAt, // ISO — max(as_of) over this month's rows
+      })),
+    };
+  } else {
+    missing.push('student_movement:not_live');
+  }
+
   // Required domains for a usable Attack Plan file: financial + membership retention.
   const usableForAttackPlan = financialLive && retentionLive;
 
@@ -788,7 +847,17 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
         }
       : { source: 'not_available' },
     retention_rates: retentionLive
-      ? { source: 'live', latest_month: realRetention[realRetention.length - 1].periodMonth }
+      ? {
+          source: 'live',
+          latest_month: realRetention[realRetention.length - 1].periodMonth,
+          basis: 'membership_continuity',
+          is_churn: false,
+          note:
+            'membership_retention_monthly is MEMBERSHIP CONTINUITY: the share of paying memberships (a ' +
+            'smaller base than all students) still active month to month, from Wodify’s "Member Retention ' +
+            'Rates" report. It is NOT student churn — lost_members and (1 − retention_rate) are not a ' +
+            'churn rate. Use student_movement_monthly for churn.',
+        }
       : { source: 'not_live' },
     retention_snapshot: snapshotProvenance,
     tenure_bands: snapshot?.tenureBands
@@ -825,6 +894,17 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     cohort_retention_rates: cohortRatesLive
       ? { source: 'live', latest_month: cohortRatesLatestMonth, note: cohortRatesNote }
       : { source: 'not_live' },
+    student_movement: studentView
+      ? {
+          source: 'live',
+          basis: 'wodify_monthly_metrics',
+          provisional: true,
+          reporting_month: studentView.reportingMonth,
+          reporting_month_available: studentView.reportingMonthAvailable,
+          latest_month: studentLatestMonth,
+          note: studentMovementNote,
+        }
+      : { source: 'not_live' },
   };
 
   // ---- SCOPE (what this export is DESIGNED to cover) ----
@@ -849,6 +929,9 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     // NOT financialLive; never feed usable_for_attack_plan.
     belt_retention: beltLive,
     cohort_retention_rates: cohortRatesLive,
+    // Net-new student-movement fetch (optional; independent monthly series). Present when the rows were
+    // readable — the block itself says whether the reporting month is available.
+    student_movement: studentView !== null,
   };
   const coveredDomains = Object.keys(domainPresence);
   const scope = {
@@ -896,6 +979,9 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     // divergence check below on purpose: an as_of_divergence when they lag is the DESIRED signal.
     belt_retention: beltLatestMonth, // 'YYYY-MM' | null
     cohort_retention_rates: cohortRatesLatestMonth, // 'YYYY-MM' | null
+    // Newest month the block actually reports (its own reporting month, NOT scorecard_month); null when
+    // no month is refreshed. Added to the divergence check below on purpose, like the other monthly series.
+    student_movement: studentLatestMonth, // 'YYYY-MM' | null
   };
   const periodAnchors: [string, string][] = [];
   if (financialLive && scorecardMonth) periodAnchors.push(['financial', scorecardMonth]);
@@ -903,8 +989,18 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
   if (snapshot) periodAnchors.push(['attendance_snapshot', snapshot.asOf.slice(0, 7)]);
   if (beltLatestMonth) periodAnchors.push(['belt_retention', beltLatestMonth]);
   if (cohortRatesLatestMonth) periodAnchors.push(['cohort_retention_rates', cohortRatesLatestMonth]);
+  if (studentLatestMonth) periodAnchors.push(['student_movement', studentLatestMonth]);
   const distinctPeriods = new Set(periodAnchors.map(([, token]) => token));
   const warnings: string[] = [];
+  if (studentView && !studentView.reportingMonthAvailable) {
+    // Said out loud (not only via the block flag) so a skimming reader can't take an older month in
+    // student_movement_monthly.months for the reporting month.
+    warnings.push(
+      `student_movement_reporting_month_unavailable: ${studentView.reportingMonth} has not been refreshed ` +
+        'yet, so no student movement numbers are reported for it. The months listed in ' +
+        'student_movement_monthly.months are older and are not a substitute.',
+    );
+  }
   if (unmappedKpiCardIds.length > 0) {
     // A KPI card compute.ts emits that this export cannot re-anchor on the scorecard month. Dropped
     // rather than shipped at the wrong anchor — recorded so the omission is never silent.
@@ -955,6 +1051,7 @@ export function buildMonthlySourceExport(inputs: MonthlySourceExportInputs): Rec
     ...(cohortRecencyHistogram ? { cohort_recency_histogram: cohortRecencyHistogram } : {}),
     ...(beltRetentionBlock ? { belt_retention: beltRetentionBlock } : {}),
     ...(cohortRetentionRatesBlock ? { cohort_retention_rates: cohortRetentionRatesBlock } : {}),
+    ...(studentMovementMonthly ? { student_movement_monthly: studentMovementMonthly } : {}),
     missing_or_unavailable: missing,
   };
 }

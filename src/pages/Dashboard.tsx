@@ -4461,7 +4461,7 @@ export default function Dashboard() {
                       <div className="card-head">
                         <p className="subtle">
                           Import the raw Wodify "Member Retention Rates" export to update the gym-wide
-                          churn / retention chart. No editing needed — the original export works as-is.
+                          Membership continuity chart. No editing needed — the original export works as-is.
                           You'll see a preview before anything is saved.
                         </p>
                       </div>
@@ -4529,7 +4529,7 @@ export default function Dashboard() {
                           {retentionImportPreview.boundaryMonth ? (
                             <p className="subtle">
                               {toMonthLabel(retentionImportPreview.boundaryMonth)} is the earliest tracked month — the
-                              tracking-onboarding boundary, excluded from the churn trend (no fake history). Re-check it
+                              tracking-onboarding boundary, excluded from the continuity trend (no fake history). Re-check it
                               matches when tracking began; a partial export would shift it.
                             </p>
                           ) : null}

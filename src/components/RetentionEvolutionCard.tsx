@@ -1,7 +1,12 @@
-// Class Plan Member Churn/Retention — gym-wide churn-evolution chart (Retention page, Watch hero
+// Membership continuity — gym-wide continuity-of-paying-memberships chart (Retention page, Watch hero
 // row). Reads the live "Member Retention Rates" monthly aggregate from Supabase; falls back to a
-// synthetic sample fixture until the table is seeded. GYM-WIDE only — a segmented retention TREND is
-// still the gated client-grain + DOB-join slice. Renders beside Attendance Health (2/3 column) via .retention-hero-split.
+// synthetic sample fixture until the table is seeded. GYM-WIDE only — a segmented trend is still the
+// gated client-grain + DOB-join slice. Renders beside Attendance Health (2/3 column) via .retention-hero-split.
+//
+// NOT CHURN. member_retention_rates follows the continuity of paying memberships in a smaller base than
+// all students, so it is shown as "Membership continuity" and never as churn or retention. Student churn
+// is the Student movement card (Wodify monthly metrics). The old Churn/Retention toggle was removed with
+// that reframing; the table and its data are untouched.
 
 import { useEffect, useId, useMemo, useState } from 'react';
 
@@ -24,7 +29,6 @@ import {
   formatMonthShort,
   realRetentionMonths,
   selectionFor,
-  type RetentionMetric,
   type RetentionMonth,
   type RetentionTimeframeId,
 } from '../lib/gym/memberRetentionSeries';
@@ -42,8 +46,6 @@ export function RetentionEvolutionCard() {
   const [live, setLive] = useState<RetentionMonth[] | null>(null);
   const [cohortRows, setCohortRows] = useState<CohortRetentionRow[] | null>(null);
   const [timeframe, setTimeframe] = useState<RetentionTimeframeId>(DEFAULT_RETENTION_TIMEFRAME);
-  // Churn is the default view; the toggle flips to retention (its complement).
-  const [metric, setMetric] = useState<RetentionMetric>('churn');
   // Segment view defaults to All (gym-wide line only) — current behavior.
   const [segment, setSegment] = useState<RetentionSegment>('all');
   const [customStart, setCustomStart] = useState<string | null>(null);
@@ -125,7 +127,7 @@ export function RetentionEvolutionCard() {
   // YoY pills (By-age view only): per plotted band, the displayed window's LAST month vs the SAME
   // calendar month one year earlier, computed off the FULL cohort series (the year-ago partner may
   // fall outside the visible window). A band with no computable pair renders no pill — never a
-  // placeholder/dash. Tracks the churn/retention toggle via `metric`.
+  // placeholder/dash.
   const yoyPills = useMemo(() => {
     if (!byAge || !cohortRows || view.points.length === 0 || !view.dataBeginsMonth) return null;
     const displayedMonth = view.points[view.points.length - 1].periodMonth;
@@ -137,20 +139,19 @@ export function RetentionEvolutionCard() {
     const shown = bands
       .map(({ band, label }) => ({
         label,
-        yoy: computeCohortYoY({ rows: cohortRows, band, displayedMonth, dataBeginsMonth, metric }),
+        yoy: computeCohortYoY({ rows: cohortRows, band, displayedMonth, dataBeginsMonth, metric: 'retention' }),
       }))
       .filter(
         (p): p is { label: string; yoy: Extract<CohortYoYResult, { status: 'show' }> } =>
           p.yoy.status === 'show',
       );
     return shown.length > 0 ? shown : null;
-  }, [byAge, cohortRows, view.points, view.dataBeginsMonth, metric]);
+  }, [byAge, cohortRows, view.points, view.dataBeginsMonth]);
 
-  // Headline stat: the mean of the visible metric across the selected timeframe — so the subtitle
-  // reads e.g. "Average Churn 8%" and tracks both the toggle and the timeframe. Stays the gym-wide
-  // All average even under By age (never recomputed per segment).
-  const metricLabel = metric === 'churn' ? 'Churn' : 'Retention';
-  const avgPct = useMemo(() => averageMetricPct(view.points, metric), [view.points, metric]);
+  // Headline stat: the mean continuity across the selected timeframe — so the subtitle reads e.g.
+  // "Average continuity 92%" and tracks the timeframe. Stays the gym-wide All average even under By
+  // age (never recomputed per segment).
+  const avgPct = useMemo(() => averageMetricPct(view.points, 'retention'), [view.points]);
   const avgLabel = avgPct != null ? `${Math.round(avgPct)}%` : '—';
 
   return (
@@ -159,12 +160,12 @@ export function RetentionEvolutionCard() {
         <div className="retention-evolution-heading">
           <div className="retention-evolution-titlerow">
             <h3 className="gym-card-title retention-evolution-title">
-              {metricLabel}
+              Membership continuity
               <span className="db-tooltip-wrap">
                 <button
                   type="button"
                   className="db-tooltip-btn"
-                  aria-label={`${metricLabel} explanation`}
+                  aria-label="Membership continuity explanation"
                   aria-describedby={titleTooltipId}
                 >
                   &#9432;
@@ -176,17 +177,16 @@ export function RetentionEvolutionCard() {
                 >
                   <ul className="db-tooltip-list">
                     <li className="db-tooltip-body">
-                      Month-over-month <strong>membership / renewal</strong>{' '}
-                      {metric === 'churn' ? 'churn' : 'retention'} from Wodify's "Member Retention Rates"
-                      report: of the members active at the start of a month, the share{' '}
-                      {metric === 'churn'
-                        ? 'whose membership lapsed by month-end (the complement of retention).'
-                        : 'still active at month-end.'}
+                      Month-over-month <strong>continuity of paying memberships</strong> from Wodify's
+                      "Member Retention Rates" report: of the memberships active at the start of a
+                      month, the share still active at month-end. It follows a smaller group than all
+                      students.
                     </li>
                     <li className="db-tooltip-body">
-                      This is a different metric from the attendance-based Silent Churn and Attendance
-                      Health cards, which measure who has stopped showing up — not whether their
-                      membership renewed.
+                      This is <strong>not student churn</strong>. See Student movement for new,
+                      returned and cancelled students and estimated churn. It is also different from
+                      Attendance Health, which measures who has stopped showing up — not whether a
+                      membership continued.
                     </li>
                     {view.dataBeginsMonth && (
                       <li className="db-tooltip-body">
@@ -203,7 +203,7 @@ export function RetentionEvolutionCard() {
             {!isLive && <span className="gym-sample-badge">Sample data</span>}
           </div>
           <p className="gym-card-subtitle">
-            Average {metricLabel} {avgLabel}
+            Average continuity {avgLabel}
           </p>
         </div>
         <div className="retention-evolution-controls">
@@ -218,7 +218,7 @@ export function RetentionEvolutionCard() {
                 const arrow =
                   yoy.direction === 'better' ? '↑' : yoy.direction === 'worse' ? '↓' : '→';
                 // Face shows ABSOLUTE magnitude — arrow + color carry direction, so a signed
-                // delta would read as "↑ -10.0pp" on the churn view (semantic arrow vs
+                // delta would read as "↑ -10.0pp" if the metric ever flipped sign (semantic arrow vs
                 // metric-relative sign). The tooltip keeps the "X points better/worse" wording.
                 const magnitude = `${Math.abs(yoy.deltaPp).toFixed(1)}pp`;
                 const words =
@@ -229,7 +229,7 @@ export function RetentionEvolutionCard() {
                   <span
                     key={label}
                     className={`retention-evolution-yoy-pill retention-evolution-yoy-pill--${yoy.direction}`}
-                    title={`${label}: ${metricLabel} ${words} the same month last year`}
+                    title={`${label}: continuity ${words} the same month last year`}
                   >
                     <span className="retention-evolution-yoy-pill-band">{label}</span>
                     <span className="retention-evolution-yoy-pill-delta">
@@ -260,22 +260,6 @@ export function RetentionEvolutionCard() {
               </button>
             </div>
           )}
-          <div className="segmented-toggle" role="group" aria-label="Churn or retention">
-            <button
-              type="button"
-              className={`segmented-toggle-btn${metric === 'churn' ? ' is-active' : ''}`}
-              onClick={() => setMetric('churn')}
-            >
-              Churn
-            </button>
-            <button
-              type="button"
-              className={`segmented-toggle-btn${metric === 'retention' ? ' is-active' : ''}`}
-              onClick={() => setMetric('retention')}
-            >
-              Retention
-            </button>
-          </div>
           <div className="retention-evolution-timeframe">
             <PeriodDropdown
               value={timeframe}
@@ -308,7 +292,6 @@ export function RetentionEvolutionCard() {
           <>
             <RetentionEvolutionChart
               points={view.points}
-              metric={metric}
               youth={overlay?.youth}
               adults={overlay?.adults}
             />
