@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  MISSING_BASE_REASON,
   STUDENT_MOVEMENT_METRIC_KEYS,
   baseLine,
   buildStudentMovement,
@@ -195,8 +194,20 @@ describe('buildStudentMovement — base and estimated churn', () => {
   it('missing base → churn is null (never 0) and the reason line is shown', () => {
     const month = buildStudentMovement(LIVE_ROWS, NOW_OCT_24).current!;
     expect(month.estimatedChurn).toBeNull();
-    expect(baseLine(month)).toEqual({ text: MISSING_BASE_REASON, hasBase: false });
+    expect(baseLine(month)).toEqual({ text: 'No student count for August', hasBase: false });
     expect(formatEstimatedChurn(month.estimatedChurn)).toBe('—');
+  });
+
+  it('does not substitute an older count when the intervening month is missing', () => {
+    const month = buildStudentMovement([
+      row('2026-07', 'active_students', 260, BACKFILL, '2026-07-28'),
+      ...counts('2026-09', WEEKLY, 24, 6, 21),
+    ], NOW_OCT_24).current!;
+    expect(month.base).toBeNull();
+    expect(month.estimatedChurn).toBeNull();
+    expect(baseLine(month).text).toBe('No student count for August');
+
+    expect(baseLine({ ...month, month: '2026-01' }).text).toBe('No student count for December');
   });
 
   it('a zero or negative base is not a base', () => {

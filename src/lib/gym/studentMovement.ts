@@ -59,8 +59,6 @@ const GYM_TIME_ZONE = 'America/New_York';
 // Reporting month + the 12 before it, so the latest month always has a same-month-last-year partner.
 const DEFAULT_MAX_MONTHS = 13;
 
-export const MISSING_BASE_REASON = 'No student count before this month';
-
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const KEY_SET: ReadonlySet<string> = new Set(STUDENT_MOVEMENT_METRIC_KEYS);
@@ -207,7 +205,7 @@ export function formatCount(value: number | null): string {
 
 // 'Base: 265 students as of Sep 28', or the short reason there is none.
 export function baseLine(m: StudentMovementMonth): { text: string; hasBase: boolean } {
-  if (m.base === null) return { text: MISSING_BASE_REASON, hasBase: false };
+  if (m.base === null) return { text: `No student count for ${monthNameLong(shiftMonth(m.month, -1))}`, hasBase: false };
   const when = m.baseAsOf ? `as of ${formatCensusDate(m.baseAsOf)}` : `(${monthNameLong(shiftMonth(m.month, -1))} count)`;
   return { text: `Base: ${m.base.toLocaleString('en-US')} students ${when}`, hasBase: true };
 }

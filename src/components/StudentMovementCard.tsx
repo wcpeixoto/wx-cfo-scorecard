@@ -67,7 +67,10 @@ function EarlierMonths({ months }: { months: StudentMovementMonth[] }) {
                 <td>{formatCount(m.newStudents)}</td>
                 <td>{formatCount(m.rejoins)}</td>
                 <td>{formatCount(m.cancellations)}</td>
-                <td>{formatEstimatedChurn(m.estimatedChurn)}</td>
+                <td>
+                  {formatEstimatedChurn(m.estimatedChurn)}
+                  <div className="student-movement-tile-context">{baseLine(m).text}</div>
+                </td>
               </tr>
             ))}
           </tbody>

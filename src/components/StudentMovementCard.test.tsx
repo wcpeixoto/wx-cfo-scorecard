@@ -44,7 +44,7 @@ describe('StudentMovementCardView', () => {
     expect(t).toContain('ADHARPY');
 
     // Headline tiles, in order.
-    expect(t).toMatch(/New students 24 .*Returned 6 .*Cancelled 21 .*Estimated churn — .*No student count before this month/);
+    expect(t).toMatch(/New students 24 .*Returned 6 .*Cancelled 21 .*Estimated churn — .*No student count for August/);
 
     // Earlier months: August on its own labelled row, with its own numbers.
     expect(html).toContain('<th scope="row">August 2026</th>');
@@ -80,6 +80,17 @@ describe('StudentMovementCardView', () => {
     const t = text(render(ready(rows, '2026-11-02T16:00:00Z')));
     expect(t).toMatch(/New students 19 .*Returned 3 .*Cancelled 18 .*Estimated churn 6\.8% .*Base: 265 students as of Sep 28/);
     expect(t).not.toContain('data not available yet');
+  });
+
+  it('keeps the dated base beside churn when October moves into history', () => {
+    const rows = [
+      ...LIVE_ROWS.filter((r) => r.periodMonth !== '2026-10'),
+      ...counts('2026-10', '2026-11-01T15:07:00Z', 19, 3, 18),
+    ];
+    const html = render(ready(rows, '2026-12-02T16:00:00Z'));
+    const octoberRow = html.match(/<tr><th scope="row">October 2026<\/th>(.*?)<\/tr>/)?.[1];
+    expect(octoberRow).toBeDefined();
+    expect(text(octoberRow!)).toContain('19 3 18 6.8% Base: 265 students as of Sep 28');
   });
 
   it('read failure and loading keep the reporting-month label and invent no numbers', () => {
