@@ -13690,8 +13690,8 @@ body {
   font-weight: 500;
   color: var(--text-primary);
 }
-/* Watch hero row — Silent Churn (1/3) + Churn chart (2/3), side by side. */
-/* WATCH top row — Attendance Health (1/3) in line with the Churn chart (2/3).
+/* Watch hero row — Attendance Health (1/3) + Membership continuity chart (2/3), side by side. */
+/* WATCH top row — Attendance Health (1/3) in line with the Membership continuity chart (2/3).
    The wrapper is the grid item (spans full width); its two cards are flex
    children in a 1 : 2 ratio. Stacks to one column on narrow viewports. */
 .retention-hero-split {
@@ -13707,7 +13707,7 @@ body {
   flex: 1 1 0; /* Attendance Health — 1/3 */
 }
 .retention-hero-split > :nth-child(2) {
-  flex: 2 1 0; /* Churn chart — 2/3 */
+  flex: 2 1 0; /* Membership continuity chart — 2/3 */
 }
 @media (max-width: 900px) {
   .retention-hero-split {
@@ -13832,4 +13832,177 @@ body {
   margin: 16px 0;
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+/* ── Student movement card (Retention page, full width) ──────────────────────
+   Card outer stays the locked white .card surface (UI_CARDS); only inner content is styled here.
+   Title role: this card's primary content is metric values >= 24px, so the title is the KPI label
+   title (16 / 600 / #344054, UI_RULES Part 1 "Card title roles"), not the 18px standard title.
+   Tiles are a summary-tile cluster (fixed 16px gap); the Earlier-months table follows the Data
+   Table Pattern (Projection Table V2): full width, all left-aligned, 12px 16px cells. */
+.student-movement-card .gym-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.student-movement-heading {
+  min-width: 0;
+}
+.student-movement-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  line-height: 24px;
+  color: #344054;
+}
+.student-movement-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+.student-movement-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg-muted);
+}
+.student-movement-tile-label {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  color: #344054;
+}
+.student-movement-tile-value {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 32px;
+  color: #1D2939;
+}
+.student-movement-tile-context {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  color: #667085;
+}
+.student-movement-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-secondary);
+}
+.student-movement-earlier {
+  margin-top: 24px;
+}
+.student-movement-earlier-title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  color: #344054;
+}
+.student-movement-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.student-movement-table {
+  width: 100%;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+.student-movement-table th,
+.student-movement-table td {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 14px;
+  line-height: 20px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--bg-muted);
+}
+.student-movement-table thead th {
+  background: #F9FAFB;
+  font-weight: 600;
+  color: #1D2939;
+  border-top: 1px solid var(--bg-muted);
+}
+.student-movement-table tbody th {
+  font-weight: 500;
+  color: #1D2939;
+}
+.student-movement-table tbody td {
+  font-weight: 400;
+  color: #1D2939;
+}
+.student-movement-table tbody tr:last-child th,
+.student-movement-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.student-movement-earlier-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: #667085;
+}
+.student-movement-footnote {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 18px;
+  color: #667085;
+}
+@media (max-width: 900px) {
+  .student-movement-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* The churn tile carries the base line — give it the full row so that line doesn't wrap to a sliver. */
+  .student-movement-tile:last-child {
+    grid-column: 1 / -1;
+  }
+}
+/* Dark mode: the app has no theme toggle today and the shared .card shell has no dark variant, so the
+   shell is darkened here too — otherwise light text would land on a white card if .dark is ever applied. */
+.dark .student-movement-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: #1D2939;
+}
+.dark .student-movement-title,
+.dark .student-movement-tile-value,
+.dark .student-movement-earlier-title,
+.dark .student-movement-table thead th,
+.dark .student-movement-table tbody th,
+.dark .student-movement-table tbody td {
+  color: rgba(255, 255, 255, 0.9);
+}
+.dark .student-movement-card .gym-card-subtitle,
+.dark .student-movement-message,
+.dark .student-movement-tile-label,
+.dark .student-movement-tile-context,
+.dark .student-movement-earlier-note,
+.dark .student-movement-footnote {
+  color: #98A2B3;
+}
+.dark .student-movement-tile {
+  background: #1D2939;
+}
+.dark .student-movement-table th,
+.dark .student-movement-table td,
+.dark .student-movement-table thead th {
+  border-color: #1D2939;
+}
+.dark .student-movement-table thead th {
+  background: rgba(255, 255, 255, 0.03);
+}
+.dark .student-movement-footnote {
+  border-top-color: #1D2939;
+}
+.dark .student-movement-card .card-status-badge.is-neutral {
+  color: #98A2B3;
+  background: rgba(255, 255, 255, 0.06);
 }
