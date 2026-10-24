@@ -1,5 +1,6 @@
 -- Post-apply check for supabase/migrations/20261024150000_wodify_monthly_metrics_anon_read.sql.
--- Run AFTER the migration is applied (SQL Editor, or psql as a privileged role).
+-- Run AFTER the migration is applied, as the `postgres` role (Supabase SQL Editor, or psql). It needs
+-- to see every role's grants in information_schema and to `set local role anon`.
 --
 -- Read-only in effect: everything runs inside one transaction that is rolled back, and the
 -- write probes are expected to be DENIED before they touch a row. If a probe unexpectedly
@@ -21,7 +22,7 @@ begin
   if exists (
     select 1 from information_schema.role_table_grants
     where table_schema = 'public' and table_name = 'wodify_monthly_metrics'
-      and grantee in ('authenticated', 'public')
+      and grantee in ('authenticated', 'PUBLIC') -- information_schema reports the public grantee in caps
   ) then
     raise exception 'authenticated/public must hold no privilege on wodify_monthly_metrics';
   end if;
