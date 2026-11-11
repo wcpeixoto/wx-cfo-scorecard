@@ -34,6 +34,8 @@ export const MULTIPLE_FLOOR = 1.5;
 export const MULTIPLE_CEILING = 3.0;
 export const DISPLAY_BUFFER = 0.25;
 export const DEFAULT_REPLACEMENT_COST = 60_000;
+// Lease runway: months secured (incl. renewal years) needed to grade Strong.
+export const LEASE_STRONG_MONTHS = 48;
 
 export type ValuationDriverKey =
   | 'recurringRevenue'
@@ -326,7 +328,7 @@ export function parseLocalDate(iso: string | null): Date | null {
 }
 
 // Integer months from `from` to `to`. Negative when `to` is before `from`.
-// Floors on partial months (matches "60+ months secured" spec semantics).
+// Floors on partial months (matches "48+ months secured" spec semantics).
 export function monthsBetween(from: Date, to: Date): number {
   const years = to.getFullYear() - from.getFullYear();
   const months = to.getMonth() - from.getMonth();
@@ -336,8 +338,10 @@ export function monthsBetween(from: Date, to: Date): number {
 }
 
 // Lease grading per spec:
-//   Strong : 60+ months secured (incl. renewal years)
-//   Mixed  : 24–59 months secured
+//   Strong : 48+ months secured (incl. renewal years). Lowered from 60 so a
+//            freshly signed 5-year term grades Strong for its first year
+//            instead of only its first day.
+//   Mixed  : 24–47 months secured
 //   Weak   : <24 months  OR  end date past with no renewal
 //   Not tracked : no usable lease data (specifically: end date missing —
 //                 without it we cannot grade)
@@ -360,7 +364,7 @@ export function gradeLeaseRunway(
   if (baseMonths < 0 && renewalMonths === 0) return 'weak';
 
   const totalMonths = baseMonths + renewalMonths;
-  if (totalMonths >= 60) return 'strong';
+  if (totalMonths >= LEASE_STRONG_MONTHS) return 'strong';
   if (totalMonths >= 24) return 'mixed';
   return 'weak';
 }

@@ -304,30 +304,52 @@ describe('gradeLeaseRunway', () => {
     ).toBe('not_tracked');
   });
 
-  it('returns "strong" for 60+ months base secured', () => {
+  it('returns "strong" for 48+ months base secured', () => {
     expect(
       gradeLeaseRunway(REF_DATE, {
         startDate: null,
-        endDate: '2031-05-27', // exactly 60 months from REF_DATE
+        endDate: '2031-05-27', // 60 months from REF_DATE
         renewalOption: null,
         renewalYears: null,
       })
     ).toBe('strong');
   });
 
-  it('returns "strong" when base + renewal years ≥ 60', () => {
-    // 36 base + 24 renewal months = 60 → Strong
+  it('returns "strong" at exactly 48 months (threshold boundary)', () => {
+    expect(
+      gradeLeaseRunway(REF_DATE, {
+        startDate: null,
+        endDate: '2030-05-27', // exactly 48 months from REF_DATE
+        renewalOption: null,
+        renewalYears: null,
+      })
+    ).toBe('strong');
+  });
+
+  it('returns "mixed" at 47 months (one below the Strong threshold)', () => {
+    expect(
+      gradeLeaseRunway(REF_DATE, {
+        startDate: null,
+        endDate: '2030-05-26', // 47 months (partial month floors)
+        renewalOption: null,
+        renewalYears: null,
+      })
+    ).toBe('mixed');
+  });
+
+  it('returns "strong" when base + renewal years ≥ 48', () => {
+    // 36 base + 12 renewal months = 48 → Strong
     expect(
       gradeLeaseRunway(REF_DATE, {
         startDate: null,
         endDate: '2029-05-27', // 36 months from REF_DATE
         renewalOption: true,
-        renewalYears: 2, // +24 months
+        renewalYears: 1, // +12 months
       })
     ).toBe('strong');
   });
 
-  it('returns "mixed" for 24–59 months secured', () => {
+  it('returns "mixed" for 24–47 months secured', () => {
     expect(
       gradeLeaseRunway(REF_DATE, {
         startDate: null,
